@@ -1,0 +1,75 @@
+{% comment %}
+    NotificationItem (FR-NOTIF-03). Шесть типов: comment | like | new_chapter
+    | follower | moderation | contest. Непрочитанные подсвечены акцентом.
+
+    Параметры:
+      n — Notification (kind, when, actor, story, text, read)
+{% endcomment %}
+<article class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-4
+                {% if not n.read %}bg-slate-50/60 ring-1 ring-brand/15{% endif %}">
+
+    {# ── Иконка по типу события ── #}
+    <span class="grid h-9 w-9 shrink-0 place-items-center rounded-pill
+        {% if n.kind == 'comment' %}bg-status-info-bg text-status-info-fg
+        {% elif n.kind == 'like' %}bg-status-error-bg text-status-error-fg
+        {% elif n.kind == 'new_chapter' %}bg-status-published-bg text-status-published-fg
+        {% elif n.kind == 'follower' %}bg-slate-100 text-slate-700
+        {% elif n.kind == 'moderation' %}bg-status-attention-bg text-status-attention-fg
+        {% elif n.kind == 'contest' %}bg-status-warning-bg text-status-warning-fg
+        {% else %}bg-slate-100 text-slate-500{% endif %}">
+        {% if n.kind == 'comment' %}
+            {% include "components/icon.html" with name="message-caption" size=16 %}
+        {% elif n.kind == 'like' %}
+            {% include "components/icon.html" with name="heart-filled" size=16 %}
+        {% elif n.kind == 'new_chapter' %}
+            {% include "components/icon.html" with name="book" size=16 %}
+        {% elif n.kind == 'follower' %}
+            {% include "components/icon.html" with name="user-circle" size=18 %}
+        {% elif n.kind == 'moderation' %}
+            {% include "components/icon.html" with name="check" size=16 %}
+        {% elif n.kind == 'contest' %}
+            {% include "components/icon.html" with name="bookmark-filled" size=16 %}
+        {% endif %}
+    </span>
+
+    {# ── Контент ── #}
+    <div class="min-w-0 flex-1">
+        <p class="font-sans text-sm leading-snug text-slate-900">
+            {% if n.kind == 'comment' and n.actor and n.story %}
+                <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.name }}</a>
+                <span class="text-slate-700">«{{ n.story.title }}» туындысына пікір қалдырды.</span>
+            {% elif n.kind == 'like' and n.actor and n.story %}
+                <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.name }}</a>
+                <span class="text-slate-700">«<a href="{% url 'core:story_detail' slug=n.story.slug %}" class="font-semibold hover:text-brand">{{ n.story.title }}</a>» туындысын ұнатты.</span>
+            {% elif n.kind == 'new_chapter' and n.story %}
+                <a href="{% url 'core:story_detail' slug=n.story.slug %}" class="font-bold hover:text-brand">{{ n.story.title }}</a>
+                <span class="text-slate-700">— жаңа бөлім қосылды.</span>
+            {% elif n.kind == 'follower' and n.actor %}
+                <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.name }}</a>
+                <span class="text-slate-700">сізге жазылды.</span>
+            {% elif n.kind == 'moderation' %}
+                <span class="font-bold">Модерация:</span>
+                <span class="text-slate-700">{{ n.text }}</span>
+            {% elif n.kind == 'contest' %}
+                <span class="font-bold">Байқау:</span>
+                <span class="text-slate-700">{{ n.text }}</span>
+            {% else %}
+                <span class="text-slate-700">{{ n.text }}</span>
+            {% endif %}
+        </p>
+
+        {# Текст-выдержка (для comment) #}
+        {% if n.kind == 'comment' and n.text %}
+            <p class="mt-1.5 line-clamp-2 rounded-md bg-slate-50 px-3 py-2 font-sans text-xs leading-snug text-slate-700">
+                «{{ n.text }}»
+            </p>
+        {% endif %}
+
+        <p class="mt-1 font-sans text-xs text-slate-500">{{ n.when }}</p>
+    </div>
+
+    {% if not n.read %}
+        <span aria-label="оқылмаған"
+              class="mt-1 h-2 w-2 shrink-0 rounded-pill bg-notif"></span>
+    {% endif %}
+</article>

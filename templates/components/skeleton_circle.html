@@ -1,0 +1,11 @@
+{% comment %}
+    Skeleton circle — для аватаров и круглых иконок-плейсхолдеров.
+
+    Параметры:
+      size — px (default 40)
+{% endcomment %}
+{% with s=size|default:40 %}
+<span aria-hidden="true"
+      class="inline-block animate-pulse rounded-pill bg-slate-200"
+      style="width:{{ s }}px;height:{{ s }}px"></span>
+{% endwith %}

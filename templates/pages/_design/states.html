@@ -1,0 +1,179 @@
+{% extends 'base.html' %}
+
+{% block title %}States · _design — Balaproza{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-14">
+
+    <header class="border-b border-slate-200 pb-6">
+        <p class="font-display text-[11px] font-bold uppercase tracking-[0.14em] text-brand">_design / states</p>
+        <h1 class="mt-1 font-display text-3xl font-bold text-slate-900">Состояния экранов (DEC-17)</h1>
+        <p class="mt-2 max-w-prose font-sans text-sm text-slate-600">
+            Skeleton (loading) · Error · Empty · Content. Каждый блок показывает три состояния side-by-side.
+            На «живых» страницах состояния доступны через <code class="rounded bg-slate-100 px-1 py-0.5 text-xs">?state=loading</code> / <code class="rounded bg-slate-100 px-1 py-0.5 text-xs">?state=error</code> —
+            проверить можно на <a href="{% url 'core:home' %}?state=loading" class="font-semibold text-brand hover:underline">home</a>,
+            <a href="{% url 'core:library' %}?state=loading" class="font-semibold text-brand hover:underline">library</a>,
+            <a href="{% url 'core:notifications' %}?state=loading" class="font-semibold text-brand hover:underline">notifications</a>,
+            <a href="{% url 'core:my_stories' %}?state=loading" class="font-semibold text-brand hover:underline">my_stories</a>.
+        </p>
+    </header>
+
+    {# ── Skeleton primitives ── #}
+    <section>
+        <h2 class="mb-4 font-display text-lg font-bold text-slate-900">Skeleton primitives</h2>
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
+            <div class="rounded-lg border border-slate-200 bg-white p-5">
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">skeleton_box</p>
+                {% include "components/skeleton_box.html" with h="h-12" radius="lg" %}
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-5">
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">skeleton_text</p>
+                {% include "components/skeleton_text.html" with lines=3 %}
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-5">
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">skeleton_circle</p>
+                <div class="flex items-center gap-4">
+                    {% include "components/skeleton_circle.html" with size=32 %}
+                    {% include "components/skeleton_circle.html" with size=48 %}
+                    {% include "components/skeleton_circle.html" with size=72 %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {# ── BookCardSmall ── #}
+    <section>
+        <h2 class="mb-4 font-display text-lg font-bold text-slate-900">BookCardSmall</h2>
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div>
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Loading</p>
+                <div class="grid grid-cols-3 gap-3">
+                    {% include "components/skeleton_book_card_small.html" %}
+                    {% include "components/skeleton_book_card_small.html" %}
+                    {% include "components/skeleton_book_card_small.html" %}
+                </div>
+            </div>
+            <div>
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Content</p>
+                <div class="grid grid-cols-3 gap-3">
+                    {% include "components/book_card_small.html" with story=sample_story %}
+                    {% include "components/book_card_small.html" with story=sample_story %}
+                    {% include "components/book_card_small.html" with story=sample_story %}
+                </div>
+            </div>
+            <div>
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Empty</p>
+                {% include "components/empty_state.html" with icon="book" title="Нічего не знайдено" text="Жанр бойынша шығарма табылмады." %}
+            </div>
+        </div>
+    </section>
+
+    {# ── BookCardWide ── #}
+    <section>
+        <h2 class="mb-4 font-display text-lg font-bold text-slate-900">DeskBookCardWide</h2>
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div>
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Loading</p>
+                <div class="flex flex-col gap-3">
+                    {% include "components/skeleton_book_card_wide.html" %}
+                    {% include "components/skeleton_book_card_wide.html" %}
+                </div>
+            </div>
+            <div>
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Content</p>
+                <div class="flex flex-col gap-3">
+                    {% include "components/book_card_wide.html" with story=sample_story description="Қысқа аннотация үшін орын — әдетте 3-4 жол." status_key="Published" %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {# ── My story row / Library row ── #}
+    <section>
+        <h2 class="mb-4 font-display text-lg font-bold text-slate-900">Row (MyStory / Library)</h2>
+        <div class="flex flex-col gap-6">
+            <div>
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Loading</p>
+                <div class="flex flex-col gap-3">
+                    {% include "components/skeleton_my_story_row.html" %}
+                    {% include "components/skeleton_my_story_row.html" %}
+                </div>
+            </div>
+            <div>
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Content</p>
+                {% include "components/library_row.html" with entry=sample_entry %}
+            </div>
+        </div>
+    </section>
+
+    {# ── Notifications ── #}
+    <section>
+        <h2 class="mb-4 font-display text-lg font-bold text-slate-900">Notification</h2>
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div>
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Loading</p>
+                <div class="flex flex-col gap-3">
+                    {% include "components/skeleton_notification_item.html" %}
+                    {% include "components/skeleton_notification_item.html" %}
+                    {% include "components/skeleton_notification_item.html" %}
+                </div>
+            </div>
+            <div>
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Content</p>
+                {% include "components/notification_item.html" with n=sample_notif %}
+            </div>
+            <div>
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Empty</p>
+                {% include "components/empty_state.html" with icon="bell" title="Әзірге хабарлама жоқ" text="Жаңа хабарламалар осында пайда болады." %}
+            </div>
+        </div>
+    </section>
+
+    {# ── Comment ── #}
+    <section>
+        <h2 class="mb-4 font-display text-lg font-bold text-slate-900">Comment</h2>
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div>
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Loading</p>
+                <div class="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-5">
+                    {% include "components/skeleton_comment.html" %}
+                    {% include "components/skeleton_comment.html" %}
+                </div>
+            </div>
+            <div>
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Content</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-5">
+                    {% include "components/comment.html" with c=sample_comment %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {# ── Chapter text (reading) ── #}
+    <section>
+        <h2 class="mb-4 font-display text-lg font-bold text-slate-900">Chapter body (reading mode)</h2>
+        <div class="rounded-lg border border-slate-200 bg-white p-6">
+            <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Loading</p>
+            {% include "components/skeleton_chapter_text.html" %}
+        </div>
+    </section>
+
+    {# ── Error state — два варианта ── #}
+    <section>
+        <h2 class="mb-4 font-display text-lg font-bold text-slate-900">ErrorState (DEC-17)</h2>
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div>
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Default (block)</p>
+                {% include "components/error_state.html" %}
+            </div>
+            <div>
+                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Compact (inline)</p>
+                {% include "components/error_state.html" with compact=True message="Бөлік деректері қолжетімсіз." %}
+            </div>
+        </div>
+    </section>
+
+</div>
+{% endblock %}
+
+{% block right_rail %}{% endblock %}

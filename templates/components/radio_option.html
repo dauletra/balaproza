@@ -1,0 +1,23 @@
+{% comment %}
+    RadioOption (docs/04.5). Радио-кнопка с подписью.
+    Выбранный — 5px бирюзовая «рамка» (двойной круг).
+
+    Параметры:
+      name      — общий name группы
+      value     — value атрибута
+      label     — подпись
+      checked   — boolean
+      disabled  — boolean
+      id        — кастомный id (опц., иначе name-value)
+{% endcomment %}
+{% with rid=id|default:name|add:"-"|add:value %}
+<label for="{{ rid }}" class="inline-flex items-center gap-2.5 {% if disabled %}cursor-not-allowed opacity-50{% else %}cursor-pointer{% endif %}">
+    <input id="{{ rid }}" type="radio" name="{{ name }}" value="{{ value }}"
+           {% if checked %}checked{% endif %}{% if disabled %} disabled{% endif %}
+           class="peer sr-only">
+    <span aria-hidden="true"
+          class="grid h-5 w-5 shrink-0 place-items-center rounded-pill border-2 border-slate-300 bg-white
+                 peer-checked:border-[5px] peer-checked:border-brand peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40 peer-focus-visible:ring-offset-2"></span>
+    <span class="font-sans text-sm text-slate-900">{{ label }}</span>
+</label>
+{% endwith %}

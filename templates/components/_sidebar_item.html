@@ -1,0 +1,38 @@
+{% comment %}
+    Пункт сайдбара. Подразумевается включение только из partials/sidebar.html.
+
+    Параметры:
+      key       — короткий ключ (home/library/…) для сравнения с nav_active
+      icon      — имя иконки из спрайта
+      label     — подпись
+      href_name — name URL-маршрута для {% url %}
+      active    — текущее значение nav_active
+      badge     — число для красного бейджа (опц.)
+{% endcomment %}
+{% with on=key|stringformat:"s" %}
+{% if on == active %}
+    <a href="{% url href_name %}" aria-current="page"
+       class="flex items-center gap-3 font-sans text-sm font-bold text-brand">
+        {% include "components/icon.html" with name=icon size=20 cls="text-brand" %}
+        <span>{{ label }}</span>
+        {% if badge %}
+            <span aria-hidden="true"
+                  class="ml-auto inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-pill bg-notif px-1.5 font-sans text-[11px] font-bold text-notif-fg">
+                {{ badge }}
+            </span>
+        {% endif %}
+    </a>
+{% else %}
+    <a href="{% url href_name %}"
+       class="flex items-center gap-3 font-sans text-sm text-slate-900 hover:text-brand">
+        {% include "components/icon.html" with name=icon size=20 cls="text-slate-800" %}
+        <span>{{ label }}</span>
+        {% if badge %}
+            <span aria-hidden="true"
+                  class="ml-auto inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-pill bg-notif px-1.5 font-sans text-[11px] font-bold text-notif-fg">
+                {{ badge }}
+            </span>
+        {% endif %}
+    </a>
+{% endif %}
+{% endwith %}

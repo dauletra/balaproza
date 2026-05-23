@@ -1,0 +1,18 @@
+{% load static %}
+{% comment %}
+    Logo · brand mark.
+
+    Параметры:
+      subtitle — "Балалар әдеби порталы" под названием (default: true).
+                 Передавай subtitle=False для компактных мест.
+      link     — оборачивать ли в <a href="…"> на главную (default: true).
+{% endcomment %}
+{% if link|default:True %}<a href="{% url 'core:home' %}" class="inline-flex items-center gap-2.5 focus-visible:outline-brand">{% endif %}
+    <img src="{% static 'img/logo.png' %}" alt="" class="block h-9 w-9 shrink-0">
+    <span class="flex flex-col gap-px leading-none">
+        <span class="font-display text-2xl font-bold leading-none text-slate-800">Balaproza</span>
+        {% if subtitle|default:True %}
+            <span class="font-display text-[10px] leading-none text-slate-600">Балалар әдеби порталы</span>
+        {% endif %}
+    </span>
+{% if link|default:True %}</a>{% endif %}

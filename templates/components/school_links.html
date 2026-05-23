@@ -1,0 +1,87 @@
+{% comment %}
+    SchoolLinks (FR-LINKS-01..06) — блок внешних ссылок «Авторлар мектебі».
+    Все ссылки открываются в новой вкладке с rel=noopener (FR-LINKS-03).
+
+    Параметры:
+      links    — list[SchoolLink] (channel, title, subtitle, url)
+      layout   — 'list' (default · вертикальный список, для рейла)
+                 | 'grid' (карточки 2×N, для catalog/home)
+                 | 'inline' (inline-icons, для footer)
+      heading  — заголовок секции (опц.; не выводится для inline)
+      hint     — подсказка под заголовком (опц.)
+{% endcomment %}
+{% with lay=layout|default:"list" %}
+
+{% if lay == "inline" %}
+    {# Компактная inline-горизонталь для footer (только иконки + название) #}
+    <ul class="flex flex-wrap items-center gap-x-4 gap-y-2" aria-label="Авторлар мектебі">
+        {% for l in links %}
+            <li>
+                <a href="{{ l.url }}" target="_blank" rel="noopener noreferrer"
+                   class="inline-flex items-center gap-1.5 font-sans text-xs text-slate-700 hover:text-brand">
+                    {% include "components/icon.html" with name=l.channel size=14 %}
+                    <span>{{ l.title }}</span>
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+
+{% elif lay == "grid" %}
+    {# Карточная решётка для контентных страниц (home, catalog) #}
+    <section class="rounded-hero border border-slate-200 bg-white p-6 sm:p-8">
+        {% if heading %}
+            <h2 class="font-display text-lg font-bold text-slate-900">{{ heading }}</h2>
+        {% endif %}
+        {% if hint %}
+            <p class="mt-1.5 font-sans text-sm text-slate-600">{{ hint }}</p>
+        {% endif %}
+        <ul class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {% for l in links %}
+                <li>
+                    <a href="{{ l.url }}" target="_blank" rel="noopener noreferrer"
+                       class="group flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/40 p-4 transition-colors hover:bg-slate-50 hover:border-brand/30">
+                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-white text-slate-700 ring-1 ring-slate-200">
+                            {% include "components/icon.html" with name=l.channel size=20 %}
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <div class="font-sans text-sm font-bold text-slate-900 group-hover:text-brand">{{ l.title }}</div>
+                            <div class="truncate font-sans text-xs text-slate-500">{{ l.subtitle }}</div>
+                        </div>
+                        <span class="text-slate-400 group-hover:text-brand" aria-hidden="true">
+                            {% include "components/icon.html" with name="arrow-right" size=14 %}
+                        </span>
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+
+{% else %}
+    {# 'list' — компактный вертикальный список для правого рейла #}
+    <section class="rounded-lg border border-slate-200 bg-white p-5">
+        {% if heading %}
+            <h3 class="mb-3 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                {{ heading }}
+            </h3>
+        {% endif %}
+        {% if hint %}
+            <p class="mb-4 font-sans text-xs leading-[1.5] text-slate-600">{{ hint }}</p>
+        {% endif %}
+        <ul class="flex flex-col gap-3">
+            {% for l in links %}
+                <li>
+                    <a href="{{ l.url }}" target="_blank" rel="noopener noreferrer"
+                       class="group flex items-center gap-3 hover:text-brand">
+                        {% include "components/icon.html" with name=l.channel size=20 %}
+                        <div class="min-w-0 flex-1">
+                            <div class="font-sans text-sm text-slate-900 group-hover:text-brand">{{ l.title }}</div>
+                            <div class="truncate font-sans text-xs text-slate-500">{{ l.subtitle }}</div>
+                        </div>
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+{% endif %}
+
+{% endwith %}

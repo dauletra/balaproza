@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block title %}Балалар әдеби порталы — Balaproza{% endblock %}
+
+{% block content %}
+    <div class="flex flex-col gap-14">
+
+        {# ── HERO: ветвление гость / возвращающийся (FR-HOME-01) ── #}
+        {% if signed_in and progress %}
+            {% include "partials/home/hero_returning.html" %}
+        {% else %}
+            {% include "partials/home/hero_guest.html" %}
+        {% endif %}
+
+        {% if page_state == 'loading' %}
+            {# ── Скелетон: жанры (плашки) + один ряд карточек ── #}
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {% for _ in '12345678'|make_list %}
+                    {% include "components/skeleton_box.html" with h="h-14" radius="lg" %}
+                {% endfor %}
+            </div>
+            <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                {% for _ in '123456'|make_list %}
+                    {% include "components/skeleton_book_card_small.html" %}
+                {% endfor %}
+            </div>
+        {% elif page_state == 'error' %}
+            {% include "components/error_state.html" with message="Басты бет контентін жүктеу мүмкін болмады." %}
+        {% else %}
+            {# ── Жанры (FR-HOME-05) ── #}
+            {% include "partials/home/genre_grid.html" %}
+
+            {# ── Кітап аптасы (FR-HOME-03) ── #}
+            {% include "partials/home/book_of_week.html" %}
+
+            {# ── Ряд 1: Ең көп оқылған (FR-HOME-04) ── #}
+            {% include "partials/home/book_row.html" with title="Ең көп оқылған кітаптар" books=top_stories %}
+
+            {# ── Жинақтар (FR-HOME-06) ── #}
+            {% include "partials/home/collections.html" %}
+
+            {# ── Ряд 2: Жаңа жарияланған — с eyebrow, чтобы визуально отличался от ряда 1 ── #}
+            {% include "partials/home/book_row.html" with title="Жаңа жарияланған шығармалар" eyebrow="апта ішінде" books=fresh_stories %}
+        {% endif %}
+
+        {# ── Жаңа авторлар (FR-HOME-07) ── #}
+        {% include "partials/home/new_authors.html" %}
+
+        {# ── Авторлар мектебі (FR-LINKS — grid-вариант для главной) ── #}
+        {% if school_links %}
+            {% include "components/school_links.html" with links=school_links layout="grid" heading="Авторлар мектебі" hint="Вебинарлар, интервью, кеңестер — сыртқы арналарда. Сайт ішінде ойнатылмайды (FR-LINKS-03)." %}
+        {% endif %}
+
+        {# ── CTA «Стань автором» (FR-HOME-08) ── #}
+        {% include "partials/home/become_author.html" %}
+    </div>
+{% endblock %}
+
+{% block right_rail %}
+    {% include "partials/right_rail/home.html" %}
+{% endblock %}

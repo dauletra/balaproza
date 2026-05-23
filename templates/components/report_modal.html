@@ -1,0 +1,79 @@
+{% comment %}
+    ReportModal (docs/04.8 + FR-STORY-09). Жалоба на контент.
+    Триггер: $dispatch('open-report', { target: 'X' })
+{% endcomment %}
+<div x-data="{ open: false, target: '', reason: '', comment: '' }"
+     @open-report.window="open = true; target = $event.detail?.target || ''"
+     @close-report.window="open = false"
+     @keydown.escape.window="open = false"
+     x-show="open" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
+
+    <div x-show="open" x-transition.opacity
+         class="absolute inset-0 bg-slate-900/60" @click="open = false"></div>
+
+    <div x-show="open"
+         x-transition:enter="ease-out duration-200"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         class="relative w-full max-w-md rounded-hero bg-white p-7 shadow-modal sm:p-9">
+
+        <button type="button" @click="open = false" aria-label="Жабу"
+                class="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-pill text-slate-500 hover:bg-slate-100">
+            {% include "components/icon.html" with name="x" size=18 %}
+        </button>
+
+        <h2 id="report-modal-title" class="font-display text-xl font-bold text-slate-900">
+            Шағым жіберу
+        </h2>
+        <p class="mt-1 font-sans text-sm text-slate-600">
+            Себебін көрсетіңіз. Модератор қарайды.
+        </p>
+
+        <form @submit.prevent="open = false; $dispatch('toast', { kind:'success', text:'Шағымыңыз жіберілді' })"
+              class="mt-5 flex flex-col gap-3">
+            <fieldset class="flex flex-col gap-2.5">
+                <legend class="sr-only">Шағым себебі</legend>
+                <label class="inline-flex items-center gap-2.5 cursor-pointer">
+                    <input type="radio" name="reason" value="spam" x-model="reason" class="peer sr-only">
+                    <span aria-hidden="true" class="grid h-5 w-5 shrink-0 place-items-center rounded-pill border-2 border-slate-300 bg-white peer-checked:border-[5px] peer-checked:border-brand"></span>
+                    <span class="font-sans text-sm text-slate-900">Спам / жарнама</span>
+                </label>
+                <label class="inline-flex items-center gap-2.5 cursor-pointer">
+                    <input type="radio" name="reason" value="copy" x-model="reason" class="peer sr-only">
+                    <span aria-hidden="true" class="grid h-5 w-5 shrink-0 place-items-center rounded-pill border-2 border-slate-300 bg-white peer-checked:border-[5px] peer-checked:border-brand"></span>
+                    <span class="font-sans text-sm text-slate-900">Плагиат / көшірме</span>
+                </label>
+                <label class="inline-flex items-center gap-2.5 cursor-pointer">
+                    <input type="radio" name="reason" value="offensive" x-model="reason" class="peer sr-only">
+                    <span aria-hidden="true" class="grid h-5 w-5 shrink-0 place-items-center rounded-pill border-2 border-slate-300 bg-white peer-checked:border-[5px] peer-checked:border-brand"></span>
+                    <span class="font-sans text-sm text-slate-900">Жараспайтын мазмұн</span>
+                </label>
+                <label class="inline-flex items-center gap-2.5 cursor-pointer">
+                    <input type="radio" name="reason" value="other" x-model="reason" class="peer sr-only">
+                    <span aria-hidden="true" class="grid h-5 w-5 shrink-0 place-items-center rounded-pill border-2 border-slate-300 bg-white peer-checked:border-[5px] peer-checked:border-brand"></span>
+                    <span class="font-sans text-sm text-slate-900">Басқа</span>
+                </label>
+            </fieldset>
+
+            <label class="font-sans text-sm font-semibold text-slate-800">Қосымша түсініктеме</label>
+            <textarea x-model="comment" rows="3" maxlength="500"
+                      class="w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-2.5 font-sans text-sm text-slate-900 placeholder:text-slate-500 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30"
+                      placeholder="Қажет болса, толығырақ жазыңыз"></textarea>
+
+            <div class="mt-2 flex justify-end gap-2.5">
+                <button type="button" @click="open = false"
+                        class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                    Болдырмау
+                </button>
+                <button type="submit"
+                        :disabled="!reason"
+                        :class="!reason ? 'bg-brand/50 cursor-not-allowed' : 'bg-brand hover:bg-brand-dark'"
+                        class="inline-flex h-9 items-center rounded-md px-5 font-sans text-sm font-bold text-white">
+                    Жіберу
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

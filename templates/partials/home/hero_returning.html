@@ -1,0 +1,68 @@
+{% load static %}
+{% comment %}
+    Hero для возвращающегося читателя — большой «Жалғастыру оқу» (FR-HOME-01).
+    Три колонки: обложка · контент · мини-прогресс.
+
+    Контекст: progress (ReadingProgress объект из stub_data)
+{% endcomment %}
+{% with story=progress.story %}
+<section class="overflow-hidden rounded-hero text-white shadow-card-hover"
+         style="background: linear-gradient(135deg, var(--color-slate-900) 0%, var(--color-brand) 100%)">
+    <div class="grid grid-cols-1 md:grid-cols-[260px_1fr] lg:grid-cols-[260px_1fr_220px]">
+
+        {# ── Обложка ── #}
+        <div class="relative min-h-[260px] bg-cover bg-center p-6"
+             style="background-image: linear-gradient(rgba(3,102,114,0.10), rgba(17,25,40,0.50)), url('{% static story.cover %}')"
+             role="img" aria-label="«{{ story.title }}» мұқабасы">
+            <span class="absolute left-4 top-4 inline-flex items-center rounded-chip bg-white/20 px-2.5 py-1 font-display text-[10px] font-bold uppercase tracking-[0.08em] text-white backdrop-blur-sm">
+                сіздің кітабыңыз
+            </span>
+        </div>
+
+        {# ── Контент ── #}
+        <div class="flex flex-col justify-center gap-3.5 px-8 py-8 md:px-9">
+            <div class="font-display text-xs font-semibold uppercase tracking-[0.14em] text-promo-bg">
+                Қайта қош келдіңіз
+            </div>
+            <h1 class="font-sans text-3xl font-bold leading-[1.1] -tracking-[0.01em]">
+                Соңында қалдыңыз: <em class="font-semibold">«{{ story.title }}»</em>
+            </h1>
+            <div class="font-sans text-[13px] text-white/70">
+                {{ story.author.name }} · {{ progress.current_chapter }}-бөлім
+            </div>
+
+            <blockquote class="mt-1 max-w-[480px] rounded-md bg-white/10 px-4 py-3 font-sans text-xs italic leading-[1.55] text-white/80">
+                {{ progress.quote }}
+            </blockquote>
+
+            <div class="mt-1.5 flex items-center gap-3">
+                {% url 'core:story_read_chapter' slug=story.slug chapter=progress.current_chapter as continue_href %}
+                {% include "components/button.html" with kind="primary" label="Жалғастыру" icon="book" href=continue_href %}
+                <span class="font-sans text-xs text-white/60">~ {{ progress.minutes_left }} минут оқу қалды</span>
+            </div>
+        </div>
+
+        {# ── Прогресс ── #}
+        <div class="hidden flex-col justify-center gap-3.5 border-t border-white/10 px-6 py-7 lg:flex lg:border-l lg:border-t-0">
+            <div class="font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">
+                Кітап прогресі
+            </div>
+            <div class="flex items-baseline gap-2">
+                <span class="font-display text-[38px] font-bold leading-none">{{ progress.current_chapter }}</span>
+                <span class="font-sans text-sm text-white/60">/ {{ story.chapters }} бөлім</span>
+            </div>
+
+            {# Прогресс-бар: width в % через style #}
+            {% widthratio progress.current_chapter story.chapters 100 as pct %}
+            <div class="h-1.5 overflow-hidden rounded-pill bg-white/15">
+                <div class="h-full bg-promo-bg" style="width: {{ pct }}%"></div>
+            </div>
+
+            <div class="mt-1.5 border-t border-dashed border-white/20 pt-3 font-sans text-[11px] leading-[1.5] text-white/60">
+                Соңғы оқу:<br>
+                <b class="text-xs text-white">{{ progress.last_read_days }} күн бұрын</b>
+            </div>
+        </div>
+    </div>
+</section>
+{% endwith %}

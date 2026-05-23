@@ -1,0 +1,77 @@
+{% comment %}
+    ChapterLike — крупная кнопка лайка главы (FR-STORY-12).
+
+    Лайк ставится именно на главу, не на произведение целиком. Это даёт
+    автору точечный фидбек: какие главы зацепили, где провал.
+
+    Параметры:
+      likes         — int, текущее число лайков
+      liked         — boolean, лайкнул ли текущий пользователь
+      signed_in     — boolean, для гостя клик ведёт на login
+      login_href    — URL для гостя (default {% url 'core:login' %})
+      theme_aware   — boolean, поддерживает ли родитель Alpine theme='dark'
+                      (true для story_read, false для остальных)
+
+    Локальное состояние Alpine: реактивно toggle'ит liked/likes на клиенте.
+    После Ф14 — реальный submit к /api/chapter/<id>/like.
+{% endcomment %}
+{% with ta=theme_aware|default_if_none:False login_href=login_href|default:'/auth/login/' %}
+<div x-data="{
+        liked: {{ liked|yesno:'true,false' }},
+        count: {{ likes|default:0 }},
+        bursting: false,
+        toggle() {
+            {% if not signed_in %}
+                window.location = '{{ login_href }}?next=' + encodeURIComponent(window.location.pathname);
+                return;
+            {% endif %}
+            this.liked = !this.liked;
+            this.count += this.liked ? 1 : -1;
+            if (this.liked) {
+                this.bursting = true;
+                setTimeout(() => this.bursting = false, 400);
+                this.$dispatch('toast', { kind: 'success', text: 'Алғыс үшін рахмет!' });
+            }
+        }
+     }"
+     class="my-10 text-center">
+
+    <p {% if ta %}:class="theme === 'dark' ? 'text-slate-400' : 'text-slate-500'"{% else %}class="text-slate-500"{% endif %}
+       class="mb-3 font-sans text-sm">
+        <span x-show="!liked">Бұл бөлім ұнады ма?</span>
+        <span x-show="liked" x-cloak>Алғыс үшін рахмет ❤</span>
+    </p>
+
+    <button type="button"
+            @click="toggle()"
+            :aria-pressed="liked"
+            aria-label="Ұнату"
+            :class="liked
+                ? 'border-status-error-fg bg-status-error-bg text-status-error-fg'
+                : ({% if ta %}theme === 'dark'
+                    ? 'border-slate-700 bg-slate-800 text-slate-300 hover:border-status-error-fg hover:text-status-error-fg'
+                    : {% endif %}'border-slate-300 bg-white text-slate-700 hover:border-status-error-fg hover:text-status-error-fg')"
+            class="group relative inline-flex h-14 items-center gap-3 rounded-pill border-2 px-7 font-sans text-base font-bold transition-all">
+
+        {# Иконка сердца + burst-эффект при первом лайке #}
+        <span class="relative grid h-6 w-6 place-items-center">
+            <template x-if="liked">
+                {% include "components/icon.html" with name="heart-filled" size=22 %}
+            </template>
+            <template x-if="!liked">
+                {% include "components/icon.html" with name="heart" size=22 %}
+            </template>
+            {# Pulse-ring при клике #}
+            <span x-show="bursting" x-cloak
+                  class="absolute inset-0 animate-ping rounded-pill bg-status-error-fg opacity-40"></span>
+        </span>
+
+        <span x-text="count"></span>
+    </button>
+
+    <p {% if ta %}:class="theme === 'dark' ? 'text-slate-500' : 'text-slate-400'"{% else %}class="text-slate-400"{% endif %}
+       class="mt-3 font-sans text-xs">
+        Авторды қолдау — бір рет басу ғана
+    </p>
+</div>
+{% endwith %}

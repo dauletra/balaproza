@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    {% if is_new %}Жаңа бөлім{% else %}{{ current.title|default:"Бөлім" }}{% endif %} ·
+    {% if story %}{{ story.title }}{% else %}{{ slug }}{% endif %} — Balaproza
+{% endblock %}
+
+{% block content %}
+{% if not story %}
+    <div class="rounded-lg border border-slate-200 bg-white p-10 text-center">
+        <h1 class="font-display text-2xl font-bold text-slate-900">Шығарма табылмады</h1>
+        <p class="mt-2 font-sans text-sm text-slate-600">Slug: <code>{{ slug }}</code></p>
+    </div>
+{% else %}
+    <p class="mb-4 font-sans text-xs text-slate-500">
+        <a href="{% url 'core:my_stories' %}" class="hover:text-brand">Менің шығармаларым</a> /
+        <a href="{% url 'core:manage_story' slug=story.slug %}" class="hover:text-brand">{{ story.title }}</a> /
+        <span class="text-slate-700">
+            {% if is_new %}жаңа бөлім{% else %}{{ chapter }}-бөлім{% endif %}
+        </span>
+    </p>
+
+    <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+            <h1 class="font-display text-3xl font-bold text-slate-900">
+                {% if is_new %}Жаңа бөлім{% else %}Бөлімді өңдеу{% endif %}
+            </h1>
+            <p class="mt-1 font-sans text-sm text-slate-600">
+                {% if is_new %}
+                    Атау + мәтін. Сақтап жариялайсыз — модерациядан өтеді.
+                {% else %}
+                    {{ chapter }}-бөлім · «{{ current.title|default:"" }}»
+                {% endif %}
+            </p>
+        </div>
+    </header>
+
+    <form method="post"
+          @submit.prevent="$dispatch('toast', { kind:'success', text: $event.submitter?.dataset.toast || 'Сақталды (демо)' })"
+          class="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
+        {% csrf_token %}
+
+        {% include "components/input_field.html" with name="title" label="Бөлім атауы" value=current.title placeholder="Мысалы: Алматыдан шығу" required=True autofocus=is_new maxlength=120 %}
+
+        <label class="flex flex-col gap-1.5">
+            <span class="flex items-baseline justify-between">
+                <span class="font-sans text-sm font-semibold text-slate-800">
+                    Мәтін <span class="text-status-error-fg" aria-hidden="true">*</span>
+                </span>
+                <span class="font-sans text-xs text-slate-500">{{ current.char_count|default:0 }} таңба</span>
+            </span>
+            <textarea name="body" rows="20" required
+                      placeholder="Бөлімнің толық мәтінін осында жазыңыз. Абзацтар екі жол ауысумен бөлінеді."
+                      class="w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-4 py-3 font-serif text-base leading-[1.7] text-slate-900 placeholder:text-slate-500 placeholder:font-sans placeholder:text-sm focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30">{{ current.body|default:"" }}</textarea>
+            <span class="font-sans text-xs text-slate-500">
+                Тұтас мәтінді сайтта қалай көрінетіндей пішімде көресіз — Georgia, ұзын жолдар.
+            </span>
+        </label>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
+            <a href="{% url 'core:manage_story' slug=story.slug %}"
+               class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                Болдырмау
+            </a>
+
+            <div class="flex flex-wrap items-center gap-2.5">
+                <button type="submit" data-toast="Жоба сақталды"
+                        class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                    {% include "components/icon.html" with name="check" size=14 %}
+                    Жоба ретінде сақтау
+                </button>
+                <button type="submit" data-toast="Бөлім модерацияға жіберілді"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-5 font-sans text-sm font-bold text-white hover:bg-brand-dark">
+                    {% include "components/icon.html" with name="paper-plane" size=14 %}
+                    Жариялау
+                </button>
+            </div>
+        </div>
+    </form>
+{% endif %}
+{% endblock %}
+
+{% block right_rail %}
+    {% include "partials/right_rail/writer.html" %}
+{% endblock %}

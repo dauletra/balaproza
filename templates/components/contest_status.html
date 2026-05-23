@@ -1,0 +1,17 @@
+{% comment %}
+    ContestStatus (docs/04.7 + BR-40). Бейдж + опц. countdown.
+
+    Параметры:
+      status     — 'active' | 'finished'
+      days_left  — int (для active)
+{% endcomment %}
+<div class="inline-flex items-center gap-2">
+    {% if status == "active" %}
+        {% include "components/badge.html" with kind="published" label="Белсенді" icon="check" %}
+        {% if days_left %}
+            {% include "components/countdown.html" with days=days_left %}
+        {% endif %}
+    {% elif status == "finished" %}
+        {% include "components/badge.html" with kind="neutral" label="Аяқталды" %}
+    {% endif %}
+</div>

@@ -1,0 +1,21 @@
+{% comment %}
+    Badge (docs/04.4) — пилюля. Высота 22, radius pill.
+
+    Параметры:
+      label — текст
+      kind  — 'neutral'(default) | 'published' | 'info' | 'warning' | 'attention' | 'error' | 'notif'
+      icon  — иконка слева (опц.)
+{% endcomment %}
+{% with k=kind|default:"neutral" %}
+<span class="inline-flex h-[22px] items-center gap-1 rounded-pill px-2.5 font-sans text-xs font-semibold
+    {% if k == 'published' %}bg-status-published-bg text-status-published-fg
+    {% elif k == 'info' %}bg-status-info-bg text-status-info-fg
+    {% elif k == 'warning' %}bg-status-warning-bg text-status-warning-fg
+    {% elif k == 'attention' %}bg-status-attention-bg text-status-attention-fg
+    {% elif k == 'error' %}bg-status-error-bg text-status-error-fg
+    {% elif k == 'notif' %}bg-notif text-notif-fg
+    {% else %}bg-slate-100 text-slate-700{% endif %}">
+    {% if icon %}{% include "components/icon.html" with name=icon size=12 %}{% endif %}
+    {{ label }}
+</span>
+{% endwith %}

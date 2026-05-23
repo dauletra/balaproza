@@ -1,0 +1,49 @@
+{% comment %}
+    DeleteConfirm (docs/04.8 + FR-WRITE-06). Подтверждение удаления.
+    Триггер: $dispatch('open-delete-confirm', { name: 'X', confirm_text: '...', confirm_url: '/path/' })
+
+    Сейчас (дизайн-фаза) — submit фейково закрывает модалку и шлёт success-toast.
+    В Ф14, когда появятся реальные ORM-actions, сюда добавится {% csrf_token %} и POST на confirm_url.
+{% endcomment %}
+<div x-data="{ open: false, name: '', confirm_url: '' }"
+     @open-delete-confirm.window="open = true; name = $event.detail?.name || ''; confirm_url = $event.detail?.confirm_url || ''"
+     @close-delete-confirm.window="open = false"
+     @keydown.escape.window="open = false"
+     x-show="open" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center p-4"
+     role="alertdialog" aria-modal="true" aria-labelledby="del-modal-title">
+
+    <div x-show="open" x-transition.opacity
+         class="absolute inset-0 bg-slate-900/60" @click="open = false"></div>
+
+    <div x-show="open"
+         x-transition:enter="ease-out duration-200"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         class="relative w-full max-w-md rounded-hero bg-white p-7 shadow-modal sm:p-9">
+
+        <div class="grid h-12 w-12 place-items-center rounded-pill bg-status-error-bg text-status-error-fg">
+            {% include "components/icon.html" with name="trash" size=22 %}
+        </div>
+
+        <h2 id="del-modal-title" class="mt-4 font-display text-xl font-bold text-slate-900">
+            Шығарманы өшіру керек пе?
+        </h2>
+        <p class="mt-2 font-sans text-sm leading-relaxed text-slate-600">
+            «<span x-text="name"></span>» қайтарылмастай өшіріледі. Барлық бөлімдер, пікірлер және статистика жоғалады.
+        </p>
+
+        <div class="mt-6 flex justify-end gap-2.5">
+            <button type="button" @click="open = false"
+                    class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                Болдырмау
+            </button>
+            <button type="button"
+                    @click="open = false; $dispatch('toast', { kind: 'error', text: name + ' өшірілді' })"
+                    class="inline-flex h-9 items-center gap-2 rounded-md bg-status-error-fg px-5 font-sans text-sm font-bold text-white hover:opacity-90">
+                {% include "components/icon.html" with name="trash" size=14 %}
+                Өшіру
+            </button>
+        </div>
+    </div>
+</div>

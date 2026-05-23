@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}Кітапхана — Balaproza{% endblock %}
+
+{% block content %}
+{% if not signed_in %}
+    <div class="rounded-lg border border-amber-200 bg-amber-50 p-6">
+        <p class="font-sans text-sm text-slate-800">
+            Кітапхананы көру үшін
+            <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}"
+               class="font-semibold text-brand hover:underline">кіріңіз</a>.
+        </p>
+    </div>
+{% else %}
+    <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+            <h1 class="font-display text-3xl font-bold text-slate-900">Кітапхана</h1>
+            <p class="mt-1 font-sans text-sm text-slate-600">Сақталған, оқу үстіндегі және оқып болған шығармалар.</p>
+        </div>
+    </header>
+
+    {# ── Реальное переключение табов (FR-LIB-01) ── #}
+    {% include "components/segmented_control.html" with items=lib_items current=tab base_url=request.path %}
+
+    {% if page_state == 'loading' %}
+        <div class="flex flex-col gap-3">
+            {% for _ in '1234'|make_list %}
+                {% include "components/skeleton_my_story_row.html" %}
+            {% endfor %}
+        </div>
+    {% elif page_state == 'error' %}
+        {% include "components/error_state.html" with message="Кітапхана деректерін жүктеу мүмкін болмады." %}
+    {% elif entries %}
+        <div class="flex flex-col gap-3">
+            {% for e in entries %}
+                {% include "components/library_row.html" with entry=e %}
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% if page_state == 'content' and not entries %}
+        {% if tab == "saved" %}
+            {% include "components/empty_state.html" with icon="bookmark" title="Сақталғандар жоқ" text="Шығарма бетіндегі «Сақтау» түймесін басып, осында жинаңыз." cta_label="Каталогқа" cta_href=catalog_href %}
+        {% elif tab == "reading" %}
+            {% include "components/empty_state.html" with icon="book" title="Оқу үстіндегі шығарма жоқ" text="Шығарманы ашып оқуды бастаңыз — ол осында пайда болады." cta_label="Каталогқа" cta_href=catalog_href %}
+        {% elif tab == "done" %}
+            {% include "components/empty_state.html" with icon="check" title="Әлі ешнәрсе оқылмаған" text="Шығарманы соңына дейін оқып шықсаңыз — осы бөлімге өтеді." cta_label="Каталогқа" cta_href=catalog_href %}
+        {% endif %}
+    {% endif %}
+{% endif %}
+{% endblock %}

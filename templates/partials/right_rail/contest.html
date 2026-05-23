@@ -1,0 +1,48 @@
+{% comment %}
+    Правый рейл CONT. Контекст:
+      contest — Contest (None → ничего не рендерим)
+{% endcomment %}
+{% if contest %}
+<div class="flex flex-col gap-6">
+    <section class="rounded-lg border border-slate-200 bg-white p-5">
+        <h3 class="mb-3 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+            Конкурс туралы
+        </h3>
+        <dl class="flex flex-col gap-2.5 font-sans text-xs">
+            <div class="flex items-center justify-between">
+                <dt class="text-slate-500">Күй</dt>
+                <dd>{% include "components/contest_status.html" with status=contest.status days_left=contest.days_left %}</dd>
+            </div>
+            {% if contest.prize_kzt %}
+                <div class="flex items-center justify-between">
+                    <dt class="text-slate-500">Сыйақы</dt>
+                    <dd class="font-bold text-slate-900">{{ contest.prize_kzt|stringformat:"d" }} ₸</dd>
+                </div>
+            {% endif %}
+            <div class="flex items-center justify-between">
+                <dt class="text-slate-500">Өтінімдер</dt>
+                <dd class="font-semibold text-slate-900">{{ contest.submissions }}</dd>
+            </div>
+        </dl>
+    </section>
+
+    {% if contest.jury %}
+        <section class="rounded-lg border border-slate-200 bg-white p-5">
+            <h3 class="mb-3 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                Қазылар алқасы
+            </h3>
+            <ul class="flex flex-col gap-2.5">
+                {% for j in contest.jury %}
+                    <li class="flex items-center gap-3">
+                        {% include "components/avatar.html" with size=32 name=j.name %}
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate font-sans text-sm font-semibold text-slate-900">{{ j.name }}</p>
+                            <p class="font-sans text-xs text-slate-500">{{ j.role }}</p>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+</div>
+{% endif %}

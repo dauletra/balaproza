@@ -1,0 +1,11 @@
+{% comment %}
+    CommentLoginGate (docs/04.6) — заглушка вместо формы комментария для гостя.
+    Опц. параметр next — куда вернуться после входа (default: текущий URL).
+{% endcomment %}
+<div class="flex flex-col items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+    <p class="font-sans text-sm text-slate-700">
+        Пікір қалдыру үшін кіріңіз.
+    </p>
+    {% url 'core:login' as login_href %}
+    {% include "components/button.html" with kind="primary" label="Кіру" icon="arrow-right-to-bracket" href=login_href %}
+</div>

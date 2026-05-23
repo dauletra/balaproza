@@ -1,0 +1,18 @@
+{% load static %}
+{% comment %}
+    BookCardSmall (docs/04.3). Обложка вертикальная, под ней title + author.
+    Используется в каруселях главной и т.п.
+
+    Параметры:
+      story — объект Story (slug, title, cover, author)
+{% endcomment %}
+<a href="{% url 'core:story_detail' slug=story.slug %}"
+   class="group flex flex-col gap-2 transition-transform hover:-translate-y-0.5">
+    <div class="aspect-[2/3] w-full rounded-chip bg-slate-200 bg-cover bg-center shadow-[0_1px_3px_rgba(0,0,0,0.08)] group-hover:shadow-card-hover"
+         style="background-image: url('{% static story.cover %}')"
+         role="img" aria-label="«{{ story.title }}» мұқабасы"></div>
+    <div class="font-sans text-[13px] font-semibold leading-tight text-slate-900 line-clamp-2">
+        {{ story.title }}
+    </div>
+    <div class="font-sans text-[11px] text-slate-500">{{ story.author.name }}</div>
+</a>

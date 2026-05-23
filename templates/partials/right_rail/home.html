@@ -1,0 +1,39 @@
+{% comment %}
+    Правый рейл главной (docs/07.4 + FR-HOME-09).
+    Для возвращающегося: прогресс чтения + автор недели + Авторлар мектебі.
+    Для гостя:           автор недели + Авторлар мектебі.
+
+    Контекст: progress (опц.), featured_author, school_links
+{% endcomment %}
+<div class="flex flex-col gap-6">
+
+    {# ── Автор недели ── #}
+    {% if featured_author %}
+        <section class="rounded-lg border border-slate-200 bg-white p-5">
+            <h3 class="mb-3 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                Аптаның авторы
+            </h3>
+            <a href="{% url 'core:profile_other' username=featured_author.username %}"
+               class="group flex flex-col items-center gap-2 text-center">
+                {% include "components/avatar.html" with size=72 name=featured_author.name %}
+                <div class="font-sans text-sm font-bold text-slate-900 group-hover:text-brand">{{ featured_author.name }}</div>
+                <div class="font-sans text-xs text-slate-500">{{ featured_author.bio }}</div>
+            </a>
+            <dl class="mt-4 flex justify-around border-t border-slate-100 pt-3 text-center font-sans text-xs">
+                <div>
+                    <dt class="text-slate-500">Шығарма</dt>
+                    <dd class="font-display text-base font-bold">{{ featured_author.works }}</dd>
+                </div>
+                <div>
+                    <dt class="text-slate-500">Жазылушы</dt>
+                    <dd class="font-display text-base font-bold">{{ featured_author.followers }}</dd>
+                </div>
+            </dl>
+        </section>
+    {% endif %}
+
+    {# ── Авторлар мектебі — блок внешних ссылок (FR-LINKS, DEC-22) ── #}
+    {% if school_links %}
+        {% include "components/school_links.html" with links=school_links layout="list" heading="Авторлар мектебі" hint="Вебинарлар, идеялар, кеңестер — сыртқы арналарда." %}
+    {% endif %}
+</div>

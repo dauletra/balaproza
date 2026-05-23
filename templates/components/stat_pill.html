@@ -1,0 +1,13 @@
+{% comment %}
+    StatPill (docs/04.3) — иконка + значение для метрик произведения.
+
+    Параметры:
+      icon  — thumbs-up | eye | message-caption | ...
+      value — число/строка
+      label — для aria (опц., тип «4 821 ұнату»)
+{% endcomment %}
+<span class="inline-flex items-center gap-1.5 font-sans text-xs text-slate-600"
+      {% if label %}aria-label="{{ label }}"{% endif %}>
+    {% include "components/icon.html" with name=icon size=12 cls="text-slate-600" %}
+    <span aria-hidden="true">{{ value }}</span>
+</span>

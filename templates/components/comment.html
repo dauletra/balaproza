@@ -1,0 +1,88 @@
+{% comment %}
+    Comment (docs/04.6, BR-30). Один комментарий: аватар + имя/дата + текст + лайк + ответы.
+    Один уровень вложенности (BR-30): на ответ нельзя ответить — параметр
+    allow_reply=False автоматически срабатывает при depth=1.
+
+    Параметры:
+      author_name   — имя
+      author_handle — @username (опц.)
+      date          — строка «2 сағат бұрын», «12 қаңтар 2024»
+      text          — текст комментария
+      likes         — int (default 0)
+      liked         — boolean (текущий пользователь лайкнул)
+      badge         — «Автор» (опц.) — показывается если непустая строка
+      depth         — 0 (default) | 1 — для ответа смещаем влево
+      allow_reply   — boolean. На depth=0 — управляет показом кнопки «жауап беру»
+                      (обычно = signed_in). На depth=1 принудительно False (BR-30).
+      reply_avatar_name — имя текущего пользователя для аватара в reply-форме
+{% endcomment %}
+{% with d=depth|default:0 %}
+{% with can_reply=allow_reply|default_if_none:False %}
+<article x-data="{ replying: false }"
+         class="flex gap-3 {% if d == 1 %}ml-12 mt-3 border-l-2 border-slate-100 pl-4{% endif %}">
+    {% include "components/avatar.html" with size=36 name=author_name %}
+
+    <div class="min-w-0 flex-1">
+        {# Шапка: имя + бейдж + дата + меню #}
+        <div class="flex items-center gap-2">
+            <a href="#" class="font-sans text-[13px] font-semibold text-slate-900 hover:text-brand">{{ author_name }}</a>
+            {% if badge %}
+                <span class="inline-flex items-center rounded-pill bg-brand-light px-2 py-0.5 font-sans text-[10px] font-semibold uppercase tracking-wide text-brand-dark">
+                    {{ badge }}
+                </span>
+            {% endif %}
+            <span class="font-sans text-xs text-slate-500">· {{ date }}</span>
+            <button type="button" aria-label="Меню" class="ml-auto -m-1 rounded-pill p-1 text-slate-400 hover:bg-slate-100">
+                {% include "components/icon.html" with name="dots-horizontal" size=16 %}
+            </button>
+        </div>
+
+        {# Тело #}
+        <p class="mt-1 font-sans text-sm leading-relaxed text-slate-800">{{ text }}</p>
+
+        {# Действия: лайк + жауап беру #}
+        <div class="mt-2 flex items-center gap-4 font-sans text-xs">
+            <button type="button"
+                    class="inline-flex items-center gap-1.5 {% if liked %}text-status-error-fg{% else %}text-slate-500 hover:text-slate-700{% endif %}">
+                {% include "components/icon.html" with name=liked|yesno:"heart-filled,heart" size=14 %}
+                <span>{{ likes|default:0 }}</span>
+            </button>
+
+            {% if d == 0 and can_reply %}
+                <button type="button"
+                        @click="replying = !replying; if (replying) $nextTick(() => $refs.replyInput.focus())"
+                        :aria-expanded="replying"
+                        class="font-ui font-medium text-brand hover:text-brand-dark">
+                    <span x-show="!replying">жауап беру</span>
+                    <span x-show="replying" x-cloak>болдырмау</span>
+                </button>
+            {% endif %}
+        </div>
+
+        {# Inline reply form — только depth=0 и allow_reply=True #}
+        {% if d == 0 and can_reply %}
+            <form x-show="replying" x-cloak x-transition.duration.150ms
+                  @submit.prevent="$dispatch('toast', { kind: 'success', text: 'Жауабыңыз қосылды (демо)' }); $refs.replyInput.value=''; replying=false"
+                  class="mt-3 flex items-start gap-3">
+                {% include "components/avatar.html" with size=28 name=reply_avatar_name|default:current_user_name %}
+                <div class="min-w-0 flex-1">
+                    <textarea x-ref="replyInput" rows="2"
+                              placeholder="{{ author_name }} үшін жауап..."
+                              class="w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-2 font-sans text-sm placeholder:text-slate-500 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30"></textarea>
+                    <div class="mt-2 flex items-center justify-end gap-2">
+                        <button type="button" @click="replying=false"
+                                class="h-8 rounded-md px-3 font-sans text-xs font-semibold text-slate-600 hover:bg-slate-100">
+                            Болдырмау
+                        </button>
+                        {% include "components/button.html" with kind="primary" label="Жіберу" type="submit" size="md" icon="paper-plane" %}
+                    </div>
+                </div>
+            </form>
+        {% endif %}
+
+        {# Слот для ответов (отдельные Comment, depth=1) — для кастомного inline-рендера #}
+        {% if reply_block %}{{ reply_block }}{% endif %}
+    </div>
+</article>
+{% endwith %}
+{% endwith %}

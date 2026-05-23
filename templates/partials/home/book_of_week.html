@@ -1,0 +1,82 @@
+{% load static %}
+{% comment %}
+    HomeBookOfWeek (FR-HOME-03). Крупная редакционная карточка.
+
+    Контекст: book_of_week (BookOfWeek объект из stub_data)
+{% endcomment %}
+{% with bw=book_of_week story=book_of_week.story %}
+<section>
+    {# Заголовок секции с собственным eyebrow справа #}
+    <div class="mb-4 flex items-baseline justify-between">
+        <h2 class="font-display text-[22px] font-semibold text-slate-900">Аптаның кітабы</h2>
+        <span class="font-display text-[11px] font-semibold uppercase tracking-[0.12em] text-status-attention-fg">
+            Редакция таңдады
+        </span>
+    </div>
+
+    <article class="grid grid-cols-1 overflow-hidden rounded-hero border border-slate-200 bg-white shadow-sm md:grid-cols-[260px_1fr]">
+        {# ── Обложка ── #}
+        <div class="relative min-h-[260px] bg-cover bg-center md:min-h-[360px]"
+             style="background-image: linear-gradient(rgba(0,0,0,0.04), rgba(0,0,0,0.20)), url('{% static story.cover %}')"
+             role="img" aria-label="«{{ story.title }}» мұқабасы">
+            <span class="absolute left-4 top-4 inline-flex items-center rounded-chip bg-promo-bg px-3 py-1 font-display text-[11px] font-bold uppercase tracking-[0.06em] text-[rgb(33,11,11)]">
+                аптаның таңдауы
+            </span>
+        </div>
+
+        {# ── Контент ── #}
+        <div class="flex flex-col gap-4 p-9">
+            <div class="flex items-center gap-2.5">
+                {% include "components/avatar.html" with size=32 name=story.author.name %}
+                <div>
+                    <a href="{% url 'core:profile_other' username=story.author.username %}"
+                       class="font-sans text-[13px] font-semibold text-slate-900 hover:text-brand">
+                        {{ story.author.name }}
+                    </a>
+                    <div class="font-sans text-[11px] text-slate-500">
+                        {% for g in story.genres_resolved %}{{ g.name|lower }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="font-sans text-[30px] font-bold leading-[1.1] -tracking-[0.01em] text-slate-900">
+                «{{ story.title }}»
+            </h3>
+
+            {# Цитата из книги #}
+            <blockquote class="rounded-md border-l-[3px] border-brand bg-slate-50 px-4 py-3.5 font-sans text-sm italic leading-[1.6] text-slate-800">
+                {{ bw.quote }}
+            </blockquote>
+
+            {# Заметка редакции #}
+            <p class="font-sans text-[13px] leading-[1.65] text-slate-600">
+                {{ bw.editorial_note }}
+            </p>
+
+            {# Метрики #}
+            <div class="mt-1 flex flex-wrap items-center gap-4 font-sans text-xs text-slate-500">
+                <span class="inline-flex items-center gap-1.5">
+                    {% include "components/icon.html" with name="eye" size=14 cls="text-slate-500" %}
+                    {{ story.views|stringformat:"d" }} оқылды
+                </span>
+                <span class="text-slate-300">·</span>
+                <span class="inline-flex items-center gap-1.5">
+                    {% include "components/icon.html" with name="thumbs-up" size=14 cls="text-slate-500" %}
+                    {{ story.likes|stringformat:"d" }}
+                </span>
+                <span class="text-slate-300">·</span>
+                <span>{{ story.chapters }} бөлім</span>
+            </div>
+
+            <div class="mt-2 flex items-center gap-2.5">
+                {% url 'core:story_read' slug=story.slug as read_href %}
+                {% include "components/button.html" with kind="primary" label="Оқуды бастау" icon="book" href=read_href %}
+                <button type="button" aria-label="Сақтау"
+                        class="grid h-9 w-9 place-items-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50">
+                    {% include "components/icon.html" with name="bookmark" size=16 %}
+                </button>
+            </div>
+        </div>
+    </article>
+</section>
+{% endwith %}

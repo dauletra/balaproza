@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block title %}Жанрлар — Balaproza{% endblock %}
+
+{% block content %}
+<header class="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div>
+        <h1 class="font-display text-4xl font-medium text-slate-900">Жанрлар</h1>
+        <p class="mt-2 font-sans text-sm text-slate-600">
+            {{ total_stories }} шығарма · {{ genres|length }} жанр
+        </p>
+    </div>
+
+    {# Фильтр-поиск по названию жанра (визуальный, без JS-фильтрации на этой фазе) #}
+    <label class="relative flex h-10 w-full max-w-[280px] items-center rounded-md border border-slate-300 bg-slate-50 px-3 has-[input:focus]:border-brand has-[input:focus]:bg-white has-[input:focus]:ring-2 has-[input:focus]:ring-brand/30">
+        {% include "components/icon.html" with name="search" size=16 cls="text-slate-500" %}
+        <input type="search" placeholder="Жанр іздеу..."
+               class="ml-2 min-w-0 flex-1 bg-transparent font-sans text-[13px] text-slate-900 placeholder:text-slate-500 focus:outline-none">
+    </label>
+</header>
+
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    {% for g in genres %}
+        <a href="{% url 'core:genre_detail' slug=g.slug %}"
+           class="relative flex min-h-[140px] flex-col gap-2 overflow-hidden rounded-lg border p-6 transition-shadow hover:shadow-card-hover"
+           style="background: oklch(0.96 0.04 {{ g.hue }});
+                  border-color: oklch(0.86 0.08 {{ g.hue }});
+                  color: oklch(0.38 0.14 {{ g.hue }});">
+            <div class="font-display text-2xl font-bold">{{ g.name }}</div>
+            <div class="font-sans text-sm opacity-75">{{ g.count }} шығарма</div>
+
+            <span class="absolute right-4 bottom-4 grid h-9 w-9 place-items-center rounded-pill text-white shadow-sm"
+                  style="background: oklch(0.38 0.14 {{ g.hue }})">
+                {% include "components/icon.html" with name="arrow-right" size=16 %}
+            </span>
+        </a>
+    {% endfor %}
+</div>
+{% endblock %}

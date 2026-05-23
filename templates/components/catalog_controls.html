@@ -1,0 +1,62 @@
+{% comment %}
+    CatalogControls — панель сортировки + status-фильтр для каталоговых страниц
+    (search_results, genre_detail). Меняет ?sort= и ?status=.
+
+    Параметры:
+      sort       — текущий ключ сортировки
+      status     — текущий ключ статуса ('' = все)
+      sorts      — итерируемый ((key, label), ...) из stub_data.CATALOG_SORTS
+      statuses   — итерируемый ((key, label), ...) из stub_data.CATALOG_STATUS_FILTERS
+      results_count — int (для счётчика)
+
+    Использует form GET с автосабмитом при change (Alpine).
+{% endcomment %}
+<form method="get" x-data
+      @change="$el.requestSubmit()"
+      class="mb-4 flex flex-wrap items-center gap-3 border-b border-slate-200 pb-3">
+
+    {# Сохранить существующий ?q= при изменении сортировки/статуса #}
+    {% if request.GET.q %}
+        <input type="hidden" name="q" value="{{ request.GET.q }}">
+    {% endif %}
+
+    {# Status-чипы #}
+    <div class="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Мәртебесі бойынша сүзу">
+        {% for key, label in statuses %}
+            <label class="cursor-pointer">
+                <input type="radio" name="status" value="{{ key }}"
+                       class="peer sr-only"
+                       {% if status == key %}checked{% endif %}>
+                <span class="inline-flex h-7 items-center rounded-pill border border-slate-300 bg-white px-3 font-sans text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 peer-checked:border-brand peer-checked:bg-brand peer-checked:text-white">
+                    {{ label }}
+                </span>
+            </label>
+        {% endfor %}
+    </div>
+
+    {# Sort dropdown #}
+    <label class="ml-auto inline-flex items-center gap-2">
+        <span class="font-sans text-xs text-slate-500">Сұрыптау:</span>
+        <select name="sort"
+                class="h-8 rounded-md border border-slate-300 bg-white px-2 font-sans text-xs font-semibold text-slate-800 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30">
+            {% for key, label in sorts %}
+                <option value="{{ key }}" {% if sort == key %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </label>
+
+    {# Счётчик результатов #}
+    {% if results_count is not None %}
+        <span class="basis-full font-sans text-xs text-slate-500">
+            {{ results_count }} шығарма
+        </span>
+    {% endif %}
+
+    {# Fallback кнопка для no-JS #}
+    <noscript>
+        <button type="submit"
+                class="h-8 rounded-md bg-brand px-3 font-sans text-xs font-semibold text-white">
+            Қолдану
+        </button>
+    </noscript>
+</form>

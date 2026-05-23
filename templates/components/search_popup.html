@@ -1,0 +1,187 @@
+{% load static %}
+{% comment %}
+    SearchPopup (расширение FR-CAT-01) — модальный быстрый поиск.
+
+    Открытие:
+      - Хоткей Cmd+K (Mac) / Ctrl+K (Win/Linux)
+      - Событие window 'open-search'
+    Закрытие: Esc, клик по бекдропу, закрытие после перехода.
+
+    Источник данных: HTML-датасет из всех произведений и авторов (тонкий index
+    в самом шаблоне). Это stub-режим — после Ф14 заменится htmx-запросом
+    к /search/api/?q=.
+
+    Поиск: case-insensitive substring по названию/автору произведения и
+    name/username автора. Лимит 5+5.
+
+    Enter → переход на /search/?q= (полная страница).
+{% endcomment %}
+<div x-data="searchPopup()"
+     x-show="open"
+     x-cloak
+     @keydown.window.escape="close()"
+     @open-search.window="openPopup()"
+     @keydown.window.prevent.meta.k="openPopup()"
+     @keydown.window.prevent.ctrl.k="openPopup()"
+     class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-[10vh] backdrop-blur-sm">
+
+    {# Backdrop click → close (через обёртку с @click.self) #}
+    <div @click.self="close()" class="absolute inset-0"></div>
+
+    <div role="dialog" aria-modal="true" aria-label="Жылдам іздеу"
+         class="relative w-full max-w-xl overflow-hidden rounded-lg bg-white shadow-modal">
+
+        {# ── Поле ввода ── #}
+        <form action="{% url 'core:search_results' %}" method="get"
+              class="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
+            {% include "components/icon.html" with name="search" size=20 cls="text-slate-500" %}
+            <input x-ref="input"
+                   x-model="q"
+                   type="search" name="q"
+                   placeholder="Шығарма немесе автор іздеу..."
+                   class="min-w-0 flex-1 bg-transparent font-sans text-[15px] text-slate-900 placeholder:text-slate-500 focus:outline-none"
+                   autocomplete="off" autocorrect="off" spellcheck="false">
+            <kbd class="hidden rounded-sm border border-slate-300 bg-slate-100 px-1.5 py-0.5 font-sans text-[11px] font-semibold text-slate-500 sm:inline">
+                Esc
+            </kbd>
+        </form>
+
+        {# ── Результаты ── #}
+        <div class="max-h-[60vh] overflow-y-auto">
+
+            {# Empty state — нет запроса #}
+            <template x-if="!q.trim()">
+                <div class="px-4 py-8 text-center">
+                    <p class="font-sans text-sm text-slate-500">
+                        Жазуды бастаңыз... <kbd class="ml-1 rounded-sm border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold">⌘K</kbd>
+                    </p>
+                </div>
+            </template>
+
+            {# Stories #}
+            <template x-if="q.trim() && filteredStories().length">
+                <div>
+                    <h3 class="px-4 pt-3 pb-1 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        Шығармалар
+                    </h3>
+                    <ul>
+                        <template x-for="s in filteredStories()" :key="s.slug">
+                            <li>
+                                <a :href="'/story/' + s.slug + '/'"
+                                   @click="close()"
+                                   class="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
+                                    <div class="h-10 w-7 shrink-0 rounded-sm bg-cover bg-center"
+                                         :style="'background-image: url(' + s.cover + ')'"></div>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="truncate font-sans text-sm font-semibold text-slate-900" x-text="s.title"></div>
+                                        <div class="truncate font-sans text-xs text-slate-500" x-text="s.author"></div>
+                                    </div>
+                                </a>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+            </template>
+
+            {# Authors #}
+            <template x-if="q.trim() && filteredAuthors().length">
+                <div class="border-t border-slate-100">
+                    <h3 class="px-4 pt-3 pb-1 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        Авторлар
+                    </h3>
+                    <ul>
+                        <template x-for="a in filteredAuthors()" :key="a.username">
+                            <li>
+                                <a :href="'/u/' + a.username + '/'"
+                                   @click="close()"
+                                   class="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
+                                    <span class="grid h-8 w-8 shrink-0 place-items-center rounded-pill bg-slate-200 font-display text-xs font-bold text-slate-600"
+                                          x-text="(a.name || '?').charAt(0)"></span>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="truncate font-sans text-sm font-semibold text-slate-900" x-text="a.name"></div>
+                                        <div class="truncate font-sans text-xs text-slate-500" x-text="'@' + a.username"></div>
+                                    </div>
+                                </a>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+            </template>
+
+            {# Не нашли #}
+            <template x-if="q.trim() && !filteredStories().length && !filteredAuthors().length">
+                <div class="px-4 py-8 text-center">
+                    <p class="font-sans text-sm text-slate-600">
+                        «<span x-text="q"></span>» бойынша ештеңе табылмады.
+                    </p>
+                    <a :href="'{% url 'core:search_results' %}?q=' + encodeURIComponent(q)"
+                       @click="close()"
+                       class="mt-2 inline-block font-sans text-sm font-semibold text-brand hover:underline">
+                        Толық іздеу нәтижесі →
+                    </a>
+                </div>
+            </template>
+        </div>
+
+        {# Футер: подсказка Enter #}
+        <div class="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-4 py-2 text-[11px] text-slate-500">
+            <span>
+                <kbd class="rounded-sm border border-slate-300 bg-white px-1.5 py-0.5 font-semibold">↵</kbd>
+                толық іздеу
+            </span>
+            <span>
+                <kbd class="rounded-sm border border-slate-300 bg-white px-1.5 py-0.5 font-semibold">Esc</kbd>
+                жабу
+            </span>
+        </div>
+    </div>
+</div>
+
+{# ── Lazy fetch индекса ── #}
+{# Данные приходят с /api/search-index.json только при первом открытии popup.
+   Это не нагружает каждый HTML и не ломает SEO/тесты. #}
+<script>
+function searchPopup() {
+    return {
+        open: false,
+        q: '',
+        loaded: false,
+        loading: false,
+        index: { stories: [], authors: [] },
+        async ensureLoaded() {
+            if (this.loaded || this.loading) return;
+            this.loading = true;
+            try {
+                const r = await fetch('{% url "core:api_search_index" %}');
+                if (r.ok) this.index = await r.json();
+                this.loaded = true;
+            } catch (e) { /* offline */ }
+            this.loading = false;
+        },
+        async openPopup() {
+            this.open = true;
+            await this.$nextTick();
+            if (this.$refs.input) this.$refs.input.focus();
+            this.ensureLoaded();
+        },
+        close() {
+            this.open = false;
+            this.q = '';
+        },
+        filteredStories() {
+            const q = this.q.trim().toLowerCase();
+            if (!q) return [];
+            return this.index.stories.filter(s =>
+                s.title.toLowerCase().includes(q) || s.author.toLowerCase().includes(q)
+            ).slice(0, 5);
+        },
+        filteredAuthors() {
+            const q = this.q.trim().toLowerCase();
+            if (!q) return [];
+            return this.index.authors.filter(a =>
+                a.name.toLowerCase().includes(q) || a.username.toLowerCase().includes(q)
+            ).slice(0, 5);
+        },
+    };
+}
+</script>

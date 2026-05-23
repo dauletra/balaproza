@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if story %}{{ story.title }}{% else %}Оқу{% endif %} · {% if current %}{{ current.title }}{% else %}{{ chapter }}-бөлім{% endif %} — Balaproza{% endblock %}
+
+{# Режим чтения — отдельная обвязка: без shell, фон/шрифт зависят от темы/гарнитуры. #}
+{% block layout %}
+<div
+    x-data="{
+        font: 'sans',     /* sans · serif */
+        size: 'md',       /* sm · md · lg */
+        theme: 'light',   /* light · dark */
+    }"
+    @reader-settings.window="font = $event.detail.font; size = $event.detail.size; theme = $event.detail.theme"
+    :class="theme === 'dark' ? 'bg-slate-900 text-slate-100' : 'bg-slate-50 text-slate-900'"
+    class="min-h-screen transition-colors duration-200">
+
+    {# ── Минимальная шапка читалки ── #}
+    <header :class="theme === 'dark' ? 'border-slate-800 bg-slate-900/95' : 'border-slate-200 bg-white/95'"
+            class="sticky top-0 z-30 border-b backdrop-blur">
+        <div class="mx-auto flex h-14 max-w-3xl items-center gap-3 px-4 sm:px-6">
+
+            {% if story %}
+                <a href="{% url 'core:story_detail' slug=story.slug %}"
+                   :class="theme === 'dark' ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-brand'"
+                   class="-m-2 inline-flex items-center gap-2 rounded-md p-2 font-sans text-sm">
+                    {% include "components/icon.html" with name="arrow-left" size=18 %}
+                    <span class="hidden sm:inline">{{ story.title }}</span>
+                </a>
+            {% else %}
+                <a href="{% url 'core:home' %}" class="font-sans text-sm hover:underline">← Басты</a>
+            {% endif %}
+
+            <div class="ml-auto flex items-center gap-1">
+                {% if signed_in %}
+                    <button type="button" aria-label="Шағым жіберу"
+                            @click="$dispatch('open-report', { target: 'chapter:{{ slug }}-{{ chapter }}' })"
+                            :class="theme === 'dark' ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'"
+                            class="grid h-10 w-10 place-items-center rounded-pill">
+                        {% include "components/icon.html" with name="dots-vertical" size=18 %}
+                    </button>
+                {% endif %}
+                {# Popover настроек: гарнитура/размер/тема (FR-STORY-07) #}
+                {% include "components/reader_settings_popover.html" %}
+            </div>
+        </div>
+    </header>
+
+    {# ── Содержимое главы ── #}
+    <main class="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-12">
+        {% if not current %}
+            <div :class="theme === 'dark' ? 'bg-slate-800 text-slate-300' : 'bg-white text-slate-700'"
+                 class="rounded-lg p-8 text-center">
+                <h1 class="font-display text-xl font-bold">Бөлім табылмады</h1>
+                <p class="mt-2 font-sans text-sm">Бөлім нөмірі: <code>{{ chapter }}</code></p>
+            </div>
+        {% else %}
+            <header class="mb-8">
+                <p :class="theme === 'dark' ? 'text-slate-500' : 'text-slate-500'"
+                   class="font-display text-[11px] font-semibold uppercase tracking-[0.16em]">
+                    {{ chapter }}-бөлім{% if story %} · {{ chapters|length }} бөлімнен{% endif %}
+                </p>
+                <h1 :class="theme === 'dark' ? 'text-white' : 'text-slate-900'"
+                    :style="size === 'sm' ? 'font-size:24px' : size === 'lg' ? 'font-size:36px' : 'font-size:30px'"
+                    class="mt-2 font-display font-bold leading-tight">
+                    {{ current.title }}
+                </h1>
+            </header>
+
+            {# Текст. Гарнитура и размер — реактивные классы. #}
+            <article :class="[
+                            font === 'serif' ? 'font-serif' : 'font-sans',
+                            theme === 'dark' ? 'text-slate-200' : 'text-slate-800',
+                            size === 'sm' ? 'text-[15px] leading-[1.75]'
+                                          : size === 'lg' ? 'text-[20px] leading-[1.8]'
+                                                          : 'text-[17px] leading-[1.75]',
+                         ]"
+                     class="prose-reader space-y-5">
+                {# linebreaks: \n\n → <p>, одиночный \n → <br>. Стили абзацев в <style> ниже. #}
+                {{ current.body|linebreaks }}
+            </article>
+
+            {# ── Лайк главы (FR-STORY-12) ── #}
+            {% include "components/chapter_like.html" with likes=current.likes liked=current.liked theme_aware=True %}
+        {% endif %}
+
+        {# ── Навигация между главами ── #}
+        <nav :class="theme === 'dark' ? 'border-slate-800' : 'border-slate-200'"
+             class="mt-12 flex items-center justify-between border-t pt-6 font-sans text-sm">
+            {% if has_prev %}
+                <a href="{% url 'core:story_read_chapter' slug=story.slug chapter=chapter|add:'-1' %}"
+                   :class="theme === 'dark' ? 'text-slate-300 hover:text-white' : 'text-slate-700 hover:text-brand'"
+                   class="inline-flex items-center gap-2 font-semibold">
+                    {% include "components/icon.html" with name="chevron-left" size=16 %}
+                    Алдыңғы бөлім
+                </a>
+            {% else %}
+                <span></span>
+            {% endif %}
+
+            {% if has_next %}
+                <a href="{% url 'core:story_read_chapter' slug=story.slug chapter=chapter|add:'1' %}"
+                   :class="theme === 'dark' ? 'text-slate-300 hover:text-white' : 'text-slate-700 hover:text-brand'"
+                   class="inline-flex items-center gap-2 font-semibold">
+                    Келесі бөлім
+                    {% include "components/icon.html" with name="chevron-right" size=16 %}
+                </a>
+            {% endif %}
+        </nav>
+    </main>
+
+    {# Тост-хост и Report-модалка работают и здесь #}
+    {% include "components/toast_host.html" %}
+    {% if signed_in %}{% include "components/report_modal.html" %}{% endif %}
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Базовая стилизация текста, который пришёл через {{ body|linebreaks }}.
+       linebreaks оборачивает абзацы в <p> сам, но между ними нужен ритмичный отступ. */
+    .prose-reader p { margin-bottom: 1.1em; }
+    .prose-reader p:last-child { margin-bottom: 0; }
+</style>
+{% endblock %}

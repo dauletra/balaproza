@@ -1,0 +1,63 @@
+{% load balaproza %}
+{% comment %}
+    Pagination (docs/04.7). ‹ 1 2 3 … 12 › Активная страница — info-цвет.
+
+    Параметры:
+      current — текущая страница (1-based)
+      total   — общее число страниц
+      base    — URL без query (например, "/search/"); ?page=N допишется автоматически
+      qs      — доп. query-параметры (например, "q=foo&genre=erteg"; без &page=)
+{% endcomment %}
+{% if total > 1 %}
+{% with prev=current|add:-1 next=current|add:1 %}
+<nav aria-label="Беттер" class="flex items-center justify-center gap-1.5">
+
+    {# ‹ Назад #}
+    {% if current > 1 %}
+        <a href="{{ base }}{% if qs %}?{{ qs }}&amp;{% else %}?{% endif %}page={{ prev }}"
+           aria-label="Алдыңғы бет"
+           class="grid h-9 w-9 place-items-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-100">
+            {% include "components/icon.html" with name="chevron-left" size=16 %}
+        </a>
+    {% else %}
+        <span aria-hidden="true"
+              class="grid h-9 w-9 place-items-center rounded-md border border-slate-200 text-slate-300">
+            {% include "components/icon.html" with name="chevron-left" size=16 %}
+        </span>
+    {% endif %}
+
+    {# Номера. Простая логика: первая, current±1, последняя, разделяем «…». #}
+    {% for n in total|page_range:current %}
+        {% if n == 0 %}
+            <span class="px-1.5 text-slate-500" aria-hidden="true">…</span>
+        {% else %}
+            {% if n == current %}
+                <span aria-current="page"
+                      class="grid h-9 min-w-9 place-items-center rounded-md bg-status-info-fg px-2.5 font-sans text-sm font-semibold text-white">
+                    {{ n }}
+                </span>
+            {% else %}
+                <a href="{{ base }}{% if qs %}?{{ qs }}&amp;{% else %}?{% endif %}page={{ n }}"
+                   class="grid h-9 min-w-9 place-items-center rounded-md border border-slate-200 px-2.5 font-sans text-sm text-slate-700 hover:bg-slate-100">
+                    {{ n }}
+                </a>
+            {% endif %}
+        {% endif %}
+    {% endfor %}
+
+    {# › Вперёд #}
+    {% if current < total %}
+        <a href="{{ base }}{% if qs %}?{{ qs }}&amp;{% else %}?{% endif %}page={{ next }}"
+           aria-label="Келесі бет"
+           class="grid h-9 w-9 place-items-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-100">
+            {% include "components/icon.html" with name="chevron-right" size=16 %}
+        </a>
+    {% else %}
+        <span aria-hidden="true"
+              class="grid h-9 w-9 place-items-center rounded-md border border-slate-200 text-slate-300">
+            {% include "components/icon.html" with name="chevron-right" size=16 %}
+        </span>
+    {% endif %}
+</nav>
+{% endwith %}
+{% endif %}

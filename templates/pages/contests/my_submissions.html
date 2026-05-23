@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}Менің өтінімдерім — Balaproza{% endblock %}
+
+{% block content %}
+{% if not signed_in %}
+    <div class="rounded-lg border border-amber-200 bg-amber-50 p-6">
+        <p class="font-sans text-sm text-slate-800">
+            Өтінімдеріңізді көру үшін
+            <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}"
+               class="font-semibold text-brand hover:underline">кіріңіз</a>.
+        </p>
+    </div>
+{% else %}
+    <p class="mb-4 font-sans text-xs text-slate-500">
+        <a href="{% url 'core:contest_list' %}" class="hover:text-brand">Конкурстар</a> /
+        <span class="text-slate-700">менің өтінімдерім</span>
+    </p>
+
+    <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+            <h1 class="font-display text-3xl font-bold text-slate-900">Менің өтінімдерім</h1>
+            <p class="mt-1 font-sans text-sm text-slate-600">
+                Сіз қатысқан байқаулар және өтінім күйі (BR-41).
+            </p>
+        </div>
+        <a href="{% url 'core:contest_list' %}"
+           class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+            {% include "components/icon.html" with name="paper-plane" size=14 %}
+            Барлық конкурстар
+        </a>
+    </header>
+
+    {% if submissions %}
+        <div class="flex flex-col gap-3">
+            {% for sub in submissions %}
+                <article class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="min-w-0 flex-1">
+                        <p class="font-sans text-xs uppercase tracking-wide text-slate-500">{{ sub.submitted_relative }}</p>
+                        <h2 class="mt-1 font-display text-lg font-bold leading-tight text-slate-900">
+                            {% if sub.contest %}
+                                <a href="{% url 'core:contest_detail' slug=sub.contest.slug %}" class="hover:text-brand">{{ sub.contest.name }}</a>
+                            {% else %}
+                                {{ sub.contest_slug }}
+                            {% endif %}
+                        </h2>
+                        {% if sub.story %}
+                            <p class="mt-0.5 font-sans text-sm text-slate-600">
+                                Шығарма:
+                                <a href="{% url 'core:story_detail' slug=sub.story.slug %}" class="font-semibold text-slate-900 hover:text-brand">«{{ sub.story.title }}»</a>
+                            </p>
+                        {% endif %}
+                        {% if sub.note %}
+                            <p class="mt-2 rounded-md bg-slate-50 px-3 py-2 font-sans text-xs leading-snug text-slate-700">
+                                Қазылар: {{ sub.note }}
+                            </p>
+                        {% endif %}
+                    </div>
+
+                    <div class="shrink-0">
+                        {% if sub.status == 'reviewing' %}
+                            {% include "components/badge.html" with kind="attention" label="Қаралуда" %}
+                        {% elif sub.status == 'accepted' %}
+                            {% include "components/badge.html" with kind="published" label="Қабылданды" icon="check" %}
+                        {% elif sub.status == 'rejected' %}
+                            {% include "components/badge.html" with kind="error" label="Қабылданбады" %}
+                        {% endif %}
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        {% url 'core:contest_list' as cl_href %}
+        {% include "components/empty_state.html" with icon="paper-plane" title="Әлі өтінім жоқ" text="Белсенді байқауларға қатысып, оларды осында табыңыз." cta_label="Конкурстарға" cta_href=cl_href %}
+    {% endif %}
+{% endif %}
+{% endblock %}

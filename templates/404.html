@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Бет табылмады — Balaproza{% endblock %}
+
+{% block content %}
+<section class="mx-auto flex max-w-md flex-col items-center gap-5 rounded-hero border border-slate-200 bg-white px-6 py-16 text-center sm:py-20">
+    <img src="{% static 'img/logo.png' %}" alt="" class="h-14 w-14 opacity-60">
+
+    <div class="font-display text-7xl font-bold text-brand">404</div>
+
+    <h1 class="font-display text-2xl font-bold text-slate-900">Бет табылмады</h1>
+    <p class="font-sans text-sm leading-relaxed text-slate-600">
+        Сіз іздеген бет жоқ, жойылған немесе мекенжай қате жазылған.
+        Басты бетке оралыңыз немесе іздеуді қолданыңыз.
+    </p>
+
+    <div class="mt-2 flex flex-wrap items-center justify-center gap-2.5">
+        {% url 'core:home' as home_href %}
+        {% include "components/button.html" with kind="primary" label="Басты бет" icon="home" href=home_href %}
+        {% url 'core:genre_index' as cat_href %}
+        {% include "components/button.html" with kind="secondary" label="Жанрлар" icon="book" href=cat_href %}
+    </div>
+
+    <button type="button" @click="$dispatch('open-search')"
+            class="mt-1 inline-flex items-center gap-1.5 font-sans text-sm font-semibold text-brand hover:underline">
+        {% include "components/icon.html" with name="search" size=14 %}
+        Іздеу ашу
+    </button>
+</section>
+{% endblock %}
+
+{% block right_rail %}{% endblock %}

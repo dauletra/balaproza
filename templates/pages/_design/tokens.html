@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+
+{% block title %}Дизайн · Токены — Balaproza{% endblock %}
+
+{% block content %}
+    <header class="mb-10">
+        <p class="text-xs font-bold uppercase tracking-wide text-brand">_design</p>
+        <h1 class="mt-1 font-display text-4xl font-bold">Дизайн-токены</h1>
+        <p class="mt-2 max-w-prose text-sm text-slate-600">
+            Визуальный аудит палитры/типографики/радиусов/теней из <code>docs/02-design-system.md</code>.
+            Доступно только при <code>DEBUG=True</code>.
+        </p>
+    </header>
+
+    {# ─────────────────────── Бренд (teal) ─────────────────────── #}
+    <section class="mb-12">
+        <h2 class="mb-4 font-display text-2xl font-bold">Бренд</h2>
+        <div class="grid gap-4 sm:grid-cols-3">
+            <div class="rounded-md bg-brand p-6 text-white">
+                <div class="font-bold">brand</div>
+                <div class="font-mono text-xs opacity-80">rgb(3,102,114)</div>
+            </div>
+            <div class="rounded-md bg-brand-dark p-6 text-white">
+                <div class="font-bold">brand-dark</div>
+                <div class="font-mono text-xs opacity-80">rgb(5,80,92)</div>
+            </div>
+            <div class="rounded-md bg-brand-light p-6 text-slate-900">
+                <div class="font-bold">brand-light</div>
+                <div class="font-mono text-xs opacity-80">rgba(3,102,114,0.42)</div>
+            </div>
+        </div>
+    </section>
+
+    {# ─────────────────────── Slate (11 ступеней) ─────────────────────── #}
+    <section class="mb-12">
+        <h2 class="mb-4 font-display text-2xl font-bold">Slate — нейтральная шкала</h2>
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-5 lg:grid-cols-10">
+            {% for step in "50,100,200,300,400,500,600,700,800,900"|cut:" " %}
+            {% endfor %}
+            {# По одному «свотчу» на ступень — статически, чтобы Tailwind видел классы. #}
+            <div class="rounded-md bg-slate-50 p-4 text-xs text-slate-900 ring-1 ring-slate-200">50</div>
+            <div class="rounded-md bg-slate-100 p-4 text-xs text-slate-900">100</div>
+            <div class="rounded-md bg-slate-200 p-4 text-xs text-slate-900">200</div>
+            <div class="rounded-md bg-slate-300 p-4 text-xs text-slate-900">300</div>
+            <div class="rounded-md bg-slate-400 p-4 text-xs text-slate-900">400</div>
+            <div class="rounded-md bg-slate-500 p-4 text-xs text-white">500</div>
+            <div class="rounded-md bg-slate-600 p-4 text-xs text-white">600</div>
+            <div class="rounded-md bg-slate-700 p-4 text-xs text-white">700</div>
+            <div class="rounded-md bg-slate-800 p-4 text-xs text-white">800</div>
+            <div class="rounded-md bg-slate-900 p-4 text-xs text-white">900</div>
+        </div>
+    </section>
+
+    {# ─────────────────────── Статусы ─────────────────────── #}
+    <section class="mb-12">
+        <h2 class="mb-4 font-display text-2xl font-bold">Семантические статусы</h2>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="rounded-pill bg-status-published-bg px-3 py-2 text-sm text-status-published-fg">Жарияланған</div>
+            <div class="rounded-pill bg-status-info-bg      px-3 py-2 text-sm text-status-info-fg">Аяқталды (info)</div>
+            <div class="rounded-pill bg-status-warning-bg   px-3 py-2 text-sm text-status-warning-fg">Жазылып жатыр</div>
+            <div class="rounded-pill bg-status-attention-bg px-3 py-2 text-sm text-status-attention-fg">Тексеруде</div>
+            <div class="rounded-pill bg-status-error-bg     px-3 py-2 text-sm text-status-error-fg">Жарияланбаған</div>
+            <div class="inline-flex items-center gap-1 rounded-pill bg-notif px-3 py-2 text-sm text-notif-fg">
+                <span>Хабарламалар</span>
+                <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-pill bg-white px-1 text-xs font-bold text-notif">3</span>
+            </div>
+        </div>
+    </section>
+
+    {# ─────────────────────── Промо ─────────────────────── #}
+    <section class="mb-12">
+        <h2 class="mb-4 font-display text-2xl font-bold">Промо-акцент (только конкурсы)</h2>
+        <div class="rounded-hero bg-promo-bg p-8">
+            <p class="font-display text-2xl font-bold text-slate-900">Алтын қалам — 2024</p>
+            <p class="mt-2 text-sm text-slate-700">Призовой фонд 500 000 ₸ · 14 күн қалды</p>
+            <button class="mt-4 rounded-md bg-promo-cta px-5 py-2 text-sm font-semibold text-white">
+                Қатысу
+            </button>
+        </div>
+    </section>
+
+    {# ─────────────────────── Типографика ─────────────────────── #}
+    <section class="mb-12">
+        <h2 class="mb-4 font-display text-2xl font-bold">Шрифты</h2>
+        <div class="space-y-4">
+            <div class="rounded-md bg-white p-5 shadow-sm">
+                <div class="font-mono text-xs text-slate-500">font-display · Montserrat</div>
+                <p class="mt-1 font-display text-3xl font-bold">Балалар әдеби порталы — заголовок</p>
+            </div>
+            <div class="rounded-md bg-white p-5 shadow-sm">
+                <div class="font-mono text-xs text-slate-500">font-sans · Open Sans (основной)</div>
+                <p class="mt-1 font-sans text-base">Основной текст интерфейса. Айдана өзінің алғашқы әңгімесін жариялады.</p>
+            </div>
+            <div class="rounded-md bg-white p-5 shadow-sm">
+                <div class="font-mono text-xs text-slate-500">font-ui · Inter (акценты)</div>
+                <p class="mt-1 font-ui text-sm font-medium">жауап беру · 12 жауап</p>
+            </div>
+            <div class="rounded-md bg-white p-5 shadow-sm">
+                <div class="font-mono text-xs text-slate-500">font-serif · Georgia (книга в режиме чтения)</div>
+                <p class="mt-1 font-serif text-base leading-relaxed">
+                    Бірде, ерте таңда, мен тауларға қарап тұрдым. Күн жаңа ғана шығып келе жатқан, аспан алтын түсті болатын…
+                </p>
+            </div>
+        </div>
+
+        <h3 class="mt-6 mb-2 font-display text-lg font-bold">Размерная шкала</h3>
+        <div class="space-y-1 rounded-md bg-white p-5 shadow-sm">
+            <p class="text-[10px] text-slate-600">10–11px · микротекст, даты, счётчики</p>
+            <p class="text-xs text-slate-600">12–13px · метаданные, подписи карточек</p>
+            <p class="text-sm">14px · базовый размер интерфейса</p>
+            <p class="text-base">16px · заголовок карточки (mobile)</p>
+            <p class="text-lg">18px · заголовок карточки (desktop)</p>
+            <p class="font-display text-2xl font-bold">24px · бренд / заголовки секций</p>
+            <p class="font-display text-4xl font-bold">36px · заголовок страницы (h1)</p>
+        </div>
+    </section>
+
+    {# ─────────────────────── Радиусы ─────────────────────── #}
+    <section class="mb-12">
+        <h2 class="mb-4 font-display text-2xl font-bold">Радиусы</h2>
+        <div class="grid gap-3 sm:grid-cols-4 lg:grid-cols-8">
+            <div class="rounded-xs   border border-slate-300 bg-white p-4 text-xs">xs · 2</div>
+            <div class="rounded-sm   border border-slate-300 bg-white p-4 text-xs">sm · 4</div>
+            <div class="rounded-chip border border-slate-300 bg-white p-4 text-xs">chip · 6</div>
+            <div class="rounded-md   border border-slate-300 bg-white p-4 text-xs">md · 8</div>
+            <div class="rounded-lg   border border-slate-300 bg-white p-4 text-xs">lg · 12</div>
+            <div class="rounded-hero border border-slate-300 bg-white p-4 text-xs">hero · 16</div>
+            <div class="rounded-search border border-slate-300 bg-white p-4 text-xs">search · 24</div>
+            <div class="rounded-pill border border-slate-300 bg-white px-4 py-2 text-xs">pill · 9999</div>
+        </div>
+    </section>
+
+    {# ─────────────────────── Тени ─────────────────────── #}
+    <section class="mb-12">
+        <h2 class="mb-4 font-display text-2xl font-bold">Тени</h2>
+        <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="rounded-md bg-white p-6 shadow-card-hover">card-hover</div>
+            <div class="rounded-pill bg-white p-6 shadow-bottom-nav">bottom-nav</div>
+            <div class="rounded-md bg-white p-6 shadow-tg-btn">tg-btn</div>
+            <div class="rounded-md bg-white p-6 shadow-modal">modal</div>
+        </div>
+    </section>
+
+    {# ─────────────────────── Иконки (спрайт) ─────────────────────── #}
+    <section class="mb-12">
+        <h2 class="mb-2 font-display text-2xl font-bold">Иконки (Flowbite, outline)</h2>
+        <p class="mb-4 text-sm text-slate-600">
+            DEC-09b · единый outline-стиль. Цвет — <code>currentColor</code>. Активные состояния
+            (<code>-filled</code>) — для Heart/Bookmark/ThumbsUp.
+        </p>
+
+        <div class="grid grid-cols-3 gap-3 rounded-md bg-white p-6 text-slate-700 shadow-sm sm:grid-cols-5 lg:grid-cols-8">
+            {% for name in icon_names %}
+                <div class="flex flex-col items-center gap-1 rounded-sm p-2 text-center hover:bg-slate-50">
+                    {% include "components/icon.html" with name=name size=24 %}
+                    <span class="font-mono text-[10px] text-slate-500">{{ name }}</span>
+                </div>
+            {% endfor %}
+        </div>
+
+        <h3 class="mt-6 mb-2 font-display text-lg font-bold">Бренд-иконки соцсетей</h3>
+        <div class="flex flex-wrap items-center gap-6 rounded-md bg-white p-6 shadow-sm">
+            {% include "components/icon.html" with name="telegram"  size=24 %}
+            {% include "components/icon.html" with name="instagram" size=24 cls="text-slate-800" %}
+            {% include "components/icon.html" with name="tiktok"    size=24 cls="text-slate-900" %}
+            {% include "components/icon.html" with name="youtube"   size=24 %}
+        </div>
+
+        <h3 class="mt-6 mb-2 font-display text-lg font-bold">Размеры и цвета</h3>
+        <div class="flex flex-wrap items-end gap-6 rounded-md bg-white p-6 shadow-sm">
+            {% include "components/icon.html" with name="bell" size=16 cls="text-slate-600" %}
+            {% include "components/icon.html" with name="bell" size=20 cls="text-slate-700" %}
+            {% include "components/icon.html" with name="bell" size=24 cls="text-brand" %}
+            {% include "components/icon.html" with name="bell" size=32 cls="text-notif" %}
+            {% include "components/icon.html" with name="bell" size=40 cls="text-status-published-fg" %}
+        </div>
+    </section>
+
+    {# ─────────────────────── Состояния focus-visible ─────────────────────── #}
+    <section class="mb-12">
+        <h2 class="mb-4 font-display text-2xl font-bold">Фокус (TAB по клавиатуре)</h2>
+        <div class="flex flex-wrap gap-3">
+            <button class="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+                Primary button
+            </button>
+            <button class="rounded-md border border-brand bg-white px-4 py-2 text-sm font-semibold text-brand hover:bg-slate-50">
+                Secondary button
+            </button>
+            <a href="#" class="text-sm font-semibold text-brand hover:underline">Текстовая ссылка</a>
+            <input type="text" placeholder="Поле ввода" class="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm">
+        </div>
+    </section>
+{% endblock %}

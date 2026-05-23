@@ -1,0 +1,41 @@
+{% load static %}
+{% comment %}
+    HomeCollections (FR-HOME-06). 4 кураторские подборки.
+    Каждая карточка: тонированный «верх» со стопкой обложек + низ с названием.
+
+    Контекст: collections (list of Collection)
+{% endcomment %}
+<section>
+    {% include "components/section_header.html" with title="Жинақтар" hint="тақырыптық таңдаулар" link="барлық жинақтар →" link_href="/collections/" %}
+
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {% for c in collections %}
+            <a href="{% url 'core:collection_detail' slug=c.slug %}"
+               class="group flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition-shadow hover:shadow-card-hover">
+
+                {# ── Верх: стопка обложек на цветном фоне ── #}
+                <div class="relative h-[140px] overflow-hidden"
+                     style="background: oklch(0.93 0.05 {{ c.tint_hue }})">
+                    <span class="absolute left-3 top-3 z-10 text-lg" aria-hidden="true">{{ c.emoji }}</span>
+
+                    {# Три обложки внахлёст по центру #}
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        {% for s in c.covers %}
+                            <div class="h-[88px] w-[60px] rounded-sm border-2 border-white bg-cover bg-center shadow-md
+                                        {% if not forloop.first %}-ml-4{% endif %}
+                                        {% if forloop.first %}-rotate-6{% elif forloop.last %}rotate-6{% endif %}"
+                                 style="background-image: url('{% static s.cover %}')"
+                                 aria-hidden="true"></div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {# ── Низ: название + счётчик ── #}
+                <div class="flex flex-col gap-1 px-4 py-3.5">
+                    <div class="font-sans text-sm font-bold text-slate-900 group-hover:text-brand">{{ c.name }}</div>
+                    <div class="font-sans text-xs text-slate-500">{{ c.count }} шығарма</div>
+                </div>
+            </a>
+        {% endfor %}
+    </div>
+</section>

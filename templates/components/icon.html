@@ -1,0 +1,19 @@
+{% comment %}
+    Иконка из спрайта. Цвет — currentColor (наследуется от text-*).
+
+    Параметры:
+      name      — имя иконки без префикса (bell, search, plus, …). См. _sprite.html.
+      size      — px (по умолч. 20).
+      cls       — дополнительные классы (например, "text-brand").
+      label     — если задан, иконка становится <svg role="img" aria-label="…">,
+                  иначе aria-hidden="true" (декоративная).
+
+    Пример:
+      {% include "components/icon.html" with name="bell" size=22 cls="text-slate-700" %}
+{% endcomment %}
+<svg width="{{ size|default:20 }}" height="{{ size|default:20 }}"
+     class="inline-block flex-shrink-0 {{ cls }}"
+     fill="currentColor"
+     {% if label %}role="img" aria-label="{{ label }}"{% else %}aria-hidden="true" focusable="false"{% endif %}>
+    <use href="#icon-{{ name }}"/>
+</svg>

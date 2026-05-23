@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if story %}{{ story.title }} · баптаулар{% else %}Баптаулар{% endif %} — Balaproza{% endblock %}
+
+{% block content %}
+{% if not story %}
+    <div class="rounded-lg border border-slate-200 bg-white p-10 text-center">
+        <h1 class="font-display text-2xl font-bold text-slate-900">Шығарма табылмады</h1>
+        <p class="mt-2 font-sans text-sm text-slate-600">Slug: <code>{{ slug }}</code></p>
+    </div>
+{% else %}
+    <p class="mb-4 font-sans text-xs text-slate-500">
+        <a href="{% url 'core:my_stories' %}" class="hover:text-brand">Менің шығармаларым</a> /
+        <a href="{% url 'core:manage_story' slug=story.slug %}" class="hover:text-brand">{{ story.title }}</a> /
+        <span class="text-slate-700">баптаулар</span>
+    </p>
+
+    <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+            <h1 class="font-display text-3xl font-bold text-slate-900">Шығарма баптаулары</h1>
+            <p class="mt-1 font-sans text-sm text-slate-600">«{{ story.title }}» туралы метадеректер.</p>
+        </div>
+        {% include "components/status_badge.html" with key=story.status %}
+    </header>
+
+    <form method="post"
+          @submit.prevent="$dispatch('toast', { kind:'success', text:'Өзгертулер сақталды (демо)' })"
+          class="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
+        {% csrf_token %}
+
+        {# ── Обложка ── #}
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-[120px_1fr] sm:items-start">
+            <div class="aspect-[2/3] w-[120px] rounded-md bg-slate-200 bg-cover bg-center shadow-sm"
+                 style="background-image: url('{% static story.cover %}')"
+                 role="img" aria-label="ағымдағы мұқаба"></div>
+
+            <div class="flex flex-col gap-2">
+                <span class="font-sans text-sm font-semibold text-slate-800">Мұқаба</span>
+                <label class="inline-flex h-9 max-w-fit cursor-pointer items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    {% include "components/icon.html" with name="upload" size=14 %}
+                    Жаңа файл таңдау
+                    <input type="file" name="cover" accept="image/*" class="sr-only">
+                </label>
+                <span class="font-sans text-xs text-slate-500">PNG/JPG, 600×900 ұсынылады.</span>
+            </div>
+        </div>
+
+        {% include "components/input_field.html" with name="title" label="Атауы" value=story.title required=True maxlength=120 %}
+
+        {% include "components/textarea.html" with name="annotation" label="Аннотация" value=story.annotation rows=4 maxlength=500 required=True %}
+
+        <label class="flex flex-col gap-1.5">
+            <span class="font-sans text-sm font-semibold text-slate-800">
+                Негізгі жанр <span class="text-status-error-fg" aria-hidden="true">*</span>
+            </span>
+            <select name="genre_primary" required
+                    class="h-9 rounded-md border border-slate-300 bg-slate-50 px-3 font-sans text-sm text-slate-900 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30">
+                {% for g in genres %}
+                    <option value="{{ g.slug }}" {% if g.slug == story.primary_genre.slug %}selected{% endif %}>{{ g.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label class="flex flex-col gap-1.5">
+            <span class="font-sans text-sm font-semibold text-slate-800">Қосымша жанр</span>
+            <select name="genre_secondary"
+                    class="h-9 rounded-md border border-slate-300 bg-slate-50 px-3 font-sans text-sm text-slate-900 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30">
+                <option value="">— жоқ —</option>
+                {% for g in genres %}
+                    <option value="{{ g.slug }}" {% if g.slug == story.secondary_genre %}selected{% endif %}>{{ g.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <fieldset class="flex flex-col gap-2">
+            <legend class="mb-1 font-sans text-sm font-semibold text-slate-800">
+                Мәртебесі <span class="text-status-error-fg" aria-hidden="true">*</span>
+            </legend>
+            {% if story.status == "OnProcess" %}
+                {% include "components/radio_option.html" with name="status" value="OnProcess" label="Жазылып жатыр" checked=True %}
+                {% include "components/radio_option.html" with name="status" value="Completed" label="Аяқталды" %}
+            {% else %}
+                {% include "components/radio_option.html" with name="status" value="OnProcess" label="Жазылып жатыр" %}
+                {% include "components/radio_option.html" with name="status" value="Completed" label="Аяқталды" checked=True %}
+            {% endif %}
+        </fieldset>
+
+        <div class="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-5">
+            <a href="{% url 'core:manage_story' slug=story.slug %}"
+               class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                Болдырмау
+            </a>
+            {% include "components/button.html" with kind="primary" label="Сақтау" icon="check" type="submit" %}
+        </div>
+    </form>
+
+    {# ── Опасная зона ── #}
+    <section class="mt-8 rounded-lg border border-status-error-fg/30 bg-status-error-bg/30 p-5">
+        <h2 class="font-display text-sm font-bold text-status-error-fg">Қауіпті аймақ</h2>
+        <p class="mt-1 font-sans text-xs leading-relaxed text-slate-700">
+            Шығарманы өшіру — қайтарылмайтын әрекет.
+        </p>
+        <button type="button"
+                @click="$dispatch('open-delete-confirm', { name: '{{ story.title|escapejs }}', confirm_url: '#' })"
+                class="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-status-error-fg bg-white px-5 font-sans text-sm font-bold text-status-error-fg hover:bg-status-error-bg">
+            {% include "components/icon.html" with name="trash" size=14 %}
+            Шығарманы өшіру
+        </button>
+    </section>
+
+    {% include "components/delete_confirm_modal.html" %}
+{% endif %}
+{% endblock %}
+
+{% block right_rail %}
+    {% include "partials/right_rail/writer.html" %}
+{% endblock %}

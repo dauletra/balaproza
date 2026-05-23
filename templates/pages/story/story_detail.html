@@ -1,0 +1,254 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if story %}{{ story.title }} — {{ story.author.name }}{% else %}Шығарма{% endif %} — Balaproza{% endblock %}
+
+{% block content %}
+{% if not story %}
+    <div class="rounded-lg border border-slate-200 bg-white p-10 text-center">
+        <h1 class="font-display text-2xl font-bold text-slate-900">Шығарма табылмады</h1>
+        <p class="mt-2 font-sans text-sm text-slate-600">Slug: <code>{{ slug }}</code></p>
+        <a href="{% url 'core:home' %}" class="mt-4 inline-block font-sans text-sm font-semibold text-brand hover:underline">
+            ← Басты бетке
+        </a>
+    </div>
+{% else %}
+
+<div class="flex flex-col gap-8">
+
+    {# ─────────────────────── Шапка произведения ─────────────────────── #}
+    <header class="grid grid-cols-1 gap-6 sm:grid-cols-[180px_1fr] md:grid-cols-[220px_1fr]">
+        <div class="aspect-[2/3] w-full rounded-lg bg-slate-200 bg-cover bg-center shadow-card-hover"
+             style="background-image: url('{% static story.cover %}')"
+             role="img" aria-label="«{{ story.title }}» мұқабасы"></div>
+
+        <div class="flex flex-col gap-3">
+            <div class="flex flex-wrap gap-1.5">
+                {% for g in story.genres_resolved %}
+                    {% include "components/genre_chip.html" with genre=g size="sm" %}
+                {% endfor %}
+            </div>
+
+            <h1 class="font-sans text-3xl font-bold leading-tight text-slate-900 sm:text-4xl">
+                {{ story.title }}
+            </h1>
+
+            <a href="{% url 'core:profile_other' username=story.author.username %}"
+               class="inline-flex items-center gap-2 self-start font-sans text-sm text-slate-600 hover:text-brand">
+                {% include "components/avatar.html" with size=24 name=story.author.name %}
+                <span>{{ story.author.name }}</span>
+            </a>
+
+            <div class="mt-1 flex flex-wrap items-center gap-4">
+                {# FR-STORY-12: общий счётчик = сумма лайков глав; ставится в режиме чтения #}
+                {% include "components/stat_pill.html" with icon="heart" value=story.likes %}
+                {% include "components/stat_pill.html" with icon="eye" value=story.views %}
+                {% include "components/stat_pill.html" with icon="message-caption" value=story.comments %}
+                <span class="font-sans text-xs text-slate-500">· {{ story.chapters }} бөлім</span>
+            </div>
+
+            <div class="mt-3 flex flex-wrap items-center gap-2.5">
+                {% url 'core:story_read' slug=story.slug as read_href %}
+                {% include "components/button.html" with kind="primary" size="lg" label="Оқу" icon="book" href=read_href %}
+
+                <button type="button" aria-label="Сақтау"
+                        class="grid h-11 w-11 place-items-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50">
+                    {% include "components/icon.html" with name="bookmark" size=18 %}
+                </button>
+
+                {% include "components/share_button.html" with url=request.build_absolute_uri title=story.title %}
+
+                {% if signed_in %}
+                    <button type="button" @click="$dispatch('open-report', { target: 'story:{{ story.slug }}' })"
+                            class="ml-auto inline-flex h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                            aria-label="Шағым жіберу">
+                        {% include "components/icon.html" with name="dots-vertical" size=16 %}
+                        <span>Шағым</span>
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    {# ─────────────────────── Scrollspy + 3 секции ─────────────────────── #}
+    <div x-data="{
+            active: 'anon',
+            init() {
+                const io = new IntersectionObserver((entries) => {
+                    entries.forEach(e => { if (e.isIntersecting) this.active = e.target.id; });
+                }, { rootMargin: '-30% 0px -60% 0px', threshold: 0 });
+                ['anon', 'chapters', 'comments'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) io.observe(el);
+                });
+            }
+         }">
+
+        {# Sticky pill-nav (DEC-15: не табы, а scrollspy) #}
+        <nav aria-label="Бөлімдер навигациясы"
+             class="sticky top-16 z-20 -mx-4 mb-6 flex gap-1.5 overflow-x-auto border-y border-slate-200 bg-slate-100/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:mx-0 lg:rounded-pill lg:border lg:px-2">
+            <a href="#anon"
+               :class="active === 'anon' ? 'bg-brand text-white' : 'text-slate-700 hover:bg-slate-200'"
+               class="rounded-pill px-4 py-1.5 font-sans text-sm font-semibold whitespace-nowrap transition-colors">
+                Аннотация
+            </a>
+            <a href="#chapters"
+               :class="active === 'chapters' ? 'bg-brand text-white' : 'text-slate-700 hover:bg-slate-200'"
+               class="rounded-pill px-4 py-1.5 font-sans text-sm font-semibold whitespace-nowrap transition-colors">
+                Бөлімдер
+                <span class="ml-1 font-normal opacity-70">{{ chapters|length }}</span>
+            </a>
+            <a href="#comments"
+               :class="active === 'comments' ? 'bg-brand text-white' : 'text-slate-700 hover:bg-slate-200'"
+               class="rounded-pill px-4 py-1.5 font-sans text-sm font-semibold whitespace-nowrap transition-colors">
+                Пікірлер
+                <span class="ml-1 font-normal opacity-70">{{ comments|length }}</span>
+            </a>
+        </nav>
+
+        {# ── Аннотация (FR-STORY-02) ── #}
+        <section id="anon" class="scroll-mt-32 rounded-lg border border-slate-200 bg-white p-6">
+            <h2 class="font-display text-xl font-bold text-slate-900">Аннотация</h2>
+            <p class="mt-3 font-sans text-[15px] leading-[1.65] text-slate-700">
+                Үш достың таңғажайып саяхаты. Олар әрқайсысы жоғалғанын іздеп жолға шығады, бірақ
+                табатыны мүлдем басқа нәрсе — өзін, бір-бірін және ішкі дауысты. Әр бөлім — жаңа
+                күмән, жаңа сын, жаңа таңдау. Авторлар әлемі — бұл біздің әлемнен бір қадам әріге
+                ғана кеткен әлем, бірақ ондағы әр сурет — таныс.
+            </p>
+        </section>
+
+        {# ── Бөлімдер (FR-STORY-04) ── #}
+        <section id="chapters" class="mt-8 scroll-mt-32 rounded-lg border border-slate-200 bg-white p-6">
+            <div class="mb-4 flex items-baseline justify-between">
+                <h2 class="font-display text-xl font-bold text-slate-900">Бөлімдер</h2>
+                {% if current_chapter_number %}
+                    <span class="font-sans text-xs text-slate-500">
+                        Оқылды: <strong class="text-slate-800">{{ current_chapter_number }}</strong> / {{ chapters|length }}
+                    </span>
+                {% endif %}
+            </div>
+
+            {% if current_chapter_number %}
+                {% widthratio current_chapter_number chapters|length 100 as pct %}
+                <div class="mb-5 h-1.5 overflow-hidden rounded-pill bg-slate-200">
+                    <div class="h-full bg-brand" style="width: {{ pct }}%"></div>
+                </div>
+            {% endif %}
+
+            <ol class="flex flex-col">
+                {% for c in chapters %}
+                    <li class="border-b border-slate-100 last:border-b-0">
+                        <a href="{% url 'core:story_read_chapter' slug=story.slug chapter=c.number %}"
+                           class="flex items-center gap-4 py-3 hover:text-brand">
+                            <span class="w-7 shrink-0 text-right font-display text-sm font-bold text-slate-400">
+                                {{ c.number }}
+                            </span>
+                            <span class="flex-1 font-sans text-sm
+                                         {% if c.number == current_chapter_number %}text-brand font-semibold{% else %}text-slate-800{% endif %}">
+                                {{ c.title }}
+                            </span>
+
+                            {# Лайки главы (FR-STORY-12) — read-only счётчик; лайк ставится в режиме чтения #}
+                            {% if c.likes %}
+                                <span class="inline-flex shrink-0 items-center gap-1 font-sans text-xs {% if c.liked %}text-status-error-fg{% else %}text-slate-500{% endif %}"
+                                      title="Бөлім ұнатулары">
+                                    {% include "components/icon.html" with name=c.liked|yesno:"heart-filled,heart" size=12 %}
+                                    <span>{{ c.likes }}</span>
+                                </span>
+                            {% endif %}
+
+                            <span class="font-sans text-xs text-slate-500">{{ c.char_count_formatted }}</span>
+                            {% if c.number == current_chapter_number %}
+                                {% include "components/icon.html" with name="bookmark-filled" size=14 cls="text-brand" %}
+                            {% endif %}
+                        </a>
+                    </li>
+                {% endfor %}
+            </ol>
+        </section>
+
+        {# ── Пікірлер (FR-STORY-05) ── #}
+        <section id="comments" class="mt-8 scroll-mt-32 rounded-lg border border-slate-200 bg-white p-6">
+            <h2 class="mb-4 font-display text-xl font-bold text-slate-900">
+                Пікірлер
+                <span class="ml-1 font-sans text-sm font-normal text-slate-500">{{ comments|length }}</span>
+            </h2>
+
+            {% if signed_in %}
+                {# Поле ввода нового комментария — заглушка, реальный submit в Ф14 #}
+                <form @submit.prevent="$dispatch('toast', { kind:'success', text:'Пікіріңіз қосылды' })"
+                      class="mb-6 flex items-start gap-3">
+                    {% include "components/avatar.html" with size=36 name=current_user_name %}
+                    <div class="flex-1">
+                        <textarea rows="2" placeholder="Пікіріңізді жазыңыз…"
+                                  class="w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-2.5 font-sans text-sm placeholder:text-slate-500 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30"></textarea>
+                        <div class="mt-2 flex justify-end">
+                            {% include "components/button.html" with kind="primary" label="Жіберу" type="submit" icon="paper-plane" %}
+                        </div>
+                    </div>
+                </form>
+            {% else %}
+                <div class="mb-6">
+                    {% include "components/comment_login_gate.html" %}
+                </div>
+            {% endif %}
+
+            <div class="flex flex-col gap-6">
+                {% for cm in comments %}
+                    {% if cm.author %}
+                        <div>
+                            {% include "components/comment.html" with author_name=cm.author.name date=cm.date text=cm.text likes=cm.likes liked=cm.liked badge=cm.is_author_badge|yesno:"Автор," allow_reply=signed_in %}
+
+                            {# Replies (BR-30: один уровень — реплай-форма у реплая отсутствует) #}
+                            {% for rp in cm.replies %}
+                                {% if rp.author %}
+                                    {% include "components/comment.html" with author_name=rp.author.name date=rp.date text=rp.text likes=rp.likes liked=rp.liked badge=rp.is_author_badge|yesno:"Автор," depth=1 allow_reply=False %}
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% empty %}
+                    <p class="rounded-md bg-slate-50 px-4 py-6 text-center font-sans text-sm text-slate-500">
+                        Әлі пікір жоқ. Бірінші болыңыз.
+                    </p>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+
+    {# ── Басқа шығармалар (FR-STORY-02) ── #}
+    {% if related %}
+        <section aria-labelledby="related-heading" class="mt-4">
+            <header class="mb-4 flex items-baseline justify-between">
+                <h2 id="related-heading" class="font-display text-xl font-bold text-slate-900">
+                    Басқа шығармалар
+                </h2>
+                {% if story.genres_resolved %}
+                    {% with primary_genre=story.genres_resolved.0 %}
+                        <a href="{% url 'core:genre_detail' slug=primary_genre.slug %}"
+                           class="font-sans text-sm font-semibold text-brand hover:underline">
+                            {{ primary_genre.name }} жанры →
+                        </a>
+                    {% endwith %}
+                {% endif %}
+            </header>
+            <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                {% for s in related %}
+                    {% include "components/book_card_small.html" with story=s %}
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
+</div>
+
+{# Маунтим ReportModal — открывается по событию из кнопки выше #}
+{% if signed_in %}
+    {% include "components/report_modal.html" %}
+{% endif %}
+
+{% endif %}
+{% endblock %}
+
+{% block right_rail %}
+    {% include "partials/right_rail/story.html" %}
+{% endblock %}

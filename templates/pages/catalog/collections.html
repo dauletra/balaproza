@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Жинақтар — Balaproza{% endblock %}
+
+{% block content %}
+<header class="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div>
+        <h1 class="font-display text-4xl font-medium text-slate-900">Жинақтар</h1>
+        <p class="mt-2 max-w-xl font-sans text-sm text-slate-600">
+            Тақырыпқа жинақталған шығармалар. Балаларға арналған құрастырылған тізімдер.
+        </p>
+    </div>
+    {% if signed_in %}
+        {% include "components/button.html" with kind="secondary" label="Өз жинағыңды құру" icon="plus" %}
+    {% endif %}
+</header>
+
+<div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+    {% for c in collections %}
+        <a href="{% url 'core:collection_detail' slug=c.slug %}"
+           class="group flex flex-col gap-3">
+
+            {# ── Тонированный «верх» + стопка обложек со сдвигом ── #}
+            <div class="relative h-[220px] overflow-hidden rounded-lg border border-slate-200"
+                 style="background: oklch(0.93 0.05 {{ c.tint_hue }})">
+                <span aria-hidden="true" class="absolute left-3 top-3 z-10 text-xl">{{ c.emoji }}</span>
+
+                <span class="absolute right-3 top-3 z-10 inline-flex items-center rounded-pill bg-slate-900/70 px-2.5 py-1 font-sans text-xs font-bold text-white">
+                    {{ c.count }}
+                </span>
+
+                {# Три обложки в ряд со смещением и небольшим поворотом #}
+                <div class="absolute inset-0 flex items-center justify-center">
+                    {% for s in c.covers %}
+                        <div class="h-[165px] w-[110px] rounded-md border-2 border-white bg-cover bg-center shadow-md transition-transform group-hover:-translate-y-1
+                                    {% if not forloop.first %}-ml-6{% endif %}
+                                    {% if forloop.first %}-rotate-6{% elif forloop.last %}rotate-6{% endif %}"
+                             style="background-image: url('{% static s.cover %}')"
+                             aria-hidden="true"></div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {# ── Низ: название + куратор ── #}
+            <div>
+                <div class="font-sans text-base font-bold text-slate-900 group-hover:text-brand">
+                    {{ c.name }}
+                </div>
+                <div class="mt-1 font-sans text-xs text-slate-500">
+                    Құрастырған: {{ c.curator }}
+                </div>
+            </div>
+        </a>
+    {% endfor %}
+</div>
+{% endblock %}

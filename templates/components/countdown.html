@@ -1,0 +1,17 @@
+{% comment %}
+    Countdown (docs/04.7). Отсчёт «N күн қалды».
+    На дизайн-этапе — статика; в проде заменится на Alpine-таймер.
+
+    Параметры:
+      days  — int, сколько осталось
+      size  — 'sm' (default, h-7) | 'md' (h-9)
+      muted — boolean: серая стилистика вместо акцентной
+{% endcomment %}
+{% with sz=size|default:"sm" %}
+<span class="inline-flex items-center gap-1.5 rounded-pill font-sans font-semibold
+             {% if sz == 'md' %}h-9 px-3 text-sm{% else %}h-7 px-2.5 text-xs{% endif %}
+             {% if muted %}bg-slate-100 text-slate-700{% else %}bg-status-attention-bg text-status-attention-fg{% endif %}">
+    {% include "components/icon.html" with name="adjustments" size=12 %}
+    {{ days }} күн қалды
+</span>
+{% endwith %}

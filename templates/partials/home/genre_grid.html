@@ -1,0 +1,27 @@
+{% comment %}
+    HomeGenreGrid (FR-HOME-05). Сетка цветных карточек жанров (OKLCH из docs/03).
+    8 топ-жанров; полный индекс по ссылке.
+
+    Контекст: genres (list of Genre, отображаются первые 8)
+{% endcomment %}
+<section>
+    {% include "components/section_header.html" with title="Жанрлар" link="барлық жанрлар (12) →" link_href="/genres/" %}
+
+    <div class="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
+        {% for g in genres|slice:":8" %}
+            <a href="{% url 'core:genre_detail' slug=g.slug %}"
+               class="relative flex min-h-[96px] flex-col gap-1 overflow-hidden rounded-lg border p-5 transition-shadow hover:shadow-card-hover"
+               style="background: oklch(0.96 0.04 {{ g.hue }});
+                      border-color: oklch(0.86 0.08 {{ g.hue }});
+                      color: oklch(0.38 0.14 {{ g.hue }});">
+                <div class="font-sans text-lg font-bold">{{ g.name }}</div>
+                <div class="font-sans text-xs opacity-70">{{ g.count }} шығарма</div>
+
+                <span class="absolute right-3.5 bottom-3.5 grid h-[26px] w-[26px] place-items-center rounded-pill text-white"
+                      style="background: oklch(0.38 0.14 {{ g.hue }})">
+                    {% include "components/icon.html" with name="arrow-right" size=12 %}
+                </span>
+            </a>
+        {% endfor %}
+    </div>
+</section>

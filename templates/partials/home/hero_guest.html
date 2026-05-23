@@ -1,0 +1,63 @@
+{% comment %}
+    Hero для нового/гостевого пользователя — приветствие + текущий конкурс
+    (FR-HOME-01 + FR-HOME-02).
+
+    Контекст: platform_stats (dict), hero_contest (Contest)
+{% endcomment %}
+<section class="relative overflow-hidden rounded-hero text-white shadow-card-hover"
+         style="background: linear-gradient(135deg, var(--color-slate-900) 0%, var(--color-brand) 75%, rgba(227,255,134,0.18) 100%)">
+    <div class="grid grid-cols-1 gap-10 px-8 py-10 md:grid-cols-[1fr_280px] md:px-[52px] md:py-11">
+
+        {# ── Левая колонка: приветствие ── #}
+        <div class="relative">
+            <div class="mb-2.5 font-display text-xs font-semibold uppercase tracking-[0.14em] text-promo-bg">
+                Balaproza-ға қош келдіңіз
+            </div>
+            <h1 class="font-sans text-[38px] font-bold leading-[1.05] -tracking-[0.01em]">
+                Қазақстандық авторлардың
+                <br>
+                <span class="text-promo-bg">әңгімелері</span> мен әлемдері.
+            </h1>
+            <p class="mt-3.5 max-w-[480px] font-sans text-sm leading-[1.6] text-white/80">
+                {{ platform_stats.stories|stringformat:"d" }} шығарма,
+                {{ platform_stats.authors|stringformat:"d" }} автор,
+                {{ platform_stats.contests }} белсенді байқау.
+                Сіздің әңгімеңіз де осында табылады.
+            </p>
+            <div class="mt-[22px] flex flex-wrap gap-2.5">
+                {% url 'core:genre_index' as browse_href %}
+                {% include "components/button.html" with kind="primary" size="lg" label="Шолуды бастау" icon="book" href=browse_href %}
+                <a href="{% url 'core:login' %}"
+                   class="inline-flex h-11 items-center gap-2 rounded-md border border-white/30 bg-transparent px-[22px] font-sans text-sm font-semibold text-white hover:bg-white/10">
+                    Telegram арқылы кіру
+                </a>
+            </div>
+        </div>
+
+        {# ── Правая колонка: мини-карточка активного конкурса ── #}
+        <aside class="rounded-lg border border-white/20 bg-white/10 p-5">
+            <div class="mb-3 font-display text-[10px] font-bold uppercase tracking-[0.12em] text-promo-bg">
+                Белсенді байқау
+            </div>
+            <div class="font-sans text-base font-bold leading-snug">{{ hero_contest.name }}</div>
+            <div class="mt-1 font-sans text-xs text-white/70">{{ hero_contest.subtitle }}</div>
+
+            <dl class="mt-4 grid grid-cols-2 gap-3 border-t border-white/10 pt-3 font-sans text-xs">
+                <div>
+                    <dt class="text-white/60">Қалды</dt>
+                    <dd class="mt-0.5 font-display text-lg font-bold">{{ hero_contest.days_left }} күн</dd>
+                </div>
+                <div>
+                    <dt class="text-white/60">Жүлде</dt>
+                    <dd class="mt-0.5 font-display text-lg font-bold">{{ hero_contest.prize_kzt|stringformat:"d" }} ₸</dd>
+                </div>
+            </dl>
+
+            <a href="{% url 'core:contest_detail' slug=hero_contest.slug %}"
+               class="mt-4 inline-flex items-center gap-1 font-sans text-xs font-semibold text-promo-bg hover:underline">
+                Толығырақ
+                {% include "components/icon.html" with name="arrow-right" size=14 %}
+            </a>
+        </aside>
+    </div>
+</section>

@@ -1,0 +1,297 @@
+{% extends 'base.html' %}
+
+{% block title %}Дизайн · Компоненты — Balaproza{% endblock %}
+
+{% block content %}
+    <header class="mb-10">
+        <p class="text-xs font-bold uppercase tracking-wide text-brand">_design</p>
+        <h1 class="mt-1 font-display text-4xl font-bold">Каталог компонентов</h1>
+        <p class="mt-2 max-w-prose text-sm text-slate-600">
+            Все атомы из <code>docs/04-component-library.md</code> во всех состояниях.
+            Доступно только при <code>DEBUG=True</code>.
+        </p>
+    </header>
+
+    {# ─────────────────────── Кнопки ─────────────────────── #}
+    <section class="mb-12 rounded-lg bg-white p-6 shadow-sm">
+        <h2 class="mb-4 font-display text-2xl font-bold">Кнопки</h2>
+
+        <div class="flex flex-wrap items-center gap-3">
+            {% include "components/button.html" with kind="primary" label="Primary" %}
+            {% include "components/button.html" with kind="primary" label="With icon" icon="plus" %}
+            {% include "components/button.html" with kind="primary" label="Large" size="lg" icon="book" %}
+            {% include "components/button.html" with kind="primary" label="Disabled" disabled=True %}
+        </div>
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+            {% include "components/button.html" with kind="secondary" label="Secondary" %}
+            {% include "components/button.html" with kind="secondary" label="With icon" icon="pen" %}
+            {% include "components/button.html" with kind="secondary" label="Disabled" disabled=True %}
+        </div>
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+            {% include "components/button.html" with kind="promo" label="Promo · Қатысу" %}
+            {% include "components/button.html" with kind="promo" label="Large promo" size="lg" %}
+        </div>
+    </section>
+
+    {# ─────────────────────── Бейджи ─────────────────────── #}
+    <section class="mb-12 rounded-lg bg-white p-6 shadow-sm">
+        <h2 class="mb-4 font-display text-2xl font-bold">Бейджи (универсальные)</h2>
+        <div class="flex flex-wrap gap-2">
+            {% include "components/badge.html" with kind="neutral" label="Neutral" %}
+            {% include "components/badge.html" with kind="published" label="Published" icon="check" %}
+            {% include "components/badge.html" with kind="info" label="Info" %}
+            {% include "components/badge.html" with kind="warning" label="Warning" %}
+            {% include "components/badge.html" with kind="attention" label="Attention" %}
+            {% include "components/badge.html" with kind="error" label="Error" %}
+            {% include "components/badge.html" with kind="notif" label="3" %}
+        </div>
+
+        <h3 class="mt-6 mb-3 font-display text-lg font-bold">StatusBadge (произведения)</h3>
+        <div class="flex flex-wrap gap-2">
+            {% include "components/status_badge.html" with key="Published" %}
+            {% include "components/status_badge.html" with key="NotPublished" %}
+            {% include "components/status_badge.html" with key="OnProcess" %}
+            {% include "components/status_badge.html" with key="Completed" %}
+            {% include "components/status_badge.html" with key="OnModeration" %}
+        </div>
+    </section>
+
+    {# ─────────────────────── Формы ─────────────────────── #}
+    <section class="mb-12 rounded-lg bg-white p-6 shadow-sm">
+        <h2 class="mb-4 font-display text-2xl font-bold">Формы</h2>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+            {% include "components/input_field.html" with name="email1" label="Default" placeholder="email@example.com" %}
+            {% include "components/input_field.html" with name="email2" label="With icon" icon="search" placeholder="Шығарма іздеу..." %}
+            {% include "components/input_field.html" with name="email3" label="Success" value="daulet@balaproza.kz" state="success" message="Дұрыс пішім" %}
+            {% include "components/input_field.html" with name="email4" label="Error" value="ne-email" state="error" message="Email пішімі дұрыс емес" %}
+            {% include "components/input_field.html" with name="email5" label="Disabled" value="readonly@x.kz" disabled=True %}
+            {% include "components/input_field.html" with name="email6" label="With hint" placeholder="Пароль" type="password" hint="Кем дегенде 8 таңба" %}
+        </div>
+
+        <div class="mt-6 grid gap-4 sm:grid-cols-2">
+            {% include "components/textarea.html" with name="bio1" label="Био" placeholder="Өзіңіз туралы..." maxlength=250 %}
+            {% include "components/textarea.html" with name="bio2" label="С ошибкой" value="Тым қысқа" state="error" message="Кем дегенде 30 таңба" maxlength=250 %}
+        </div>
+
+        <div class="mt-6 grid gap-4 sm:grid-cols-2">
+            <div class="space-y-3">
+                <h3 class="font-display text-sm font-bold uppercase tracking-wide text-slate-600">Toggle</h3>
+                {% include "components/toggle.html" with name="notif" label="Хабарламаларды қосу" on=True %}
+                {% include "components/toggle.html" with name="email" label="Email-ге де жіберу" %}
+                {% include "components/toggle.html" with name="dark" label="Қараңғы тақырыпша" disabled=True %}
+            </div>
+            <div class="space-y-3">
+                <h3 class="font-display text-sm font-bold uppercase tracking-wide text-slate-600">Radio + Checkbox</h3>
+                {% include "components/radio_option.html" with name="gender" value="boy" label="Ұл" %}
+                {% include "components/radio_option.html" with name="gender" value="girl" label="Қыз" checked=True %}
+                <div class="pt-2">
+                    {% include "components/checkbox.html" with name="agree" label="Пайдалану ережелерімен таныстым" required=True %}
+                </div>
+                <div>
+                    {% include "components/checkbox.html" with name="newsletter" label="Жаңалықтарды email-ге алам" checked=True %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {# ─────────────────────── Avatar + StatPill + SectionHeader ─────────────────────── #}
+    <section class="mb-12 rounded-lg bg-white p-6 shadow-sm">
+        <h2 class="mb-4 font-display text-2xl font-bold">Avatar · StatPill · SectionHeader</h2>
+
+        <div class="flex flex-wrap items-end gap-4">
+            {% include "components/avatar.html" with size=24 %}
+            {% include "components/avatar.html" with size=32 %}
+            {% include "components/avatar.html" with size=40 %}
+            {% include "components/avatar.html" with size=56 %}
+            {% include "components/avatar.html" with size=72 %}
+        </div>
+
+        <div class="mt-6 flex flex-wrap items-center gap-5">
+            {% include "components/stat_pill.html" with icon="thumbs-up" value="4 821" %}
+            {% include "components/stat_pill.html" with icon="eye" value="12 482" %}
+            {% include "components/stat_pill.html" with icon="message-caption" value="312" %}
+            {% include "components/stat_pill.html" with icon="heart" value="2 100" %}
+        </div>
+
+        <div class="mt-6 rounded-md border border-slate-200 p-5">
+            {% include "components/section_header.html" with title="Ең көп оқылған" hint="апта ішінде" link="барлығы →" link_href="#" %}
+        </div>
+        <div class="mt-3 rounded-md border border-slate-200 p-5">
+            {% include "components/section_header.html" with title="Сақтаулыларым" eyebrow="ЖАЙ" %}
+        </div>
+    </section>
+
+    {# ─────────────────────── GenreChip (все 12 OKLCH) ─────────────────────── #}
+    <section class="mb-12 rounded-lg bg-white p-6 shadow-sm">
+        <h2 class="mb-4 font-display text-2xl font-bold">GenreChip — все 12 жанров</h2>
+        <div class="flex flex-wrap gap-2">
+            {% for g in genres %}
+                {% include "components/genre_chip.html" with genre=g size="sm" %}
+            {% endfor %}
+        </div>
+        <h3 class="mt-6 mb-3 font-display text-sm font-bold uppercase tracking-wide text-slate-600">Размер md</h3>
+        <div class="flex flex-wrap gap-2">
+            {% for g in genres|slice:":6" %}
+                {% include "components/genre_chip.html" with genre=g size="md" %}
+            {% endfor %}
+        </div>
+    </section>
+
+    {# ─────────────────────── Карточки книг ─────────────────────── #}
+    <section class="mb-12 rounded-lg bg-white p-6 shadow-sm">
+        <h2 class="mb-4 font-display text-2xl font-bold">Карточки книг</h2>
+
+        <h3 class="mb-3 font-display text-sm font-bold uppercase tracking-wide text-slate-600">BookCardSmall</h3>
+        <div class="grid grid-cols-3 gap-4 sm:grid-cols-6">
+            {% for s in stories %}
+                {% include "components/book_card_small.html" with story=s %}
+            {% endfor %}
+        </div>
+
+        <h3 class="mt-6 mb-3 font-display text-sm font-bold uppercase tracking-wide text-slate-600">BookCardWide</h3>
+        <div class="flex flex-col gap-3">
+            {% include "components/book_card_wide.html" with story=stories.0 description="Үш достың таңғажайып саяхаты. Олар әрқайсысы жоғалғанын іздеп, бір-бірін табады." status_key="Published" %}
+            {% include "components/book_card_wide.html" with story=stories.1 status_key="OnModeration" %}
+        </div>
+    </section>
+
+    {# ─────────────────────── Pagination + Countdown + ContestStatus ─────────────────────── #}
+    <section class="mb-12 rounded-lg bg-white p-6 shadow-sm">
+        <h2 class="mb-4 font-display text-2xl font-bold">Pagination · Countdown · ContestStatus</h2>
+
+        <div class="flex flex-wrap items-center gap-6">
+            {% include "components/countdown.html" with days=12 %}
+            {% include "components/countdown.html" with days=3 size="md" %}
+            {% include "components/countdown.html" with days=30 muted=True %}
+        </div>
+
+        <div class="mt-4 flex flex-wrap items-center gap-6">
+            {% include "components/contest_status.html" with status="active" days_left=12 %}
+            {% include "components/contest_status.html" with status="finished" %}
+        </div>
+
+        <div class="mt-6">
+            {% include "components/pagination.html" with current=3 total=12 base="/search/" qs="" %}
+        </div>
+        <div class="mt-4">
+            {% include "components/pagination.html" with current=1 total=4 base="/search/" %}
+        </div>
+        <div class="mt-4">
+            {% include "components/pagination.html" with current=12 total=12 base="/search/" %}
+        </div>
+    </section>
+
+    {# ─────────────────────── Comment · все вариации ─────────────────────── #}
+    <section class="mb-12 rounded-lg bg-white p-6 shadow-sm">
+        <h2 class="mb-1 font-display text-2xl font-bold">Comment · все состояния</h2>
+        <p class="mb-6 font-sans text-sm text-slate-600">
+            BR-30: один уровень ответов. На <code>depth=1</code> кнопка «жауап беру» отсутствует.
+            Reply-форма (Alpine) появляется по клику и фокусирует textarea автоматически.
+        </p>
+
+        {# ── 1. Базовый ── #}
+        <h3 class="mb-2 font-display text-sm font-bold uppercase tracking-wide text-slate-600">1. Базовый (read-only, без лайка)</h3>
+        <div class="mb-6 rounded-md border border-slate-100 p-4">
+            {% include "components/comment.html" with author_name="Айгерім Қасенова" date="3 күн бұрын" text="Сюжет қарапайым, бірақ кейіпкерлер шынайы. Маған ұнады." likes=4 %}
+        </div>
+
+        {# ── 2. Лайкнут текущим юзером ── #}
+        <h3 class="mb-2 font-display text-sm font-bold uppercase tracking-wide text-slate-600">2. Лайкнут текущим пользователем (heart-filled, brand-color)</h3>
+        <div class="mb-6 rounded-md border border-slate-100 p-4">
+            {% include "components/comment.html" with author_name="Бекжан Тұрсынов" date="3 күн бұрын" text="Тіл өте таза, метафоралары жанды." likes=12 liked=True %}
+        </div>
+
+        {# ── 3. Бейдж «Автор» ── #}
+        <h3 class="mb-2 font-display text-sm font-bold uppercase tracking-wide text-slate-600">3. С бейджем «Автор» (автор отвечает на свой пост)</h3>
+        <div class="mb-6 rounded-md border border-slate-100 p-4">
+            {% include "components/comment.html" with author_name="Сайын Қаспер" date="1 күн бұрын" badge="Автор" text="Пікірлерге рахмет. Келесі бөлім жұма күні шығады, дайындап жатырмын." likes=87 %}
+        </div>
+
+        {# ── 4. Длинный + reply-форма (если signed_in) ── #}
+        <h3 class="mb-2 font-display text-sm font-bold uppercase tracking-wide text-slate-600">4. Длинный текст + reply-форма (клик по «жауап беру»)</h3>
+        <div class="mb-6 rounded-md border border-slate-100 p-4">
+            {% include "components/comment.html" with author_name="Дина Кітаптанаева" date="6 сағат бұрын" text="Үшінші бөлімдегі қарттың сұрағы — «жүректің не дейтіні?» — әлі есімде. Авторға айтарым: тіл өте таза, метафоралары жанды. Сирек кездесетін сапа. Жалғасын асыға күтемін, тағы 4 бөлім жетеді деп үміттенемін." likes=24 allow_reply=True reply_avatar_name="Айдана" %}
+            <p class="mt-3 font-sans text-xs text-slate-500">
+                <em>Reply-форма открывается по клику. Сабмит диспатчит toast.</em>
+            </p>
+        </div>
+
+        {# ── 5. Нить: верхний комментарий + 2 ответа (включая ответ автора) ── #}
+        <h3 class="mb-2 font-display text-sm font-bold uppercase tracking-wide text-slate-600">5. Нить: комментарий + 2 ответа (1 от автора, BR-30 — 1 уровень)</h3>
+        <div class="mb-6 rounded-md border border-slate-100 p-4">
+            {% include "components/comment.html" with author_name="Айгерім Қасенова" date="5 сағат бұрын" text="Бірінші тарау қызықтыра түсті, бірақ кейіпкерлердің мотивациясы әлі түсініксіз. Авторға сұрақ: бұл қасақана ма?" likes=6 allow_reply=True reply_avatar_name="Айдана" %}
+
+            {% include "components/comment.html" with author_name="Александр Рудазов" date="3 сағат бұрын" badge="Автор" text="Иә, бұл әдейі. Кейіпкерлер 4-бөлімде ашылады. Шыдамдылықпен оқыңыз 🙂" likes=11 depth=1 allow_reply=False %}
+
+            {% include "components/comment.html" with author_name="Бекжан Тұрсынов" date="1 сағат бұрын" text="Айгерімнің пікіріне қосыламын." likes=3 depth=1 allow_reply=False %}
+        </div>
+
+        {# ── 6. Очень короткий (emoji) ── #}
+        <h3 class="mb-2 font-display text-sm font-bold uppercase tracking-wide text-slate-600">6. Очень короткий (emoji-комментарий)</h3>
+        <div class="mb-6 rounded-md border border-slate-100 p-4">
+            {% include "components/comment.html" with author_name="Дина Кітаптанаева" date="5 күн бұрын" text="👍" %}
+        </div>
+
+        {# ── 7. Guest gate ── #}
+        <h3 class="mb-2 font-display text-sm font-bold uppercase tracking-wide text-slate-600">7. CommentLoginGate (для гостя)</h3>
+        <div class="mb-2 rounded-md border border-slate-100 p-4">
+            {% include "components/comment_login_gate.html" %}
+        </div>
+
+        {# ── 8. Empty state ── #}
+        <h3 class="mb-2 mt-6 font-display text-sm font-bold uppercase tracking-wide text-slate-600">8. Empty state (нет ни одного комментария)</h3>
+        <div class="rounded-md border border-slate-100 p-4">
+            <p class="rounded-md bg-slate-50 px-4 py-6 text-center font-sans text-sm text-slate-500">
+                Әлі пікір жоқ. Бірінші болыңыз.
+            </p>
+        </div>
+    </section>
+
+    {# ─────────────────────── Toast + Modals (триггеры) ─────────────────────── #}
+    <section class="mb-12 rounded-lg bg-white p-6 shadow-sm">
+        <h2 class="mb-4 font-display text-2xl font-bold">Toast + Modals</h2>
+
+        <h3 class="mb-3 font-display text-sm font-bold uppercase tracking-wide text-slate-600">Toast</h3>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" @click="$dispatch('toast', { kind:'success', text:'Шығарма сақталды' })"
+                    class="rounded-md border border-status-published-fg/30 bg-status-published-bg px-4 py-2 font-sans text-sm font-semibold text-status-published-fg hover:opacity-90">
+                Success toast
+            </button>
+            <button type="button" @click="$dispatch('toast', { kind:'info', text:'Жаңа хабарлама бар' })"
+                    class="rounded-md border border-status-info-fg/30 bg-status-info-bg px-4 py-2 font-sans text-sm font-semibold text-status-info-fg hover:opacity-90">
+                Info toast
+            </button>
+            <button type="button" @click="$dispatch('toast', { kind:'error', text:'Файл тым үлкен' })"
+                    class="rounded-md border border-status-error-fg/30 bg-status-error-bg px-4 py-2 font-sans text-sm font-semibold text-status-error-fg hover:opacity-90">
+                Error toast
+            </button>
+        </div>
+
+        <h3 class="mt-6 mb-3 font-display text-sm font-bold uppercase tracking-wide text-slate-600">Modals</h3>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" @click="$dispatch('open-login')"
+                    class="rounded-md border border-slate-300 bg-white px-4 py-2 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                Открыть LoginModal
+            </button>
+            <button type="button" @click="$dispatch('open-report', { target: 'story:sample' })"
+                    class="rounded-md border border-slate-300 bg-white px-4 py-2 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                Открыть ReportModal
+            </button>
+            <button type="button" @click="$dispatch('open-delete-confirm', { name: 'На дальних берегах' })"
+                    class="rounded-md border border-slate-300 bg-white px-4 py-2 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                Открыть DeleteConfirm
+            </button>
+        </div>
+
+        <h3 class="mt-6 mb-3 font-display text-sm font-bold uppercase tracking-wide text-slate-600">ReaderSettingsPopover (триггер-кнопка)</h3>
+        <div>
+            {% include "components/reader_settings_popover.html" %}
+        </div>
+    </section>
+
+    {# ── Мaунтим модалки (они невидимы пока не открыли) ── #}
+    {% include "components/login_modal.html" %}
+    {% include "components/report_modal.html" %}
+    {% include "components/delete_confirm_modal.html" %}
+{% endblock %}

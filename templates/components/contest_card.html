@@ -1,0 +1,37 @@
+{% load static %}
+{% comment %}
+    ContestCard (FR-CONT-01). Карточка конкурса для списка.
+    Параметры:
+      contest — Contest
+{% endcomment %}
+<a href="{% url 'core:contest_detail' slug=contest.slug %}"
+   class="group flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition-shadow hover:shadow-card-hover">
+
+    {# ── Обложка с тинтом по статусу ── #}
+    <div class="relative h-32 w-full bg-cover bg-center"
+         style="background-image: linear-gradient(180deg, rgba(15,23,42,0.0) 0%, rgba(15,23,42,0.55) 100%), url('{% static contest.cover %}')">
+        <div class="absolute left-3 top-3">
+            {% include "components/contest_status.html" with status=contest.status days_left=contest.days_left %}
+        </div>
+        {% if contest.prize_kzt %}
+            <span class="absolute right-3 top-3 inline-flex h-7 items-center rounded-pill bg-promo-cta px-3 font-sans text-xs font-bold text-white">
+                {{ contest.prize_kzt|stringformat:"d" }} ₸
+            </span>
+        {% endif %}
+    </div>
+
+    {# ── Контент ── #}
+    <div class="flex flex-1 flex-col gap-2 p-4">
+        <h3 class="font-display text-lg font-bold leading-tight text-slate-900 group-hover:text-brand">
+            {{ contest.name }}
+        </h3>
+        <p class="font-sans text-sm text-slate-600">{{ contest.subtitle }}</p>
+
+        <div class="mt-auto flex flex-wrap items-center gap-4 pt-2 font-sans text-xs text-slate-500">
+            {% include "components/stat_pill.html" with icon="paper-plane" value=contest.submissions|stringformat:"d"|add:" өтінім" %}
+            {% if contest.status == 'finished' %}
+                <span>· аяқталды</span>
+            {% endif %}
+        </div>
+    </div>
+</a>

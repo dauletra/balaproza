@@ -1,0 +1,16 @@
+{% comment %}
+    Skeleton text — несколько строк-«полосок» разной длины (имитация текста).
+
+    Параметры:
+      lines    — int, сколько строк (default 3)
+      tall     — boolean: «толстая» полоска (h-4 vs h-3)
+{% endcomment %}
+{% with n=lines|default:3 %}
+<div aria-hidden="true" class="flex flex-col gap-2">
+    {% for i in '12345678'|make_list|slice:":n" %}
+        <span class="block animate-pulse rounded-sm bg-slate-200
+                     {% if tall %}h-4{% else %}h-3{% endif %}
+                     {% if forloop.last and n > 1 %}w-2/3{% elif forloop.counter == 1 %}w-full{% else %}w-11/12{% endif %}"></span>
+    {% endfor %}
+</div>
+{% endwith %}

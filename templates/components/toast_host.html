@@ -1,0 +1,44 @@
+{% comment %}
+    Toast host (docs/04.8). Подключи раз в base.html (можно и в конкретной странице).
+    Слушает кастомные window-события:
+        $dispatch('toast', { kind:'success'|'info'|'error', text:'…', timeout:4000 })
+
+    Каждый toast живёт `timeout` мс (по умолч. 4000), автоскрытие.
+    Неблокирующий — складывается стопкой снизу-справа.
+{% endcomment %}
+<div aria-live="polite" aria-atomic="true"
+     x-data="{
+         items: [],
+         add(detail) {
+             const id = Date.now() + Math.random();
+             const item = { id, kind: detail.kind || 'info', text: detail.text || '', timeout: detail.timeout || 4000 };
+             this.items.push(item);
+             setTimeout(() => this.remove(id), item.timeout);
+         },
+         remove(id) { this.items = this.items.filter(i => i.id !== id); }
+     }"
+     @toast.window="add($event.detail)"
+     class="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex flex-col items-center gap-2 px-4 sm:right-6 sm:inset-x-auto sm:items-end">
+
+    <template x-for="t in items" :key="t.id">
+        <div role="status"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 translate-y-2"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             :class="{
+                 'bg-status-published-bg text-status-published-fg border-status-published-fg/30': t.kind === 'success',
+                 'bg-status-info-bg      text-status-info-fg      border-status-info-fg/30':      t.kind === 'info',
+                 'bg-status-error-bg     text-status-error-fg     border-status-error-fg/30':     t.kind === 'error',
+             }"
+             class="pointer-events-auto flex max-w-md items-start gap-3 rounded-md border bg-white px-4 py-3 font-sans text-sm shadow-modal">
+            <span x-text="t.text"></span>
+            <button type="button" @click="remove(t.id)" aria-label="Жабу"
+                    class="-m-1 rounded-pill p-1 opacity-60 hover:opacity-100">
+                {% include "components/icon.html" with name="x" size=14 %}
+            </button>
+        </div>
+    </template>
+</div>

@@ -1,0 +1,80 @@
+{% comment %}
+    MobileBottomNav (docs/07.6) · плавающая пилюля 360×64, radius 999, тень bottom-nav.
+    Центральная кнопка-FAB «создать» — brand (DEC-06: бирюзовый, не синий).
+
+    Активный пункт: brand; неактивные: slate-800.
+    Гость:  home · genres · plus (login) · contests · search
+    Auth:   home · contests · plus (new_story) · bell (notifications) · profile
+            Library доступна через dropdown header и desktop sidebar.
+{% endcomment %}
+<nav aria-label="Мобильді мәзір"
+     class="fixed inset-x-0 bottom-4 z-30 mx-auto flex h-16 w-[360px] max-w-[calc(100%-2rem)] items-center rounded-pill border border-slate-200 bg-white shadow-bottom-nav md:hidden">
+
+    {% if signed_in %}
+        {# 1 · Главная #}
+        <a href="{% url 'core:home' %}"
+           class="flex flex-1 items-center justify-center{% if nav_active == 'home' %} text-brand{% else %} text-slate-800{% endif %}"
+           aria-label="Басты бет">
+            {% include "components/icon.html" with name="home" size=24 %}
+        </a>
+        {# 2 · Конкурсы (library доступна через dropdown header) #}
+        <a href="{% url 'core:contest_list' %}"
+           class="flex flex-1 items-center justify-center{% if nav_active == 'contests' %} text-brand{% else %} text-slate-800{% endif %}"
+           aria-label="Конкурстар">
+            {% include "components/icon.html" with name="adjustments" size=24 %}
+        </a>
+        {# 3 · FAB · brand #}
+        <div class="flex flex-1 items-center justify-center">
+            <a href="{% url 'core:new_story' %}" aria-label="Жаңа шығарма"
+               class="grid h-8 w-8 place-items-center rounded-pill bg-brand text-white hover:bg-brand-dark">
+                {% include "components/icon.html" with name="plus" size=20 %}
+            </a>
+        </div>
+        {# 4 · Уведомления (со счётчиком) #}
+        <a href="{% url 'core:notifications' %}"
+           class="relative flex flex-1 items-center justify-center{% if nav_active == 'notifications' %} text-brand{% else %} text-slate-800{% endif %}"
+           aria-label="Хабарламалар{% if unread_notifications %} ({{ unread_notifications }} оқылмаған){% endif %}">
+            {% include "components/icon.html" with name="bell" size=24 %}
+            {% if unread_notifications %}
+                <span aria-hidden="true"
+                      class="absolute right-[24%] top-[22%] inline-flex h-4 min-w-4 items-center justify-center rounded-pill bg-notif px-1 font-sans text-[10px] font-bold text-notif-fg">
+                    {{ unread_notifications }}
+                </span>
+            {% endif %}
+        </a>
+        {# 5 · Профиль #}
+        <a href="{% url 'core:profile_me' %}"
+           class="flex flex-1 items-center justify-center{% if nav_active == 'profile' %} text-brand{% else %} text-slate-800{% endif %}"
+           aria-label="Профиль">
+            {% include "components/icon.html" with name="user-circle" size=24 %}
+        </a>
+    {% else %}
+        {# Гостевой набор: home · genres · login(FAB) · contests · login-text #}
+        <a href="{% url 'core:home' %}"
+           class="flex flex-1 items-center justify-center{% if nav_active == 'home' %} text-brand{% else %} text-slate-800{% endif %}"
+           aria-label="Басты бет">
+            {% include "components/icon.html" with name="home" size=24 %}
+        </a>
+        <a href="{% url 'core:genre_index' %}"
+           class="flex flex-1 items-center justify-center{% if nav_active == 'catalog' %} text-brand{% else %} text-slate-800{% endif %}"
+           aria-label="Жанрлар">
+            {% include "components/icon.html" with name="book" size=24 %}
+        </a>
+        <div class="flex flex-1 items-center justify-center">
+            <a href="{% url 'core:login' %}?next={{ request.get_full_path|urlencode }}" aria-label="Кіру"
+               class="grid h-8 w-8 place-items-center rounded-pill bg-brand text-white hover:bg-brand-dark">
+                {% include "components/icon.html" with name="arrow-right-to-bracket" size=20 %}
+            </a>
+        </div>
+        <a href="{% url 'core:contest_list' %}"
+           class="flex flex-1 items-center justify-center{% if nav_active == 'contests' %} text-brand{% else %} text-slate-800{% endif %}"
+           aria-label="Конкурстар">
+            {% include "components/icon.html" with name="adjustments" size=24 %}
+        </a>
+        <a href="{% url 'core:search_results' %}"
+           class="flex flex-1 items-center justify-center{% if nav_active == 'catalog' %} text-brand{% else %} text-slate-800{% endif %}"
+           aria-label="Іздеу">
+            {% include "components/icon.html" with name="search" size=24 %}
+        </a>
+    {% endif %}
+</nav>

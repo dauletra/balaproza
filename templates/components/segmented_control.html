@@ -1,0 +1,32 @@
+{% comment %}
+    SegmentedControl (DEC-15). Реальное переключение разделов через ?tab=…
+    — НЕ декоративные табы. Активный сегмент подсвечен и aria-current="page".
+
+    Параметры:
+      items    — список dict'ов: [{slug, label, count?}, ...]
+      current  — слаг активного сегмента
+      base_url — куда вешать ссылки (полный путь без query). Обычно request.path
+      param    — имя query-параметра (default 'tab')
+{% endcomment %}
+{% with p=param|default:"tab" %}
+<nav role="tablist" aria-label="Бөлімдер"
+     class="mb-6 inline-flex flex-wrap gap-1 rounded-pill bg-slate-100 p-1">
+    {% for it in items %}
+        {% if it.slug == current %}
+            <a href="{{ base_url }}?{{ p }}={{ it.slug }}"
+               role="tab" aria-selected="true" aria-current="page"
+               class="inline-flex h-8 items-center gap-1.5 rounded-pill bg-white px-4 font-sans text-sm font-bold text-slate-900 shadow-sm">
+                <span>{{ it.label }}</span>
+                {% if it.count %}<span class="font-semibold text-slate-500">{{ it.count }}</span>{% endif %}
+            </a>
+        {% else %}
+            <a href="{{ base_url }}?{{ p }}={{ it.slug }}"
+               role="tab" aria-selected="false"
+               class="inline-flex h-8 items-center gap-1.5 rounded-pill px-4 font-sans text-sm font-semibold text-slate-600 hover:bg-white/60 hover:text-slate-900">
+                <span>{{ it.label }}</span>
+                {% if it.count %}<span class="text-slate-500">{{ it.count }}</span>{% endif %}
+            </a>
+        {% endif %}
+    {% endfor %}
+</nav>
+{% endwith %}

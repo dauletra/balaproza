@@ -1,0 +1,77 @@
+# ─────────────────────────── Python ──────────────────────────────────────
+__pycache__/
+*.py[oc]
+*.egg-info
+build/
+dist/
+wheels/
+
+# Тестирование и покрытие
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# ─────────────────────────── Virtual env / uv ────────────────────────────
+.venv/
+.venv.bak/
+venv/
+env/
+
+# ─────────────────────────── Django ──────────────────────────────────────
+# Локальная SQLite-БД — стаб без миграций (CLAUDE.md). В прод не нужна.
+db.sqlite3
+db.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Локальные настройки и секреты
+local_settings.py
+.env
+.env.*
+!.env.example
+
+# Логи
+*.log
+
+# Загрузки пользователей (когда появятся реальные модели — Ф14)
+/media/
+
+# collectstatic output (если когда-то понадобится)
+/staticfiles/
+
+# ─────────────────────────── Node / Tailwind ─────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp.*
+
+# Скомпилированный Tailwind CSS — пересобирается через `npm run build`.
+# Источник — static_src/input.css.
+static/css/output.css
+static/css/output.css.map
+
+# ─────────────────────────── IDE / редакторы ─────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ─────────────────────────── ОС ──────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# ─────────────────────────── Claude Code / агенты ────────────────────────
+.claude/
+
+# ─────────────────────────── Прочее ──────────────────────────────────────
+*.bak
+*.tmp
+*.orig

@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block title %}Конкурстар — Balaproza{% endblock %}
+
+{% block content %}
+    <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+            <h1 class="font-display text-3xl font-bold text-slate-900">Конкурстар</h1>
+            <p class="mt-1 font-sans text-sm text-slate-600">
+                Жас прозаиктерге арналған әдеби байқаулар. Жеңімпаздар сыйақы алады, үздіктер басты бетке шығады.
+            </p>
+        </div>
+        {% if signed_in %}
+            <a href="{% url 'core:my_submissions' %}"
+               class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                {% include "components/icon.html" with name="paper-plane" size=14 %}
+                Менің өтінімдерім
+            </a>
+        {% endif %}
+    </header>
+
+    {% if active_contests %}
+        <section class="mb-10">
+            <h2 class="mb-4 font-display text-sm font-bold uppercase tracking-[0.12em] text-slate-500">Белсенді</h2>
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {% for c in active_contests %}
+                    {% include "components/contest_card.html" with contest=c %}
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
+
+    {% if finished_contests %}
+        <section>
+            <h2 class="mb-4 font-display text-sm font-bold uppercase tracking-[0.12em] text-slate-500">Аяқталған</h2>
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {% for c in finished_contests %}
+                    {% include "components/contest_card.html" with contest=c %}
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
+
+    {% if not active_contests and not finished_contests %}
+        {% include "components/empty_state.html" with icon="paper-plane" title="Әзірге конкурс жоқ" text="Жаңа байқаулар туралы хабарлама аласыз — хабарландырулар бөлімінде." %}
+    {% endif %}
+{% endblock %}

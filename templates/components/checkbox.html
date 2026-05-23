@@ -1,0 +1,30 @@
+{% comment %}
+    Checkbox. Заполненная — фон brand, белая галочка.
+
+    Параметры:
+      name      — name атрибута
+      value     — value (опц., default 'on')
+      label     — подпись (опц., может быть HTML — используй safe)
+      checked   — boolean
+      disabled  — boolean
+      required  — boolean
+{% endcomment %}
+{% with id="cb-"|add:name %}
+<label for="{{ id }}"
+       x-data="{ on: {{ checked|yesno:'true,false' }} }"
+       class="inline-flex items-start gap-2.5 {% if disabled %}cursor-not-allowed opacity-50{% else %}cursor-pointer{% endif %}">
+    <input id="{{ id }}" type="checkbox" name="{{ name }}" value="{{ value|default:'on' }}"
+           {% if checked %}checked{% endif %}{% if disabled %} disabled{% endif %}{% if required %} required{% endif %}
+           @change="on = $event.target.checked"
+           class="peer sr-only">
+    <span aria-hidden="true"
+          :class="on ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white text-transparent'"
+          class="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-sm border
+                 peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40 peer-focus-visible:ring-offset-2">
+        {% include "components/icon.html" with name="check" size=14 %}
+    </span>
+    {% if label %}
+        <span class="font-sans text-xs leading-snug text-slate-700">{{ label }}</span>
+    {% endif %}
+</label>
+{% endwith %}

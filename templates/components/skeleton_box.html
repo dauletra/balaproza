@@ -1,0 +1,20 @@
+{% comment %}
+    Skeleton primitive — серый прямоугольник с pulse-анимацией (DEC-17).
+
+    Параметры:
+      w        — ширина: Tailwind-класс (h-X w-X) или произвольно. Default 'w-full'.
+      h        — высота. Default 'h-4'.
+      radius   — 'sm' (default) | 'pill' | 'lg' | 'hero' | 'none'
+      cls      — дополнительные классы (опц.)
+{% endcomment %}
+{% with rad=radius|default:"sm" %}
+<span aria-hidden="true"
+      class="block animate-pulse bg-slate-200
+             {{ w|default:'w-full' }} {{ h|default:'h-4' }}
+             {% if rad == 'pill' %}rounded-pill
+             {% elif rad == 'lg' %}rounded-lg
+             {% elif rad == 'hero' %}rounded-hero
+             {% elif rad == 'none' %}{# no radius #}
+             {% else %}rounded-sm{% endif %}
+             {{ cls|default:'' }}"></span>
+{% endwith %}

@@ -1,0 +1,59 @@
+{% comment %}
+    DesktopFooter (docs/07.5). Слейт-100 фон, поля 125px на lg+.
+    Три колонки (контакты + соцсети, ссылки 1, ссылки 2) + копирайт.
+    Соцсети живут только тут (DEC-19).
+{% endcomment %}
+<footer class="mt-12 bg-slate-100">
+    <div class="mx-auto max-w-[1440px] px-6 pt-6 pb-4.5 lg:px-[125px]">
+
+        <div class="flex flex-col gap-8 sm:flex-row sm:justify-between">
+
+            {# ── Колонка 1: контакты + соцсети ── #}
+            <section class="flex w-full max-w-[234px] flex-col gap-3">
+                <h3 class="font-sans text-[13px] font-bold tracking-[0.5px] text-slate-600">БАЙЛАНЫС</h3>
+                <a href="mailto:daulet.rakhmankul@gmail.com"
+                   class="font-sans text-xs text-slate-500 hover:text-brand">
+                    daulet.rakhmankul@gmail.com
+                </a>
+                <ul class="mt-1 flex items-center gap-3.5" aria-label="Әлеуметтік желілер">
+                    <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="YouTube">
+                        {% include "components/icon.html" with name="youtube" size=18 %}
+                    </a></li>
+                    <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+                        {% include "components/icon.html" with name="instagram" size=18 cls="text-slate-900" %}
+                    </a></li>
+                    <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="TikTok">
+                        {% include "components/icon.html" with name="tiktok" size=18 cls="text-slate-900" %}
+                    </a></li>
+                    <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="Telegram">
+                        {% include "components/icon.html" with name="telegram" size=18 %}
+                    </a></li>
+                </ul>
+            </section>
+
+            {# ── Колонка 2: правила/школа ── #}
+            <nav aria-label="Жариялау туралы"
+                 class="flex w-full max-w-[234px] flex-col gap-3 sm:items-end sm:text-right">
+                <a href="{% url 'core:legal_moderation' %}" class="font-sans text-[13px] text-slate-900 hover:text-brand">Модерация ережелері</a>
+                <a href="{% url 'core:legal_publishing' %}" class="font-sans text-[13px] text-slate-900 hover:text-brand">Жариялау шарттары</a>
+                <div class="mt-1 flex flex-col gap-2 sm:items-end">
+                    <span class="font-sans text-[11px] uppercase tracking-wide text-slate-500">Авторлар мектебі</span>
+                    {% include "components/school_links.html" with links=school_links_global layout="inline" %}
+                </div>
+            </nav>
+
+            {# ── Колонка 3: проект ── #}
+            <nav aria-label="Проект туралы"
+                 class="flex w-full max-w-[234px] flex-col gap-3 sm:items-end sm:text-right">
+                <a href="{% url 'core:legal_about' %}" class="font-sans text-[13px] text-slate-900 hover:text-brand">Проект туралы</a>
+                <a href="{% url 'core:legal_terms' %}" class="font-sans text-[13px] text-slate-900 hover:text-brand">Пайдалану ережелері</a>
+                <a href="{% url 'core:legal_privacy' %}" class="font-sans text-[13px] text-slate-900 hover:text-brand">Құпиялылық саясаты</a>
+            </nav>
+        </div>
+    </div>
+
+    {# ── Копирайт ── #}
+    <div class="border-t border-slate-200 py-3.5 text-center font-sans text-xs text-slate-600">
+        ТАРАЗ 2024
+    </div>
+</footer>

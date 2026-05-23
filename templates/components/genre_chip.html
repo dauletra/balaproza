@@ -1,0 +1,25 @@
+{% comment %}
+    GenreChip (docs/04.7 + docs/03 OKLCH). Цветной чип жанра.
+
+    Параметры:
+      genre — объект Genre из stub_data (имеет .slug, .name, .hue)
+      size  — 'sm' (default · h-7 text-xs) | 'md' (h-8 text-sm)
+      href  — куда вести (default: /genres/<slug>/)
+
+    Цвета формулой docs/03.3:
+      bg:  oklch(0.96 0.04 H)
+      fg:  oklch(0.38 0.14 H)
+      ring:oklch(0.86 0.08 H)
+{% endcomment %}
+{% with sz=size|default:"sm" %}
+<a href="{{ href|default:'#' }}"
+   class="inline-flex items-center rounded-pill border font-sans font-semibold transition-shadow hover:shadow-card-hover
+          {% if sz == 'md' %}h-8 px-3.5 text-sm{% else %}h-7 px-3 text-xs{% endif %}"
+   style="
+       background: oklch(0.96 0.04 {{ genre.hue }});
+       color:      oklch(0.38 0.14 {{ genre.hue }});
+       border-color: oklch(0.86 0.08 {{ genre.hue }});
+   ">
+    {{ genre.name }}
+</a>
+{% endwith %}

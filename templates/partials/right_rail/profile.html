@@ -1,0 +1,57 @@
+{% comment %}
+    Правый рейл PROF. Контекст:
+      profile_user — Author (None для гостя)
+      stats        — reader_stats(...) dict (опц.)
+      following    — Authors, на кого подписан (опц.)
+{% endcomment %}
+{% if profile_user %}
+<div class="flex flex-col gap-6">
+    {% if stats %}
+    <section class="rounded-lg border border-slate-200 bg-white p-5">
+        <h3 class="mb-4 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+            Қысқа сан
+        </h3>
+        <dl class="grid grid-cols-2 gap-4 text-center">
+            <div>
+                <dt class="font-sans text-xs text-slate-500">Шығарма</dt>
+                <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.works }}</dd>
+            </div>
+            <div>
+                <dt class="font-sans text-xs text-slate-500">Жазылулар</dt>
+                <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.followers }}</dd>
+            </div>
+            <div>
+                <dt class="font-sans text-xs text-slate-500">Ұнатулар</dt>
+                <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.likes }}</dd>
+            </div>
+            <div>
+                <dt class="font-sans text-xs text-slate-500">Оқылды</dt>
+                <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.read }}</dd>
+            </div>
+        </dl>
+    </section>
+    {% endif %}
+
+    {% if following %}
+    <section class="rounded-lg border border-slate-200 bg-white p-5">
+        <h3 class="mb-3 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+            Жазылулар
+        </h3>
+        <ul class="flex flex-col gap-2.5">
+            {% for a in following %}
+                <li class="flex items-center gap-3">
+                    {% include "components/avatar.html" with size=32 name=a.name %}
+                    <div class="min-w-0 flex-1">
+                        <a href="{% url 'core:profile_other' username=a.username %}"
+                           class="block truncate font-sans text-sm font-semibold text-slate-900 hover:text-brand">
+                            {{ a.name }}
+                        </a>
+                        <span class="font-sans text-xs text-slate-500">{{ a.works }} шығарма</span>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+</div>
+{% endif %}

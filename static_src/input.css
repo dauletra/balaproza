@@ -1,0 +1,151 @@
+@import "tailwindcss";
+
+/* ─────────────────────────── Self-hosted шрифты ───────────────────────────
+   Variable WOFF2 (см. docs/02.2). Italic подгружаются только при реальном
+   использовании (font-style: italic).
+*/
+
+@font-face {
+    font-family: "Montserrat";
+    src: url("/static/fonts/montserrat-variable.woff2") format("woff2-variations");
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: "Montserrat";
+    src: url("/static/fonts/montserrat-italic-variable.woff2") format("woff2-variations");
+    font-weight: 100 900;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Open Sans";
+    src: url("/static/fonts/open-sans-variable.woff2") format("woff2-variations");
+    font-weight: 300 800;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: "Open Sans";
+    src: url("/static/fonts/open-sans-italic-variable.woff2") format("woff2-variations");
+    font-weight: 300 800;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Inter";
+    src: url("/static/fonts/inter-variable.woff2") format("woff2-variations");
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: "Inter";
+    src: url("/static/fonts/inter-italic-variable.woff2") format("woff2-variations");
+    font-weight: 100 900;
+    font-style: italic;
+    font-display: swap;
+}
+
+/* ─────────────────────────────── @theme ────────────────────────────────────
+   Дизайн-токены по docs/02. Все цвета/шрифты/радиусы/тени — отсюда.
+   Запрещено использовать сырые rgb() и hex в шаблонах (DEC-05).
+*/
+@theme {
+    /* — Шрифты — */
+    --font-display: "Montserrat", system-ui, sans-serif;       /* заголовки */
+    --font-sans:    "Open Sans", system-ui, sans-serif;         /* основной */
+    --font-ui:      "Inter", system-ui, sans-serif;             /* акценты */
+    --font-serif:   Georgia, "Times New Roman", serif;          /* книга в режиме чтения */
+
+    /* — Бренд (DEC-06 — единый accent teal) — */
+    --color-brand:        rgb(3, 102, 114);
+    --color-brand-dark:   rgb(5, 80, 92);
+    --color-brand-light:  rgba(3, 102, 114, 0.42);
+
+    /* — Нейтральная шкала (slate, 11 ступеней; перекрывает дефолтный slate Tailwind) — */
+    --color-slate-50:  rgb(249, 250, 251);
+    --color-slate-100: rgb(243, 244, 246);
+    --color-slate-200: rgb(229, 231, 235);
+    --color-slate-300: rgb(209, 213, 219);
+    --color-slate-400: rgb(156, 163, 175);
+    --color-slate-500: rgb(107, 114, 128);
+    --color-slate-600: rgb(75, 85, 99);
+    --color-slate-700: rgb(55, 65, 81);
+    --color-slate-800: rgb(31, 42, 55);
+    --color-slate-900: rgb(17, 25, 40);
+
+    /* — Семантические статусы (fg + bg парами) — */
+    --color-status-published-fg:  rgb(4, 108, 78);     /* Жарияланған */
+    --color-status-published-bg:  rgb(222, 247, 236);
+    --color-status-info-fg:       rgb(26, 86, 219);    /* Аяқталды / info */
+    --color-status-info-bg:       rgb(225, 239, 254);
+    --color-status-warning-fg:    rgb(142, 75, 16);    /* Жазылып жатыр */
+    --color-status-warning-bg:    rgb(253, 246, 178);
+    --color-status-attention-fg:  rgb(180, 52, 3);     /* Тексеруде */
+    --color-status-attention-bg:  rgb(254, 235, 200);
+    --color-status-error-fg:      rgb(155, 28, 28);    /* Жарияланбаған */
+    --color-status-error-bg:      rgb(253, 232, 232);
+
+    /* — Бейдж непрочитанных (DEC-07) — */
+    --color-notif:    rgb(220, 38, 38);
+    --color-notif-fg: #ffffff;
+
+    /* — Промо-акцент конкурса (DEC-08; только промо-блоки) — */
+    --color-promo-bg:  rgb(227, 255, 134);
+    --color-promo-cta: rgb(158, 34, 34);
+
+    /* — Бренд-цвета Telegram (только footer/кнопка входа) — */
+    --color-tg-1: rgb(42, 171, 238);
+    --color-tg-2: rgb(34, 158, 217);
+
+    /* — Радиусы (docs/02.3) — */
+    --radius-xs:     2px;     /* свотчи, микроэлементы */
+    --radius-sm:     4px;
+    --radius-chip:   6px;     /* мелкие чипы */
+    --radius-md:     8px;     /* базовый — кнопки, поля, обложки */
+    --radius-lg:    12px;
+    --radius-hero:  16px;     /* hero-карточки */
+    --radius-search: 24px;    /* поле поиска в шапке */
+    --radius-pill: 9999px;    /* пилюли / mobile-nav / GenreChip */
+
+    /* — Тени (docs/02.4 — плоский «бумажный» стиль) — */
+    --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.08);
+    --shadow-bottom-nav: 0 4px 14px rgba(0, 0, 0, 0.06);
+    --shadow-tg-btn:     1px 1px 2.7px rgba(0, 0, 0, 0.18);
+    --shadow-modal:      0 8px 28px rgba(0, 0, 0, 0.18);
+}
+
+/* ───────────────────── Глобальные базовые стили ──────────────────────────── */
+
+@layer base {
+    html {
+        font-family: var(--font-sans);
+        color: var(--color-slate-900);
+        background: var(--color-slate-100);
+    }
+
+    /* docs/02.6 — focus-visible обводка только для клавиатуры */
+    :focus { outline: none; }
+    :focus-visible {
+        outline: 2px solid var(--color-brand);
+        outline-offset: 2px;
+        border-radius: 4px;
+    }
+}
+
+/* ────────────────────────── Утилитарные хелперы ─────────────────────────── */
+
+@layer utilities {
+    /* Доступность: скрыть визуально, оставить для screen-reader */
+    .sr-only {
+        position: absolute;
+        width: 1px; height: 1px;
+        padding: 0; margin: -1px;
+        overflow: hidden; clip: rect(0, 0, 0, 0);
+        white-space: nowrap; border: 0;
+    }
+}

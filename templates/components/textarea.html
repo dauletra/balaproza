@@ -1,0 +1,49 @@
+{% comment %}
+    TextArea (docs/04.5). С опц. счётчиком символов (обязателен для полей с лимитом).
+    Параметры — те же, что у input_field, плюс:
+      rows      — int (default 4)
+      maxlength — int (если задан, рендерится счётчик)
+      value     — для отображения текущей длины
+{% endcomment %}
+{% with st=state|default:"default" id="t-"|add:name r=rows|default:4 %}
+<div class="flex w-full flex-col gap-1.5"
+     {% if maxlength %}x-data="{ count: {{ value|default_if_none:''|length }} }"{% endif %}>
+    {% if label %}
+        <div class="flex items-baseline justify-between">
+            <label for="{{ id }}" class="font-sans text-sm font-semibold text-slate-800">
+                {{ label }}{% if required %} <span class="text-status-error-fg" aria-hidden="true">*</span>{% endif %}
+            </label>
+            {% if maxlength %}
+                <span class="font-sans text-xs text-slate-500">
+                    <span x-text="count">{{ value|default_if_none:''|length }}</span>/{{ maxlength }}
+                </span>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <textarea id="{{ id }}" name="{{ name }}" rows="{{ r }}"
+              {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+              {% if required %}required{% endif %}
+              {% if disabled %}disabled{% endif %}
+              {% if maxlength %}maxlength="{{ maxlength }}" @input="count = $event.target.value.length"{% endif %}
+              {% if message %}aria-describedby="{{ id }}-msg"{% endif %}
+              class="w-full resize-y rounded-md bg-slate-50 px-3 py-2.5 font-sans text-sm text-slate-900 placeholder:text-slate-500
+                     {% if st == 'error' %}border border-status-error-fg
+                     {% elif st == 'success' %}border border-status-published-fg
+                     {% else %}border border-slate-300{% endif %}
+                     {% if disabled %}cursor-not-allowed opacity-50{% endif %}
+                     focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30">{{ value|default_if_none:'' }}</textarea>
+
+    {% if message %}
+        <div id="{{ id }}-msg"
+             class="font-sans text-xs
+                    {% if st == 'error' %}text-status-error-fg
+                    {% elif st == 'success' %}text-status-published-fg
+                    {% else %}text-slate-500{% endif %}">
+            {{ message }}
+        </div>
+    {% elif hint %}
+        <div class="font-sans text-xs text-slate-500">{{ hint }}</div>
+    {% endif %}
+</div>
+{% endwith %}

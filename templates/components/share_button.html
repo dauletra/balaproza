@@ -1,0 +1,76 @@
+{% comment %}
+    ShareButton — кнопка «Бөлісу» с двумя режимами:
+      - Мобайл (поддерживает navigator.share): нативный Web Share API
+      - Десктоп (или fallback): dropdown с Telegram / WhatsApp / Copy link
+
+    Параметры:
+      url    — абсолютный/относительный URL (обязательно)
+      title  — заголовок шеринга (string)
+      label  — текст кнопки (default: "Бөлісу")
+
+    Использование:
+      {% include "components/share_button.html" with url=request.build_absolute_uri title=story.title %}
+{% endcomment %}
+{% with btn_label=label|default:"Бөлісу" %}
+<div x-data="{
+        open: false,
+        canNative: typeof navigator !== 'undefined' && typeof navigator.share === 'function',
+        url: '{{ url|escapejs }}',
+        title: '{{ title|escapejs }}',
+        async share() {
+            if (this.canNative) {
+                try {
+                    await navigator.share({ title: this.title, url: this.url });
+                } catch (e) { /* user dismissed */ }
+            } else {
+                this.open = !this.open;
+            }
+        },
+        async copy() {
+            try {
+                await navigator.clipboard.writeText(this.url);
+                this.$dispatch('toast', { kind: 'success', text: 'Сілтеме көшірілді' });
+            } catch (e) {
+                this.$dispatch('toast', { kind: 'error', text: 'Көшіру мүмкін болмады' });
+            }
+            this.open = false;
+        },
+        tgUrl() {
+            return 'https://t.me/share/url?url=' + encodeURIComponent(this.url) + '&text=' + encodeURIComponent(this.title);
+        },
+        waUrl() {
+            return 'https://api.whatsapp.com/send?text=' + encodeURIComponent(this.title + ' ' + this.url);
+        }
+     }"
+     class="relative">
+    <button type="button" @click="share()" @click.outside="open = false"
+            aria-label="{{ btn_label }}"
+            class="inline-flex h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-50">
+        {% include "components/icon.html" with name="paper-plane" size=16 %}
+        <span>{{ btn_label }}</span>
+    </button>
+
+    {# Десктопный dropdown — показывается только если нет navigator.share #}
+    <div x-show="open" x-cloak x-transition
+         role="menu" aria-label="{{ btn_label }}"
+         class="absolute right-0 z-20 mt-2 w-56 rounded-md border border-slate-200 bg-white py-1 shadow-modal">
+        <a :href="tgUrl()" target="_blank" rel="noopener noreferrer"
+           role="menuitem" @click="open = false"
+           class="flex items-center gap-3 px-4 py-2 font-sans text-sm text-slate-800 hover:bg-slate-50">
+            {% include "components/icon.html" with name="telegram" size=16 %}
+            <span>Telegram</span>
+        </a>
+        <a :href="waUrl()" target="_blank" rel="noopener noreferrer"
+           role="menuitem" @click="open = false"
+           class="flex items-center gap-3 px-4 py-2 font-sans text-sm text-slate-800 hover:bg-slate-50">
+            {% include "components/icon.html" with name="message-caption" size=16 %}
+            <span>WhatsApp</span>
+        </a>
+        <button type="button" @click="copy()" role="menuitem"
+                class="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-2 text-left font-sans text-sm text-slate-800 hover:bg-slate-50">
+            {% include "components/icon.html" with name="check" size=16 cls="text-slate-400" %}
+            <span>Сілтемені көшіру</span>
+        </button>
+    </div>
+</div>
+{% endwith %}

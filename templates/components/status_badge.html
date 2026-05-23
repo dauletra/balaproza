@@ -1,0 +1,18 @@
+{% comment %}
+    StatusBadge (docs/04.4) — справочник статусов произведения (BR-10/11).
+    Запрещено собирать руками — используй только этот компонент.
+
+    Параметры:
+      key — Published | NotPublished | OnProcess | Completed | OnModeration
+{% endcomment %}
+{% if key == "Published" %}
+    {% include "components/badge.html" with kind="published" label="Жарияланған" icon="check" %}
+{% elif key == "NotPublished" %}
+    {% include "components/badge.html" with kind="error" label="Жарияланбаған" %}
+{% elif key == "OnProcess" %}
+    {% include "components/badge.html" with kind="warning" label="Жазылып жатыр" %}
+{% elif key == "Completed" %}
+    {% include "components/badge.html" with kind="info" label="Аяқталды" icon="check" %}
+{% elif key == "OnModeration" %}
+    {% include "components/badge.html" with kind="attention" label="Тексеруде" %}
+{% endif %}

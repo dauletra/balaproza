@@ -1,0 +1,42 @@
+{% comment %}
+    HomeBecomeAuthor (FR-HOME-08) — emotional-CTA «Стань автором».
+    Тёмный градиент slate-900 → brand с подсветом promo-bg справа сверху.
+{% endcomment %}
+<section class="relative overflow-hidden rounded-hero text-white shadow-card-hover"
+         style="background:
+            radial-gradient(circle at 92% 20%, rgba(227,255,134,0.50) 0%, rgba(227,255,134,0) 50%),
+            linear-gradient(135deg, var(--color-slate-900) 0%, var(--color-brand) 100%)">
+    <div class="grid grid-cols-1 items-center gap-10 px-8 py-11 md:grid-cols-[1fr_280px] md:px-[56px] md:py-12">
+
+        {# ── Левая колонка ── #}
+        <div class="relative">
+            <div class="mb-2.5 font-display text-xs font-semibold uppercase tracking-[0.14em] text-promo-bg">
+                Қазір қосылыңыз
+            </div>
+            <h2 class="font-sans text-[38px] font-bold leading-[1.05] -tracking-[0.01em]">
+                Сіздің әңгімеңіз
+                <br>
+                <span class="text-promo-bg">әлемге</span> керек.
+            </h2>
+            <p class="mt-4 max-w-[480px] font-sans text-[15px] leading-[1.6] text-white/80">
+                Жариялау тегін. Авторлық сақталады.
+                Telegram арқылы бір минутта тіркеліп, бірінші тарауыңызды жазыңыз.
+            </p>
+        </div>
+
+        {# ── Правая колонка: действия ── #}
+        <div class="flex flex-col gap-3">
+            {% if signed_in %}
+                {% url 'core:new_story' as cta_href %}
+                {% include "components/button.html" with kind="primary" size="lg" full=True label="Шығарма жазу" icon="pen" href=cta_href %}
+            {% else %}
+                {% url 'core:login' as cta_href %}
+                {% include "components/button.html" with kind="primary" size="lg" full=True label="Telegram арқылы кіру" icon="arrow-right-to-bracket" href=cta_href %}
+            {% endif %}
+            <a href="{% url 'core:genre_index' %}"
+               class="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-white/30 bg-transparent px-5 font-sans text-sm font-semibold text-white hover:bg-white/10">
+                Алдымен оқуды бастаймын
+            </a>
+        </div>
+    </div>
+</section>

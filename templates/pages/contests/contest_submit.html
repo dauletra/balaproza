@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if contest %}{{ contest.name }} · қатысу — Balaproza{% else %}Өтінім — Balaproza{% endif %}
+{% endblock %}
+
+{% block content %}
+{% if not contest %}
+    <div class="rounded-lg border border-slate-200 bg-white p-10 text-center">
+        <h1 class="font-display text-2xl font-bold text-slate-900">Конкурс табылмады</h1>
+        <p class="mt-2 font-sans text-sm text-slate-600">Slug: <code>{{ slug }}</code></p>
+    </div>
+{% elif not signed_in %}
+    <div class="rounded-lg border border-amber-200 bg-amber-50 p-6">
+        <p class="font-sans text-sm text-slate-800">
+            Қатысу үшін
+            <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}"
+               class="font-semibold text-brand hover:underline">кіріңіз</a>.
+        </p>
+    </div>
+{% else %}
+    <p class="mb-4 font-sans text-xs text-slate-500">
+        <a href="{% url 'core:contest_list' %}" class="hover:text-brand">Конкурстар</a> /
+        <a href="{% url 'core:contest_detail' slug=contest.slug %}" class="hover:text-brand">{{ contest.name }}</a> /
+        <span class="text-slate-700">өтінім беру</span>
+    </p>
+
+    <header class="mb-6">
+        <h1 class="font-display text-3xl font-bold text-slate-900">Өтінім беру</h1>
+        <p class="mt-1.5 font-sans text-sm text-slate-600">
+            «{{ contest.name }}» байқауына қатысу үшін шығармаңызды таңдап, талаптарды растаңыз.
+        </p>
+    </header>
+
+    {% if already_submitted %}
+        <div class="rounded-lg border border-status-attention-fg/30 bg-status-attention-bg/30 p-5">
+            <h2 class="font-display text-base font-bold text-slate-900">Сіз бұл байқауға өтінім бергенсіз</h2>
+            <p class="mt-1 font-sans text-sm text-slate-700">
+                Ереже BR-23: бір автор — бір өтінім. Күйін «<a href="{% url 'core:my_submissions' %}" class="font-semibold text-brand hover:underline">Менің өтінімдерім</a>» бетінен қараңыз.
+            </p>
+        </div>
+    {% else %}
+        <form method="post" action="{% url 'core:contest_submit' slug=contest.slug %}"
+              @submit.prevent="$dispatch('toast', { kind:'success', text:'Өтінім қабылданды (демо)' })"
+              class="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
+            {% csrf_token %}
+
+            {# ── Выбор произведения (BR-24: показываем все, дисэйблим короткие) ── #}
+            <fieldset class="flex flex-col gap-3">
+                <legend class="font-sans text-sm font-semibold text-slate-800">
+                    Шығарманы таңдау <span class="text-status-error-fg" aria-hidden="true">*</span>
+                </legend>
+
+                {% if eligible %}
+                    {% for item in eligible %}
+                        {% with s=item.story chars=item.chars ok=item.eligible %}
+                            <label class="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 p-3
+                                          {% if not ok %}opacity-60 cursor-not-allowed{% else %}hover:bg-slate-50{% endif %}">
+                                <input type="radio" name="story_slug" value="{{ s.slug }}"
+                                       class="mt-1 h-4 w-4 accent-brand"
+                                       {% if not ok %}disabled{% endif %}
+                                       {% if forloop.first and ok %}checked{% endif %}>
+                                <div class="min-w-0 flex-1">
+                                    <p class="font-sans text-sm font-semibold text-slate-900">{{ s.title }}</p>
+                                    <p class="mt-0.5 font-sans text-xs text-slate-500">
+                                        {{ chars|stringformat:"d" }} таңба · {{ s.chapters }} бөлім
+                                    </p>
+                                    {% if not ok %}
+                                        <p class="mt-1 font-sans text-xs font-semibold text-status-error-fg">
+                                            {% if chars < contest.min_chars %}Көлемі тым аз — мин. {{ contest.min_chars }}{% else %}Көлемі тым үлкен — макс. {{ contest.max_chars }}{% endif %}
+                                        </p>
+                                    {% endif %}
+                                </div>
+                            </label>
+                        {% endwith %}
+                    {% endfor %}
+                {% else %}
+                    <p class="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center font-sans text-sm text-slate-600">
+                        Сізде әлі жарияланған шығарма жоқ.
+                        <a href="{% url 'core:new_story' %}" class="font-semibold text-brand hover:underline">Жаңа шығарма жазу</a>.
+                    </p>
+                {% endif %}
+            </fieldset>
+
+            {# ── Чек-лист BR-22 ── #}
+            {% if checklist %}
+                <fieldset class="flex flex-col gap-2">
+                    <legend class="font-sans text-sm font-semibold text-slate-800">Сәйкестік чек-листі</legend>
+                    <ul class="flex flex-col gap-2">
+                        {% for item in checklist %}
+                            <li class="flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50/60 px-3 py-2.5">
+                                <span class="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-pill
+                                    {% if item.passed %}bg-status-published-bg text-status-published-fg
+                                    {% else %}bg-status-warning-bg text-status-warning-fg{% endif %}">
+                                    {% if item.passed %}
+                                        {% include "components/icon.html" with name="check" size=12 %}
+                                    {% else %}
+                                        <span class="text-xs font-bold">!</span>
+                                    {% endif %}
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                    <p class="font-sans text-sm font-semibold text-slate-900">
+                                        {{ item.label }}
+                                        {% if item.required %}<span class="text-status-error-fg" aria-hidden="true">*</span>{% endif %}
+                                    </p>
+                                    <p class="mt-0.5 font-sans text-xs text-slate-600">{{ item.hint }}</p>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </fieldset>
+
+                {# ── AI-декларация (DEC-21 — обязательный явный ответ) ── #}
+                <fieldset class="flex flex-col gap-2">
+                    <legend class="font-sans text-sm font-semibold text-slate-800">
+                        AI-декларация <span class="text-status-error-fg" aria-hidden="true">*</span>
+                    </legend>
+                    <div class="mb-1 rounded-md bg-slate-50 p-3">
+                        <p class="font-sans text-xs leading-relaxed text-slate-700">
+                            <strong>AI</strong> — бұл ChatGPT, Claude, Gemini сияқты жасанды интеллект құралдары.
+                            Адал болыңыз: жауабыңыз жұмысты алып тастамайды, бірақ жалған жауап анықталса —
+                            жұмыс байқаудан шеттетіледі.
+                        </p>
+                        <details class="mt-2">
+                            <summary class="cursor-pointer font-sans text-xs font-semibold text-brand hover:underline">
+                                Не санауға болады?
+                            </summary>
+                            <ul class="mt-2 list-disc pl-4 font-sans text-xs leading-relaxed text-slate-600">
+                                <li><strong>Жоқ</strong> — мәтінді толық өзіңіз жаздыңыз, AI ешқандай көмек көрсетпеді.</li>
+                                <li><strong>Жартылай</strong> — идея ойлап табуға, кейіпкер атын таңдауға немесе грамматиканы тексеруге AI қолдандыңыз.</li>
+                                <li><strong>Иә</strong> — мәтіннің едәуір бөлігін AI жазды немесе қайта өңдеді.</li>
+                            </ul>
+                        </details>
+                    </div>
+                    {% include "components/radio_option.html" with name="ai_used" value="no" label="Жоқ, AI қолданбадым" %}
+                    {% include "components/radio_option.html" with name="ai_used" value="partial" label="Жартылай (идея/редакция)" %}
+                    {% include "components/radio_option.html" with name="ai_used" value="yes" label="Иә, AI айтарлықтай қолданылды" %}
+                </fieldset>
+
+                {% include "components/checkbox.html" with name="confirm_age" label="Жасым 14-18 аралығында" required=True %}
+                {% include "components/checkbox.html" with name="confirm_rules" label="Байқау ережелерімен таныстым және келісемін" required=True %}
+            {% endif %}
+
+            <div class="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-5">
+                <a href="{% url 'core:contest_detail' slug=contest.slug %}"
+                   class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                    Болдырмау
+                </a>
+                {% include "components/button.html" with kind="primary" label="Өтінім беру" icon="paper-plane" type="submit" disabled=preview_story|yesno:",1," %}
+            </div>
+        </form>
+    {% endif %}
+{% endif %}
+{% endblock %}
+
+{% block right_rail %}
+    {% include "partials/right_rail/contest.html" %}
+{% endblock %}

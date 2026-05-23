@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Кіру — Balaproza{% endblock %}
+
+{% block content %}
+<div class="mx-auto flex max-w-md flex-col items-center">
+
+    {# ── Лого + заголовок ── #}
+    <div class="mb-6 text-center">
+        <img src="{% static 'img/logo.png' %}" alt="" class="mx-auto h-12 w-12">
+        <h1 class="mt-4 font-display text-3xl font-bold text-slate-900">Balaproza-ға кіру</h1>
+        <p class="mt-1.5 font-sans text-sm text-slate-600">
+            Кіру тек Telegram арқылы. Профиль автоматты түрде жасалады.
+        </p>
+    </div>
+
+    {# ── Карточка с Telegram-кнопкой ── #}
+    <div class="w-full rounded-hero border border-slate-200 bg-white p-7 shadow-sm sm:p-9">
+        <form method="post" action="{% url 'core:login' %}{% if next %}?next={{ next|urlencode }}{% endif %}"
+              class="flex flex-col gap-4">
+            {% csrf_token %}
+            {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+            {# TelegramLoginPill — pill 999px с фирменным градиентом #}
+            <button type="submit"
+                    class="inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-pill font-sans text-sm font-bold text-white shadow-tg-btn hover:opacity-90"
+                    style="background: linear-gradient(180deg, var(--color-tg-1), var(--color-tg-2))">
+                {% include "components/icon.html" with name="telegram" size=18 %}
+                Сайтқа кіру
+            </button>
+
+            <p class="text-center font-sans text-[11px] leading-relaxed text-slate-500">
+                Жалғастыра отырып,
+                <a href="#" class="text-brand hover:underline">пайдалану ережелеріне</a>
+                және
+                <a href="#" class="text-brand hover:underline">құпиялылық саясатына</a>
+                келісесіз.
+            </p>
+        </form>
+
+        <div class="my-5 flex items-center gap-3">
+            <span class="h-px flex-1 bg-slate-200"></span>
+            <span class="font-sans text-xs uppercase tracking-wide text-slate-400">немесе</span>
+            <span class="h-px flex-1 bg-slate-200"></span>
+        </div>
+
+        <p class="text-center font-sans text-sm text-slate-600">
+            Жаңа қолданушы?
+            <a href="{% url 'core:signup' %}" class="font-semibold text-brand hover:underline">Тіркелу</a>
+        </p>
+    </div>
+
+    {# ── Гостевая ссылка обратно ── #}
+    <p class="mt-6 font-sans text-xs text-slate-500">
+        <a href="{% url 'core:home' %}" class="hover:text-brand">← Кірмей-ақ оқуды бастаймын</a>
+    </p>
+</div>
+{% endblock %}
+
+{% block right_rail %}{% endblock %}

@@ -1,0 +1,19 @@
+{% comment %}
+    HomeBookRowV2 (FR-HOME-04) — ряд из 6 BookCardSmall.
+
+    Параметры (через include with):
+      title    — заголовок ряда
+      eyebrow  — мелкий up-надпись (опц.)
+      books    — список Story (отрежется до :6)
+      link     — текст ссылки «барлығы →» (default: "барлығы →")
+      link_href — куда вести (default: '#')
+{% endcomment %}
+<section>
+    {% include "components/section_header.html" with title=title eyebrow=eyebrow link=link|default:"барлығы →" link_href=link_href|default:"#" %}
+
+    <div class="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
+        {% for s in books|slice:":6" %}
+            {% include "components/book_card_small.html" with story=s %}
+        {% endfor %}
+    </div>
+</section>

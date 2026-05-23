@@ -1,0 +1,36 @@
+{% comment %}
+    HomeNewAuthors (FR-HOME-07). 4 карточки авторов.
+
+    Контекст: new_authors (list of Author)
+{% endcomment %}
+<section>
+    {% include "components/section_header.html" with title="Жаңа авторлар" hint="танысыңыз, жазылыңыз" link="барлық авторлар →" link_href="#" %}
+
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {% for a in new_authors|slice:":4" %}
+            <a href="{% url 'core:profile_other' username=a.username %}"
+               class="group flex flex-col items-start gap-3 rounded-lg border border-slate-200 bg-white p-5 transition-shadow hover:shadow-card-hover">
+                {% include "components/avatar.html" with size=56 name=a.name %}
+
+                <div class="min-w-0">
+                    <div class="truncate font-sans text-sm font-bold text-slate-900 group-hover:text-brand">{{ a.name }}</div>
+                    <div class="truncate font-sans text-xs text-slate-500">@{{ a.username }}</div>
+                </div>
+
+                <p class="font-sans text-xs leading-snug text-slate-600">{{ a.bio }}</p>
+
+                <dl class="mt-auto flex w-full items-baseline gap-3 border-t border-slate-100 pt-3 font-sans text-xs text-slate-500">
+                    <div>
+                        <dt class="sr-only">Шығармалар</dt>
+                        <dd><span class="font-semibold text-slate-900">{{ a.works }}</span> шығарма</dd>
+                    </div>
+                    <span class="text-slate-300">·</span>
+                    <div>
+                        <dt class="sr-only">Жазылушылар</dt>
+                        <dd><span class="font-semibold text-slate-900">{{ a.followers }}</span> жазылушы</dd>
+                    </div>
+                </dl>
+            </a>
+        {% endfor %}
+    </div>
+</section>

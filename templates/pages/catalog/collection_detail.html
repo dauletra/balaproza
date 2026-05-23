@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if collection %}{{ collection.name }}{% else %}Жинақ{% endif %} — Balaproza{% endblock %}
+
+{% block content %}
+{% if not collection %}
+    <div class="rounded-lg border border-slate-200 bg-white p-10 text-center">
+        <h1 class="font-display text-2xl font-bold text-slate-900">Жинақ табылмады</h1>
+        <p class="mt-2 font-sans text-sm text-slate-600">Slug: <code>{{ slug }}</code></p>
+        <a href="{% url 'core:collections' %}" class="mt-4 inline-block font-sans text-sm font-semibold text-brand hover:underline">
+            ← Барлық жинақтар
+        </a>
+    </div>
+{% else %}
+    <p class="mb-4 font-sans text-xs text-slate-500">
+        <a href="{% url 'core:collections' %}" class="hover:text-brand">Жинақтар</a> /
+        <span class="text-slate-700">{{ collection.name }}</span>
+    </p>
+
+    {# ── Hero коллекции ── #}
+    <header class="mb-8 grid grid-cols-1 gap-6 overflow-hidden rounded-lg border border-slate-200 lg:grid-cols-[1fr_320px]"
+            style="background: oklch(0.97 0.03 {{ collection.tint_hue }})">
+
+        <div class="flex flex-col gap-4 p-8">
+            <p class="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                <span class="mr-1" aria-hidden="true">{{ collection.emoji }}</span> Жинақ · {{ collection.count }} шығарма
+            </p>
+            <h1 class="font-display text-3xl font-bold leading-tight text-slate-900 sm:text-4xl">
+                {{ collection.name }}
+            </h1>
+            <p class="font-sans text-[15px] leading-[1.65] text-slate-700">
+                {{ collection.description }}
+            </p>
+            <p class="font-sans text-xs text-slate-500">
+                Құрастырған: <strong class="text-slate-700">{{ collection.curator }}</strong>
+            </p>
+        </div>
+
+        {# Стопка обложек справа #}
+        <div class="relative hidden h-[280px] overflow-hidden lg:block">
+            <div class="absolute inset-0 flex items-center justify-center">
+                {% for s in collection.covers %}
+                    <div class="h-[200px] w-[133px] rounded-md border-[3px] border-white bg-cover bg-center shadow-card-hover
+                                {% if not forloop.first %}-ml-8{% endif %}
+                                {% if forloop.first %}-rotate-6{% elif forloop.last %}rotate-6{% endif %}"
+                         style="background-image: url('{% static s.cover %}')"
+                         aria-hidden="true"></div>
+                {% endfor %}
+            </div>
+        </div>
+    </header>
+
+    {# ── Список произведений ── #}
+    <div class="mb-4 flex items-baseline justify-between border-b border-slate-200 pb-3">
+        <h2 class="font-display text-lg font-bold text-slate-900">Шығармалар</h2>
+        <span class="font-sans text-xs text-slate-500">{{ collection.stories|length }} шт.</span>
+    </div>
+
+    {% if collection.stories %}
+        <div class="flex flex-col gap-3">
+            {% for s in collection.stories %}
+                {% include "components/book_card_wide.html" with story=s %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="rounded-md bg-slate-50 px-4 py-6 text-center font-sans text-sm text-slate-500">
+            Бұл жинаққа әлі шығарма қосылмаған.
+        </p>
+    {% endif %}
+{% endif %}
+{% endblock %}

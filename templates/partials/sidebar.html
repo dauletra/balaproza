@@ -1,0 +1,28 @@
+{% comment %}
+    DesktopSidebar (docs/07.3) · 189px.
+
+    Семантика: <nav aria-label="Негізгі мәзір">.
+    Гостю показываем home/genres/contests; авторизованному — library/write/notifications/contests/profile.
+
+    Активный пункт: цвет brand, font 700.
+    Неактивный: цвет slate-900, font 400.
+{% endcomment %}
+<nav aria-label="Негізгі мәзір"
+     class="hidden w-[189px] shrink-0 self-start px-3 md:flex md:flex-col md:gap-[18px]">
+
+    {% with active=nav_active %}
+        {% include "components/_sidebar_item.html" with key="home" icon="home" label="Басты бет" href_name="core:home" active=active %}
+
+        {% if signed_in %}
+            {% include "components/_sidebar_item.html" with key="library" icon="book" label="Кітапхана" href_name="core:library" active=active %}
+            {% include "components/_sidebar_item.html" with key="write" icon="pen" label="Жазу" href_name="core:my_stories" active=active %}
+            {% include "components/_sidebar_item.html" with key="contests" icon="adjustments" label="Конкурстар" href_name="core:contest_list" active=active %}
+            {% include "components/_sidebar_item.html" with key="notifications" icon="bell" label="Хабарламалар" href_name="core:notifications" active=active badge=unread_notifications %}
+            {% include "components/_sidebar_item.html" with key="profile" icon="user-circle" label="Профиль" href_name="core:profile_me" active=active %}
+        {% else %}
+            {# Для гостя — публичные точки входа #}
+            {% include "components/_sidebar_item.html" with key="catalog" icon="book" label="Жанрлар" href_name="core:genre_index" active=active %}
+            {% include "components/_sidebar_item.html" with key="contests" icon="adjustments" label="Конкурстар" href_name="core:contest_list" active=active %}
+        {% endif %}
+    {% endwith %}
+</nav>

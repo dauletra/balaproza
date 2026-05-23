@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}Профильді өңдеу — Balaproza{% endblock %}
+
+{% block content %}
+{% if not signed_in %}
+    <div class="rounded-lg border border-amber-200 bg-amber-50 p-6">
+        <p class="font-sans text-sm text-slate-800">
+            Профильді өңдеу үшін
+            <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}"
+               class="font-semibold text-brand hover:underline">кіріңіз</a>.
+        </p>
+    </div>
+{% else %}
+<div class="mx-auto max-w-xl">
+    <header class="mb-6">
+        <a href="{% url 'core:profile_me' %}"
+           class="inline-flex items-center gap-1.5 font-sans text-sm font-semibold text-slate-600 hover:text-brand">
+            {% include "components/icon.html" with name="chevron-right" size=12 cls="rotate-180" %}
+            Профильге қайту
+        </a>
+        <h1 class="mt-3 font-display text-3xl font-bold text-slate-900">Профильді өңдеу</h1>
+        <p class="mt-1.5 font-sans text-sm text-slate-600">
+            Аты-жөні, био және байланыс параметрлерін жаңартыңыз.
+        </p>
+    </header>
+
+    <form method="post" action="{% url 'core:profile_me_edit' %}"
+          @submit.prevent="$dispatch('toast', { kind:'success', text:'Өзгерістер сақталды (демо)' });
+                           setTimeout(()=>window.location='{% url 'core:profile_me' %}', 400)"
+          class="flex flex-col gap-6 rounded-hero border border-slate-200 bg-white p-6 sm:p-8">
+        {% csrf_token %}
+
+        {# ── Аты-жөні (FR-AUTH-04) ── #}
+        {% include "components/input_field.html" with name="name" label="Аты-жөні" value=profile_user.name required=True maxlength=80 %}
+
+        {# ── Жынысы ── #}
+        <fieldset class="flex flex-col gap-2">
+            <legend class="mb-1 font-sans text-sm font-semibold text-slate-800">Жынысы</legend>
+            <div class="flex flex-wrap gap-6">
+                {% include "components/radio_option.html" with name="gender" value="boy"  label="Ұл" %}
+                {% include "components/radio_option.html" with name="gender" value="girl" label="Қыз" %}
+            </div>
+        </fieldset>
+
+        {# ── Возраст (BR-20) ── #}
+        {% include "components/input_field.html" with name="age" type="number" label="Жасы" placeholder="14-18 аралығында" hint="Конкурсқа қатысу үшін 14-18 жас керек (BR-20)." %}
+
+        {# ── Био ── #}
+        {% include "components/textarea.html" with name="bio" label="Автор туралы" value=profile_user.bio rows=4 maxlength=300 hint="Профильде көрсетіледі. Қажет емес болса бос қалдырыңыз." %}
+
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
+            <a href="{% url 'core:profile_me' %}"
+               class="font-sans text-sm font-semibold text-slate-600 hover:text-brand">
+                Бас тарту
+            </a>
+            {% include "components/button.html" with kind="primary" size="md" label="Сақтау" type="submit" %}
+        </div>
+    </form>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block right_rail %}{% endblock %}

@@ -1,0 +1,15 @@
+{% comment %}
+    Avatar (docs/04.6). Заглушка: серый круг + иконка user-circle.
+    В продакшене подставит фото пользователя.
+
+    Параметры:
+      size  — px (default 36)
+      name  — для aria-label
+{% endcomment %}
+{% with s=size|default:36 %}
+<span class="inline-grid shrink-0 place-items-center rounded-pill bg-slate-200 text-slate-500"
+      style="width:{{ s }}px;height:{{ s }}px"
+      {% if name %}aria-label="{{ name }}"{% endif %}>
+    {% include "components/icon.html" with name="user-circle" size=s|add:"-8" %}
+</span>
+{% endwith %}

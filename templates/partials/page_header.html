@@ -1,0 +1,15 @@
+{% comment %}
+    Универсальная шапка страницы-заглушки. Подключается так:
+        {% include "partials/page_header.html" with title="…" subtitle="…" module="HOME" %}
+{% endcomment %}
+<header class="mb-8 border-b border-slate-200 pb-6">
+    {% if module %}
+        <p class="text-xs font-bold uppercase tracking-wide text-teal-700">
+            {{ module }}
+        </p>
+    {% endif %}
+    <h1 class="mt-1 text-3xl font-bold text-slate-900">{{ title }}</h1>
+    {% if subtitle %}
+        <p class="mt-2 max-w-prose text-sm text-slate-600">{{ subtitle }}</p>
+    {% endif %}
+</header>

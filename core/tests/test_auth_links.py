@@ -1,0 +1,185 @@
+"""AUTH-полировка (login/signup/success) + LINKS (Авторлар мектебі)."""
+
+from django.test import TestCase
+from django.urls import reverse
+
+from core import stub_data
+
+
+# ════════════════════════════ AUTH · Login ═════════════════════════════════
+
+class LoginPage(TestCase):
+
+    def test_renders(self):
+        r = self.client.get(reverse('core:login'))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Balaproza-ға кіру')
+
+    def test_telegram_cta_present(self):
+        r = self.client.get(reverse('core:login'))
+        # Кнопка Telegram-входа (FR-AUTH-01)
+        self.assertContains(r, 'Сайтқа кіру')
+        self.assertContains(r, '#icon-telegram')
+
+    def test_link_to_signup(self):
+        r = self.client.get(reverse('core:login'))
+        self.assertContains(r, reverse('core:signup'))
+        self.assertContains(r, 'Тіркелу')
+
+    def test_back_to_home_link(self):
+        r = self.client.get(reverse('core:login'))
+        self.assertContains(r, 'Кірмей-ақ оқуды бастаймын')
+
+    def test_next_param_persisted_in_form(self):
+        r = self.client.get(reverse('core:login') + '?next=/library/')
+        # Hidden input с next или query в action
+        self.assertContains(r, '/library/')
+
+
+# ════════════════════════════ AUTH · Signup ════════════════════════════════
+
+class SignupPage(TestCase):
+
+    def setUp(self):
+        self.response = self.client.get(reverse('core:signup'))
+
+    def test_200(self):
+        self.assertEqual(self.response.status_code, 200)
+
+    def test_has_name_input(self):
+        self.assertContains(self.response, 'name="name"')
+        self.assertContains(self.response, 'Аты-жөні')
+
+    def test_gender_radios(self):
+        self.assertContains(self.response, 'name="gender"')
+        self.assertContains(self.response, 'value="boy"')
+        self.assertContains(self.response, 'value="girl"')
+
+    def test_age_field_with_hint(self):
+        self.assertContains(self.response, 'name="age"')
+        self.assertContains(self.response, '14-18')   # BR-20
+
+    def test_bio_textarea(self):
+        self.assertContains(self.response, 'name="bio"')
+
+    def test_consent_checkbox_required(self):
+        # FR-AUTH-05
+        self.assertContains(self.response, 'name="agree"')
+        self.assertContains(self.response, 'келісемін')
+
+    def test_signup_post_redirects_to_success(self):
+        r = self.client.post(reverse('core:signup'), data={'name': 'Тест'})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.url, reverse('core:signup_success'))
+
+
+# ════════════════════════════ AUTH · SignupSuccess ═════════════════════════
+
+class SignupSuccessPage(TestCase):
+
+    def setUp(self):
+        # имитируем что юзер только что зарегился
+        s = self.client.session
+        s['signed_in'] = True
+        s['user_name'] = 'Ержан'
+        s['user_username'] = 'erzhan'
+        s.save()
+        self.response = self.client.get(reverse('core:signup_success'))
+
+    def test_200(self):
+        self.assertEqual(self.response.status_code, 200)
+
+    def test_greets_by_name(self):
+        self.assertContains(self.response, 'Ержан')
+        self.assertContains(self.response, 'Қош келдіңіз')
+
+    def test_has_all_four_onboarding_cards(self):
+        # FR-AUTH-03 → онбординг с 4 направлениями
+        self.assertContains(self.response, reverse('core:new_story'))
+        self.assertContains(self.response, reverse('core:genre_index'))
+        self.assertContains(self.response, reverse('core:profile_me'))
+        self.assertContains(self.response, reverse('core:contest_list'))
+
+
+# ════════════════════════════ LINKS · SchoolLinks ══════════════════════════
+
+class SchoolLinksData(TestCase):
+
+    def test_school_links_dataclass_fields(self):
+        for l in stub_data.SCHOOL_LINKS:
+            with self.subTest(channel=l.channel):
+                self.assertTrue(l.channel)
+                self.assertTrue(l.title)
+                self.assertTrue(l.subtitle)
+                self.assertTrue(l.url)
+
+    def test_all_four_channels_present(self):
+        channels = {l.channel for l in stub_data.SCHOOL_LINKS}
+        self.assertEqual(channels, {'youtube', 'instagram', 'tiktok', 'telegram'})
+
+
+class SchoolLinksInRightRail(TestCase):
+    """Главная страница: рейл с блоком SchoolLinks."""
+
+    def test_present_for_guest(self):
+        r = self.client.get(reverse('core:home'))
+        self.assertContains(r, 'Авторлар мектебі')
+        # все 4 названия каналов
+        for l in stub_data.SCHOOL_LINKS:
+            with self.subTest(channel=l.channel):
+                self.assertContains(r, l.title)
+
+    def test_links_open_in_new_tab(self):
+        # FR-LINKS-03
+        r = self.client.get(reverse('core:home'))
+        self.assertContains(r, 'target="_blank"')
+        self.assertContains(r, 'rel="noopener noreferrer"')
+
+
+class SchoolLinksInHomeGrid(TestCase):
+
+    def test_grid_section_present_on_home(self):
+        r = self.client.get(reverse('core:home'))
+        # Подпись описания grid-варианта (отличает от рейл-версии)
+        self.assertContains(r, 'Сайт ішінде ойнатылмайды')
+
+    def test_grid_renders_all_channel_subtitles(self):
+        r = self.client.get(reverse('core:home'))
+        for l in stub_data.SCHOOL_LINKS:
+            with self.subTest(channel=l.channel):
+                self.assertContains(r, l.subtitle)
+
+
+class SchoolLinksInFooter(TestCase):
+    """Inline-вариант в footer — должен присутствовать на ВСЕХ страницах."""
+
+    def test_footer_has_school_links_on_home(self):
+        r = self.client.get(reverse('core:home'))
+        # Заголовок секции в футере
+        self.assertContains(r, 'Авторлар мектебі')
+
+    def test_footer_has_school_links_on_library(self):
+        # Глобальный context processor → school_links_global доступен везде
+        s = self.client.session
+        s['signed_in'] = True
+        s['user_name'] = 'X'
+        s['user_username'] = 'aidana'
+        s.save()
+        r = self.client.get(reverse('core:library'))
+        self.assertContains(r, 'Авторлар мектебі')
+
+    def test_footer_has_school_links_for_guest(self):
+        # FR-LINKS-04 — гостю тоже доступны
+        r = self.client.get(reverse('core:contest_list'))
+        self.assertContains(r, 'Авторлар мектебі')
+
+
+class SchoolLinksGlobalContextProcessor(TestCase):
+
+    def test_school_links_global_in_context(self):
+        r = self.client.get(reverse('core:home'))
+        # Проверяем что контекст-процессор отдаёт ссылки
+        self.assertEqual(
+            list(r.context['school_links_global']),
+            list(stub_data.SCHOOL_LINKS),
+        )

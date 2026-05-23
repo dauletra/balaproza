@@ -1,0 +1,49 @@
+{% comment %}
+    ErrorState (DEC-17). Universal «load failed + retry» block.
+
+    Параметры:
+      title      — заголовок (default «Бір нәрсе сәтсіз болды»)
+      message    — пояснение (опц.)
+      retry_href — куда вести «Қайта көру» (default request.path)
+      compact    — boolean: компактный inline-вариант (без padding-heavy)
+{% endcomment %}
+<div role="alert" aria-live="polite"
+     class="rounded-lg border border-status-error-fg/30 bg-status-error-bg/30
+            {% if compact %}px-4 py-3 flex items-center gap-3{% else %}px-6 py-10 text-center{% endif %}">
+
+    {% if compact %}
+        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-pill bg-status-error-bg text-status-error-fg">
+            {% include "components/icon.html" with name="x" size=16 %}
+        </span>
+        <div class="min-w-0 flex-1">
+            <p class="font-sans text-sm font-semibold text-slate-900">
+                {{ title|default:"Бір нәрсе сәтсіз болды" }}
+            </p>
+            {% if message %}
+                <p class="font-sans text-xs text-slate-600">{{ message }}</p>
+            {% endif %}
+        </div>
+        <a href="{{ retry_href|default:request.path }}"
+           class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-status-error-fg bg-white px-3 font-sans text-xs font-bold text-status-error-fg hover:bg-status-error-bg">
+            {% include "components/icon.html" with name="arrow-right" size=12 %}
+            Қайта көру
+        </a>
+    {% else %}
+        <span class="mb-3 inline-grid h-12 w-12 place-items-center rounded-pill bg-status-error-bg text-status-error-fg">
+            {% include "components/icon.html" with name="x" size=24 %}
+        </span>
+        <h3 class="font-display text-lg font-bold text-slate-900">
+            {{ title|default:"Бір нәрсе сәтсіз болды" }}
+        </h3>
+        <p class="mx-auto mt-1.5 max-w-md font-sans text-sm text-slate-600">
+            {{ message|default:"Деректерді жүктеу мүмкін болмады. Қосылыс пен сервер жұмысын тексеріп, қайтадан көріңіз." }}
+        </p>
+        <div class="mt-5">
+            <a href="{{ retry_href|default:request.path }}"
+               class="inline-flex h-9 items-center gap-2 rounded-md border border-status-error-fg bg-white px-5 font-sans text-sm font-bold text-status-error-fg hover:bg-status-error-bg">
+                {% include "components/icon.html" with name="arrow-right" size=14 %}
+                Қайта жүктеу
+            </a>
+        </div>
+    {% endif %}
+</div>

@@ -1,0 +1,31 @@
+{% comment %}
+    SectionHeader (docs/04.7) — заголовок секции с опц. eyebrow и ссылкой «барлығы →».
+
+    Параметры:
+      title    — заголовок (Montserrat 600 22)
+      eyebrow  — мелкий up-надпись над title (опц., attention-цвет)
+      hint     — серая подпись справа от title (опц.)
+      link     — текст ссылки в правом верхнем углу (опц.)
+      link_href — куда ведёт ссылка (default '#')
+{% endcomment %}
+<div class="mb-4 flex items-baseline justify-between">
+    <div>
+        {% if eyebrow %}
+            <div class="mb-1 font-display text-[11px] font-semibold uppercase tracking-[0.12em] text-status-attention-fg">
+                {{ eyebrow }}
+            </div>
+        {% endif %}
+        <h2 class="font-display text-[22px] font-semibold text-slate-900">
+            {{ title }}
+            {% if hint %}
+                <span class="ml-2 font-sans text-[13px] font-normal text-slate-500">{{ hint }}</span>
+            {% endif %}
+        </h2>
+    </div>
+    {% if link %}
+        <a href="{{ link_href|default:'#' }}"
+           class="font-sans text-[13px] font-semibold text-brand hover:text-brand-dark">
+            {{ link }}
+        </a>
+    {% endif %}
+</div>

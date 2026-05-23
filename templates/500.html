@@ -1,0 +1,35 @@
+{% load static %}<!DOCTYPE html>
+{# 500.html НЕ extends base.html — на server error context_processors могут падать. #}
+<html lang="kk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сервер қатесі — Balaproza</title>
+    <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
+    <link rel="stylesheet" href="{% static 'css/output.css' %}">
+    <meta name="theme-color" content="#036672">
+</head>
+<body class="min-h-screen bg-slate-100 text-slate-900 antialiased">
+<main class="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-5 px-6 py-12 text-center">
+    <img src="{% static 'img/logo.png' %}" alt="" class="h-14 w-14 opacity-60">
+
+    <div class="font-display text-7xl font-bold text-status-error-fg">500</div>
+
+    <h1 class="font-display text-2xl font-bold text-slate-900">Бір нәрсе бұзылды</h1>
+    <p class="font-sans text-sm leading-relaxed text-slate-600">
+        Сервер қатесі орын алды. Біз мәселе туралы білдік және түзетудеміз.
+        Біраздан кейін қайталап көріңіз.
+    </p>
+
+    <div class="mt-2 flex items-center justify-center gap-3">
+        <a href="/" class="inline-flex h-9 items-center rounded-md bg-brand px-5 font-sans text-sm font-bold text-white hover:bg-brand-dark">
+            Басты бетке
+        </a>
+        <button type="button" onclick="location.reload()"
+                class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-bold text-slate-700 hover:bg-slate-50">
+            Қайталау
+        </button>
+    </div>
+</main>
+</body>
+</html>
