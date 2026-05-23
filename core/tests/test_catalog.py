@@ -23,17 +23,17 @@ class SearchResultsEmptyQuery(TestCase):
 
 class SearchResultsWithMatches(TestCase):
     def setUp(self):
-        # «На дальних берегах» — точно матчится по подстроке
-        self.response = self.client.get(reverse('core:search_results') + '?q=дальних')
+        # «Алыс жағалауларда» — точно матчится по подстроке
+        self.response = self.client.get(reverse('core:search_results') + '?q=жағалау')
 
     def test_200(self):
         self.assertEqual(self.response.status_code, 200)
 
     def test_query_echo(self):
-        self.assertContains(self.response, 'дальних')
+        self.assertContains(self.response, 'жағалау')
 
     def test_shows_matching_story(self):
-        self.assertContains(self.response, 'На дальних берегах')
+        self.assertContains(self.response, 'Алыс жағалауларда')
 
     def test_no_empty_state(self):
         self.assertNotContains(self.response, 'Ештеңе табылмады')
@@ -53,10 +53,10 @@ class SearchResultsNoMatches(TestCase):
 
 class SearchByAuthorName(TestCase):
     def test_matches_author(self):
-        r = self.client.get(reverse('core:search_results') + '?q=Рудазов')
+        r = self.client.get(reverse('core:search_results') + '?q=Рысқали')
         self.assertEqual(r.status_code, 200)
-        # У Рудазова в стабе есть «Кронцессии» и «Архимаг»
-        self.assertContains(r, 'Кронцессии')
+        # У Рысқали в стабе есть «Тас уәделер» и «Сиқыршы»
+        self.assertContains(r, 'Тас уәделер')
 
 
 # ───────────────────────── Genre index ─────────────────────────
@@ -96,8 +96,8 @@ class GenreDetailKnown(TestCase):
         self.assertContains(self.response, g.name)
 
     def test_shows_filtered_stories(self):
-        # Тёмный лорд: genres=('fantezi','horror') → должен быть в выдаче
-        self.assertContains(self.response, 'Тёмный лорд')
+        # «Күңгірт мырза»: genres=('fantezi','horror') → должен быть в выдаче
+        self.assertContains(self.response, 'Күңгірт мырза')
 
     def test_back_to_genres_link(self):
         self.assertContains(self.response, reverse('core:genre_index'))
@@ -182,7 +182,7 @@ class HelperFunctions(TestCase):
         self.assertEqual(stub_data.search_stories('   '), [])
 
     def test_search_case_insensitive(self):
-        upper = stub_data.search_stories('РУДАЗОВ')
-        lower = stub_data.search_stories('рудазов')
+        upper = stub_data.search_stories('РЫСҚАЛИ')
+        lower = stub_data.search_stories('рысқали')
         self.assertEqual([s.slug for s in upper], [s.slug for s in lower])
         self.assertGreater(len(upper), 0)

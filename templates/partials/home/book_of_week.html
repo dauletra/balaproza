@@ -1,12 +1,14 @@
-{% load static %}
 {% comment %}
-    HomeBookOfWeek (FR-HOME-03). Крупная редакционная карточка.
+    HomeBookOfWeek (FR-HOME-03). Якорный редакционный блок.
+    Цветная плашка по primary жанру + бэйдж «#1» + крупная типографическая
+    обложка слева + название/цитата/CTA справа.
 
     Контекст: book_of_week (BookOfWeek объект из stub_data)
 {% endcomment %}
 {% with bw=book_of_week story=book_of_week.story %}
+{% with hue=story.primary_genre.hue|default:195 %}
 <section>
-    {# Заголовок секции с собственным eyebrow справа #}
+    {# Заголовок секции с eyebrow справа #}
     <div class="mb-4 flex items-baseline justify-between">
         <h2 class="font-display text-[22px] font-semibold text-slate-900">Аптаның кітабы</h2>
         <span class="font-display text-[11px] font-semibold uppercase tracking-[0.12em] text-status-attention-fg">
@@ -14,69 +16,45 @@
         </span>
     </div>
 
-    <article class="grid grid-cols-1 overflow-hidden rounded-hero border border-slate-200 bg-white shadow-sm md:grid-cols-[260px_1fr]">
-        {# ── Обложка ── #}
-        <div class="relative min-h-[260px] bg-cover bg-center md:min-h-[360px]"
-             style="background-image: linear-gradient(rgba(0,0,0,0.04), rgba(0,0,0,0.20)), url('{% static story.cover %}')"
-             role="img" aria-label="«{{ story.title }}» мұқабасы">
-            <span class="absolute left-4 top-4 inline-flex items-center rounded-chip bg-promo-bg px-3 py-1 font-display text-[11px] font-bold uppercase tracking-[0.06em] text-[rgb(33,11,11)]">
-                аптаның таңдауы
-            </span>
+    <article class="relative grid grid-cols-1 overflow-hidden rounded-hero shadow-card-hover sm:grid-cols-[180px_1fr] md:grid-cols-[220px_1fr]"
+             style="background: linear-gradient(135deg, oklch(0.96 0.04 {{ hue }}) 0%, oklch(0.92 0.06 {{ hue }}) 100%);">
+
+        {# Декоративный бэйдж #1 в правом верхнем углу #}
+        <span class="absolute right-4 top-4 z-10 inline-flex items-center gap-1 rounded-pill bg-white/80 px-2.5 py-1 font-display text-[10px] font-bold uppercase tracking-[0.1em] backdrop-blur-sm"
+              style="color: oklch(0.32 0.14 {{ hue }})">
+            № 1 · апта
+        </span>
+
+        {# ── Обложка (крупная, типографическая) ── #}
+        <div class="relative p-5 sm:p-6">
+            {% include "components/cover_placeholder.html" with story=story cls="aspect-[2/3] w-full max-w-[160px] mx-auto rounded-md shadow-card-hover" letter_cls="text-7xl" %}
         </div>
 
         {# ── Контент ── #}
-        <div class="flex flex-col gap-4 p-9">
-            <div class="flex items-center gap-2.5">
-                {% include "components/avatar.html" with size=32 name=story.author.name %}
-                <div>
-                    <a href="{% url 'core:profile_other' username=story.author.username %}"
-                       class="font-sans text-[13px] font-semibold text-slate-900 hover:text-brand">
-                        {{ story.author.name }}
-                    </a>
-                    <div class="font-sans text-[11px] text-slate-500">
-                        {% for g in story.genres_resolved %}{{ g.name|lower }}{% if not forloop.last %}, {% endif %}{% endfor %}
-                    </div>
-                </div>
+        <div class="flex flex-col gap-3 p-5 sm:py-7 sm:pr-7">
+            <div class="flex items-center gap-2">
+                {% include "components/genre_chip.html" with genre=story.primary_genre size="sm" %}
+                <span class="font-sans text-xs text-slate-600">{{ story.author.name }}</span>
             </div>
 
-            <h3 class="font-sans text-[30px] font-bold leading-[1.1] -tracking-[0.01em] text-slate-900">
+            <h3 class="font-sans text-2xl font-bold leading-[1.1] -tracking-[0.01em] text-slate-900 md:text-[26px]">
                 «{{ story.title }}»
             </h3>
 
-            {# Цитата из книги #}
-            <blockquote class="rounded-md border-l-[3px] border-brand bg-slate-50 px-4 py-3.5 font-sans text-sm italic leading-[1.6] text-slate-800">
+            <blockquote class="rounded-md border-l-[3px] bg-white/70 px-3.5 py-2.5 font-sans text-[13px] italic leading-[1.55] text-slate-700"
+                        style="border-color: oklch(0.5 0.14 {{ hue }})">
                 {{ bw.quote }}
             </blockquote>
 
-            {# Заметка редакции #}
-            <p class="font-sans text-[13px] leading-[1.65] text-slate-600">
-                {{ bw.editorial_note }}
-            </p>
-
-            {# Метрики #}
-            <div class="mt-1 flex flex-wrap items-center gap-4 font-sans text-xs text-slate-500">
-                <span class="inline-flex items-center gap-1.5">
-                    {% include "components/icon.html" with name="eye" size=14 cls="text-slate-500" %}
-                    {{ story.views|stringformat:"d" }} оқылды
-                </span>
-                <span class="text-slate-300">·</span>
-                <span class="inline-flex items-center gap-1.5">
-                    {% include "components/icon.html" with name="thumbs-up" size=14 cls="text-slate-500" %}
-                    {{ story.likes|stringformat:"d" }}
-                </span>
-                <span class="text-slate-300">·</span>
-                <span>{{ story.chapters }} бөлім</span>
-            </div>
-
-            <div class="mt-2 flex items-center gap-2.5">
+            <div class="mt-1 flex items-center gap-3">
                 {% url 'core:story_read' slug=story.slug as read_href %}
                 {% include "components/button.html" with kind="primary" label="Оқуды бастау" icon="book" href=read_href %}
-                <button type="button" aria-label="Сақтау"
-                        class="grid h-9 w-9 place-items-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50">
-                    {% include "components/icon.html" with name="bookmark" size=16 %}
-                </button>
+                <span class="font-sans text-xs text-slate-600">
+                    {{ story.views|stringformat:"d" }} оқыды · {{ story.likes|stringformat:"d" }} ұнатты
+                </span>
             </div>
         </div>
     </article>
 </section>
+{% endwith %}
 {% endwith %}

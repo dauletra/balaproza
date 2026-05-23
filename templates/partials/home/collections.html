@@ -1,39 +1,36 @@
-{% load static %}
 {% comment %}
-    HomeCollections (FR-HOME-06). 4 кураторские подборки.
-    Каждая карточка: тонированный «верх» со стопкой обложек + низ с названием.
+    HomeCollections (FR-HOME-06). Тематические подборки «по настроению».
+    Карточка: цветная плашка OKLCH + крупная SVG-иконка + название + count.
 
     Контекст: collections (list of Collection)
 {% endcomment %}
 <section>
-    {% include "components/section_header.html" with title="Жинақтар" hint="тақырыптық таңдаулар" link="барлық жинақтар →" link_href="/collections/" %}
+    {% include "components/section_header.html" with title="Жинақтар" hint="көңіл-күй бойынша" link="барлық жинақтар →" link_href="/collections/" %}
 
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {% for c in collections %}
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {% for c in collections|slice:":8" %}
             <a href="{% url 'core:collection_detail' slug=c.slug %}"
-               class="group flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition-shadow hover:shadow-card-hover">
+               class="group relative flex flex-col items-start gap-2 overflow-hidden rounded-lg p-4 transition-shadow hover:shadow-card-hover"
+               style="background: oklch(0.95 0.05 {{ c.tint_hue }});
+                      box-shadow: inset 0 0 0 1px oklch(0.86 0.08 {{ c.tint_hue }});">
 
-                {# ── Верх: стопка обложек на цветном фоне ── #}
-                <div class="relative h-[140px] overflow-hidden"
-                     style="background: oklch(0.93 0.05 {{ c.tint_hue }})">
-                    <span class="absolute left-3 top-3 z-10 text-lg" aria-hidden="true">{{ c.emoji }}</span>
+                {# Иконка-настроение в правом верхнем углу #}
+                <span class="absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-pill"
+                      style="background: oklch(0.86 0.08 {{ c.tint_hue }});
+                             color: oklch(0.32 0.14 {{ c.tint_hue }});"
+                      aria-hidden="true">
+                    {% include "components/icon.html" with name=c.icon size=20 %}
+                </span>
 
-                    {# Три обложки внахлёст по центру #}
-                    <div class="absolute inset-0 flex items-center justify-center">
-                        {% for s in c.covers %}
-                            <div class="h-[88px] w-[60px] rounded-sm border-2 border-white bg-cover bg-center shadow-md
-                                        {% if not forloop.first %}-ml-4{% endif %}
-                                        {% if forloop.first %}-rotate-6{% elif forloop.last %}rotate-6{% endif %}"
-                                 style="background-image: url('{% static s.cover %}')"
-                                 aria-hidden="true"></div>
-                        {% endfor %}
+                <div class="mt-7 min-w-0 pr-2">
+                    <div class="font-sans text-[15px] font-bold leading-tight group-hover:underline"
+                         style="color: oklch(0.28 0.12 {{ c.tint_hue }})">
+                        {{ c.name }}
                     </div>
-                </div>
-
-                {# ── Низ: название + счётчик ── #}
-                <div class="flex flex-col gap-1 px-4 py-3.5">
-                    <div class="font-sans text-sm font-bold text-slate-900 group-hover:text-brand">{{ c.name }}</div>
-                    <div class="font-sans text-xs text-slate-500">{{ c.count }} шығарма</div>
+                    <div class="mt-1 font-sans text-xs"
+                         style="color: oklch(0.42 0.10 {{ c.tint_hue }})">
+                        {{ c.count }} шығарма
+                    </div>
                 </div>
             </a>
         {% endfor %}

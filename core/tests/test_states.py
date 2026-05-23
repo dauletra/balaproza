@@ -51,17 +51,17 @@ class LibraryStates(TestCase):
         r = self.client.get(reverse('core:library') + '?state=loading')
         self.assertContains(r, 'animate-pulse')
         # Реальные книги не рендерим
-        self.assertNotContains(r, 'Тёмный лорд')
+        self.assertNotContains(r, 'Күңгірт мырза')
 
     def test_error_shows_error_block(self):
         r = self.client.get(reverse('core:library') + '?state=error')
         self.assertContains(r, 'Кітапхана деректерін жүктеу мүмкін болмады')
-        self.assertNotContains(r, 'Тёмный лорд')
+        self.assertNotContains(r, 'Күңгірт мырза')
 
     def test_content_default(self):
         r = self.client.get(reverse('core:library'))
-        # Saved — содержит «Тёмный лорд»
-        self.assertContains(r, 'Тёмный лорд')
+        # Saved — содержит «Күңгірт мырза»
+        self.assertContains(r, 'Күңгірт мырза')
 
 
 class NotificationsStates(TestCase):

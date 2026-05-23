@@ -1,0 +1,32 @@
+{% comment %}
+    CoverPlaceholder — типографическая «обложка» произведения.
+    Цветной OKLCH-прямоугольник + первая буква названия в display-фонте.
+    Цвет фона и буквы тонируются по hue primary жанра произведения.
+
+    Используется вместо фото-обложек в дизайн-стабе (вместо `img/bookN.jpg`).
+
+    Параметры:
+      story       — Story (читает story.title и story.primary_genre.hue)
+      cls         — внешние классы (размеры/радиусы/тени), напр.:
+                    "h-[120px] w-[80px] rounded-md shadow-sm"
+      letter_cls  — классы для размера буквы (по умолчанию text-5xl)
+      href        — если задан, рендерится <a>, иначе <div role="img">
+{% endcomment %}
+{% with hue=story.primary_genre.hue|default:210 letter=story.title|slice:":1" %}
+{% if href %}<a href="{{ href }}"
+   class="relative grid shrink-0 place-items-center overflow-hidden {{ cls }}"
+   style="background: oklch(0.90 0.06 {{ hue }});"
+   aria-label="«{{ story.title }}» мұқабасы">
+{% else %}<div role="img" aria-label="«{{ story.title }}» мұқабасы"
+   class="relative grid shrink-0 place-items-center overflow-hidden {{ cls }}"
+   style="background: oklch(0.90 0.06 {{ hue }});">
+{% endif %}
+    {# Лёгкий «корешок» слева для книжного ощущения #}
+    <span aria-hidden="true" class="absolute inset-y-0 left-0 w-[3px]"
+          style="background: oklch(0.55 0.14 {{ hue }}); opacity: 0.45"></span>
+    <span class="font-display font-bold leading-none tracking-tight {{ letter_cls|default:'text-5xl' }}"
+          style="color: oklch(0.32 0.14 {{ hue }});">
+        {{ letter|upper }}
+    </span>
+{% if href %}</a>{% else %}</div>{% endif %}
+{% endwith %}

@@ -18,9 +18,7 @@
 
     {# ─────────────────────── Шапка произведения ─────────────────────── #}
     <header class="grid grid-cols-1 gap-6 sm:grid-cols-[180px_1fr] md:grid-cols-[220px_1fr]">
-        <div class="aspect-[2/3] w-full rounded-lg bg-slate-200 bg-cover bg-center shadow-card-hover"
-             style="background-image: url('{% static story.cover %}')"
-             role="img" aria-label="«{{ story.title }}» мұқабасы"></div>
+        {% include "components/cover_placeholder.html" with story=story cls="aspect-[2/3] w-full rounded-lg shadow-card-hover" letter_cls="text-8xl" %}
 
         <div class="flex flex-col gap-3">
             <div class="flex flex-wrap gap-1.5">
@@ -35,7 +33,7 @@
 
             <a href="{% url 'core:profile_other' username=story.author.username %}"
                class="inline-flex items-center gap-2 self-start font-sans text-sm text-slate-600 hover:text-brand">
-                {% include "components/avatar.html" with size=24 name=story.author.name %}
+                {% include "components/avatar.html" with size=24 name=story.author.name username=story.author.username %}
                 <span>{{ story.author.name }}</span>
             </a>
 

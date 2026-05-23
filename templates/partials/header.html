@@ -37,7 +37,8 @@
         {# ── Правый кластер (desktop) ── #}
         <nav class="ml-auto hidden items-center gap-6 md:flex" aria-label="Қолданушы әрекеттері">
             <a href="{% url 'core:new_story' %}"
-               class="font-sans text-[13px] font-bold text-brand hover:text-brand-dark">
+               class="inline-flex items-center gap-1.5 font-sans text-[13px] font-bold text-brand hover:text-brand-dark">
+                {% include "components/icon.html" with name="pen" size=15 %}
                 Шығарма жазу
             </a>
 

@@ -1,15 +1,25 @@
 {% comment %}
-    Avatar (docs/04.6). Заглушка: серый круг + иконка user-circle.
-    В продакшене подставит фото пользователя.
+    Avatar (docs/04.6). Заглушка: буквенные инициалы на цветном OKLCH-фоне.
+    Hue стабильно выводится из длины seed (username|name) — один и тот же
+    автор всегда получает один и тот же цвет.
+
+    В продакшене подставится фото пользователя.
 
     Параметры:
-      size  — px (default 36)
-      name  — для aria-label
+      size      — px (default 36)
+      name      — отображаемое имя (для инициалов и aria-label)
+      username  — стабильный идентификатор для выбора цвета (опц.)
 {% endcomment %}
-{% with s=size|default:36 %}
-<span class="inline-grid shrink-0 place-items-center rounded-pill bg-slate-200 text-slate-500"
-      style="width:{{ s }}px;height:{{ s }}px"
-      {% if name %}aria-label="{{ name }}"{% endif %}>
-    {% include "components/icon.html" with name="user-circle" size=s|add:"-8" %}
+{% with s=size|default:36 disp=name|default:"" uname=username|default:"" %}
+{% with seed=uname|add:disp|default:"?" letter=disp|default:"?"|slice:":1" %}
+<span class="inline-grid shrink-0 place-items-center rounded-pill font-display font-bold"
+      style="width:{{ s }}px;
+             height:{{ s }}px;
+             background: oklch(0.86 0.08 {% widthratio seed|length 1 31 %});
+             color: oklch(0.32 0.14 {% widthratio seed|length 1 31 %});
+             font-size: {% widthratio s 5 2 %}px;"
+      {% if disp %}aria-label="{{ disp }}"{% endif %}>
+    {{ letter|upper }}
 </span>
+{% endwith %}
 {% endwith %}

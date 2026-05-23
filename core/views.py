@@ -34,7 +34,6 @@ def home(request):
         'fresh_stories':   list(reversed(stub_data.STORIES)),
         'collections':     stub_data.COLLECTIONS,
         'new_authors':     stub_data.AUTHORS[1:5],   # без «Рудазова» — он книга недели
-        'featured_author': stub_data.AUTHORS[0],
         'school_links':    stub_data.SCHOOL_LINKS,
         'platform_stats':  stub_data.PLATFORM_STATS,
     })

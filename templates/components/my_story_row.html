@@ -1,4 +1,3 @@
-{% load static %}
 {% comment %}
     Строка в списке «Менің шығармаларым»: обложка + название + StatusBadge + метрики
     + быстрые действия (Басқару / Бөлім қосу).
@@ -9,10 +8,8 @@
 <article class="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 transition-shadow hover:shadow-card-hover sm:flex-row sm:items-center">
 
     {# Обложка-thumb #}
-    <a href="{% url 'core:manage_story' slug=story.slug %}"
-       class="block h-[120px] w-[80px] shrink-0 rounded-md bg-slate-200 bg-cover bg-center shadow-sm"
-       style="background-image: url('{% static story.cover %}')"
-       aria-label="«{{ story.title }}» мұқабасы"></a>
+    {% url 'core:manage_story' slug=story.slug as cover_href %}
+    {% include "components/cover_placeholder.html" with story=story href=cover_href cls="h-[120px] w-[80px] rounded-md shadow-sm" letter_cls="text-4xl" %}
 
     {# Контент #}
     <div class="flex min-w-0 flex-1 flex-col gap-2">

@@ -169,7 +169,7 @@ class ProfileMeAuthed(TestCase):
         self.assertContains(r, 'Оқу үстіндегі')
         self.assertContains(r, 'Сақталған')
         # Книги из ридинга
-        self.assertContains(r, 'На дальних берегах')
+        self.assertContains(r, 'Алыс жағалауларда')
 
     def test_about_tab_shows_bio(self):
         r = self.client.get(reverse('core:profile_me') + '?tab=about')
@@ -193,7 +193,7 @@ class ProfileOtherKnown(TestCase):
     def test_renders_for_guest(self):
         r = self.client.get(reverse('core:profile_other', kwargs={'username': self.USERNAME}))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'Александр Рудазов')
+        self.assertContains(r, 'Алмат Рысқали')
         # Гость видит кнопку «Жазылу» — но это <a> на /auth/login/?next=
         self.assertContains(r, 'Жазылу')
         self.assertContains(r, '/auth/login/')
@@ -215,9 +215,9 @@ class ProfileOtherKnown(TestCase):
 
     def test_works_tab_lists_author_stories(self):
         r = self.client.get(reverse('core:profile_other', kwargs={'username': self.USERNAME}))
-        # У Рудазова в стабе — 2 произведения (kronchessii, arhimag)
-        self.assertContains(r, 'Кронцессии')
-        self.assertContains(r, 'Архимаг')
+        # У Рысқали в стабе — 2 произведения (kronchessii, arhimag)
+        self.assertContains(r, 'Тас уәделер')
+        self.assertContains(r, 'Сиқыршы')
 
     def test_about_tab_visible(self):
         r = self.client.get(reverse('core:profile_other', kwargs={'username': self.USERNAME}) + '?tab=about')
@@ -245,7 +245,7 @@ class LibraryGuest(TestCase):
         r = self.client.get(reverse('core:library'))
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'кіріңіз')
-        self.assertNotContains(r, 'На дальних берегах')
+        self.assertNotContains(r, 'Алыс жағалауларда')
 
 
 class LibraryAuthed(TestCase):
@@ -264,13 +264,13 @@ class LibraryAuthed(TestCase):
     def test_reading_tab_shows_progress_and_continue(self):
         r = self.client.get(reverse('core:library') + '?tab=reading')
         self.assertContains(r, 'Жалғастыру')
-        self.assertContains(r, 'На дальних берегах')
+        self.assertContains(r, 'Алыс жағалауларда')
         # Прогресс «N / M бөлім»
         self.assertContains(r, '4 / 12 бөлім')
 
     def test_done_tab(self):
         r = self.client.get(reverse('core:library') + '?tab=done')
-        self.assertContains(r, 'Сила империи')
+        self.assertContains(r, 'Империя құдіреті')
         self.assertContains(r, 'Қайта оқу')
 
     def test_segmented_control_links(self):
@@ -282,12 +282,12 @@ class LibraryAuthed(TestCase):
     def test_unknown_tab_falls_back_to_saved(self):
         r = self.client.get(reverse('core:library') + '?tab=garbage')
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'Тёмный лорд')  # из saved
+        self.assertContains(r, 'Күңгірт мырза')  # из saved
 
     def test_other_tab_books_not_shown(self):
-        # На reading-табе НЕ должно быть «Тёмный лорд» (saved)
+        # На reading-табе НЕ должно быть «Күңгірт мырза» (saved)
         r = self.client.get(reverse('core:library') + '?tab=reading')
-        self.assertNotContains(r, 'Тёмный лорд')
+        self.assertNotContains(r, 'Күңгірт мырза')
 
 
 class LibraryEmpty(TestCase):

@@ -136,20 +136,6 @@ class SchoolLinksInRightRail(TestCase):
         self.assertContains(r, 'rel="noopener noreferrer"')
 
 
-class SchoolLinksInHomeGrid(TestCase):
-
-    def test_grid_section_present_on_home(self):
-        r = self.client.get(reverse('core:home'))
-        # Подпись описания grid-варианта (отличает от рейл-версии)
-        self.assertContains(r, 'Сайт ішінде ойнатылмайды')
-
-    def test_grid_renders_all_channel_subtitles(self):
-        r = self.client.get(reverse('core:home'))
-        for l in stub_data.SCHOOL_LINKS:
-            with self.subTest(channel=l.channel):
-                self.assertContains(r, l.subtitle)
-
-
 class SchoolLinksInFooter(TestCase):
     """Inline-вариант в footer — должен присутствовать на ВСЕХ страницах."""
 

@@ -23,8 +23,13 @@
             style="background: oklch(0.97 0.03 {{ collection.tint_hue }})">
 
         <div class="flex flex-col gap-4 p-8">
-            <p class="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">
-                <span class="mr-1" aria-hidden="true">{{ collection.emoji }}</span> Жинақ · {{ collection.count }} шығарма
+            <p class="inline-flex items-center gap-2 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                <span class="grid h-7 w-7 place-items-center rounded-pill"
+                      style="background: oklch(0.86 0.08 {{ collection.tint_hue }}); color: oklch(0.28 0.14 {{ collection.tint_hue }});"
+                      aria-hidden="true">
+                    {% include "components/icon.html" with name=collection.icon size=14 %}
+                </span>
+                Жинақ · {{ collection.count }} шығарма
             </p>
             <h1 class="font-display text-3xl font-bold leading-tight text-slate-900 sm:text-4xl">
                 {{ collection.name }}
@@ -41,11 +46,11 @@
         <div class="relative hidden h-[280px] overflow-hidden lg:block">
             <div class="absolute inset-0 flex items-center justify-center">
                 {% for s in collection.covers %}
-                    <div class="h-[200px] w-[133px] rounded-md border-[3px] border-white bg-cover bg-center shadow-card-hover
+                    <div class="overflow-hidden border-[3px] border-white shadow-card-hover
                                 {% if not forloop.first %}-ml-8{% endif %}
-                                {% if forloop.first %}-rotate-6{% elif forloop.last %}rotate-6{% endif %}"
-                         style="background-image: url('{% static s.cover %}')"
-                         aria-hidden="true"></div>
+                                {% if forloop.first %}-rotate-6{% elif forloop.last %}rotate-6{% endif %}">
+                        {% include "components/cover_placeholder.html" with story=s cls="h-[200px] w-[133px] rounded-md" letter_cls="text-6xl" %}
+                    </div>
                 {% endfor %}
             </div>
         </div>

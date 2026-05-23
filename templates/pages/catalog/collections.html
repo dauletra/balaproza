@@ -1,5 +1,4 @@
 {% extends 'base.html' %}
-{% load static %}
 
 {% block title %}Жинақтар — Balaproza{% endblock %}
 
@@ -8,7 +7,7 @@
     <div>
         <h1 class="font-display text-4xl font-medium text-slate-900">Жинақтар</h1>
         <p class="mt-2 max-w-xl font-sans text-sm text-slate-600">
-            Тақырыпқа жинақталған шығармалар. Балаларға арналған құрастырылған тізімдер.
+            Көңіл-күй мен тақырып бойынша жинақталған шығармалар. Әр жинақ — бір сезім немесе бір әлем.
         </p>
     </div>
     {% if signed_in %}
@@ -16,39 +15,29 @@
     {% endif %}
 </header>
 
-<div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
     {% for c in collections %}
         <a href="{% url 'core:collection_detail' slug=c.slug %}"
-           class="group flex flex-col gap-3">
+           class="group relative flex flex-col items-start gap-3 overflow-hidden rounded-lg p-5 transition-shadow hover:shadow-card-hover"
+           style="background: oklch(0.95 0.05 {{ c.tint_hue }});
+                  box-shadow: inset 0 0 0 1px oklch(0.86 0.08 {{ c.tint_hue }});">
 
-            {# ── Тонированный «верх» + стопка обложек со сдвигом ── #}
-            <div class="relative h-[220px] overflow-hidden rounded-lg border border-slate-200"
-                 style="background: oklch(0.93 0.05 {{ c.tint_hue }})">
-                <span aria-hidden="true" class="absolute left-3 top-3 z-10 text-xl">{{ c.emoji }}</span>
+            {# Крупная иконка-настроение #}
+            <span class="grid h-14 w-14 place-items-center rounded-pill"
+                  style="background: oklch(0.86 0.08 {{ c.tint_hue }});
+                         color: oklch(0.28 0.14 {{ c.tint_hue }});"
+                  aria-hidden="true">
+                {% include "components/icon.html" with name=c.icon size=28 %}
+            </span>
 
-                <span class="absolute right-3 top-3 z-10 inline-flex items-center rounded-pill bg-slate-900/70 px-2.5 py-1 font-sans text-xs font-bold text-white">
-                    {{ c.count }}
-                </span>
-
-                {# Три обложки в ряд со смещением и небольшим поворотом #}
-                <div class="absolute inset-0 flex items-center justify-center">
-                    {% for s in c.covers %}
-                        <div class="h-[165px] w-[110px] rounded-md border-2 border-white bg-cover bg-center shadow-md transition-transform group-hover:-translate-y-1
-                                    {% if not forloop.first %}-ml-6{% endif %}
-                                    {% if forloop.first %}-rotate-6{% elif forloop.last %}rotate-6{% endif %}"
-                             style="background-image: url('{% static s.cover %}')"
-                             aria-hidden="true"></div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            {# ── Низ: название + куратор ── #}
-            <div>
-                <div class="font-sans text-base font-bold text-slate-900 group-hover:text-brand">
+            <div class="min-w-0">
+                <div class="font-sans text-base font-bold leading-tight group-hover:underline"
+                     style="color: oklch(0.26 0.12 {{ c.tint_hue }})">
                     {{ c.name }}
                 </div>
-                <div class="mt-1 font-sans text-xs text-slate-500">
-                    Құрастырған: {{ c.curator }}
+                <div class="mt-1 font-sans text-xs"
+                     style="color: oklch(0.42 0.10 {{ c.tint_hue }})">
+                    {{ c.count }} шығарма · {{ c.curator }}
                 </div>
             </div>
         </a>

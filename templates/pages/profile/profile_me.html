@@ -16,7 +16,7 @@
 {% else %}
     {# ── Шапка профиля ── #}
     <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-        {% include "components/avatar.html" with size=96 name=profile_user.name %}
+        {% include "components/avatar.html" with size=96 name=profile_user.name username=profile_user.username %}
 
         <div class="flex min-w-0 flex-1 flex-col gap-1.5">
             <h1 class="font-display text-3xl font-bold text-slate-900">{{ profile_user.name }}</h1>

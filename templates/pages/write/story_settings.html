@@ -31,9 +31,7 @@
 
         {# ── Обложка ── #}
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-[120px_1fr] sm:items-start">
-            <div class="aspect-[2/3] w-[120px] rounded-md bg-slate-200 bg-cover bg-center shadow-sm"
-                 style="background-image: url('{% static story.cover %}')"
-                 role="img" aria-label="ағымдағы мұқаба"></div>
+            {% include "components/cover_placeholder.html" with story=story cls="aspect-[2/3] w-[120px] rounded-md shadow-sm" letter_cls="text-5xl" %}
 
             <div class="flex flex-col gap-2">
                 <span class="font-sans text-sm font-semibold text-slate-800">Мұқаба</span>

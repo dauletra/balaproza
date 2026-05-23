@@ -49,7 +49,7 @@ class Author:
 
 
 AUTHORS = [
-    Author("rudazov",   "Александр Рудазов", "Фэнтези, шытырман",      12, 8420),
+    Author("rudazov",   "Алмат Рысқали",     "Фэнтези, шытырман",      12, 8420),
     Author("aygerim_k", "Айгерім Қасенова",  "Жас прозаик · Алматы",    3,  184),
     Author("bekzhan_t", "Бекжан Тұрсынов",   "Қалалық әңгімелер",       5,  312),
     Author("dina_books","Дина Айдарбекова",  "Балалар әдебиеті",        8,  542),
@@ -96,12 +96,12 @@ class Story:
 
 
 STORIES = [
-    Story("dalney-berega",  "На дальних берегах",   "sayyn",      "img/book1.jpg", ("fantastika",  None),         12, 12482, 4821, 312, status="Published"),
-    Story("temniy-lord",    "Тёмный лорд",          "bekzhan_t",  "img/book3.jpg", ("fantezi",     "horror"),      8,  8920, 2440, 156, status="Published"),
-    Story("igra-kuklovoda", "Игра кукловода",       "dina_books", "img/book4.jpg", ("triller",     "drama"),      15, 18102, 6230, 421, status="Published"),
-    Story("kronchessii",    "Кронцессии",           "rudazov",    "img/book2.jpg", ("shyttyrman",  "fantezi"),    24, 32540, 11200, 890, status="Published"),
-    Story("arhimag",        "Архимаг: Бөтен әлемдер","rudazov",   "img/book1.jpg", ("fantezi",     "shyttyrman"), 12, 12482, 4821, 312, status="Published"),
-    Story("sila-imperii",   "Сила империи",         "aygerim_k",  "img/book3.jpg", ("tarih",       "drama"),      18, 14200, 3890, 245, status="Published"),
+    Story("dalney-berega",  "Алыс жағалауларда",     "sayyn",      "img/book1.jpg", ("fantastika",  None),         12, 12482, 4821, 312, status="Published"),
+    Story("temniy-lord",    "Күңгірт мырза",         "bekzhan_t",  "img/book3.jpg", ("fantezi",     "horror"),      8,  8920, 2440, 156, status="Published"),
+    Story("igra-kuklovoda", "Қуыршақшының ойыны",    "dina_books", "img/book4.jpg", ("triller",     "drama"),      15, 18102, 6230, 421, status="Published"),
+    Story("kronchessii",    "Тас уәделер",           "rudazov",    "img/book2.jpg", ("shyttyrman",  "fantezi"),    24, 32540, 11200, 890, status="Published"),
+    Story("arhimag",        "Сиқыршы: бөтен әлемдер","rudazov",    "img/book1.jpg", ("fantezi",     "shyttyrman"), 12, 12482, 4821, 312, status="Published"),
+    Story("sila-imperii",   "Империя құдіреті",      "aygerim_k",  "img/book3.jpg", ("tarih",       "drama"),      18, 14200, 3890, 245, status="Published"),
 
     # ─ Произведения демо-пользователя «Айдана» (для WRITE-страниц) ─
     Story(
@@ -541,10 +541,10 @@ BOOK_OF_WEEK = BookOfWeek(
     story_slug="arhimag",
     editorial_note=(
         "Редакциядан: бұл апта мүлдем жаңа басталған туындыға арналды. "
-        "Архимаг сериясының сегізінші кітабы — Рудазов оқырмандарының ұзақ күткен жалғасы."
+        "«Сиқыршы» сериясының сегізінші кітабы — Алмат Рысқали оқырмандарының ұзақ күткен жалғасы."
     ),
     quote=(
-        "«Уақыт ағады, бірақ Архимаг үшін бір ғасыр — бір сәт. Ол өзі ойлап тапқан "
+        "«Уақыт ағады, бірақ Сиқыршы үшін бір ғасыр — бір сәт. Ол өзі ойлап тапқан "
         "құдай үшін мың әлемді кезеді — тағы бір сүйікті оқырманын тауып алу үшін.»"
     ),
 )
@@ -557,9 +557,9 @@ class Collection:
     slug: str
     name: str
     count: int
-    tint_hue: int                # OKLCH hue для тонировки обложки
-    emoji: str
-    cover_slugs: tuple           # 3 story slug для стопки обложек на карточке
+    tint_hue: int                # OKLCH hue для тонировки карточки и иконки
+    icon: str                    # slug SVG-иконки из спрайта (без префикса icon-)
+    cover_slugs: tuple           # 3 story slug — для fallback и детальной (стопка обложек)
     curator: str = "редакция"    # «Құрастырған: …»
     description: str = ""        # описание подборки на детальной
     story_slugs: tuple = ()      # все произведения внутри; пусто → fallback на cover_slugs
@@ -579,7 +579,7 @@ class Collection:
 COLLECTIONS = [
     Collection(
         slug="zhaz-okyrman", name="Жаз оқырмандарына",
-        count=6, tint_hue=75, emoji="☀️",
+        count=6, tint_hue=75, icon="planet",
         cover_slugs=("dalney-berega", "temniy-lord", "igra-kuklovoda"),
         curator="редакция",
         description="Жазғы демалысқа арналған жеңіл әрі қызық оқу. Ұзақ түнгі поезд сапары немесе теңіз жағасында бір күн — осы тізіммен.",
@@ -587,7 +587,7 @@ COLLECTIONS = [
     ),
     Collection(
         slug="bir-otyru", name="Бір отыруда оқу",
-        count=3, tint_hue=210, emoji="📖",
+        count=3, tint_hue=210, icon="book",
         cover_slugs=("kronchessii", "dalney-berega", "temniy-lord"),
         curator="редакция",
         description="Қысқа форматтар — бір кешке. Әр шығарма 3 сағаттан аспайды.",
@@ -595,7 +595,7 @@ COLLECTIONS = [
     ),
     Collection(
         slug="kazak-avt", name="Қазақ авторлары",
-        count=4, tint_hue=195, emoji="🇰🇿",
+        count=4, tint_hue=195, icon="feather",
         cover_slugs=("temniy-lord", "igra-kuklovoda", "kronchessii"),
         curator="Бекжан Тұрсынов",
         description="Қазақстандық авторлардың үздік шығармалары. Жас прозаиктерден танымал классиктерге дейін.",
@@ -603,11 +603,76 @@ COLLECTIONS = [
     ),
     Collection(
         slug="korkynyshty", name="Қорқынышты түн",
-        count=3, tint_hue=25, emoji="🕯️",
+        count=3, tint_hue=25, icon="skull",
         cover_slugs=("igra-kuklovoda", "kronchessii", "dalney-berega"),
         curator="редакция",
         description="Күн батқанда оқуға арналған. Тек ересектерге ұсынылады.",
         story_slugs=("igra-kuklovoda", "temniy-lord", "kronchessii"),
+    ),
+    # ── Настроенческие подборки ────────────────────────────────────────
+    Collection(
+        slug="kozzhasty-tun", name="Көзжасты түн",
+        count=5, tint_hue=250, icon="drop",
+        cover_slugs=("dalney-berega", "kronchessii", "temniy-lord"),
+        curator="редакция",
+        description="Ішкі үнсіздікке арналған шығармалар — қайғы, қимас сезім, өткен күндер туралы.",
+        story_slugs=("dalney-berega", "kronchessii", "temniy-lord", "sila-imperii", "arhimag"),
+    ),
+    Collection(
+        slug="mektep-kundeligi", name="Мектеп күнделігі",
+        count=4, tint_hue=130, icon="backpack",
+        cover_slugs=("temniy-lord", "arhimag", "sila-imperii"),
+        curator="редакция",
+        description="Мектеп жасындағы кейіпкерлер: сабақ, достық, алғашқы сезімдер.",
+        story_slugs=("temniy-lord", "arhimag", "sila-imperii", "kronchessii"),
+    ),
+    Collection(
+        slug="zhuldyzdan-kelgender", name="Жұлдыздан келгендер",
+        count=4, tint_hue=280, icon="planet",
+        cover_slugs=("sila-imperii", "arhimag", "kronchessii"),
+        curator="редакция",
+        description="Бөгде планеталық қонақтар, ғарыштық кездесулер және белгісіз әлемдер.",
+        story_slugs=("sila-imperii", "arhimag", "kronchessii", "igra-kuklovoda"),
+    ),
+    Collection(
+        slug="kala-anyzdary", name="Қала аңыздары",
+        count=5, tint_hue=15, icon="cityscape",
+        cover_slugs=("igra-kuklovoda", "temniy-lord", "kronchessii"),
+        curator="редакция",
+        description="Қалалық мифтер, түнгі көше әңгімелері, шынайылық пен сиқыр шегіндегі оқиғалар.",
+        story_slugs=("igra-kuklovoda", "temniy-lord", "kronchessii", "dalney-berega", "arhimag"),
+    ),
+    Collection(
+        slug="kalam-ustagan-kyzdar", name="Қалам ұстаған қыздар",
+        count=4, tint_hue=340, icon="feather",
+        cover_slugs=("dalney-berega", "arhimag", "kronchessii"),
+        curator="редакция",
+        description="Қыз авторлардың шығармалары — нәзік, ашық және ерекше дауыстар.",
+        story_slugs=("dalney-berega", "arhimag", "kronchessii", "sila-imperii"),
+    ),
+    Collection(
+        slug="zhana-zhyl-tuninde", name="Жаңа жыл түнінде",
+        count=3, tint_hue=0, icon="fir",
+        cover_slugs=("arhimag", "temniy-lord", "dalney-berega"),
+        curator="редакция",
+        description="Мерекелік көңіл-күй, ғажайыпқа сенім және қыс кешінің жылуы.",
+        story_slugs=("arhimag", "temniy-lord", "dalney-berega"),
+    ),
+    Collection(
+        slug="tiri-olikter", name="Тірі өліктер",
+        count=3, tint_hue=100, icon="skull",
+        cover_slugs=("igra-kuklovoda", "sila-imperii", "kronchessii"),
+        curator="редакция",
+        description="Зомби-апокалипсис, тірі қалу күресі және адамзаттан кейінгі әлем.",
+        story_slugs=("igra-kuklovoda", "sila-imperii", "kronchessii"),
+    ),
+    Collection(
+        slug="kulki-men-kuanysh", name="Күлкі мен қуаныш",
+        count=4, tint_hue=60, icon="smile",
+        cover_slugs=("temniy-lord", "arhimag", "dalney-berega"),
+        curator="редакция",
+        description="Жеңіл, жылы, көңіл көтеретін шығармалар — кейде күлкі ең жақсы дәрі.",
+        story_slugs=("temniy-lord", "arhimag", "dalney-berega", "sila-imperii"),
     ),
 ]
 
@@ -669,7 +734,7 @@ CONTESTS = [
             TimelineStage("Жеңімпаздар", "20 жел", "upcoming"),
         ),
         jury=(
-            JuryMember("Александр Рудазов", "Төраға"),
+            JuryMember("Алмат Рысқали", "Төраға"),
             JuryMember("Бекжан Тұрсынов",   "Мүше"),
             JuryMember("Дина Айдарбекова",  "Мүше"),
         ),
@@ -704,13 +769,13 @@ CONTESTS = [
         "zhas-aldym-2023", "Жас алдым — 2023", "Жабылды",
         status="finished", days_left=None, prize_kzt=None, submissions=156,
         cover="img/book3.jpg",
-        description="2023 жылғы байқау аяқталды. Жеңімпаздар: «Тёмный лорд», «Игра кукловода».",
+        description="2023 жылғы байқау аяқталды. Жеңімпаздар: «Күңгірт мырза», «Қуыршақшының ойыны».",
         conditions=(),
         timeline=(
             TimelineStage("Өтінім қабылдау", "1 қыр — 1 жел", "done"),
             TimelineStage("Финал", "15 жел", "done"),
         ),
-        jury=(JuryMember("Александр Рудазов", "Төраға"),),
+        jury=(JuryMember("Алмат Рысқали", "Төраға"),),
     ),
 ]
 
@@ -975,7 +1040,7 @@ NOTIFICATIONS_BY_USER: dict = {
         Notification(
             kind="new_chapter", bucket="yesterday", when="кеше 14:20",
             actor_username="rudazov", story_slug="arhimag",
-            text="«Архимаг: Бөтен әлемдер» — жаңа бөлім қосылды.",
+            text="«Сиқыршы: бөтен әлемдер» — жаңа бөлім қосылды.",
             read=True,
         ),
         # ── Өткен аптада ──

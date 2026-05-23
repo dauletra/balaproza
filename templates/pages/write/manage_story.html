@@ -20,9 +20,7 @@
 
     {# ── Шапка ── #}
     <header class="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-[120px_1fr]">
-        <div class="aspect-[2/3] w-[120px] rounded-md bg-slate-200 bg-cover bg-center shadow-sm"
-             style="background-image: url('{% static story.cover %}')"
-             role="img" aria-label="мұқаба"></div>
+        {% include "components/cover_placeholder.html" with story=story cls="aspect-[2/3] w-[120px] rounded-md shadow-sm" letter_cls="text-5xl" %}
 
         <div class="flex flex-col gap-3">
             <div class="flex flex-wrap items-start justify-between gap-3">
