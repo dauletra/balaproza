@@ -22,8 +22,8 @@ class HomeGuestMode(TestCase):
 
     def test_shows_guest_hero_marker(self):
         """Hero для гостя — редакционный, без CTA, сообщает обе функции платформы."""
-        self.assertContains(self.response, 'Жасөспірімдер жазады')
-        self.assertContains(self.response, 'өзің жазасың')
+        self.assertContains(self.response, 'Балалар мен жасөспірімдер әдебиеті')
+        self.assertContains(self.response, 'Автор бол')
 
     def test_does_not_show_continue_reading(self):
         """У гостя нет блока «Жалғастыру оқу»."""
@@ -65,7 +65,7 @@ class HomeAuthedMode(TestCase):
 
     def test_no_guest_hero_welcome(self):
         # Маркер hero_guest у авторизованного не показывается — у него свой hero_returning.
-        self.assertNotContains(self.response, 'Жасөспірімдер жазады')
+        self.assertNotContains(self.response, 'Балалар мен жасөспірімдер әдебиеті')
 
 
 class HeaderContestsLink(TestCase):

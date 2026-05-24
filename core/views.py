@@ -231,19 +231,47 @@ def story_detail(request, slug):
     # Автор своего стори видит pending-теги (BR-TAG-07). Для прочих скрыты.
     viewer = request.session.get('user_username') or ''
     is_author = bool(story and viewer and story.author.username == viewer)
+
+    # Резолв текущей главы из ?chapter=N. Невалидное/отсутствующее значение:
+    #  - авторизованный с прогрессом по этому slug → SAMPLE_PROGRESS.current_chapter
+    #  - иначе → 1
+    # Если глав нет вовсе — chapter_number=None, current=None (no-op в шаблоне).
+    explicit_chapter = request.GET.get('chapter')
+    has_progress_here = (
+        request.session.get('signed_in')
+        and stub_data.SAMPLE_PROGRESS.story_slug == slug
+    )
+    if chapters:
+        try:
+            chapter_number = int(explicit_chapter) if explicit_chapter else None
+        except (TypeError, ValueError):
+            chapter_number = None
+        if not chapter_number or chapter_number < 1 or chapter_number > len(chapters):
+            chapter_number = (
+                stub_data.SAMPLE_PROGRESS.current_chapter if has_progress_here else 1
+            )
+        current = stub_data.chapter_of(slug, chapter_number)
+    else:
+        chapter_number = None
+        current = None
+
+    # Тизер с разворотом — только для гл.1 при «голом» URL без ?chapter (первое
+    # знакомство с произведением). Возвращающийся юзер или явный выбор главы → полный текст.
+    is_teaser = bool(current and chapter_number == 1 and not explicit_chapter and not has_progress_here)
+
     return render(request, 'pages/story/story_detail.html', {
         'has_right_rail': True,
         'slug':     slug,
         'story':    story,
         'chapters': chapters,
-        'comments': stub_data.comments_of(slug),
-        # «текущая глава» для подсветки в списке глав. У возвращающегося — из прогресса.
-        'current_chapter_number': (
-            stub_data.SAMPLE_PROGRESS.current_chapter
-            if request.session.get('signed_in')
-               and stub_data.SAMPLE_PROGRESS.story_slug == slug
-            else None
-        ),
+        'chapter_number': chapter_number,
+        'current':  current,
+        'has_prev': bool(current) and chapter_number > 1,
+        'has_next': bool(current) and chapter_number < len(chapters),
+        'is_teaser': is_teaser,
+        'comments': stub_data.comments_of_chapter(slug, chapter_number) if chapter_number else [],
+        # Подсветка в правом рейле — текущая отображаемая глава.
+        'current_chapter_number': chapter_number,
         # FR-STORY-02: блок «Басқа шығармалар» внизу страницы
         'related':  stub_data.related_stories(slug, limit=6) if story else [],
         # docs/11: UGC-теги произведения (resolved Tag-объекты)

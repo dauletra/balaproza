@@ -49,9 +49,6 @@
             </div>
 
             <div class="mt-3 flex flex-wrap items-center gap-2.5">
-                {% url 'core:story_read' slug=story.slug as read_href %}
-                {% include "components/button.html" with kind="primary" size="lg" label="Оқу" icon="book" href=read_href %}
-
                 <button type="button" aria-label="Сақтау"
                         class="grid h-11 w-11 place-items-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50">
                     {% include "components/icon.html" with name="bookmark" size=18 %}
@@ -71,117 +68,104 @@
         </div>
     </header>
 
-    {# ─────────────────────── Scrollspy + 3 секции ─────────────────────── #}
-    <div x-data="{
-            active: 'anon',
-            init() {
-                const io = new IntersectionObserver((entries) => {
-                    entries.forEach(e => { if (e.isIntersecting) this.active = e.target.id; });
-                }, { rootMargin: '-30% 0px -60% 0px', threshold: 0 });
-                ['anon', 'chapters', 'comments'].forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) io.observe(el);
-                });
-            }
-         }">
+    {# ─────────────────────── Аннотация ─────────────────────── #}
+    <section class="rounded-lg border border-slate-200 bg-white p-6">
+        <h2 class="font-display text-xl font-bold text-slate-900">Аннотация</h2>
+        <p class="mt-3 font-sans text-[15px] leading-[1.65] text-slate-700">
+            Үш достың таңғажайып саяхаты. Олар әрқайсысы жоғалғанын іздеп жолға шығады, бірақ
+            табатыны мүлдем басқа нәрсе — өзін, бір-бірін және ішкі дауысты. Әр бөлім — жаңа
+            күмән, жаңа сын, жаңа таңдау. Авторлар әлемі — бұл біздің әлемнен бір қадам әріге
+            ғана кеткен әлем, бірақ ондағы әр сурет — таныс.
+        </p>
+    </section>
 
-        {# Sticky pill-nav (DEC-15: не табы, а scrollspy) #}
-        <nav aria-label="Бөлімдер навигациясы"
-             class="sticky top-16 z-20 -mx-4 mb-6 flex gap-1.5 overflow-x-auto border-y border-slate-200 bg-slate-100/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:mx-0 lg:rounded-pill lg:border lg:px-2">
-            <a href="#anon"
-               :class="active === 'anon' ? 'bg-brand text-white' : 'text-slate-700 hover:bg-slate-200'"
-               class="rounded-pill px-4 py-1.5 font-sans text-sm font-semibold whitespace-nowrap transition-colors">
-                Аннотация
-            </a>
-            <a href="#chapters"
-               :class="active === 'chapters' ? 'bg-brand text-white' : 'text-slate-700 hover:bg-slate-200'"
-               class="rounded-pill px-4 py-1.5 font-sans text-sm font-semibold whitespace-nowrap transition-colors">
-                Бөлімдер
-                <span class="ml-1 font-normal opacity-70">{{ chapters|length }}</span>
-            </a>
-            <a href="#comments"
-               :class="active === 'comments' ? 'bg-brand text-white' : 'text-slate-700 hover:bg-slate-200'"
-               class="rounded-pill px-4 py-1.5 font-sans text-sm font-semibold whitespace-nowrap transition-colors">
-                Пікірлер
-                <span class="ml-1 font-normal opacity-70">{{ comments|length }}</span>
-            </a>
-        </nav>
+    {# ─────────────────────── Текущая глава inline ─────────────────────── #}
+    {% if current %}
+        <section id="chapter-{{ chapter_number }}" class="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
+            <header class="mb-5">
+                <p class="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    {{ chapter_number }}-бөлім · {{ chapters|length }} бөлімнен
+                </p>
+                <h2 class="mt-1 font-display text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">
+                    {{ current.title }}
+                </h2>
 
-        {# ── Аннотация (FR-STORY-02) ── #}
-        <section id="anon" class="scroll-mt-32 rounded-lg border border-slate-200 bg-white p-6">
-            <h2 class="font-display text-xl font-bold text-slate-900">Аннотация</h2>
-            <p class="mt-3 font-sans text-[15px] leading-[1.65] text-slate-700">
-                Үш достың таңғажайып саяхаты. Олар әрқайсысы жоғалғанын іздеп жолға шығады, бірақ
-                табатыны мүлдем басқа нәрсе — өзін, бір-бірін және ішкі дауысты. Әр бөлім — жаңа
-                күмән, жаңа сын, жаңа таңдау. Авторлар әлемі — бұл біздің әлемнен бір қадам әріге
-                ғана кеткен әлем, бірақ ондағы әр сурет — таныс.
-            </p>
-        </section>
-
-        {# ── Бөлімдер (FR-STORY-04) ── #}
-        <section id="chapters" class="mt-8 scroll-mt-32 rounded-lg border border-slate-200 bg-white p-6">
-            <div class="mb-4 flex items-baseline justify-between">
-                <h2 class="font-display text-xl font-bold text-slate-900">Бөлімдер</h2>
-                {% if current_chapter_number %}
-                    <span class="font-sans text-xs text-slate-500">
-                        Оқылды: <strong class="text-slate-800">{{ current_chapter_number }}</strong> / {{ chapters|length }}
-                    </span>
+                {% if current_chapter_number and not is_teaser %}
+                    {% widthratio current_chapter_number chapters|length 100 as pct %}
+                    <div class="mt-4 h-1.5 overflow-hidden rounded-pill bg-slate-200">
+                        <div class="h-full bg-brand" style="width: {{ pct }}%"></div>
+                    </div>
+                    <p class="mt-1.5 font-sans text-xs text-slate-500">
+                        Оқылды: <strong class="text-slate-700">{{ current_chapter_number }}</strong> / {{ chapters|length }}
+                    </p>
                 {% endif %}
-            </div>
+            </header>
 
-            {% if current_chapter_number %}
-                {% widthratio current_chapter_number chapters|length 100 as pct %}
-                <div class="mb-5 h-1.5 overflow-hidden rounded-pill bg-slate-200">
-                    <div class="h-full bg-brand" style="width: {{ pct }}%"></div>
+            {% if is_teaser %}
+                {# Тизер первой главы: max-h + fade-gradient, разворот по клику. #}
+                <div x-data="{ expanded: false }" class="relative">
+                    <article :class="!expanded ? 'max-h-72 overflow-hidden' : ''"
+                             class="prose-reader font-sans text-[17px] leading-[1.75] text-slate-800">
+                        {{ current.body|linebreaks }}
+                    </article>
+                    <div x-show="!expanded"
+                         class="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-white via-white/85 to-transparent"></div>
+
+                    <div x-show="!expanded" class="mt-5 flex justify-center">
+                        <button type="button" @click="expanded = true"
+                                class="inline-flex h-11 items-center gap-2 rounded-pill border-2 border-brand bg-white px-6 font-sans text-sm font-semibold text-brand hover:bg-brand hover:text-white transition-colors">
+                            Жалғастыру
+                            {% include "components/icon.html" with name="chevron-down" size=16 %}
+                        </button>
+                    </div>
                 </div>
+            {% else %}
+                <article class="prose-reader font-sans text-[17px] leading-[1.75] text-slate-800">
+                    {{ current.body|linebreaks }}
+                </article>
             {% endif %}
 
-            <ol class="flex flex-col">
-                {% for c in chapters %}
-                    <li class="border-b border-slate-100 last:border-b-0">
-                        <a href="{% url 'core:story_read_chapter' slug=story.slug chapter=c.number %}"
-                           class="flex items-center gap-4 py-3 hover:text-brand">
-                            <span class="w-7 shrink-0 text-right font-display text-sm font-bold text-slate-400">
-                                {{ c.number }}
-                            </span>
-                            <span class="flex-1 font-sans text-sm
-                                         {% if c.number == current_chapter_number %}text-brand font-semibold{% else %}text-slate-800{% endif %}">
-                                {{ c.title }}
-                            </span>
+            {# FR-STORY-12: лайк главы #}
+            {% include "components/chapter_like.html" with likes=current.likes liked=current.liked %}
 
-                            {# Лайки главы (FR-STORY-12) — read-only счётчик; лайк ставится в режиме чтения #}
-                            {% if c.likes %}
-                                <span class="inline-flex shrink-0 items-center gap-1 font-sans text-xs {% if c.liked %}text-status-error-fg{% else %}text-slate-500{% endif %}"
-                                      title="Бөлім ұнатулары">
-                                    {% include "components/icon.html" with name=c.liked|yesno:"heart-filled,heart" size=12 %}
-                                    <span>{{ c.likes }}</span>
-                                </span>
-                            {% endif %}
+            {# Навигация между главами — full reload на ?chapter=N±1 с якорем на тексте #}
+            <nav class="mt-8 flex items-center justify-between gap-3 border-t border-slate-200 pt-6 font-sans text-sm">
+                {% if has_prev %}
+                    <a href="?chapter={{ chapter_number|add:'-1' }}#chapter-{{ chapter_number|add:'-1' }}"
+                       class="inline-flex items-center gap-2 font-semibold text-slate-700 hover:text-brand">
+                        {% include "components/icon.html" with name="chevron-left" size=16 %}
+                        Алдыңғы бөлім
+                    </a>
+                {% else %}
+                    <span></span>
+                {% endif %}
 
-                            <span class="font-sans text-xs text-slate-500">{{ c.char_count_formatted }}</span>
-                            {% if c.number == current_chapter_number %}
-                                {% include "components/icon.html" with name="bookmark-filled" size=14 cls="text-brand" %}
-                            {% endif %}
-                        </a>
-                    </li>
-                {% endfor %}
-            </ol>
+                {% if has_next %}
+                    <a href="?chapter={{ chapter_number|add:'1' }}#chapter-{{ chapter_number|add:'1' }}"
+                       class="inline-flex h-11 items-center gap-2 rounded-md bg-brand px-5 font-semibold text-white hover:bg-brand-dark">
+                        Келесі бөлім
+                        {% include "components/icon.html" with name="chevron-right" size=16 %}
+                    </a>
+                {% else %}
+                    <span class="font-sans text-xs text-slate-500">Бұл — соңғы бөлім</span>
+                {% endif %}
+            </nav>
         </section>
 
-        {# ── Пікірлер (FR-STORY-05) ── #}
-        <section id="comments" class="mt-8 scroll-mt-32 rounded-lg border border-slate-200 bg-white p-6">
+        {# ─────────────────────── Комментарии этой главы ─────────────────────── #}
+        <section class="rounded-lg border border-slate-200 bg-white p-6">
             <h2 class="mb-4 font-display text-xl font-bold text-slate-900">
-                Пікірлер
+                {{ chapter_number }}-бөлім пікірлері
                 <span class="ml-1 font-sans text-sm font-normal text-slate-500">{{ comments|length }}</span>
             </h2>
 
             {% if signed_in %}
-                {# Поле ввода нового комментария — заглушка, реальный submit в Ф14 #}
+                {# Заглушка submit; реальная логика появится в Ф14 #}
                 <form @submit.prevent="$dispatch('toast', { kind:'success', text:'Пікіріңіз қосылды' })"
                       class="mb-6 flex items-start gap-3">
                     {% include "components/avatar.html" with size=36 name=current_user_name %}
                     <div class="flex-1">
-                        <textarea rows="2" placeholder="Пікіріңізді жазыңыз…"
+                        <textarea rows="2" placeholder="Осы бөлім туралы пікіріңізді жазыңыз…"
                                   class="w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-2.5 font-sans text-sm placeholder:text-slate-500 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30"></textarea>
                         <div class="mt-2 flex justify-end">
                             {% include "components/button.html" with kind="primary" label="Жіберу" type="submit" icon="paper-plane" %}
@@ -215,7 +199,7 @@
                 {% endfor %}
             </div>
         </section>
-    </div>
+    {% endif %}
 
     {# ── Басқа шығармалар (FR-STORY-02) ── #}
     {% if related %}
@@ -252,4 +236,12 @@
 
 {% block right_rail %}
     {% include "partials/right_rail/story.html" %}
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Стилизация текста главы (linebreaks оборачивает абзацы в <p>, нужен ритм отступов) */
+    .prose-reader p { margin-bottom: 1.1em; }
+    .prose-reader p:last-child { margin-bottom: 0; }
+</style>
 {% endblock %}

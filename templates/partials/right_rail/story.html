@@ -48,7 +48,7 @@
             <ol class="flex flex-col gap-px">
                 {% for c in chapters %}
                     <li>
-                        <a href="{% url 'core:story_read_chapter' slug=story.slug chapter=c.number %}"
+                        <a href="{% url 'core:story_detail' slug=story.slug %}?chapter={{ c.number }}#chapter-{{ c.number }}"
                            class="flex items-center gap-2 rounded-sm px-2 py-1.5 font-sans text-xs hover:bg-slate-50
                                   {% if c.number == current_chapter_number %}bg-brand-light/30 text-brand{% else %}text-slate-700{% endif %}">
                             <span class="w-5 shrink-0 text-right font-mono text-[10px] text-slate-400">{{ c.number }}</span>

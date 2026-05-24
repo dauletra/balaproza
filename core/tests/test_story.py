@@ -2,13 +2,13 @@
 
 Покрываем:
  - валидный/невалидный slug;
- - наличие 3 scrollspy-якорей и pill-навигации;
- - список глав со ссылками на конкретные главы;
+ - inline-чтение главы на странице detail (?chapter=N), тизер для гл.1;
+ - prev/next ссылки через ?chapter=N±1 в граничных случаях;
+ - per-chapter комментарии под текстом главы;
  - gate для комментариев у гостя, форма для авторизованного;
  - ReportModal-триггер только для авторизованного;
  - прогресс чтения отображается только если slug совпадает с SAMPLE_PROGRESS;
- - reading: prev/next ссылки только если есть соседние главы;
- - reading: попавер настроек и текст главы.
+ - reading (fullscreen): prev/next ссылки и попавер настроек.
 """
 
 from django.test import TestCase
@@ -35,11 +35,12 @@ class StoryDetailUnknownSlug(TestCase):
         response = self.client.get(reverse('core:story_detail', kwargs={'slug': 'no-such-story'}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Шығарма табылмады')
-        # И никаких scrollspy-якорей в этой ветке
-        self.assertNotContains(response, 'id="anon"')
+        # И никаких артефактов главы
+        self.assertNotContains(response, 'Аннотация')
 
 
 class StoryDetailValidSlug(TestCase):
+    """Гость заходит на /story/<slug>/ — видит главную карточку, аннотацию и тизер гл.1."""
 
     def setUp(self):
         self.url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG})
@@ -53,28 +54,118 @@ class StoryDetailValidSlug(TestCase):
         self.assertContains(self.response, story.title)
         self.assertContains(self.response, story.author.name)
 
-    def test_has_scrollspy_anchors(self):
-        for anchor_id in ('anon', 'chapters', 'comments'):
-            with self.subTest(anchor=anchor_id):
-                self.assertContains(self.response, f'id="{anchor_id}"')
+    def test_annotation_section_present(self):
+        self.assertContains(self.response, 'Аннотация')
 
-    def test_pill_nav_links_to_each_section(self):
-        """Pills — реальные href-якоря (для no-JS клиентов тоже работает)."""
-        for href in ('#anon', '#chapters', '#comments'):
-            with self.subTest(href=href):
-                self.assertContains(self.response, f'href="{href}"')
+    def test_first_chapter_shown_inline(self):
+        """Под аннотацией — первая глава с её заголовком."""
+        ch1 = stub_data.chapter_of(STORY_SLUG, 1)
+        self.assertContains(self.response, ch1.title)
+        self.assertContains(self.response, '1-бөлім')
 
-    def test_chapter_list_links_to_each_chapter(self):
+    def test_first_chapter_renders_as_teaser_for_guest(self):
+        """Гость на голом URL без ?chapter — видит «Жалғастыру» (тизер)."""
+        self.assertContains(self.response, 'Жалғастыру')
+
+    def test_no_old_scrollspy_anchors(self):
+        """Старый scrollspy-блок удалён."""
+        # Якорь #anon/#comments в pill-nav больше не нужны
+        self.assertNotContains(self.response, 'href="#anon"')
+        self.assertNotContains(self.response, 'href="#comments"')
+
+    def test_no_read_button(self):
+        """Кнопка «Оқу» удалена — чтение происходит inline."""
+        # На detail-странице не должно быть ссылки на fullscreen-читалку
+        read_url = reverse('core:story_read', kwargs={'slug': STORY_SLUG})
+        self.assertNotContains(self.response, f'href="{read_url}"')
+
+    def test_right_rail_chapter_links_use_query(self):
+        """Список глав в рейле ведёт на ?chapter=N (а не на /read/N/)."""
         for c in stub_data.chapters_of(STORY_SLUG):
             with self.subTest(chapter=c.number):
-                url = reverse('core:story_read_chapter', kwargs={'slug': STORY_SLUG, 'chapter': c.number})
-                self.assertContains(self.response, f'href="{url}"')
+                self.assertContains(self.response, f'?chapter={c.number}')
+
+    def test_next_chapter_link_present(self):
+        """На гл.1 есть ссылка «Келесі бөлім» через ?chapter=2."""
+        self.assertContains(self.response, 'Келесі бөлім')
+        self.assertContains(self.response, '?chapter=2')
+
+    def test_no_prev_link_on_first_chapter(self):
+        self.assertNotContains(self.response, 'Алдыңғы бөлім')
 
     def test_genres_chips_rendered(self):
         story = stub_data.STORIES_BY_SLUG[STORY_SLUG]
         for g in story.genres_resolved:
             with self.subTest(genre=g.slug):
                 self.assertContains(self.response, g.name)
+
+
+class StoryDetailChapterParam(TestCase):
+    """?chapter=N показывает конкретную главу полностью (без тизера)."""
+
+    def test_chapter_2_renders_full_text(self):
+        ch2 = stub_data.chapter_of(STORY_SLUG, 2)
+        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=2'
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, ch2.title)
+        self.assertContains(r, '2-бөлім')
+        # Тизер только для гл.1 на голом URL — здесь его быть не должно
+        self.assertNotContains(r, 'Жалғастыру')
+
+    def test_prev_and_next_for_middle_chapter(self):
+        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=4'
+        r = self.client.get(url)
+        self.assertContains(r, 'Алдыңғы бөлім')
+        self.assertContains(r, 'Келесі бөлім')
+        self.assertContains(r, '?chapter=3')
+        self.assertContains(r, '?chapter=5')
+
+    def test_last_chapter_has_no_next(self):
+        last = len(stub_data.chapters_of(STORY_SLUG))
+        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + f'?chapter={last}'
+        r = self.client.get(url)
+        # Ссылки на ?chapter=last+1 быть не должно
+        self.assertNotContains(r, f'?chapter={last + 1}')
+        self.assertContains(r, 'соңғы бөлім')
+
+    def test_out_of_range_falls_back_to_chapter_1(self):
+        """Невалидное N (999) — view возвращает гл.1 (без 404)."""
+        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=999'
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 200)
+        ch1 = stub_data.chapter_of(STORY_SLUG, 1)
+        self.assertContains(r, ch1.title)
+
+    def test_garbage_chapter_param_falls_back(self):
+        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=abc'
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 200)
+
+
+class StoryDetailPerChapterComments(TestCase):
+    """Комментарии под текстом — пришвартованные к текущей главе + общие (chapter_number=None)."""
+
+    def test_chapter_3_shows_aygerim_comment(self):
+        """У dalney-berega коммент Айгерім привязан к гл.3."""
+        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=3'
+        r = self.client.get(url)
+        self.assertContains(r, '3-бөлім пікірлері')
+        self.assertContains(r, 'үшінші бөлімдегі қарттың сұрағы')
+
+    def test_chapter_1_does_not_show_chapter_3_comment(self):
+        """На гл.1 коммент из гл.3 не должен появиться."""
+        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
+        self.assertNotContains(r, 'үшінші бөлімдегі қарттың сұрағы')
+
+    def test_general_comment_visible_on_every_chapter(self):
+        """Общий коммент (chapter_number=None) виден под любой главой."""
+        for n in (1, 2, 3):
+            with self.subTest(chapter=n):
+                url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + f'?chapter={n}'
+                r = self.client.get(url)
+                # «Келесі бөлім жұма күні шығады…» — общее объявление автора
+                self.assertContains(r, 'Келесі бөлім жұма күні шығады')
 
 
 class StoryDetailGuestVsAuth(TestCase):
