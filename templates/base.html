@@ -30,18 +30,18 @@
 {% block layout %}
     {% include "partials/header.html" %}
 
-    {# Sidebar (189) · контент · правый рейл (опц.). docs/07.1 — DesktopShell. #}
-    <div class="mx-auto flex max-w-[1440px] gap-6 px-4 pt-6 pb-24 sm:px-6 md:pb-12 lg:px-[125px]">
-        {% include "partials/sidebar.html" %}
-
+    {# Контент · правый рейл (опц.). docs/07.1 — DesktopShell без sidebar (DEC-25). #}
+    <div class="mx-auto flex max-w-[1280px] gap-6 px-4 pt-6 pb-24 sm:px-6 md:pb-12 lg:px-12">
         <main class="min-w-0 flex-1">
             {% block content %}{% endblock %}
         </main>
 
-        {# Сменный правый рейл (docs/07.4). Страница переопределяет {% block right_rail %} #}
-        <aside class="hidden w-[234px] shrink-0 lg:block">
-            {% block right_rail %}{% endblock %}
-        </aside>
+        {# Правый рейл рендерим только если страница явно прокинула has_right_rail=True. #}
+        {% if has_right_rail %}
+            <aside class="hidden w-[300px] shrink-0 lg:block">
+                {% block right_rail %}{% endblock %}
+            </aside>
+        {% endif %}
     </div>
 
     {% include "partials/footer.html" %}

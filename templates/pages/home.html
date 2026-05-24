@@ -12,6 +12,12 @@
             {% include "partials/home/hero_guest.html" %}
         {% endif %}
 
+        {# ── Конкурс-полоса (выносит приз/таймер above the fold, в т.ч. на mobile) ── #}
+        {% include "partials/home/contest_banner.html" %}
+
+        {# ── Жанрлар — отдельный блок с тайлами (вариант B, см. genres_section) ── #}
+        {% include "partials/home/genres_section.html" %}
+
         {% if page_state == 'loading' %}
             {# ── Скелетон: Аптаның кітабы + один ряд карточек ── #}
             {% include "components/skeleton_box.html" with h="h-[200px]" radius="hero" %}

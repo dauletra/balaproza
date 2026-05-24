@@ -62,16 +62,7 @@
         <span class="font-sans text-xs text-slate-500">{{ collection.stories|length }} шт.</span>
     </div>
 
-    {% if collection.stories %}
-        <div class="flex flex-col gap-3">
-            {% for s in collection.stories %}
-                {% include "components/book_card_wide.html" with story=s %}
-            {% endfor %}
-        </div>
-    {% else %}
-        <p class="rounded-md bg-slate-50 px-4 py-6 text-center font-sans text-sm text-slate-500">
-            Бұл жинаққа әлі шығарма қосылмаған.
-        </p>
-    {% endif %}
+    {# Shared list-partial (DEC-27) — переиспользуется каталогом и коллекциями #}
+    {% include "partials/catalog/_book_list.html" with results=collection.stories empty_title="Шығарма жоқ" empty_text="Бұл жинаққа әлі шығарма қосылмаған." %}
 {% endif %}
 {% endblock %}

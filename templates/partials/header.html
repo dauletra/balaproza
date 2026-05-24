@@ -36,6 +36,13 @@
 
         {# ── Правый кластер (desktop) ── #}
         <nav class="ml-auto hidden items-center gap-6 md:flex" aria-label="Қолданушы әрекеттері">
+            {# Единственная контент-ссылка в хедере: остальные разделы доступны с главной и из footer (DEC-25) #}
+            <a href="{% url 'core:contest_list' %}"
+               class="inline-flex items-center gap-1.5 font-sans text-[13px] font-bold {% if nav_active == 'contests' %}text-brand-dark{% else %}text-brand hover:text-brand-dark{% endif %}">
+                {% include "components/icon.html" with name="trophy" size=15 %}
+                Байқаулар
+            </a>
+
             <a href="{% url 'core:new_story' %}"
                class="inline-flex items-center gap-1.5 font-sans text-[13px] font-bold text-brand hover:text-brand-dark">
                 {% include "components/icon.html" with name="pen" size=15 %}
@@ -70,19 +77,32 @@
 
                     <div x-show="open" x-cloak x-transition
                          role="menu"
-                         class="absolute right-0 mt-2 w-52 rounded-md border border-slate-200 bg-white shadow-modal">
+                         class="absolute right-0 mt-2 w-56 rounded-md border border-slate-200 bg-white shadow-modal">
                         <a href="{% url 'core:profile_me' %}" role="menuitem"
-                           class="block px-4 py-2 text-sm hover:bg-slate-50">Профиль</a>
+                           class="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                            {% include "components/icon.html" with name="user-circle" size=16 cls="text-slate-500" %}
+                            Профиль
+                        </a>
                         <a href="{% url 'core:my_stories' %}" role="menuitem"
-                           class="block px-4 py-2 text-sm hover:bg-slate-50">Менің шығармаларым</a>
+                           class="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                            {% include "components/icon.html" with name="pen" size=16 cls="text-slate-500" %}
+                            Менің шығармаларым
+                        </a>
                         <a href="{% url 'core:library' %}" role="menuitem"
-                           class="block px-4 py-2 text-sm hover:bg-slate-50">Кітапхана</a>
+                           class="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                            {% include "components/icon.html" with name="book" size=16 cls="text-slate-500" %}
+                            Кітапхана
+                        </a>
                         <a href="{% url 'core:my_submissions' %}" role="menuitem"
-                           class="block px-4 py-2 text-sm hover:bg-slate-50">Менің заявкаларым</a>
+                           class="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                            {% include "components/icon.html" with name="paper-plane" size=16 cls="text-slate-500" %}
+                            Менің заявкаларым
+                        </a>
                         <form action="{% url 'core:logout' %}" method="post" role="none" class="border-t border-slate-200">
                             {% csrf_token %}
                             <button type="submit" role="menuitem"
-                                    class="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
+                                    class="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
+                                {% include "components/icon.html" with name="x" size=16 cls="text-slate-500" %}
                                 Шығу
                             </button>
                         </form>

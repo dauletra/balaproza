@@ -1,0 +1,55 @@
+{% comment %}
+    Жанрлар — отдельный блок на главной (вариант B из дизайн-обсуждения).
+    Каждый тайл — «мини-обложка»: корешок слева + декоративная буква +
+    SVG-иконка справа сверху + название + count.
+    Визуально связан с cover_placeholder (единый типографический язык).
+
+    Контекст: genres (list of Genre — имеет slug, name, hue, count, icon)
+{% endcomment %}
+<section>
+    {% url 'core:genre_index' as genre_index_url %}
+    {% include "components/section_header.html" with title="Жанрлар" hint="көңіл-күй бойынша" link="барлығы (12) →" link_href=genre_index_url %}
+
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {% for g in genres|slice:":8" %}
+            <a href="{% url 'core:genre_detail' slug=g.slug %}"
+               class="group relative flex h-[120px] flex-col justify-end overflow-hidden rounded-lg p-4 pl-5 transition-all hover:-translate-y-0.5 hover:shadow-card-hover"
+               style="background: oklch(0.94 0.05 {{ g.hue }});
+                      box-shadow: inset 0 0 0 1px oklch(0.84 0.08 {{ g.hue }});">
+
+                {# Корешок слева — как у обложек cover_placeholder #}
+                <span aria-hidden="true"
+                      class="absolute inset-y-0 left-0 w-[5px]"
+                      style="background: oklch(0.50 0.16 {{ g.hue }}); opacity: 0.55;"></span>
+
+                {# Декоративная крупная буква в правом нижнем углу — типографический орнамент #}
+                <span aria-hidden="true"
+                      class="pointer-events-none absolute -right-2 -bottom-4 select-none font-display text-[88px] font-bold leading-none transition-transform group-hover:scale-110"
+                      style="color: oklch(0.32 0.14 {{ g.hue }}); opacity: 0.14;">
+                    {{ g.name|slice:":1" }}
+                </span>
+
+                {# Иконка в правом верхнем углу #}
+                {% if g.icon %}
+                    <span class="absolute right-3 top-3 transition-opacity"
+                          style="color: oklch(0.38 0.16 {{ g.hue }}); opacity: 0.75;"
+                          aria-hidden="true">
+                        {% include "components/icon.html" with name=g.icon size=22 %}
+                    </span>
+                {% endif %}
+
+                {# Контент в левом нижнем углу #}
+                <div class="relative z-10">
+                    <div class="font-display text-[15px] font-bold leading-tight group-hover:underline"
+                         style="color: oklch(0.24 0.14 {{ g.hue }});">
+                        {{ g.name }}
+                    </div>
+                    <div class="mt-0.5 font-sans text-xs"
+                         style="color: oklch(0.40 0.12 {{ g.hue }});">
+                        {{ g.count }} шығарма
+                    </div>
+                </div>
+            </a>
+        {% endfor %}
+    </div>
+</section>

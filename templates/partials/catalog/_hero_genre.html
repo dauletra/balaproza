@@ -1,0 +1,19 @@
+{% comment %}
+    Genre hero — OKLCH hue-tinted hero под жанр.
+    Используется когда mode == 'genre'.
+
+    Контекст: genre (Genre)
+{% endcomment %}
+<header class="mb-6 overflow-hidden rounded-lg border p-7"
+        style="background: oklch(0.96 0.04 {{ genre.hue }});
+               border-color: oklch(0.86 0.08 {{ genre.hue }});
+               color: oklch(0.38 0.14 {{ genre.hue }});">
+    <p class="font-display text-[11px] font-semibold uppercase tracking-[0.14em] opacity-70">
+        Жанр
+    </p>
+    <h1 class="mt-1 font-display text-3xl font-bold sm:text-4xl">{{ genre.name }}</h1>
+    <p class="mt-2 font-sans text-sm opacity-80">{{ genre.count }} шығарма</p>
+    <p class="mt-1 font-sans text-xs opacity-60">
+        <a href="{% url 'core:genre_index' %}" class="hover:underline">← Барлық жанрлар</a>
+    </p>
+</header>

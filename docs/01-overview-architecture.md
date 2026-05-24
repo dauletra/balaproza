@@ -52,8 +52,8 @@ Balaproza — литературная UGC-платформа (user-generated co
 
 Все экраны строятся поверх единого каркаса:
 
-- **Desktop:** `DesktopShell` = `DesktopHeader` + `DesktopSidebar` (левое меню) + сменный `RightRail` + контент + `DesktopFooter`.
-- **Mobile:** обёртка `ScreenWrap` = `MobileHeader` + контент + `MobileBottomNav`.
+- **Desktop:** `DesktopShell` = `DesktopHeader` + контент + опциональный `RightRail` (по флагу `has_right_rail` из view) + `DesktopFooter`. Левый sidebar исключён (DEC-25); контентная навигация — секции главной и колонка «Контент» в footer.
+- **Mobile:** обёртка `ScreenWrap` = `MobileHeader` + контент + `MobileBottomNav` (5 пунктов).
 
 Каркас неизменен между экранами, меняется только контентная область и (на десктопе) правый рейл. Подробно — модуль [`07-layout-navigation.md`](07-layout-navigation.md).
 

@@ -290,6 +290,44 @@
         </div>
     </section>
 
+    {# ─────────────────────── Теги (docs/11) ─────────────────────── #}
+    <section class="mb-12 rounded-lg bg-white p-6 shadow-sm">
+        <h2 class="mb-4 font-display text-2xl font-bold">Теги (UGC-таксономия)</h2>
+        <p class="mb-4 font-sans text-sm text-slate-600">
+            Параллельно жанрам, до 10 на произведение. Авторы создают свободно;
+            модератор пост-фактум переводит pending → accepted. См. <code>docs/11</code>.
+        </p>
+
+        <h3 class="mt-2 mb-3 font-display text-sm font-bold uppercase tracking-wide text-slate-600">TagChip — accepted</h3>
+        <div class="flex flex-wrap gap-1.5">
+            {% for t in showcase_tags_accepted %}
+                {% include "components/tag_chip.html" with tag=t %}
+            {% endfor %}
+        </div>
+
+        <h3 class="mt-6 mb-3 font-display text-sm font-bold uppercase tracking-wide text-slate-600">TagChip — pending (видно только автору)</h3>
+        <div class="flex flex-wrap gap-1.5">
+            {% for t in showcase_tags_pending %}
+                {% include "components/tag_chip.html" with tag=t %}
+            {% endfor %}
+        </div>
+
+        <h3 class="mt-6 mb-3 font-display text-sm font-bold uppercase tracking-wide text-slate-600">TagList — public view (pending скрыт)</h3>
+        {% include "components/tag_list.html" with tags=showcase_tags_mixed viewer_is_author=False %}
+
+        <h3 class="mt-6 mb-3 font-display text-sm font-bold uppercase tracking-wide text-slate-600">TagList — author view (pending виден с бейджем)</h3>
+        {% include "components/tag_list.html" with tags=showcase_tags_mixed viewer_is_author=True %}
+
+        <h3 class="mt-8 mb-3 font-display text-sm font-bold uppercase tracking-wide text-slate-600">TagInput — пустое</h3>
+        <p class="mb-3 font-sans text-xs text-slate-500">
+            Enter / запятая — добавить. Backspace на пустом — удалить последний.
+            Стрелки — навигация по подсказкам. Попробуй: <code>политика</code> (blocklist),
+            <code>достық</code> (уже в accepted, выберется из dropdown), <code>жасөспірім</code>,
+            или своё уникальное.
+        </p>
+        {% include "components/tag_input.html" %}
+    </section>
+
     {# ── Мaунтим модалки (они невидимы пока не открыли) ── #}
     {% include "components/login_modal.html" %}
     {% include "components/report_modal.html" %}

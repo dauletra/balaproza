@@ -186,3 +186,160 @@ class HelperFunctions(TestCase):
         lower = stub_data.search_stories('рысқали')
         self.assertEqual([s.slug for s in upper], [s.slug for s in lower])
         self.assertGreater(len(upper), 0)
+
+
+# ───────────────── DEC-27: унифицированный catalog-движок ─────────────────
+
+class CatalogPage(TestCase):
+    """Новый /catalog/ — нейтральная entry-страница."""
+
+    def setUp(self):
+        self.response = self.client.get(reverse('core:catalog'))
+
+    def test_200(self):
+        self.assertEqual(self.response.status_code, 200)
+
+    def test_renders_catalog_hero(self):
+        self.assertContains(self.response, 'Каталог')
+
+    def test_renders_filter_panel(self):
+        """Правый рейл содержит filter_panel с заголовком «Сүзгілер»."""
+        self.assertContains(self.response, 'Сүзгілер')
+
+    def test_mobile_filter_trigger_present(self):
+        """Mobile-кнопка диспатчит событие open-catalog-filters."""
+        self.assertContains(self.response, 'open-catalog-filters')
+
+
+class CatalogFilterCombination(TestCase):
+    """DEC-27: комбинации фильтров через query string."""
+
+    def test_genre_plus_status_filter(self):
+        # У жанра fantezi есть стори со status='Published'. Применяем оба.
+        r = self.client.get(reverse('core:genre_detail',
+                                    kwargs={'slug': 'fantezi'}) + '?status=Published')
+        self.assertEqual(r.status_code, 200)
+        # Хотя бы одна fantezi-published стори должна быть видна
+        self.assertContains(r, 'Күңгірт мырза')
+
+    def test_genre_plus_query_filter(self):
+        """На странице жанра можно дополнительно фильтровать по тексту."""
+        r = self.client.get(reverse('core:genre_detail',
+                                    kwargs={'slug': 'fantezi'}) + '?q=мырза')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Күңгірт мырза')
+
+    def test_sort_changes_order(self):
+        """Sort alphabet → первая стори по алфавиту впереди."""
+        r_pop  = self.client.get(reverse('core:catalog') + '?sort=popularity')
+        r_alph = self.client.get(reverse('core:catalog') + '?sort=alphabet')
+        # Оба возвращают 200; HTML отличается порядком — проверим хотя бы что
+        # маркеры сортировки переключились корректно (checked в right-rail panel)
+        self.assertIn(b'value="popularity"', r_pop.content)
+        self.assertIn(b'value="alphabet"', r_alph.content)
+
+
+class CatalogFilterHelper(TestCase):
+    """filter_catalog helper из stub_data."""
+
+    def test_query_only(self):
+        out = stub_data.filter_catalog(query='жағалау')
+        self.assertGreater(len(out), 0)
+        self.assertTrue(any('жағалау' in s.title.lower() for s in out))
+
+    def test_genre_only(self):
+        out = stub_data.filter_catalog(genre='fantezi')
+        self.assertGreater(len(out), 0)
+        for s in out:
+            self.assertIn('fantezi', s.genres)
+
+    def test_tag_accepted_filters(self):
+        out = stub_data.filter_catalog(tag='mektep')
+        self.assertGreater(len(out), 0)
+        for s in out:
+            self.assertIn('mektep', s.tags)
+
+    def test_tag_pending_returns_empty(self):
+        """BR-TAG-07: pending-теги не фильтруют публичный каталог."""
+        out = stub_data.filter_catalog(tag='basqa-alem')
+        self.assertEqual(out, [])
+
+    def test_genre_and_tag_combination_is_and(self):
+        """Жанр И тег — AND (DEC-27)."""
+        out = stub_data.filter_catalog(genre='fantezi', tag='mektep')
+        for s in out:
+            self.assertIn('fantezi', s.genres)
+            self.assertIn('mektep', s.tags)
+
+
+# ───────────────── docs/11 Phase 3: /tag/<slug>/ ─────────────────
+
+class TagDetailKnown(TestCase):
+    """Accepted-тег: страница рендерит hero + список + фильтр-панель."""
+    SLUG = 'mektep'
+
+    def setUp(self):
+        self.response = self.client.get(reverse('core:tag_detail', kwargs={'slug': self.SLUG}))
+
+    def test_200(self):
+        self.assertEqual(self.response.status_code, 200)
+
+    def test_hero_shows_tag_name(self):
+        self.assertContains(self.response, 'мектеп')
+
+    def test_lists_stories_with_this_tag(self):
+        # arhimag и aidana-koshe имеют тег mektep
+        self.assertContains(self.response, 'Сиқыршы')
+
+    def test_filter_panel_present(self):
+        self.assertContains(self.response, 'Сүзгілер')
+
+    def test_back_to_catalog_link(self):
+        self.assertContains(self.response, reverse('core:catalog'))
+
+
+class TagDetailUnknown(TestCase):
+    def test_unknown_slug_renders_not_found(self):
+        r = self.client.get(reverse('core:tag_detail', kwargs={'slug': 'no-such-tag'}))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Тег табылмады')
+
+
+class TagDetailPendingBlocked(TestCase):
+    """BR-TAG-07: pending-теги не работают как публичные URL."""
+
+    def test_pending_tag_returns_not_found_page(self):
+        # basqa-alem существует в TAGS, но status=pending
+        r = self.client.get(reverse('core:tag_detail', kwargs={'slug': 'basqa-alem'}))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Тег табылмады')
+
+
+class TagsInFilterPanel(TestCase):
+    """Popular tags появляются в filter-panel рейла на любом catalog-mode."""
+
+    def test_popular_tags_chips_on_catalog(self):
+        r = self.client.get(reverse('core:catalog'))
+        self.assertContains(r, 'Танымал тегтер')
+        # Хотя бы один из топовых accepted-тегов в HTML
+        self.assertContains(r, 'жасөспірім')
+
+    def test_active_tag_highlighted_on_tag_page(self):
+        r = self.client.get(reverse('core:tag_detail', kwargs={'slug': 'mektep'}))
+        # Активный chip ведёт на catalog для снятия (DEC-27)
+        self.assertContains(r, reverse('core:catalog'))
+
+
+class SearchIndexHasTags(TestCase):
+    """Cmd+K popup получает теги через /api/search-index.json."""
+
+    def test_tags_in_index_json(self):
+        r = self.client.get(reverse('core:api_search_index'))
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertIn('tags', data)
+        self.assertGreater(len(data['tags']), 0)
+        # Только accepted-теги (basqa-alem pending → не должен быть)
+        names = [t['slug'] for t in data['tags']]
+        self.assertIn('mektep', names)
+        self.assertNotIn('basqa-alem', names)

@@ -31,6 +31,9 @@
                 {{ story.title }}
             </h1>
 
+            {# docs/11: UGC-теги. Pending видны только автору (BR-TAG-07). #}
+            {% include "components/tag_list.html" with tags=tags viewer_is_author=is_author %}
+
             <a href="{% url 'core:profile_other' username=story.author.username %}"
                class="inline-flex items-center gap-2 self-start font-sans text-sm text-slate-600 hover:text-brand">
                 {% include "components/avatar.html" with size=24 name=story.author.name username=story.author.username %}

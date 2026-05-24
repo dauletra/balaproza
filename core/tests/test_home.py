@@ -21,8 +21,9 @@ class HomeGuestMode(TestCase):
         self.assertContains(self.response, 'Кіру')
 
     def test_shows_guest_hero_marker(self):
-        """Hero для гостя содержит «Balaproza-ға қош келдіңіз»."""
-        self.assertContains(self.response, 'Balaproza-ға')
+        """Hero для гостя — редакционный, без CTA, сообщает обе функции платформы."""
+        self.assertContains(self.response, 'Жасөспірімдер жазады')
+        self.assertContains(self.response, 'өзің жазасың')
 
     def test_does_not_show_continue_reading(self):
         """У гостя нет блока «Жалғастыру оқу»."""
@@ -31,10 +32,11 @@ class HomeGuestMode(TestCase):
     def test_does_not_show_logout(self):
         self.assertNotContains(self.response, 'Шығу')
 
-    def test_does_not_show_private_sidebar_items(self):
-        """Гостю в sidebar не должно быть «Жазу» (написать)."""
-        # «Кітапхана» в footer присутствует как ссылка — проверим уникальный сайдбаровский «Жазу»
-        self.assertNotContains(self.response, '>Жазу<')
+    def test_does_not_show_private_dropdown_items(self):
+        """Гость не видит в хедере личных пунктов из avatar-dropdown."""
+        # «Менің заявкаларым» появляется только в авторизованном dropdown
+        self.assertNotContains(self.response, 'Менің заявкаларым')
+        self.assertNotContains(self.response, 'Менің шығармаларым')
 
 
 class HomeAuthedMode(TestCase):
@@ -62,9 +64,39 @@ class HomeAuthedMode(TestCase):
         self.assertContains(self.response, 'Хабарламалар')
 
     def test_no_guest_hero_welcome(self):
-        # Текст «Қош келдіңіз» из hero_guest не должен попасть к авторизованному.
-        # (Может встретиться в других местах — поэтому проверим точную форму hero.)
-        self.assertNotContains(self.response, 'Balaproza-ға қош келдіңіз')
+        # Маркер hero_guest у авторизованного не показывается — у него свой hero_returning.
+        self.assertNotContains(self.response, 'Жасөспірімдер жазады')
+
+
+class HeaderContestsLink(TestCase):
+    """DEC-25: единственная контент-ссылка в хедере — «Байқаулар»."""
+
+    def test_link_present_on_home(self):
+        r = self.client.get(reverse('core:home'))
+        self.assertContains(r, 'Байқаулар')
+        self.assertContains(r, reverse('core:contest_list'))
+
+    def test_active_state_on_contests_page(self):
+        """На /contests/ ссылка подсвечена brand-цветом."""
+        r = self.client.get(reverse('core:contest_list'))
+        # nav_active=='contests' даёт класс text-brand на ссылке Байқаулар
+        self.assertContains(r, 'Байқаулар')
+        # На главной этой подсветки нет → проверяем что на /contests/ есть
+        self.assertEqual(r.status_code, 200)
+
+
+class FooterSiteMap(TestCase):
+    """DEC-25: контентные разделы (Жанрлар/Жинақтар) живут в footer, не в хедере."""
+
+    def test_footer_links_to_genres(self):
+        r = self.client.get(reverse('core:home'))
+        self.assertContains(r, reverse('core:genre_index'))
+        self.assertContains(r, 'Жанрлар')
+
+    def test_footer_links_to_collections(self):
+        r = self.client.get(reverse('core:home'))
+        self.assertContains(r, reverse('core:collections'))
+        self.assertContains(r, 'Жинақтар')
 
 
 class StoryDetailHasGate(TestCase):

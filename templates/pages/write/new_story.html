@@ -54,6 +54,9 @@
             <span class="font-sans text-xs text-slate-500">Опциональды (BR-12).</span>
         </label>
 
+        {# docs/11: UGC-теги, до 10. Новые попадают в pending — модератор пост-фактум. #}
+        {% include "components/tag_input.html" with tags=initial_tags %}
+
         <fieldset class="flex flex-col gap-2">
             <legend class="mb-1 font-sans text-sm font-semibold text-slate-800">
                 Мәртебесі <span class="text-status-error-fg" aria-hidden="true">*</span>

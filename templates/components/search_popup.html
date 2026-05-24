@@ -108,8 +108,33 @@
                 </div>
             </template>
 
+            {# Tags (docs/11 Phase 3) #}
+            <template x-if="q.trim() && filteredTags().length">
+                <div class="border-t border-slate-100">
+                    <h3 class="px-4 pt-3 pb-1 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        Тегтер
+                    </h3>
+                    <ul>
+                        <template x-for="t in filteredTags()" :key="t.slug">
+                            <li>
+                                <a :href="'/tag/' + t.slug + '/'"
+                                   @click="close()"
+                                   class="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
+                                    <span class="grid h-8 w-8 shrink-0 place-items-center rounded-pill bg-slate-100 font-display text-base font-bold text-slate-500"
+                                          aria-hidden="true">#</span>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="truncate font-sans text-sm font-semibold text-slate-900" x-text="t.name"></div>
+                                        <div class="truncate font-sans text-xs text-slate-500" x-text="t.usage_count + ' рет қолданылған'"></div>
+                                    </div>
+                                </a>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+            </template>
+
             {# Не нашли #}
-            <template x-if="q.trim() && !filteredStories().length && !filteredAuthors().length">
+            <template x-if="q.trim() && !filteredStories().length && !filteredAuthors().length && !filteredTags().length">
                 <div class="px-4 py-8 text-center">
                     <p class="font-sans text-sm text-slate-600">
                         «<span x-text="q"></span>» бойынша ештеңе табылмады.
@@ -147,7 +172,7 @@ function searchPopup() {
         q: '',
         loaded: false,
         loading: false,
-        index: { stories: [], authors: [] },
+        index: { stories: [], authors: [], tags: [] },
         async ensureLoaded() {
             if (this.loaded || this.loading) return;
             this.loading = true;
@@ -180,6 +205,13 @@ function searchPopup() {
             if (!q) return [];
             return this.index.authors.filter(a =>
                 a.name.toLowerCase().includes(q) || a.username.toLowerCase().includes(q)
+            ).slice(0, 5);
+        },
+        filteredTags() {
+            const q = this.q.trim().toLowerCase();
+            if (!q) return [];
+            return (this.index.tags || []).filter(t =>
+                t.name.toLowerCase().includes(q) || t.slug.toLowerCase().includes(q)
             ).slice(0, 5);
         },
     };

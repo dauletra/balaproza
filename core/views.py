@@ -25,6 +25,7 @@ def home(request):
     """Главная — редакционная витрина. Гость vs возвращающийся (FR-HOME-01)."""
     is_signed_in = bool(request.session.get('signed_in'))
     return render(request, 'pages/home.html', {
+        'has_right_rail':  True,
         'page_state':      _page_state(request),
         'progress':        stub_data.SAMPLE_PROGRESS if is_signed_in else None,
         'hero_contest':    stub_data.HERO_CONTEST,
@@ -97,18 +98,94 @@ def _catalog_controls(request):
     )
 
 
-def search_results(request):
+def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str = ''):
+    """Единая точка рендера унифицированного каталога (DEC-27).
+
+    Используется search_results / catalog / genre_detail / (в Phase 3) tag_detail.
+    """
     query = request.GET.get('q', '').strip()
     sort, status = _catalog_controls(request)
-    raw = stub_data.search_stories(query)
-    return render(request, 'pages/catalog/search_results.html', {
-        'query':     query,
-        'results':   stub_data.apply_catalog_filters(raw, sort=sort, status=status),
-        'sort':      sort,
-        'status':    status,
-        'sorts':     stub_data.CATALOG_SORTS,
-        'statuses':  stub_data.CATALOG_STATUS_FILTERS,
+
+    empty_title, empty_text = "Шығарма табылмады", "Сүзгілерді өзгертіп көріңіз."
+
+    if mode == 'search' and not query:
+        # Idle — без запроса не запускаем фильтр
+        results = []
+        empty_title = "Не іздейміз?"
+        empty_text = (
+            "Шығарманың атауын немесе автордың атын жазыңыз. "
+            "Жанр бойынша ізделсе — жанрлар бетіне өтіңіз."
+        )
+    elif mode == 'genre':
+        genre = stub_data.GENRES_BY_SLUG.get(genre_slug)
+        if genre is None:
+            # Неизвестный жанр — отдаём страницу с error-блоком в hero
+            return render(request, 'pages/catalog/catalog.html', {
+                'has_right_rail': True, 'mode': mode, 'results': [],
+                'genres': stub_data.GENRES, 'current_genre_slug': genre_slug,
+                'current_tag_slug': '', 'current_tag': None,
+                'popular_tags': stub_data.popular_tags(),
+                'genre': None,
+                'query': '', 'sort': sort, 'status': status,
+                'sorts': stub_data.CATALOG_SORTS, 'statuses': stub_data.CATALOG_STATUS_FILTERS,
+                'empty_title': '', 'empty_text': '',
+            })
+        results = stub_data.filter_catalog(query=query, genre=genre_slug,
+                                           status=status, sort=sort)
+        empty_title = "Әзірге шығарма жоқ"
+        empty_text = "Бұл жанрда әлі шығарма жарияланбаған."
+    elif mode == 'tag':
+        tag = stub_data.tag_by_slug(tag_slug)
+        if tag is None or tag.status != 'accepted':
+            # Неизвестный или непринятый тег — error-блок
+            return render(request, 'pages/catalog/catalog.html', {
+                'has_right_rail': True, 'mode': mode, 'results': [],
+                'genres': stub_data.GENRES, 'current_genre_slug': '',
+                'current_tag_slug': tag_slug, 'current_tag': None,
+                'popular_tags': stub_data.popular_tags(),
+                'genre': None,
+                'query': '', 'sort': sort, 'status': status,
+                'sorts': stub_data.CATALOG_SORTS, 'statuses': stub_data.CATALOG_STATUS_FILTERS,
+                'empty_title': '', 'empty_text': '',
+            })
+        results = stub_data.filter_catalog(query=query, tag=tag_slug,
+                                           status=status, sort=sort)
+        empty_title = "Бұл тегпен шығарма жоқ"
+        empty_text = "Басқа тегтерді көріңіз немесе сүзгілерді өзгертіңіз."
+    elif mode == 'search':
+        results = stub_data.filter_catalog(query=query, status=status, sort=sort)
+        empty_title = "Ештеңе табылмады"
+        empty_text = f"«{query}» бойынша шығарма табылмады. Атауды тексеріп көріңіз."
+    else:  # mode == 'catalog'
+        results = stub_data.filter_catalog(query=query, status=status, sort=sort)
+
+    return render(request, 'pages/catalog/catalog.html', {
+        'has_right_rail': True,
+        'mode':           mode,
+        'results':        results,
+        'query':          query,
+        'sort':           sort,
+        'status':         status,
+        'sorts':          stub_data.CATALOG_SORTS,
+        'statuses':       stub_data.CATALOG_STATUS_FILTERS,
+        'genres':         stub_data.GENRES,
+        'current_genre_slug': genre_slug,
+        'genre':          stub_data.GENRES_BY_SLUG.get(genre_slug) if genre_slug else None,
+        'current_tag_slug':   tag_slug,
+        'current_tag':        stub_data.tag_by_slug(tag_slug) if tag_slug else None,
+        'popular_tags':       stub_data.popular_tags(),
+        'empty_title':    empty_title,
+        'empty_text':     empty_text,
     })
+
+
+def search_results(request):
+    return _render_catalog(request, mode='search')
+
+
+def catalog(request):
+    """Нейтральная entry-страница каталога. URL: /catalog/"""
+    return _render_catalog(request, mode='catalog')
 
 
 def genre_index(request):
@@ -119,18 +196,12 @@ def genre_index(request):
 
 
 def genre_detail(request, slug):
-    genre = stub_data.GENRES_BY_SLUG.get(slug)
-    sort, status = _catalog_controls(request)
-    raw = stub_data.stories_by_genre(slug)
-    return render(request, 'pages/catalog/genre_detail.html', {
-        'slug':     slug,
-        'genre':    genre,
-        'results':  stub_data.apply_catalog_filters(raw, sort=sort, status=status),
-        'sort':     sort,
-        'status':   status,
-        'sorts':    stub_data.CATALOG_SORTS,
-        'statuses': stub_data.CATALOG_STATUS_FILTERS,
-    })
+    return _render_catalog(request, mode='genre', genre_slug=slug)
+
+
+def tag_detail(request, slug):
+    """Каталог по UGC-тегу (docs/11 Phase 3, DEC-26+27). URL: /tag/<slug>/"""
+    return _render_catalog(request, mode='tag', tag_slug=slug)
 
 
 def collections(request):
@@ -157,7 +228,11 @@ def _story_or_stub(slug):
 def story_detail(request, slug):
     story = _story_or_stub(slug)
     chapters = stub_data.chapters_of(slug)
+    # Автор своего стори видит pending-теги (BR-TAG-07). Для прочих скрыты.
+    viewer = request.session.get('user_username') or ''
+    is_author = bool(story and viewer and story.author.username == viewer)
     return render(request, 'pages/story/story_detail.html', {
+        'has_right_rail': True,
         'slug':     slug,
         'story':    story,
         'chapters': chapters,
@@ -171,6 +246,9 @@ def story_detail(request, slug):
         ),
         # FR-STORY-02: блок «Басқа шығармалар» внизу страницы
         'related':  stub_data.related_stories(slug, limit=6) if story else [],
+        # docs/11: UGC-теги произведения (resolved Tag-объекты)
+        'tags':      stub_data.tags_of(story) if story else [],
+        'is_author': is_author,
     })
 
 
@@ -204,6 +282,7 @@ def my_stories(request):
     username = _current_username(request)
     stories = stub_data.my_stories_of(username) if username else []
     return render(request, 'pages/write/my_stories.html', {
+        'has_right_rail': True,
         'page_state': _page_state(request),
         'stories':    stories,
         'stats':      stub_data.writer_stats(username) if username else None,
@@ -212,13 +291,19 @@ def my_stories(request):
 
 def new_story(request):
     return render(request, 'pages/write/new_story.html', {
-        'genres': stub_data.GENRES,
+        'has_right_rail': True,
+        'genres':           stub_data.GENRES,
+        # docs/11: данные для tag_input
+        'accepted_tags':    stub_data.accepted_tags_json(),
+        'blocked_patterns': stub_data.blocked_tag_patterns_list(),
+        'initial_tags':     [],   # новая стори — без тегов
     })
 
 
 def manage_story(request, slug):
     story = stub_data.STORIES_BY_SLUG.get(slug)
     return render(request, 'pages/write/manage_story.html', {
+        'has_right_rail': True,
         'slug':     slug,
         'story':    story,
         'chapters': stub_data.chapters_of(slug),
@@ -227,10 +312,16 @@ def manage_story(request, slug):
 
 
 def story_settings(request, slug):
+    story = stub_data.STORIES_BY_SLUG.get(slug)
     return render(request, 'pages/write/story_settings.html', {
+        'has_right_rail': True,
         'slug':   slug,
-        'story':  stub_data.STORIES_BY_SLUG.get(slug),
+        'story':  story,
         'genres': stub_data.GENRES,
+        # docs/11: данные для tag_input + текущие теги стори для edit-режима
+        'accepted_tags':    stub_data.accepted_tags_json(),
+        'blocked_patterns': stub_data.blocked_tag_patterns_list(),
+        'initial_tags':     stub_data.tags_of(story) if story else [],
     })
 
 
@@ -238,6 +329,7 @@ def chapter_editor(request, slug, chapter=None):
     story = stub_data.STORIES_BY_SLUG.get(slug)
     current = stub_data.chapter_of(slug, chapter) if chapter else None
     return render(request, 'pages/write/chapter_editor.html', {
+        'has_right_rail': True,
         'slug':    slug,
         'story':   story,
         'chapter': chapter,
@@ -274,6 +366,7 @@ def profile_me(request):
     author = stub_data.AUTHORS_BY_USERNAME.get(username)
     tab = _resolve_prof_tab(request, _PROF_TABS_ME)
     return render(request, 'pages/profile/profile_me.html', {
+        'has_right_rail':  True,
         'profile_user':    author,
         'username':        username,
         'is_self':         True,
@@ -306,6 +399,7 @@ def profile_other(request, username):
     me = _current_username(request)
     tab = _resolve_prof_tab(request, _PROF_TABS_OTHER)
     return render(request, 'pages/profile/profile_other.html', {
+        'has_right_rail': True,
         'profile_user':  author,
         'username':      username,
         'is_self':       False,
@@ -383,6 +477,7 @@ def contest_detail(request, slug):
     contest = stub_data.CONTESTS_BY_SLUG.get(slug)
     username = _current_username(request)
     return render(request, 'pages/contests/contest_detail.html', {
+        'has_right_rail': True,
         'slug':           slug,
         'contest':        contest,
         'already_submitted': stub_data.has_submission(username, slug) if username else False,
@@ -400,6 +495,7 @@ def contest_submit(request, slug):
         if preview_story and contest else []
     )
     return render(request, 'pages/contests/contest_submit.html', {
+        'has_right_rail':    True,
         'slug':              slug,
         'contest':           contest,
         'eligible':          eligible,
@@ -433,7 +529,8 @@ def search_index_json(request):
                     'slug':   s.slug,
                     'title':  s.title,
                     'author': s.author.name if s.author else '',
-                    'cover':  static(s.cover),
+                    # Обложки лежат в /media/ (после Фазы интеграции реальных файлов)
+                    'cover':  ('/media/' + s.cover) if s.cover else '',
                 }
                 for s in stub_data.STORIES
                 if s.status == 'Published'
@@ -441,6 +538,11 @@ def search_index_json(request):
             'authors': [
                 {'username': a.username, 'name': a.name}
                 for a in stub_data.AUTHORS
+            ],
+            # docs/11 Phase 3: теги в Cmd+K (только accepted)
+            'tags': [
+                {'slug': t.slug, 'name': t.name, 'usage_count': t.usage_count}
+                for t in stub_data.TAGS if t.status == 'accepted'
             ],
         }
     return JsonResponse(_SEARCH_INDEX_CACHE)
@@ -503,10 +605,21 @@ def design_components(request):
     """Каталог всех атомов во всех состояниях. Только при DEBUG."""
     if not settings.DEBUG:
         raise Http404
+    accepted = [t for t in stub_data.TAGS if t.status == 'accepted']
+    pending  = [t for t in stub_data.TAGS if t.status == 'pending']
+    # Микс accepted + pending — иллюстрирует фильтрацию tag_list по viewer
+    mixed = accepted[:3] + pending[:2]
     return render(request, 'pages/_design/components.html', {
         'genres':    stub_data.GENRES,
         'stories':   stub_data.STORIES,
         'authors':   stub_data.AUTHORS,
+        # docs/11 — showcase тегов
+        'showcase_tags_accepted': accepted[:8],
+        'showcase_tags_pending':  pending,
+        'showcase_tags_mixed':    mixed,
+        # для интерактивного tag_input
+        'accepted_tags':    stub_data.accepted_tags_json(),
+        'blocked_patterns': stub_data.blocked_tag_patterns_list(),
     })
 
 

@@ -1,0 +1,21 @@
+{% comment %}
+    TagList (docs/11.6). Ряд UGC-тегов произведения.
+    Скрывает pending-теги от публики; автор своих видит всегда (BR-TAG-07).
+
+    Параметры:
+      tags             — list of Tag (получить через stub_data.tags_of(story))
+      viewer_is_author — bool (default False) — true для автора своих стори
+      size             — для tag_chip ('sm'|'md', default 'sm')
+
+    Если все теги pending и зритель не автор — div рендерится пустым
+    (флекс-контейнер без детей не имеет визуального эффекта).
+{% endcomment %}
+{% if tags %}
+    <div class="flex flex-wrap items-center gap-1.5">
+        {% for t in tags %}
+            {% if t.status == 'accepted' or viewer_is_author %}
+                {% include "components/tag_chip.html" with tag=t size=size|default:"sm" %}
+            {% endif %}
+        {% endfor %}
+    </div>
+{% endif %}

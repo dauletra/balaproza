@@ -1,0 +1,136 @@
+{% comment %}
+    Каталог-фильтр (DEC-27). Используется в двух местах:
+      • Десктоп — в правом рейле (рендерится из right_rail/catalog.html)
+      • Mobile — в bottom-sheet (рендерится из _filter_sheet.html по кнопке)
+
+    Параметры:
+      query       — текущий ?q=
+      sort        — текущая сортировка
+      status      — текущий статус-фильтр
+      sorts       — CATALOG_SORTS
+      statuses    — CATALOG_STATUS_FILTERS
+      genres      — список Genre для chip-cloud
+      current_genre_slug — slug активного жанра (если на /genres/<slug>/)
+      mode        — 'search' | 'genre' | 'tag' | 'catalog'
+{% endcomment %}
+<div class="flex flex-col gap-5">
+
+    {# ── Шапка: «Сүзгілер» + Clear ── #}
+    <div class="flex items-baseline justify-between">
+        <h3 class="font-display text-sm font-bold uppercase tracking-[0.12em] text-slate-600">
+            Сүзгілер
+        </h3>
+        {% if query or status or current_genre_slug or current_tag_slug or sort != 'popularity' %}
+            <a href="{% url 'core:catalog' %}"
+               class="font-sans text-xs font-semibold text-brand hover:text-brand-dark">
+                Тазалау
+            </a>
+        {% endif %}
+    </div>
+
+    {# ── Форма: q + sort + status. Auto-submit на change. ── #}
+    <form method="get" x-data @change="$el.requestSubmit()" class="flex flex-col gap-5">
+
+        {# Іздеу — на search-странице input уже в hero, но в рейле — ещё одно поле для refining #}
+        {% if mode != 'search' %}
+            <div>
+                <label for="filter-q" class="mb-1.5 block font-sans text-xs font-semibold text-slate-700">Іздеу</label>
+                <input id="filter-q" type="search" name="q" value="{{ query }}"
+                       placeholder="Атау, автор..."
+                       class="h-9 w-full rounded-md border border-slate-300 bg-slate-50 px-3 font-sans text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30">
+            </div>
+        {% else %}
+            {# на search-странице — preserve query при смене sort/status #}
+            <input type="hidden" name="q" value="{{ query }}">
+        {% endif %}
+
+        {# Сұрыптау — radio group #}
+        <fieldset>
+            <legend class="mb-1.5 font-sans text-xs font-semibold text-slate-700">Сұрыптау</legend>
+            <div class="flex flex-col gap-1">
+                {% for key, label in sorts %}
+                    <label class="inline-flex cursor-pointer items-center gap-2 font-sans text-sm text-slate-700">
+                        <input type="radio" name="sort" value="{{ key }}"
+                               {% if sort == key %}checked{% endif %}
+                               class="h-3.5 w-3.5 accent-brand">
+                        {{ label }}
+                    </label>
+                {% endfor %}
+            </div>
+        </fieldset>
+
+        {# Мәртебесі — radio group #}
+        <fieldset>
+            <legend class="mb-1.5 font-sans text-xs font-semibold text-slate-700">Мәртебесі</legend>
+            <div class="flex flex-col gap-1">
+                {% for key, label in statuses %}
+                    <label class="inline-flex cursor-pointer items-center gap-2 font-sans text-sm text-slate-700">
+                        <input type="radio" name="status" value="{{ key }}"
+                               {% if status == key %}checked{% endif %}
+                               class="h-3.5 w-3.5 accent-brand">
+                        {{ label }}
+                    </label>
+                {% endfor %}
+            </div>
+        </fieldset>
+
+        {# No-JS fallback #}
+        <noscript>
+            <button type="submit" class="h-8 rounded-md bg-brand px-3 font-sans text-xs font-semibold text-white">
+                Қолдану
+            </button>
+        </noscript>
+    </form>
+
+    {# ── Жанр — chip-cloud (вне формы; каждый chip — ссылка) ── #}
+    <div>
+        <p class="mb-1.5 font-sans text-xs font-semibold text-slate-700">Жанр</p>
+        <div class="flex flex-wrap gap-1.5">
+            {% for g in genres %}
+                {% if g.slug == current_genre_slug %}
+                    {# Активный — со снятием × #}
+                    <a href="{% url 'core:catalog' %}"
+                       class="inline-flex h-7 items-center gap-1 rounded-pill border-2 px-2.5 font-sans text-xs font-semibold transition-colors"
+                       style="background: oklch(0.96 0.04 {{ g.hue }});
+                              color: oklch(0.32 0.14 {{ g.hue }});
+                              border-color: oklch(0.55 0.14 {{ g.hue }});">
+                        {{ g.name }}
+                        {% include "components/icon.html" with name="x" size=11 %}
+                    </a>
+                {% else %}
+                    <a href="{% url 'core:genre_detail' slug=g.slug %}"
+                       class="inline-flex h-7 items-center rounded-pill border px-2.5 font-sans text-xs font-semibold transition-shadow hover:shadow-card-hover"
+                       style="background: oklch(0.96 0.04 {{ g.hue }});
+                              color: oklch(0.38 0.14 {{ g.hue }});
+                              border-color: oklch(0.86 0.08 {{ g.hue }});">
+                        {{ g.name }}
+                    </a>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    {# ── Танымал тегтер — chip-cloud (docs/11 Phase 3) ── #}
+    {% if popular_tags %}
+        <div>
+            <p class="mb-1.5 font-sans text-xs font-semibold text-slate-700">Танымал тегтер</p>
+            <div class="flex flex-wrap gap-1.5">
+                {% for t in popular_tags %}
+                    {% if t.slug == current_tag_slug %}
+                        {# Активный тег — со снятием × #}
+                        <a href="{% url 'core:catalog' %}"
+                           class="inline-flex h-7 items-center gap-1 rounded-pill border-2 border-brand bg-brand/5 px-2.5 font-sans text-xs font-semibold text-brand-dark">
+                            <span class="opacity-60">#</span>{{ t.name }}
+                            {% include "components/icon.html" with name="x" size=11 %}
+                        </a>
+                    {% else %}
+                        <a href="{% url 'core:tag_detail' slug=t.slug %}"
+                           class="inline-flex h-7 items-center rounded-pill border border-slate-200 bg-slate-100 px-2.5 font-sans text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200">
+                            <span class="opacity-60">#</span>{{ t.name }}
+                        </a>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+</div>

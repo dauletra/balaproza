@@ -1,0 +1,8 @@
+{% comment %}
+    Правый рейл каталога (DEC-27 + DEC-25).
+    Содержит filter_panel — единый источник сортировки/статуса/жанра/тега.
+    На mobile тот же panel рендерится в bottom-sheet через _filter_sheet.html.
+{% endcomment %}
+<section class="rounded-lg border border-slate-200 bg-white p-5">
+    {% include "partials/catalog/_filter_panel.html" %}
+</section>

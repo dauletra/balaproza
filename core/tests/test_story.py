@@ -179,3 +179,39 @@ class StoryReadHasSettingsPopover(TestCase):
         self.assertContains(r, 'reader-settings')
         # Popover содержит триггерную aria
         self.assertContains(r, 'Оқу баптаулары')
+
+
+class StoryDetailTags(TestCase):
+    """docs/11: UGC-теги. Pending видны только автору (BR-TAG-07)."""
+
+    # У `dalney-berega` теги все accepted → видны всем
+    PUBLIC_SLUG = 'dalney-berega'
+    # У `temniy-lord` есть pending-тег 'basqa-alem' (басқа әлем)
+    HAS_PENDING_SLUG = 'temniy-lord'
+    # У `aidana-tan` есть pending 'experimental' (эксперимент), автор — aidana
+    OWN_PENDING_SLUG = 'aidana-tan'
+
+    def test_accepted_tag_visible_to_guest(self):
+        r = self.client.get(reverse('core:story_detail', kwargs={'slug': self.PUBLIC_SLUG}))
+        self.assertContains(r, 'арман')      # accepted-тег
+        self.assertContains(r, 'жасөспірім') # accepted-тег
+
+    def test_pending_tag_hidden_from_guest(self):
+        r = self.client.get(reverse('core:story_detail', kwargs={'slug': self.HAS_PENDING_SLUG}))
+        self.assertContains(r, 'мистика')        # accepted показан
+        self.assertNotContains(r, 'басқа әлем')  # pending скрыт от гостя
+        self.assertNotContains(r, 'проверкада')
+
+    def test_pending_tag_hidden_from_other_authed_user(self):
+        # Логинимся как aidana, смотрим чужое произведение с pending-тегом
+        _login(self.client)
+        r = self.client.get(reverse('core:story_detail', kwargs={'slug': self.HAS_PENDING_SLUG}))
+        self.assertNotContains(r, 'басқа әлем')
+        self.assertNotContains(r, 'проверкада')
+
+    def test_author_sees_own_pending_tag_with_badge(self):
+        # aidana заходит на своё произведение → видит pending-тег с бейджем
+        _login(self.client)
+        r = self.client.get(reverse('core:story_detail', kwargs={'slug': self.OWN_PENDING_SLUG}))
+        self.assertContains(r, 'эксперимент')   # pending-тег
+        self.assertContains(r, 'проверкада')    # бейдж модерации

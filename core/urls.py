@@ -14,10 +14,12 @@ urlpatterns = [
     path('auth/signup/', views.signup, name='signup'),
     path('auth/signup/success/', views.signup_success, name='signup_success'),
 
-    # CAT — каталог и поиск
+    # CAT — каталог и поиск (DEC-27: search/genre/tag — единый catalog-движок)
+    path('catalog/', views.catalog, name='catalog'),
     path('search/', views.search_results, name='search_results'),
     path('genres/', views.genre_index, name='genre_index'),
     path('genres/<slug:slug>/', views.genre_detail, name='genre_detail'),
+    path('tag/<slug:slug>/', views.tag_detail, name='tag_detail'),
     path('collections/', views.collections, name='collections'),
     path('collections/<slug:slug>/', views.collection_detail, name='collection_detail'),
 

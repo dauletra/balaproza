@@ -9,7 +9,7 @@
 | Главная | Home (финальная, состояния гость/возвращающийся), Home с промо-баром |
 | Авторизация | Login (модал), SignUp, SignUp (валидация), SignUp success (онбординг) |
 | Создание | New story |
-| Поиск/каталог | Search results (+ sort/filter, FR-CAT-07), Search by genre (+ sort/filter), Genres index, Collections, Collection detail, **Search popup overlay** (Cmd+K, FR-CAT-06), Genre color system (демо) |
+| Поиск/каталог | **Catalog** (`/catalog/` — нейтральный), Search results (`/search/?q=`), Genre detail (`/genres/<slug>/`), **Tag detail** (`/tag/<slug>/`, docs/11) — все через единый `catalog.html` (DEC-27). Genres index, Collections, Collection detail, **Search popup overlay** (Cmd+K — включает группу «Тегтер»), Genre color system (демо) |
 | Произведение/чтение | Story detail (v2 — scrollspy, + блок «Басқа шығармалар» внизу, + ShareButton), Reading, Reading (popover-настройки), Reading dark, Report modal |
 | Профиль | Profile, Profile (чужой), **Profile edit** (FR-PROF-05, `/me/edit/`), Notifications, Notifications empty |
 | Авторский кабинет | My stories, My stories empty, Manage story, Story settings, Delete confirm, Chapter editor |
@@ -20,12 +20,12 @@
 
 ### Мобайл (375px)
 
-Login, SignUp, Home, Home (с жанрами), Search results, Search by genre, **Search popup (overlay, Cmd+K)**, Story detail (v2 scrollspy + ShareButton), Reading, Profile, Profile edit, Notifications, My stories, Manage story, Story settings, New story, Contest list, 404 page.
+Login, SignUp, Home, Home (с жанрами), Catalog (`/catalog/`), Search results, Genre detail, **Tag detail** (`/tag/<slug>/`), **Search popup (overlay, Cmd+K)**, **Catalog filter sheet** (bottom-sheet триггером `open-catalog-filters`, DEC-27), Story detail (v2 scrollspy + ShareButton), Reading, Profile, Profile edit, Notifications, My stories, Manage story, Story settings, New story, Contest list, 404 page.
 
 > **Mobile bottom nav** (плавающая пилюля 360×64):
 > - **Гость:** home / genres / login (FAB) / contests / search
 > - **Авторизованный:** home / contests / new_story (FAB) / notifications / profile
-> Library и my_submissions у авторизованных — через dropdown header (desktop) и sidebar; на мобайле — через профиль/конкурсы соответственно.
+> Library и my_submissions у авторизованных — через avatar-dropdown в хедере (десктоп) либо через профиль/конкурсы (mobile). Левый sidebar на десктопе отсутствует — DEC-25.
 
 > ✅ **Решение DEC-16.** Версии-эксперименты из прототипа (Home v1/v2/v3, Story v1, Reading v1, Profile v1) — это история проектирования. В ТЗ за каноничные приняты **финальные**: Home FINAL (с разделением гость/возвращающийся), Story v2 (scrollspy), Reading v2 (popover) + dark, Profile v2 (без дубль-таба). Остальные версии в разработку не идут.
 
@@ -44,7 +44,7 @@ Login, SignUp, Home, Home (с жанрами), Search results, Search by genre, 
 Произведение (STORY)
 ├── «Оқу» ──> Режим чтения ──> (главы ◀▶) ──> Настройки чтения (popover)
 ├── Автор ──> Профиль автора
-├── Пікірлер ──> (гость) Login modal / (читатель) комментирование
+├── Пікірлер ──> (гость) Login modal / (авторизованный) комментирование
 └── Жалоба ──> Report modal
 
 Авторский кабинет (WRITE)
@@ -60,9 +60,8 @@ Login, SignUp, Home, Home (с жанрами), Search results, Search by genre, 
 └── Footer ──> { Модерация ережелері | Жариялау шарттары | Проект туралы | Пайдалану ережелері | Құпиялылық саясаты }
 
 Сквозные:
-  ├── Шапка: поиск (фокус/клик → search popup Cmd+K) · CTA · уведомления · профиль (dropdown с Library/Submissions/Logout)
-  ├── Sidebar
-  ├── Footer (соцсети, школа, правовые)
+  ├── Шапка: поиск (фокус/клик → search popup Cmd+K) · ссылка «Байқаулар» · CTA «Шығарма жазу» · уведомления · аватар-dropdown с Профиль/Шығармаларым/Кітапхана/Заявкаларым/Шығу
+  ├── Footer (карта сайта: Контент/Сайт/Құжаттар + школа + соцсети + правовые)
   ├── Search popup overlay (Cmd+K / Ctrl+K, из любого экрана)
   └── 404 / 500 (branded)
 ```

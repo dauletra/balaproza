@@ -1,18 +1,24 @@
 {% comment %}
-    DesktopFooter (docs/07.5). Слейт-100 фон, поля 125px на lg+.
-    Три колонки (контакты + соцсети, ссылки 1, ссылки 2) + копирайт.
-    Соцсети живут только тут (DEC-19).
+    DesktopFooter (docs/07.5). После DEC-25 sidebar убран, footer служит
+    «картой сайта»: контентные разделы (Жанрлар/Жинақтар/Байқаулар) живут тут,
+    а не в навигации хедера.
+
+    Колонки:
+      1. Байланыс (контакты + соцсети)
+      2. Контент (Жанрлар, Жинақтар, Байқаулар)
+      3. Сайт (Проект, Жариялау, Модерация)
+      4. Құжаттар (Пайдалану, Құпиялылық) + Авторлар мектебі
 {% endcomment %}
 <footer class="mt-12 bg-slate-100">
-    <div class="mx-auto max-w-[1440px] px-6 pt-6 pb-4.5 lg:px-[125px]">
+    <div class="mx-auto max-w-[1280px] px-6 pt-8 pb-4 lg:px-12">
 
-        <div class="flex flex-col gap-8 sm:flex-row sm:justify-between">
+        <div class="grid grid-cols-2 gap-8 sm:grid-cols-2 lg:grid-cols-4">
 
             {# ── Колонка 1: контакты + соцсети ── #}
-            <section class="flex w-full max-w-[234px] flex-col gap-3">
-                <h3 class="font-sans text-[13px] font-bold tracking-[0.5px] text-slate-600">БАЙЛАНЫС</h3>
+            <section class="flex flex-col gap-3">
+                <h3 class="font-sans text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Байланыс</h3>
                 <a href="mailto:daulet.rakhmankul@gmail.com"
-                   class="font-sans text-xs text-slate-500 hover:text-brand">
+                   class="font-sans text-xs text-slate-600 hover:text-brand">
                     daulet.rakhmankul@gmail.com
                 </a>
                 <ul class="mt-1 flex items-center gap-3.5" aria-label="Әлеуметтік желілер">
@@ -31,24 +37,35 @@
                 </ul>
             </section>
 
-            {# ── Колонка 2: правила/школа ── #}
-            <nav aria-label="Жариялау туралы"
-                 class="flex w-full max-w-[234px] flex-col gap-3 sm:items-end sm:text-right">
-                <a href="{% url 'core:legal_moderation' %}" class="font-sans text-[13px] text-slate-900 hover:text-brand">Модерация ережелері</a>
-                <a href="{% url 'core:legal_publishing' %}" class="font-sans text-[13px] text-slate-900 hover:text-brand">Жариялау шарттары</a>
-                <div class="mt-1 flex flex-col gap-2 sm:items-end">
-                    <span class="font-sans text-[11px] uppercase tracking-wide text-slate-500">Авторлар мектебі</span>
-                    {% include "components/school_links.html" with links=school_links_global layout="inline" %}
-                </div>
+            {# ── Колонка 2: Контент ── #}
+            <nav aria-label="Контент бойынша" class="flex flex-col gap-3">
+                <h3 class="font-sans text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Контент</h3>
+                <a href="{% url 'core:genre_index' %}" class="font-sans text-[13px] text-slate-700 hover:text-brand">Жанрлар</a>
+                <a href="{% url 'core:collections' %}" class="font-sans text-[13px] text-slate-700 hover:text-brand">Жинақтар</a>
+                <a href="{% url 'core:contest_list' %}" class="font-sans text-[13px] text-slate-700 hover:text-brand">Байқаулар</a>
             </nav>
 
-            {# ── Колонка 3: проект ── #}
-            <nav aria-label="Проект туралы"
-                 class="flex w-full max-w-[234px] flex-col gap-3 sm:items-end sm:text-right">
-                <a href="{% url 'core:legal_about' %}" class="font-sans text-[13px] text-slate-900 hover:text-brand">Проект туралы</a>
-                <a href="{% url 'core:legal_terms' %}" class="font-sans text-[13px] text-slate-900 hover:text-brand">Пайдалану ережелері</a>
-                <a href="{% url 'core:legal_privacy' %}" class="font-sans text-[13px] text-slate-900 hover:text-brand">Құпиялылық саясаты</a>
+            {# ── Колонка 3: Сайт ── #}
+            <nav aria-label="Сайт туралы" class="flex flex-col gap-3">
+                <h3 class="font-sans text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Сайт</h3>
+                <a href="{% url 'core:legal_about' %}" class="font-sans text-[13px] text-slate-700 hover:text-brand">Проект туралы</a>
+                <a href="{% url 'core:legal_publishing' %}" class="font-sans text-[13px] text-slate-700 hover:text-brand">Жариялау шарттары</a>
+                <a href="{% url 'core:legal_moderation' %}" class="font-sans text-[13px] text-slate-700 hover:text-brand">Модерация ережелері</a>
             </nav>
+
+            {# ── Колонка 4: Құжаттар + Авторлар мектебі ── #}
+            <div class="flex flex-col gap-5">
+                <nav aria-label="Құжаттар" class="flex flex-col gap-3">
+                    <h3 class="font-sans text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Құжаттар</h3>
+                    <a href="{% url 'core:legal_terms' %}" class="font-sans text-[13px] text-slate-700 hover:text-brand">Пайдалану ережелері</a>
+                    <a href="{% url 'core:legal_privacy' %}" class="font-sans text-[13px] text-slate-700 hover:text-brand">Құпиялылық саясаты</a>
+                </nav>
+
+                <div class="flex flex-col gap-2">
+                    <h3 class="font-sans text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Авторлар мектебі</h3>
+                    {% include "components/school_links.html" with links=school_links_global layout="inline" %}
+                </div>
+            </div>
         </div>
     </div>
 

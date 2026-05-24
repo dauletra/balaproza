@@ -17,24 +17,101 @@ class Genre:
     name: str       # казахское название
     hue: int        # OKLCH hue 0-360
     count: int      # сколько произведений
+    icon: str = ""  # slug SVG-иконки из спрайта (без префикса icon-)
 
 
 GENRES = [
-    Genre("fantastika", "Фантастика", 250, 124),
-    Genre("fantezi",    "Фэнтези",    295,  87),
-    Genre("triller",    "Триллер",    210,  56),
-    Genre("romantika",  "Романтика",    8, 142),
-    Genre("drama",      "Драма",      195,  91),
-    Genre("horror",     "Хоррор",      25,  34),
-    Genre("erteg",      "Ертегі",      75,  48),
-    Genre("tarih",      "Тарихи",      40,  29),
-    Genre("komediya",   "Комедия",     55,  61),
-    Genre("fanfik",     "Фанфик",     330,  38),
-    Genre("balalar",    "Балалар",    180,  77),
-    Genre("shyttyrman", "Шытырман",   145,  53),
+    Genre("fantastika", "Фантастика", 250, 124, icon="planet"),
+    Genre("fantezi",    "Фэнтези",    295,  87, icon="feather"),
+    Genre("triller",    "Триллер",    210,  56, icon="skull"),
+    Genre("romantika",  "Романтика",    8, 142, icon="heart"),
+    Genre("drama",      "Драма",      195,  91, icon="drop"),
+    Genre("horror",     "Хоррор",      25,  34, icon="fir"),
+    Genre("erteg",      "Ертегі",      75,  48, icon="book"),
+    Genre("tarih",      "Тарихи",      40,  29, icon="book"),
+    Genre("komediya",   "Комедия",     55,  61, icon="smile"),
+    Genre("fanfik",     "Фанфик",     330,  38, icon="pen"),
+    Genre("balalar",    "Балалар",    180,  77, icon="backpack"),
+    Genre("shyttyrman", "Шытырман",   145,  53, icon="cityscape"),
 ]
 
 GENRES_BY_SLUG = {g.slug: g for g in GENRES}
+
+
+# ───────────────────────── Теги (docs/11 — UGC-таксономия) ─────────────────
+# Параллельно жанрам: до 10 на произведение (BR-TAG-01). Авторы создают
+# свободно, модератор пост-фактум переводит pending → accepted (тег попадает
+# в автокомплит) или rejected (тег удаляется из произведения).
+
+@dataclass(frozen=True)
+class Tag:
+    slug: str
+    name: str           # оригинал, отображается; в Ф14 — original input автора
+    status: str         # 'pending' | 'accepted' | 'rejected'
+    usage_count: int    # денормализовано, для сортировки автокомплита/виджета
+
+
+TAGS = [
+    Tag('mektep',           'мектеп',           'accepted', 42),
+    Tag('dostyk',           'достық',           'accepted', 38),
+    Tag('sayahat',          'саяхат',           'accepted', 24),
+    Tag('jasospirim',       'жасөспірім',       'accepted', 56),
+    Tag('gashyqtyq',        'ғашықтық',         'accepted', 31),
+    Tag('mistika',          'мистика',          'accepted', 18),
+    Tag('syikyr-akademiya', 'сиқыр-академиясы', 'accepted', 12),
+    Tag('arman',            'арман',            'accepted', 27),
+    Tag('detektiv-jas',     'жас детектив',     'accepted',  9),
+    Tag('aua-ralighi',      'ауыл-қала',        'accepted', 14),
+    # pending — для иллюстрации работы модерации (BR-TAG-03/07)
+    Tag('basqa-alem',       'басқа әлем',       'pending',   3),
+    Tag('experimental',     'эксперимент',      'pending',   1),
+]
+
+TAGS_BY_SLUG = {t.slug: t for t in TAGS}
+
+# Блок-лист (BR-TAG-05). В Ф14 — таблица, редактируется в Django admin.
+BLOCKED_TAG_PATTERNS = frozenset({'spam', 'реклама', 'политика'})
+
+
+def tag_by_slug(slug: str) -> Optional["Tag"]:
+    return TAGS_BY_SLUG.get(slug)
+
+
+def tags_of(story: "Story") -> list:
+    """Resolve Story.tags (slug-tuple) в Tag-объекты.
+
+    Возвращает ВСЕ теги, включая pending. Фильтрация по видимости (BR-TAG-07)
+    делается в шаблоне `tag_list.html` по флагу viewer_is_author.
+    """
+    return [TAGS_BY_SLUG[s] for s in story.tags if s in TAGS_BY_SLUG]
+
+
+def is_blocked(name: str) -> bool:
+    """Проверка имени тега против блок-листа (BR-TAG-05). Case-insensitive."""
+    return name.strip().lower() in BLOCKED_TAG_PATTERNS
+
+
+def popular_tags(limit: int = 10) -> list:
+    """Топ-N accepted-тегов по usage_count — для виджета «Танымал тегтер»."""
+    return sorted(
+        (t for t in TAGS if t.status == 'accepted'),
+        key=lambda t: t.usage_count,
+        reverse=True,
+    )[:limit]
+
+
+def accepted_tags_json() -> list:
+    """Accepted-теги как plain dicts — для встраивания в Alpine-компонент
+    через {% json_script %}. dataclass напрямую не json-serializable."""
+    return [
+        {'slug': t.slug, 'name': t.name, 'usage_count': t.usage_count}
+        for t in TAGS if t.status == 'accepted'
+    ]
+
+
+def blocked_tag_patterns_list() -> list:
+    """Блок-лист как отсортированный list[str] для встраивания в Alpine."""
+    return sorted(BLOCKED_TAG_PATTERNS)
 
 
 # ───────────────────────── Пользователи / Авторы ─────────────────────────
@@ -80,6 +157,9 @@ class Story:
     status: str = "NotPublished"   # Published | NotPublished | OnProcess | Completed | OnModeration
     annotation: str = ""        # короткое описание для STORY/MANAGE/EDIT
     secondary_genre: str = ""   # если у произведения есть второй жанр — для форм
+    # UGC-теги (docs/11, BR-TAG-01): до 10 slug-ов на произведение.
+    # Pending фильтруются в шаблоне tag_list.html по viewer_is_author (BR-TAG-07).
+    tags: tuple = ()
 
     @property
     def author(self) -> Author:
@@ -96,36 +176,38 @@ class Story:
 
 
 STORIES = [
-    Story("dalney-berega",  "Алыс жағалауларда",     "sayyn",      "img/book1.jpg", ("fantastika",  None),         12, 12482, 4821, 312, status="Published"),
-    Story("temniy-lord",    "Күңгірт мырза",         "bekzhan_t",  "img/book3.jpg", ("fantezi",     "horror"),      8,  8920, 2440, 156, status="Published"),
-    Story("igra-kuklovoda", "Қуыршақшының ойыны",    "dina_books", "img/book4.jpg", ("triller",     "drama"),      15, 18102, 6230, 421, status="Published"),
-    Story("kronchessii",    "Тас уәделер",           "rudazov",    "img/book2.jpg", ("shyttyrman",  "fantezi"),    24, 32540, 11200, 890, status="Published"),
-    Story("arhimag",        "Сиқыршы: бөтен әлемдер","rudazov",    "img/book1.jpg", ("fantezi",     "shyttyrman"), 12, 12482, 4821, 312, status="Published"),
-    Story("sila-imperii",   "Империя құдіреті",      "aygerim_k",  "img/book3.jpg", ("tarih",       "drama"),      18, 14200, 3890, 245, status="Published"),
+    Story("dalney-berega",  "Алыс жағалауларда",     "sayyn",      "ipad_19b0bc4bcd9c1a1dc4c3cc12cf20dce5.webp", ("fantastika",  None),         12, 12482, 4821, 312, status="Published", tags=("arman", "sayahat", "jasospirim")),
+    Story("temniy-lord",    "Күңгірт мырза",         "bekzhan_t",  "ipad_42f033cf1b9a2bcad744d05b9d429609.webp", ("fantezi",     "horror"),      8,  8920, 2440, 156, status="Published", tags=("mistika", "arman", "basqa-alem")),
+    Story("igra-kuklovoda", "Қуыршақшының ойыны",    "dina_books", "ipad_499539963221e0fe36b0888bf8601067.webp", ("triller",     "drama"),      15, 18102, 6230, 421, status="Published", tags=("mistika", "jasospirim", "detektiv-jas")),
+    Story("kronchessii",    "Тас уәделер",           "rudazov",    "ipad_5916b4e19c616e74d008125ba9a1be8e.webp", ("shyttyrman",  "fantezi"),    24, 32540, 11200, 890, status="Published", tags=("sayahat", "arman", "syikyr-akademiya")),
+    Story("arhimag",        "Сиқыршы: бөтен әлемдер","rudazov",    "ipad_940e074d12d6c3657199601ca568f1b3.jpg",  ("fantezi",     "shyttyrman"), 12, 12482, 4821, 312, status="Published", tags=("syikyr-akademiya", "arman", "dostyk", "jasospirim", "mektep")),
+    Story("sila-imperii",   "Империя құдіреті",      "aygerim_k",  "ipad_992f1631a421d74ed5e1aa72717df374.webp", ("tarih",       "drama"),      18, 14200, 3890, 245, status="Published", tags=("arman", "jasospirim")),
 
     # ─ Произведения демо-пользователя «Айдана» (для WRITE-страниц) ─
     Story(
         slug="aidana-tan",    title="Таң алдында",            author_username="aidana",
-        cover="img/book2.jpg", genres=("drama", None),
+        cover="ipad_c9217632f98051fd88ca5763f218a9e3.webp", genres=("drama", None),
         chapters=8, views=1042, likes=87, comments=12,
         status="Published", annotation="Жас қыздың Алматыдан Таразға қайту туралы әңгімесі. Сегіз бөлімде, әр бөлім — жаңа қала.",
+        tags=("sayahat", "jasospirim", "arman", "experimental"),
     ),
     Story(
         slug="aidana-koshe",  title="Көше әндері",            author_username="aidana",
-        cover="img/book4.jpg", genres=("drama", "komediya"),
+        cover="ipad_e655bb59097d8f25698466168d385969.webp", genres=("drama", "komediya"),
         chapters=5, views=203, likes=18, comments=4,
         status="OnProcess", annotation="Қаладағы бес адамның бір күні. Әрқайсысының өз әні.",
         secondary_genre="komediya",
+        tags=("aua-ralighi", "dostyk", "mektep"),
     ),
     Story(
         slug="aidana-erteg",  title="Ертегі ертеректегі",      author_username="aidana",
-        cover="img/book3.jpg", genres=("erteg", None),
+        cover="ipad_eec6a1375d9124c7348c7579b8d2db33.jpg", genres=("erteg", None),
         chapters=3, views=0, likes=0, comments=0,
         status="OnModeration", annotation="Дәстүрлі ертегі формасында жазылған заманауи тарих.",
     ),
     Story(
         slug="aidana-kysh",   title="Қыстың үнсіздігі",        author_username="aidana",
-        cover="img/book1.jpg", genres=("drama", None),
+        cover="ipad_f0e918b204613b38cc0e04ba74e3e3ab.webp", genres=("drama", None),
         chapters=12, views=872, likes=64, comments=9,
         status="Completed", annotation="Қыстағы ауылда қалған әжемен өткізген бір ай. Аяқталған кітап.",
     ),
@@ -430,6 +512,30 @@ def apply_catalog_filters(stories: list, sort: str = "popularity", status: str =
     else:  # popularity (default)
         out.sort(key=lambda s: s.views, reverse=True)
     return out
+
+
+def filter_catalog(*, query: str = "", genre: str = "", tag: str = "",
+                   status: str = "", sort: str = "popularity") -> list:
+    """Единый фильтр-пайплайн для унифицированного каталога (DEC-27).
+
+    Применяет все источники AND-комбинацией. Для пустых параметров — no-op.
+    Tag учитывает BR-TAG-07 (только accepted-теги показываются в публичной выборке).
+    """
+    # Стартуем с полного источника (или с search-результата если есть query)
+    out = search_stories(query) if query else list(STORIES)
+
+    if genre:
+        out = [s for s in out if genre in s.genres]
+
+    if tag:
+        # Pending-теги не фильтруют публичный каталог (BR-TAG-07).
+        t = TAGS_BY_SLUG.get(tag)
+        if t and t.status == 'accepted':
+            out = [s for s in out if tag in s.tags]
+        else:
+            out = []  # неизвестный/непринятый тег → пусто
+
+    return apply_catalog_filters(out, sort=sort, status=status)
 
 
 def related_stories(slug: str, limit: int = 6) -> list:

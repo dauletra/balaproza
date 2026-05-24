@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% comment %}
+    Унифицированный каталог (DEC-27). Один шаблон для search/genre/tag/all.
+
+    Контекст (всё через view):
+      mode              — 'search' | 'genre' | 'tag' | 'catalog'
+      results           — list of Story (после filter_catalog)
+      query             — текущий ?q=
+      sort, status      — текущие фильтры
+      sorts, statuses   — справочники
+      genres            — список Genre (для chip-cloud в panel)
+      current_genre_slug — slug активного жанра (для genre-mode и chip-выделения)
+      genre             — Genre-объект (только в genre-mode)
+      empty_title/text  — кастомные сообщения empty-state (опц.)
+{% endcomment %}
+
+{% block title %}
+    {% if mode == 'search' and query %}Іздеу: «{{ query }}»{% elif mode == 'genre' and genre %}{{ genre.name }}{% else %}Каталог{% endif %} — Balaproza
+{% endblock %}
+
+{% block content %}
+
+    {# Error-state: неизвестный жанр — рендерим только error-блок, без списка/контролов #}
+    {% if mode == 'genre' and not genre %}
+        <div class="rounded-lg border border-slate-200 bg-white p-10 text-center">
+            <h1 class="font-display text-2xl font-bold text-slate-900">Жанр табылмады</h1>
+            <p class="mt-2 font-sans text-sm text-slate-600">Slug: <code>{{ current_genre_slug }}</code></p>
+            <a href="{% url 'core:genre_index' %}" class="mt-4 inline-block font-sans text-sm font-semibold text-brand hover:underline">
+                ← Барлық жанрлар
+            </a>
+        </div>
+        {% include "partials/catalog/_filter_sheet.html" %}
+    {% elif mode == 'tag' and not current_tag %}
+        <div class="rounded-lg border border-slate-200 bg-white p-10 text-center">
+            <h1 class="font-display text-2xl font-bold text-slate-900">Тег табылмады</h1>
+            <p class="mt-2 font-sans text-sm text-slate-600">
+                Slug: <code>{{ current_tag_slug }}</code>. Мүмкін, әлі модерациядан өтпеген.
+            </p>
+            <a href="{% url 'core:catalog' %}" class="mt-4 inline-block font-sans text-sm font-semibold text-brand hover:underline">
+                ← Каталогқа
+            </a>
+        </div>
+        {% include "partials/catalog/_filter_sheet.html" %}
+    {% else %}
+
+    {# ── Hero (один из четырёх вариантов в зависимости от mode) ── #}
+    {% if mode == 'search' %}
+        {% include "partials/catalog/_hero_search.html" %}
+    {% elif mode == 'genre' %}
+        {% include "partials/catalog/_hero_genre.html" %}
+    {% elif mode == 'tag' %}
+        {% include "partials/catalog/_hero_tag.html" %}
+    {% else %}
+        {% include "partials/catalog/_hero_catalog.html" %}
+    {% endif %}
+
+    {# ── Mobile: trigger «Сүзгілер» + счётчик ── #}
+    <div class="mb-4 flex items-center justify-between gap-3 lg:hidden">
+        <button type="button"
+                @click="$dispatch('open-catalog-filters')"
+                class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            {% include "components/icon.html" with name="adjustments" size=16 cls="text-slate-500" %}
+            Сүзгілер
+            {% if query or status or current_genre_slug or current_tag_slug or sort != 'popularity' %}
+                <span aria-hidden="true" class="grid h-2 w-2 place-items-center rounded-pill bg-brand"></span>
+            {% endif %}
+        </button>
+        <span class="font-sans text-xs text-slate-500">
+            {{ results|length }} шығарма
+        </span>
+    </div>
+
+    {# ── Desktop: счётчик результатов + текущая сортировка-метка над списком ── #}
+    <div class="mb-4 hidden items-baseline justify-between border-b border-slate-200 pb-3 lg:flex">
+        <span class="font-sans text-sm text-slate-600">
+            {{ results|length }} шығарма
+        </span>
+        <span class="font-sans text-xs text-slate-500">
+            {% for key, label in sorts %}{% if key == sort %}Сұрыпталу: {{ label }}{% endif %}{% endfor %}
+        </span>
+    </div>
+
+    {# ── Список + empty state ── #}
+    {% include "partials/catalog/_book_list.html" with results=results empty_title=empty_title empty_text=empty_text %}
+
+    {# ── Mobile bottom-sheet с тем же filter_panel ── #}
+    {% include "partials/catalog/_filter_sheet.html" %}
+
+    {% endif %}{# end error/normal branch #}
+
+{% endblock %}
+
+{% block right_rail %}
+    {% include "partials/right_rail/catalog.html" %}
+{% endblock %}

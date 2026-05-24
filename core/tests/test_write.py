@@ -299,3 +299,55 @@ class ChapterEditorUnknownStory(TestCase):
         _login_as_aidana(self.client)
         r = self.client.get(reverse('core:chapter_new', kwargs={'slug': 'no-such-story'}))
         self.assertContains(r, 'Шығарма табылмады')
+
+
+class TagInputOnNewStory(TestCase):
+    """docs/11 · Фаза 2: tag_input на форме нового произведения."""
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+        self.response = self.client.get(reverse('core:new_story'))
+
+    def test_renders(self):
+        self.assertEqual(self.response.status_code, 200)
+
+    def test_hidden_field_named_tags(self):
+        """В форму попадает скрытое поле name='tags' — для submit."""
+        self.assertContains(self.response, 'name="tags"')
+
+    def test_accepted_tags_embedded_as_json(self):
+        """Alpine читает accepted-теги через json_script с id='tag-input-accepted'."""
+        self.assertContains(self.response, 'id="tag-input-accepted"')
+        # Хотя бы один accepted-тег попал в JSON
+        self.assertContains(self.response, 'мектеп')
+
+    def test_blocklist_embedded_as_json(self):
+        self.assertContains(self.response, 'id="tag-input-blocked"')
+        # Django json_script экранирует non-ASCII как \uXXXX, поэтому 'политика'
+        # в bytes отсутствует. Проверяем латинский 'spam' из блок-листа.
+        self.assertContains(self.response, 'spam')
+
+    def test_no_initial_tags_for_new_story(self):
+        """У новой стори чипов нет — initial пустой."""
+        self.assertContains(self.response, 'initial: []')
+
+
+class TagInputOnStorySettings(TestCase):
+    """docs/11 · Фаза 2: tag_input на странице настроек — initial из stub."""
+
+    # У aidana-tan есть теги, включая pending 'experimental'
+    SLUG = 'aidana-tan'
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+        self.response = self.client.get(reverse('core:story_settings', kwargs={'slug': self.SLUG}))
+
+    def test_renders(self):
+        self.assertEqual(self.response.status_code, 200)
+
+    def test_initial_tags_passed_to_alpine(self):
+        """В initial-массив Alpine попадают существующие теги стори."""
+        # Имена тегов aidana-tan: 'саяхат', 'жасөспірім', 'арман', 'эксперимент'
+        for name in ('саяхат', 'жасөспірім', 'арман', 'эксперимент'):
+            with self.subTest(tag=name):
+                self.assertContains(self.response, name)

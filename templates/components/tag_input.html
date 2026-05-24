@@ -1,0 +1,211 @@
+{% comment %}
+    TagInput (docs/11.6). UGC-теги: input + автокомплит + чипы.
+
+    Параметры:
+      name      — form-field name (default 'tags'). Отправляется в submit
+                  как comma-separated имена тегов (backend сам резолвит slug
+                  и создаёт Tag(status=pending) для новых, см. BR-TAG-02/03/06).
+      tags      — initial list of Tag (для edit mode); default — пусто
+      max_tags  — лимит (default 10, BR-TAG-01)
+
+    Контекст view (обязательно):
+      accepted_tags     — list[Tag] для автокомплита (status='accepted')
+      blocked_patterns  — list[str], нижний регистр (BR-TAG-05)
+
+    Использовать один раз на страницу (json_script id-конфликты иначе).
+{% endcomment %}
+{% with input_name=name|default:'tags' max_n=max_tags|default:10 %}
+
+{# Сериализуем данные для Alpine отдельными script-блоками — без quote-escaping #}
+{{ accepted_tags|json_script:"tag-input-accepted" }}
+{{ blocked_patterns|json_script:"tag-input-blocked" }}
+
+<div x-data="tagInput({
+        initial: [{% for t in tags %}{slug:'{{ t.slug|escapejs }}',name:'{{ t.name|escapejs }}',status:'{{ t.status }}'}{% if not forloop.last %},{% endif %}{% endfor %}],
+        maxTags: {{ max_n }}
+     })"
+     class="flex flex-col gap-1.5">
+
+    <span class="font-sans text-sm font-semibold text-slate-800">
+        Тегтер
+        <span class="font-normal text-slate-500">— ключевые сөздер</span>
+    </span>
+
+    {# Поле ввода + dropdown #}
+    <div class="relative">
+        <div @click="$refs.input.focus()"
+             class="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-slate-300 bg-slate-50 px-2 py-1.5 transition-colors focus-within:border-brand focus-within:bg-white focus-within:ring-2 focus-within:ring-brand/30">
+
+            {# Чипы выбранных #}
+            <template x-for="(t, idx) in selected" :key="(t.slug || t.name) + ':' + idx">
+                <span class="inline-flex items-center gap-1 rounded-pill border px-2 py-0.5 font-sans text-xs"
+                      :class="t.status === 'pending'
+                              ? 'border-dashed border-slate-300 bg-slate-50 text-slate-500'
+                              : (t.status === 'new'
+                                 ? 'border-dashed border-brand/40 bg-brand/5 text-slate-700'
+                                 : 'border-slate-200 bg-slate-100 text-slate-700')">
+                    <span class="opacity-60">#</span><span x-text="t.name"></span>
+                    <button type="button"
+                            @click.stop="remove(idx)"
+                            aria-label="Тегті өшіру"
+                            class="ml-0.5 -mr-0.5 grid h-4 w-4 place-items-center rounded-pill text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+                        {% include "components/icon.html" with name="x" size=10 %}
+                    </button>
+                </span>
+            </template>
+
+            {# Сам input #}
+            <input type="text"
+                   x-ref="input"
+                   x-model="inputValue"
+                   @input="onInput"
+                   @keydown.enter.prevent="addCurrent"
+                   @keydown.comma.prevent="addCurrent"
+                   @keydown.backspace="onBackspace"
+                   @keydown.down.prevent="moveHighlight(1)"
+                   @keydown.up.prevent="moveHighlight(-1)"
+                   @keydown.escape="closeSuggestions"
+                   @focus="onInput"
+                   @click.outside="closeSuggestions"
+                   :disabled="selected.length >= maxTags"
+                   :placeholder="selected.length === 0 ? 'мектеп, достық, саяхат...' : (selected.length >= maxTags ? 'лимит толды' : 'тағы тег...')"
+                   class="min-w-[100px] flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:cursor-not-allowed">
+        </div>
+
+        {# Dropdown автокомплита #}
+        <div x-show="showSuggestions && suggestions.length > 0"
+             x-cloak
+             x-transition.opacity.duration.100ms
+             class="absolute left-0 right-0 top-full z-20 mt-1 max-h-60 overflow-auto rounded-md border border-slate-200 bg-white shadow-modal">
+            <template x-for="(s, i) in suggestions" :key="s.slug">
+                <button type="button"
+                        @click="addExisting(s)"
+                        @mouseenter="highlightIndex = i"
+                        :class="i === highlightIndex ? 'bg-slate-100' : ''"
+                        class="flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-sm text-slate-700 hover:bg-slate-100">
+                    <span class="opacity-60">#</span>
+                    <span x-text="s.name" class="font-semibold"></span>
+                    <span class="ml-auto font-sans text-[11px] text-slate-400" x-text="s.usage_count + ' рет'"></span>
+                </button>
+            </template>
+        </div>
+    </div>
+
+    {# Подсказка + счётчик + inline-ошибка #}
+    <div class="flex items-start justify-between gap-3 font-sans text-xs">
+        <span class="text-slate-500">
+            <template x-if="!error">
+                <span>Enter не үтір — тегті қосу. До <span x-text="maxTags"></span> тег.</span>
+            </template>
+            <template x-if="error">
+                <span class="font-semibold text-status-error-fg" x-text="error"></span>
+            </template>
+        </span>
+        <span class="shrink-0"
+              :class="selected.length >= maxTags ? 'font-semibold text-status-attention-fg' : 'text-slate-500'">
+            <span x-text="selected.length"></span> / <span x-text="maxTags"></span>
+        </span>
+    </div>
+
+    {# Hidden input для submit — имена через запятую; backend сам резолвит #}
+    <input type="hidden" name="{{ input_name }}" :value="selected.map(t => t.name).join(',')">
+</div>
+
+<script>
+function tagInput({ initial, maxTags }) {
+    const accepted = JSON.parse(document.getElementById('tag-input-accepted').textContent || '[]');
+    const blocked  = JSON.parse(document.getElementById('tag-input-blocked').textContent  || '[]');
+    const blockedSet = new Set(blocked.map(b => String(b).toLowerCase()));
+
+    return {
+        selected: Array.isArray(initial) ? [...initial] : [],
+        inputValue: '',
+        suggestions: [],
+        showSuggestions: false,
+        highlightIndex: -1,
+        error: '',
+        maxTags,
+
+        onInput() {
+            this.error = '';
+            const q = this.inputValue.trim().toLowerCase();
+            const taken = new Set(this.selected.map(t => (t.slug || t.name).toLowerCase()));
+            this.suggestions = accepted
+                .filter(t => !taken.has(t.slug.toLowerCase()) && !taken.has(t.name.toLowerCase()))
+                .filter(t => !q || t.name.toLowerCase().includes(q) || t.slug.toLowerCase().includes(q))
+                .slice(0, 8);
+            this.showSuggestions = true;
+            this.highlightIndex = this.suggestions.length > 0 ? 0 : -1;
+        },
+
+        moveHighlight(delta) {
+            if (!this.showSuggestions || this.suggestions.length === 0) return;
+            this.highlightIndex = (this.highlightIndex + delta + this.suggestions.length) % this.suggestions.length;
+        },
+
+        closeSuggestions() {
+            this.showSuggestions = false;
+            this.highlightIndex = -1;
+        },
+
+        validateName(name) {
+            const n = name.trim();
+            if (n.length < 2)  return 'Тег тым қысқа (минимум 2 таңба).';
+            if (n.length > 30) return 'Тег тым ұзын (максимум 30 таңба).';
+            if (blockedSet.has(n.toLowerCase())) return '«' + n + '» тегін қолдануға болмайды.';
+            const dup = this.selected.find(t =>
+                (t.name || '').toLowerCase() === n.toLowerCase() ||
+                (t.slug || '').toLowerCase() === n.toLowerCase()
+            );
+            if (dup) return 'Бұл тег қазірдің өзінде қосылған.';
+            if (this.selected.length >= this.maxTags) return 'Максимум ' + this.maxTags + ' тег.';
+            return '';
+        },
+
+        addExisting(t) {
+            const err = this.validateName(t.name);
+            if (err) { this.error = err; return; }
+            this.selected.push({ slug: t.slug, name: t.name, status: 'accepted' });
+            this.inputValue = '';
+            this.suggestions = [];
+            this.showSuggestions = false;
+            this.highlightIndex = -1;
+            this.$refs.input.focus();
+        },
+
+        addCurrent() {
+            if (this.highlightIndex >= 0 && this.suggestions[this.highlightIndex]) {
+                this.addExisting(this.suggestions[this.highlightIndex]);
+                return;
+            }
+            const raw = this.inputValue.trim();
+            if (!raw) return;
+            const err = this.validateName(raw);
+            if (err) { this.error = err; return; }
+            const exact = accepted.find(t =>
+                t.name.toLowerCase() === raw.toLowerCase() ||
+                t.slug.toLowerCase() === raw.toLowerCase()
+            );
+            if (exact) { this.addExisting(exact); return; }
+            // Новый тег: backend создаст Tag(status=pending) после submit
+            this.selected.push({ slug: '', name: raw, status: 'new' });
+            this.inputValue = '';
+            this.suggestions = [];
+            this.showSuggestions = false;
+        },
+
+        onBackspace() {
+            if (this.inputValue === '' && this.selected.length > 0) {
+                this.selected.pop();
+                this.error = '';
+            }
+        },
+
+        remove(idx) {
+            this.selected.splice(idx, 1);
+            this.error = '';
+        },
+    };
+}
+</script>
+{% endwith %}

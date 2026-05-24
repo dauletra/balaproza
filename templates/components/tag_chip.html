@@ -1,0 +1,29 @@
+{% comment %}
+    TagChip (docs/11.6). Нейтральный slate-чип для UGC-тега.
+    Отличается от цветного `genre_chip` (OKLCH per-genre) намеренно —
+    жанры и теги визуально не должны конкурировать.
+
+    Параметры:
+      tag   — объект Tag (имеет .slug, .name, .status)
+      href  — куда вести (default: /tag/<slug>/ для accepted; '#' для pending)
+      size  — 'sm' (h-7 text-xs, default) | 'md' (h-8 text-sm)
+
+    Pending-статус определяется автоматически по tag.status.
+    Фильтрация видимости pending для нечитающего автора — в `tag_list.html`.
+{% endcomment %}
+{% with sz=size|default:"sm" %}
+{# Для accepted-тегов генерируем URL; для pending — link останется undefined и firstof отдаст '#' #}
+{% if tag.status == 'accepted' %}{% url 'core:tag_detail' slug=tag.slug as accepted_link %}{% endif %}
+<a href="{% firstof href accepted_link '#' %}"
+   class="inline-flex items-center gap-1.5 rounded-pill border font-sans transition-colors
+          {% if tag.status == 'pending' %}border-dashed border-slate-300 bg-slate-50 text-slate-500{% else %}border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}
+          {% if sz == 'md' %}h-8 px-3 text-sm{% else %}h-7 px-2.5 text-xs{% endif %}">
+    <span class="opacity-60">#</span>{{ tag.name }}
+    {% if tag.status == 'pending' %}
+        <span class="ml-0.5 rounded-chip bg-slate-200 px-1.5 py-0.5 font-display text-[9px] font-bold uppercase tracking-wider text-slate-500"
+              title="Модератор тексеруінде">
+            проверкада
+        </span>
+    {% endif %}
+</a>
+{% endwith %}
