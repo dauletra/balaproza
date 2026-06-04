@@ -280,26 +280,6 @@ def story_detail(request, slug):
     })
 
 
-def story_read(request, slug):
-    return story_read_chapter(request, slug, 1)
-
-
-def story_read_chapter(request, slug, chapter):
-    story = _story_or_stub(slug)
-    chapters = stub_data.chapters_of(slug)
-    current = stub_data.chapter_of(slug, chapter)
-    # Если конкретной главы нет (или нет глав вовсе) — отдадим заглушку
-    return render(request, 'pages/story/story_read.html', {
-        'slug':       slug,
-        'story':      story,
-        'chapter':    chapter,
-        'chapters':   chapters,
-        'current':    current,
-        'has_prev':   chapter > 1,
-        'has_next':   bool(chapters) and chapter < len(chapters),
-    })
-
-
 # ───────────────────────── WRITE — авторский кабинет ─────────────────────
 def _current_username(request) -> str:
     """Имя из фейк-сессии (см. core.views.login_view). Для гостя — ''."""

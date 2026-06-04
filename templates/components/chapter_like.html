@@ -10,7 +10,7 @@
       signed_in     — boolean, для гостя клик ведёт на login
       login_href    — URL для гостя (default {% url 'core:login' %})
       theme_aware   — boolean, поддерживает ли родитель Alpine theme='dark'
-                      (true для story_read, false для остальных)
+                      (опциональный, используется в тёмных контекстах)
 
     Локальное состояние Alpine: реактивно toggle'ит liked/likes на клиенте.
     После Ф14 — реальный submit к /api/chapter/<id>/like.

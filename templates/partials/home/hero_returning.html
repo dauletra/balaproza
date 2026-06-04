@@ -17,7 +17,7 @@
         <div class="relative grid grid-cols-1 gap-6 px-7 py-7 sm:grid-cols-[160px_1fr] md:grid-cols-[200px_1fr] md:gap-8 md:px-10 md:py-9">
 
             {# ── Обложка ── #}
-            <a href="{% url 'core:story_read_chapter' slug=story.slug chapter=progress.current_chapter %}"
+            <a href="{% url 'core:story_detail' slug=story.slug %}?chapter={{ progress.current_chapter }}#chapter-{{ progress.current_chapter }}"
                class="group block">
                 {% include "components/cover_placeholder.html" with story=story cls="aspect-[2/3] w-full max-w-[160px] mx-auto rounded-md shadow-card-hover transition-transform group-hover:-translate-y-0.5" letter_cls="text-7xl" %}
             </a>
@@ -56,8 +56,12 @@
 
                 {# CTA: одна основная кнопка + вторичная inline-ссылка #}
                 <div class="mt-1 flex flex-wrap items-center gap-4">
-                    {% url 'core:story_read_chapter' slug=story.slug chapter=progress.current_chapter as continue_href %}
+                    {% with chap=progress.current_chapter|stringformat:"d" %}
+                    {% url 'core:story_detail' slug=story.slug as detail_base %}
+                    {% with continue_href=detail_base|add:"?chapter="|add:chap|add:"#chapter-"|add:chap %}
                     {% include "components/button.html" with kind="primary" size="lg" label="Жалғастыру" icon="book" href=continue_href %}
+                    {% endwith %}
+                    {% endwith %}
                     <a href="{% url 'core:genre_index' %}"
                        class="inline-flex items-center gap-1 font-sans text-sm font-semibold text-slate-700 hover:text-brand">
                         Басқа шығарма табу

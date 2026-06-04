@@ -79,11 +79,14 @@
                                class="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700">
                                 {% include "components/icon.html" with name="pen" size=14 %}
                             </a>
-                            <a href="{% url 'core:story_read_chapter' slug=story.slug chapter=c.number %}"
+                            {% with chap=c.number|stringformat:"d" %}
+                            {% url 'core:story_detail' slug=story.slug as detail_base %}
+                            <a href="{{ detail_base }}?chapter={{ chap }}#chapter-{{ chap }}"
                                aria-label="Сайтта қарау" target="_blank"
                                class="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700">
                                 {% include "components/icon.html" with name="eye" size=14 %}
                             </a>
+                            {% endwith %}
                         </div>
                     </li>
                 {% endfor %}

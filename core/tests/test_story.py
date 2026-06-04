@@ -1,4 +1,4 @@
-"""STORY-модуль: detail и reading.
+"""STORY-модуль: detail с inline-чтением глав.
 
 Покрываем:
  - валидный/невалидный slug;
@@ -7,8 +7,7 @@
  - per-chapter комментарии под текстом главы;
  - gate для комментариев у гостя, форма для авторизованного;
  - ReportModal-триггер только для авторизованного;
- - прогресс чтения отображается только если slug совпадает с SAMPLE_PROGRESS;
- - reading (fullscreen): prev/next ссылки и попавер настроек.
+ - прогресс чтения отображается только если slug совпадает с SAMPLE_PROGRESS.
 """
 
 from django.test import TestCase
@@ -75,9 +74,8 @@ class StoryDetailValidSlug(TestCase):
 
     def test_no_read_button(self):
         """Кнопка «Оқу» удалена — чтение происходит inline."""
-        # На detail-странице не должно быть ссылки на fullscreen-читалку
-        read_url = reverse('core:story_read', kwargs={'slug': STORY_SLUG})
-        self.assertNotContains(self.response, f'href="{read_url}"')
+        # Старого пути /read/ нигде в шаблоне быть не должно
+        self.assertNotContains(self.response, f'/story/{STORY_SLUG}/read/')
 
     def test_right_rail_chapter_links_use_query(self):
         """Список глав в рейле ведёт на ?chapter=N (а не на /read/N/)."""
@@ -210,66 +208,6 @@ class StoryDetailReadingProgress(TestCase):
     def test_guest_no_progress_indicator(self):
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
         self.assertNotContains(r, 'Оқылды:')
-
-
-class StoryReadKnownChapter(TestCase):
-
-    def setUp(self):
-        self.url = reverse('core:story_read_chapter', kwargs={'slug': STORY_SLUG, 'chapter': 4})
-        self.response = self.client.get(self.url)
-
-    def test_200(self):
-        self.assertEqual(self.response.status_code, 200)
-
-    def test_renders_chapter_title_and_some_body(self):
-        chapter = stub_data.chapter_of(STORY_SLUG, 4)
-        self.assertContains(self.response, chapter.title)
-        # тело главы — длинный текст, проверим первое предложение
-        self.assertContains(self.response, 'Бірде ерте таңда')
-
-    def test_has_back_to_story_link(self):
-        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG})
-        self.assertContains(self.response, f'href="{url}"')
-
-    def test_has_prev_and_next_links_for_middle_chapter(self):
-        prev_url = reverse('core:story_read_chapter', kwargs={'slug': STORY_SLUG, 'chapter': 3})
-        next_url = reverse('core:story_read_chapter', kwargs={'slug': STORY_SLUG, 'chapter': 5})
-        self.assertContains(self.response, f'href="{prev_url}"')
-        self.assertContains(self.response, f'href="{next_url}"')
-
-
-class StoryReadEdgeChapters(TestCase):
-
-    def test_first_chapter_has_no_prev_link(self):
-        r = self.client.get(reverse('core:story_read_chapter', kwargs={'slug': STORY_SLUG, 'chapter': 1}))
-        # «Алдыңғы бөлім» не должно быть
-        self.assertNotContains(r, 'Алдыңғы бөлім')
-        # Зато «Келесі бөлім» есть
-        self.assertContains(r, 'Келесі бөлім')
-
-    def test_last_chapter_has_no_next_link(self):
-        last = len(stub_data.chapters_of(STORY_SLUG))
-        r = self.client.get(reverse('core:story_read_chapter', kwargs={'slug': STORY_SLUG, 'chapter': last}))
-        self.assertContains(r, 'Алдыңғы бөлім')
-        self.assertNotContains(r, 'Келесі бөлім')
-
-
-class StoryReadUnknownChapter(TestCase):
-
-    def test_chapter_out_of_range_renders_not_found(self):
-        r = self.client.get(reverse('core:story_read_chapter', kwargs={'slug': STORY_SLUG, 'chapter': 999}))
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'Бөлім табылмады')
-
-
-class StoryReadHasSettingsPopover(TestCase):
-
-    def test_popover_listens_for_reader_settings_event(self):
-        r = self.client.get(reverse('core:story_read', kwargs={'slug': STORY_SLUG}))
-        # Wrapper читалки реагирует на событие reader-settings
-        self.assertContains(r, 'reader-settings')
-        # Popover содержит триггерную aria
-        self.assertContains(r, 'Оқу баптаулары')
 
 
 class StoryDetailTags(TestCase):

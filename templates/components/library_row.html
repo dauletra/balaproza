@@ -37,15 +37,19 @@
                 <span class="font-sans text-xs text-slate-600">
                     {{ entry.progress_chapter }} / {{ entry.story.chapters }} бөлім
                 </span>
-                {% url 'core:story_read_chapter' slug=entry.story.slug chapter=entry.progress_chapter as cont_href %}
+                {% with chap=entry.progress_chapter|stringformat:"d" %}
+                {% url 'core:story_detail' slug=entry.story.slug as detail_base %}
+                {% with cont_href=detail_base|add:"?chapter="|add:chap|add:"#chapter-"|add:chap %}
                 {% include "components/button.html" with kind="primary" label="Жалғастыру" icon_right="arrow-right" href=cont_href %}
+                {% endwith %}
+                {% endwith %}
             {% elif entry.kind == "saved" %}
                 <span class="font-sans text-xs text-slate-600">{{ entry.story.chapters }} бөлім</span>
-                {% url 'core:story_read' slug=entry.story.slug as read_href %}
+                {% url 'core:story_detail' slug=entry.story.slug as read_href %}
                 {% include "components/button.html" with kind="secondary" label="Оқу" icon="book" href=read_href %}
             {% elif entry.kind == "done" %}
                 <span class="font-sans text-xs text-status-info-fg">Оқылды · {{ entry.story.chapters }} бөлім</span>
-                {% url 'core:story_read' slug=entry.story.slug as reread_href %}
+                {% url 'core:story_detail' slug=entry.story.slug as reread_href %}
                 {% include "components/button.html" with kind="secondary" label="Қайта оқу" href=reread_href %}
             {% endif %}
         </div>

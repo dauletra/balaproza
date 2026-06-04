@@ -25,8 +25,6 @@ PUBLIC_URLS = [
     ('core:collections',       {},                                'collections'),
     ('core:collection_detail', {'slug': 'zhas-zhurek'},           'collection-detail'),
     ('core:story_detail',      {'slug': 'dalney-berega'},         'story-detail'),
-    ('core:story_read',        {'slug': 'dalney-berega'},         'story-read'),
-    ('core:story_read_chapter',{'slug': 'dalney-berega', 'chapter': 4}, 'story-read-chapter'),
     ('core:my_stories',        {},                                'my-stories'),
     ('core:new_story',         {},                                'new-story'),
     ('core:manage_story',      {'slug': 'sample'},                'manage-story'),

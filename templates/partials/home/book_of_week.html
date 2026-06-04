@@ -47,7 +47,7 @@
             </blockquote>
 
             <div class="mt-1 flex items-center gap-3">
-                {% url 'core:story_read' slug=story.slug as read_href %}
+                {% url 'core:story_detail' slug=story.slug as read_href %}
                 {% include "components/button.html" with kind="primary" label="Оқуды бастау" icon="book" href=read_href %}
                 <span class="font-sans text-xs text-slate-600">
                     {{ story.views|stringformat:"d" }} оқыды · {{ story.likes|stringformat:"d" }} ұнатты

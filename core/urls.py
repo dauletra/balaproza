@@ -23,10 +23,8 @@ urlpatterns = [
     path('collections/', views.collections, name='collections'),
     path('collections/<slug:slug>/', views.collection_detail, name='collection_detail'),
 
-    # STORY — произведение и чтение
+    # STORY — произведение (чтение глав происходит inline через ?chapter=N)
     path('story/<slug:slug>/', views.story_detail, name='story_detail'),
-    path('story/<slug:slug>/read/', views.story_read, name='story_read'),
-    path('story/<slug:slug>/read/<int:chapter>/', views.story_read_chapter, name='story_read_chapter'),
 
     # WRITE — авторский кабинет
     path('write/', views.my_stories, name='my_stories'),
