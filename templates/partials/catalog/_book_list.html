@@ -10,7 +10,7 @@
 {% if results %}
     <div class="flex flex-col gap-3">
         {% for s in results %}
-            {% include "components/book_card_wide.html" with story=s %}
+            {% include "components/book_card_wide.html" with story=s description=s.annotation|truncatechars:170 %}
         {% endfor %}
     </div>
 {% else %}

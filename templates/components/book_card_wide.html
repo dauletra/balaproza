@@ -38,11 +38,18 @@
                 {% for g in story.genres_resolved %}
                     {% include "components/genre_chip.html" with genre=g size="sm" %}
                 {% endfor %}
+                {% for badge in story.badges %}
+                    <span class="font-sans text-[11px] font-bold text-brand-dark">{{ badge }}</span>
+                {% endfor %}
             </div>
         {% endif %}
 
         {% if description %}
             <p class="line-clamp-4 font-sans text-[13px] leading-snug text-slate-600">{{ description }}</p>
+        {% endif %}
+
+        {% if story.tags_resolved %}
+            {% include "components/tag_list.html" with tags=story.tags_resolved|slice:":3" viewer_is_author=False size="sm" %}
         {% endif %}
 
         {# Метрики внизу #}

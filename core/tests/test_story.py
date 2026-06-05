@@ -83,6 +83,11 @@ class StoryDetailValidSlug(TestCase):
             with self.subTest(chapter=c.number):
                 self.assertContains(self.response, f'?chapter={c.number}')
 
+    def test_mobile_chapter_selector_present(self):
+        """На mobile список глав доступен в основном контенте, потому что right rail скрыт."""
+        self.assertContains(self.response, 'aria-label="Мобильді бөлімдер"')
+        self.assertContains(self.response, '<summary', html=False)
+
     def test_next_chapter_link_present(self):
         """На гл.1 есть ссылка «Келесі бөлім» через ?chapter=2."""
         self.assertContains(self.response, 'Келесі бөлім')

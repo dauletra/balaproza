@@ -96,7 +96,7 @@ class SignupSuccessPage(TestCase):
     def test_has_all_four_onboarding_cards(self):
         # FR-AUTH-03 → онбординг с 4 направлениями
         self.assertContains(self.response, reverse('core:new_story'))
-        self.assertContains(self.response, reverse('core:genre_index'))
+        self.assertContains(self.response, reverse('core:catalog'))
         self.assertContains(self.response, reverse('core:profile_me'))
         self.assertContains(self.response, reverse('core:contest_list'))
 

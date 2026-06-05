@@ -2,7 +2,7 @@ from . import stub_data
 
 
 def auth_state(request):
-    """Гость ↔ авторизованный для шаблонов (используется header/sidebar/nav).
+    """Гость ↔ авторизованный для шаблонов (используется header/mobile-nav/right-rail).
     Никаких моделей: только session-флаг, выставленный в core.views.login_view.
     """
     is_in = bool(request.session.get('signed_in'))
@@ -37,7 +37,7 @@ def nav_state(request):
         active = 'profile'
     elif p.startswith('/contests'):
         active = 'contests'
-    elif p.startswith('/genres') or p.startswith('/collections') or p.startswith('/search'):
+    elif p.startswith('/catalog') or p.startswith('/genres') or p.startswith('/collections') or p.startswith('/search'):
         active = 'catalog'
     elif p.startswith('/story'):
         active = 'story'

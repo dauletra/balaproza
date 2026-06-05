@@ -29,26 +29,10 @@
         {% elif page_state == 'error' %}
             {% include "components/error_state.html" with message="Басты бет контентін жүктеу мүмкін болмады." %}
         {% else %}
-            {# ── Кітап аптасы (FR-HOME-03) ── #}
             {% include "partials/home/book_of_week.html" %}
 
-            {# ── Ряд 1: Ең көп оқылған (FR-HOME-04) ── #}
             {% include "partials/home/book_row.html" with title="Ең көп оқылған кітаптар" books=top_stories %}
-
-            {# ── Жинақтар (FR-HOME-06) — настроенческие подборки ── #}
-            {% include "partials/home/collections.html" %}
-
-            {# ── Ряд 2: Жаңа жарияланған — с eyebrow, чтобы визуально отличался от ряда 1 ── #}
-            {% include "partials/home/book_row.html" with title="Жаңа жарияланған шығармалар" eyebrow="апта ішінде" books=fresh_stories %}
         {% endif %}
-
-        {# ── Жаңа авторлар (FR-HOME-07) ── #}
-        {% include "partials/home/new_authors.html" %}
-
-        {# Школа авторов представлена в правом рейле и footer (DEC: дубль убран) #}
-
-        {# ── CTA «Стань автором» (FR-HOME-08) ── #}
-        {% include "partials/home/become_author.html" %}
     </div>
 {% endblock %}
 

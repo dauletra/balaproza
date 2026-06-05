@@ -31,12 +31,8 @@ def home(request):
         'hero_contest':    stub_data.HERO_CONTEST,
         'book_of_week':    stub_data.BOOK_OF_WEEK,
         'genres':          stub_data.GENRES,
-        'top_stories':     stub_data.STORIES,
-        'fresh_stories':   list(reversed(stub_data.STORIES)),
-        'collections':     stub_data.COLLECTIONS,
-        'new_authors':     stub_data.AUTHORS[1:5],   # без «Рудазова» — он книга недели
+        'top_stories':     stub_data.STORIES[:6],
         'school_links':    stub_data.SCHOOL_LINKS,
-        'platform_stats':  stub_data.PLATFORM_STATS,
     })
 
 
@@ -387,7 +383,7 @@ def profile_me(request):
         'followers':       stub_data.followers_of(username) if username else [],
         'following':       stub_data.following_of(username) if username else [],
         'new_story_href':  reverse('core:new_story'),
-        'catalog_href':    reverse('core:genre_index'),
+        'catalog_href':    reverse('core:catalog'),
     })
 
 
@@ -453,7 +449,7 @@ def library(request):
         'tab':          tab,
         'lib_items':    items,
         'entries':      entries,
-        'catalog_href': reverse('core:genre_index'),
+        'catalog_href': reverse('core:catalog'),
     })
 
 

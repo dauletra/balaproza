@@ -13,13 +13,10 @@
 {% endcomment %}
 {% with sz=size|default:"sm" %}
 <a href="{{ href|default:'#' }}"
-   class="inline-flex items-center rounded-pill border font-sans font-semibold transition-shadow hover:shadow-card-hover
-          {% if sz == 'md' %}h-8 px-3.5 text-sm{% else %}h-7 px-3 text-xs{% endif %}"
-   style="
-       background: oklch(0.96 0.04 {{ genre.hue }});
-       color:      oklch(0.38 0.14 {{ genre.hue }});
-       border-color: oklch(0.86 0.08 {{ genre.hue }});
-   ">
+   class="inline-flex items-center gap-1.5 font-sans font-semibold transition-colors hover:text-brand-dark
+          {% if sz == 'md' %}text-sm{% else %}text-xs{% endif %}"
+   style="color: oklch(0.38 0.14 {{ genre.hue }});">
+    <span aria-hidden="true" class="h-1.5 w-1.5 rounded-pill" style="background: oklch(0.55 0.14 {{ genre.hue }});"></span>
     {{ genre.name }}
 </a>
 {% endwith %}

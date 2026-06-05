@@ -71,9 +71,9 @@ class MyStoriesAuthedHasItems(TestCase):
 
     def test_shows_status_badges_for_each(self):
         # 4 status'а: Published, OnProcess, OnModeration, Completed → разные тексты
-        self.assertContains(self.response, 'Жарияланған')
+        self.assertContains(self.response, 'Жарияланды')
         self.assertContains(self.response, 'Жазылып жатыр')
-        self.assertContains(self.response, 'Тексеруде')
+        self.assertContains(self.response, 'Модерацияда')
         self.assertContains(self.response, 'Аяқталды')
 
     def test_does_not_show_empty_state(self):
@@ -166,8 +166,8 @@ class ManageStoryKnown(TestCase):
     def test_shows_title_and_status(self):
         story = stub_data.STORIES_BY_SLUG[self.SLUG]
         self.assertContains(self.response, story.title)
-        # У aidana-tan статус Published → бейдж «Жарияланған»
-        self.assertContains(self.response, 'Жарияланған')
+        # У aidana-tan статус Published → бейдж «Жарияланды»
+        self.assertContains(self.response, 'Жарияланды')
 
     def test_lists_each_chapter_with_edit_link(self):
         chapters = stub_data.chapters_of(self.SLUG)

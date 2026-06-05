@@ -6,13 +6,13 @@
       key — Published | NotPublished | OnProcess | Completed | OnModeration
 {% endcomment %}
 {% if key == "Published" %}
-    {% include "components/badge.html" with kind="published" label="Жарияланған" icon="check" %}
+    {% include "components/badge.html" with kind="published" label="Жарияланды" icon="check" %}
 {% elif key == "NotPublished" %}
-    {% include "components/badge.html" with kind="error" label="Жарияланбаған" %}
+    {% include "components/badge.html" with kind="error" label="Жоба" %}
 {% elif key == "OnProcess" %}
     {% include "components/badge.html" with kind="warning" label="Жазылып жатыр" %}
 {% elif key == "Completed" %}
     {% include "components/badge.html" with kind="info" label="Аяқталды" icon="check" %}
 {% elif key == "OnModeration" %}
-    {% include "components/badge.html" with kind="attention" label="Тексеруде" %}
+    {% include "components/badge.html" with kind="attention" label="Модерацияда" %}
 {% endif %}

@@ -38,6 +38,10 @@ class HomeGuestMode(TestCase):
         self.assertNotContains(self.response, 'Менің заявкаларым')
         self.assertNotContains(self.response, 'Менің шығармаларым')
 
+    def test_mobile_guest_reading_entry_goes_to_catalog(self):
+        self.assertContains(self.response, reverse('core:catalog'))
+        self.assertContains(self.response, 'aria-label="Оқу"')
+
 
 class HomeAuthedMode(TestCase):
 
@@ -59,7 +63,7 @@ class HomeAuthedMode(TestCase):
         """Авторизованный возвращающийся видит «Жалғастыру оқу»."""
         self.assertContains(self.response, 'Жалғастыру')
 
-    def test_shows_private_sidebar_items(self):
+    def test_shows_private_nav_items(self):
         # Хотя бы один из приватных пунктов должен присутствовать как ссылка.
         self.assertContains(self.response, 'Хабарламалар')
 

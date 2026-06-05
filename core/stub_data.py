@@ -160,6 +160,8 @@ class Story:
     # UGC-теги (docs/11, BR-TAG-01): до 10 slug-ов на произведение.
     # Pending фильтруются в шаблоне tag_list.html по viewer_is_author (BR-TAG-07).
     tags: tuple = ()
+    audience: str = "10+"
+    badges: tuple = ()
 
     @property
     def author(self) -> Author:
@@ -174,14 +176,19 @@ class Story:
         """Все жанры произведения как объекты Genre, фильтруя None."""
         return [GENRES_BY_SLUG[s] for s in self.genres if s and s in GENRES_BY_SLUG]
 
+    @property
+    def tags_resolved(self) -> list:
+        """UGC-теги произведения как объекты Tag."""
+        return tags_of(self)
+
 
 STORIES = [
-    Story("dalney-berega",  "Алыс жағалауларда",     "sayyn",      "ipad_19b0bc4bcd9c1a1dc4c3cc12cf20dce5.webp", ("fantastika",  None),         12, 12482, 4821, 312, status="Published", tags=("arman", "sayahat", "jasospirim")),
-    Story("temniy-lord",    "Күңгірт мырза",         "bekzhan_t",  "ipad_42f033cf1b9a2bcad744d05b9d429609.webp", ("fantezi",     "horror"),      8,  8920, 2440, 156, status="Published", tags=("mistika", "arman", "basqa-alem")),
-    Story("igra-kuklovoda", "Қуыршақшының ойыны",    "dina_books", "ipad_499539963221e0fe36b0888bf8601067.webp", ("triller",     "drama"),      15, 18102, 6230, 421, status="Published", tags=("mistika", "jasospirim", "detektiv-jas")),
-    Story("kronchessii",    "Тас уәделер",           "rudazov",    "ipad_5916b4e19c616e74d008125ba9a1be8e.webp", ("shyttyrman",  "fantezi"),    24, 32540, 11200, 890, status="Published", tags=("sayahat", "arman", "syikyr-akademiya")),
-    Story("arhimag",        "Сиқыршы: бөтен әлемдер","rudazov",    "ipad_940e074d12d6c3657199601ca568f1b3.jpg",  ("fantezi",     "shyttyrman"), 12, 12482, 4821, 312, status="Published", tags=("syikyr-akademiya", "arman", "dostyk", "jasospirim", "mektep")),
-    Story("sila-imperii",   "Империя құдіреті",      "aygerim_k",  "ipad_992f1631a421d74ed5e1aa72717df374.webp", ("tarih",       "drama"),      18, 14200, 3890, 245, status="Published", tags=("arman", "jasospirim")),
+    Story("dalney-berega",  "Алыс жағалауларда",     "sayyn",      "ipad_19b0bc4bcd9c1a1dc4c3cc12cf20dce5.webp", ("fantastika",  None),         12, 12482, 4821, 312, status="Published", annotation="Үш дос жоғалған жолды іздеп шығады. Таудағы сапар оларды өз қорқынышымен, достықпен және белгісіз ауылдың құпиясымен беттестіреді.", tags=("arman", "sayahat", "jasospirim"), audience="10+", badges=("Редакция таңдауы",)),
+    Story("temniy-lord",    "Күңгірт мырза",         "bekzhan_t",  "ipad_42f033cf1b9a2bcad744d05b9d429609.webp", ("fantezi",     "horror"),      8,  8920, 2440, 156, status="Published", annotation="Қараңғы патшалыққа түскен жас кейіпкер биліктің бағасын түсіне бастайды. Сиқыр, қорқыныш және таңдау туралы фэнтези.", tags=("mistika", "arman", "basqa-alem"), audience="14+"),
+    Story("igra-kuklovoda", "Қуыршақшының ойыны",    "dina_books", "ipad_499539963221e0fe36b0888bf8601067.webp", ("triller",     "drama"),      15, 18102, 6230, 421, status="Published", annotation="Мектептегі тыныш күндер бір жұмбақ ойыннан кейін өзгереді. Әр белгі жаңа күдікке апарады, ал шындық жақын жерде жасырынып тұр.", tags=("mistika", "jasospirim", "detektiv-jas"), audience="14+", badges=("Байқауға қатысады",)),
+    Story("kronchessii",    "Тас уәделер",           "rudazov",    "ipad_5916b4e19c616e74d008125ba9a1be8e.webp", ("shyttyrman",  "fantezi"),    24, 32540, 11200, 890, status="Published", annotation="Ескі қала қабырғаларындағы тасқа қашалған уәделер оянады. Кейіпкерлер өткеннің шартын бұзбай, болашақты сақтауға тырысады.", tags=("sayahat", "arman", "syikyr-akademiya")),
+    Story("arhimag",        "Сиқыршы: бөтен әлемдер","rudazov",    "ipad_940e074d12d6c3657199601ca568f1b3.jpg",  ("fantezi",     "shyttyrman"), 12, 12482, 4821, 312, status="Published", annotation="Жас сиқыршы бөтен әлемдердің есігін ашқанда, әр әлем өз ережесін ұсынады. Үйге қайту үшін ол күштен бұрын жауапкершілікті үйренеді.", tags=("syikyr-akademiya", "arman", "dostyk", "jasospirim", "mektep")),
+    Story("sila-imperii",   "Империя құдіреті",      "aygerim_k",  "ipad_992f1631a421d74ed5e1aa72717df374.webp", ("tarih",       "drama"),      18, 14200, 3890, 245, status="Published", annotation="Көне империяның шетінде өскен жас батыр тарихтың үлкен толқынына түседі. Бұл шығарма билік, адалдық және ел алдындағы таңдау туралы.", tags=("arman", "jasospirim")),
 
     # ─ Произведения демо-пользователя «Айдана» (для WRITE-страниц) ─
     Story(

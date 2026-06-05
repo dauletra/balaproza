@@ -27,7 +27,7 @@
         <div class="flex shrink-0 flex-wrap items-center gap-2">
             {% if not signed_in %}
                 <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}"
-                   class="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-5 font-sans text-sm font-bold text-white hover:bg-brand-dark">
+                   class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:border-brand hover:text-brand">
                     {% include "components/icon.html" with name="plus" size=16 %}
                     Жазылу
                 </a>
@@ -46,7 +46,7 @@
                       @submit.prevent="$dispatch('toast', { kind:'success', text:'Жазылдыңыз (демо)' })">
                     {% csrf_token %}
                     <button type="submit"
-                            class="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-5 font-sans text-sm font-bold text-white hover:bg-brand-dark">
+                            class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:border-brand hover:text-brand">
                         {% include "components/icon.html" with name="plus" size=16 %}
                         Жазылу
                     </button>

@@ -54,6 +54,7 @@ class NavState(TestCase):
         ('/u/rudazov/',             'profile'),
         ('/contests/',              'contests'),
         ('/contests/altyn-qalam/',  'contests'),
+        ('/catalog/',               'catalog'),
         ('/genres/',                'catalog'),
         ('/collections/',           'catalog'),
         ('/search/',                'catalog'),

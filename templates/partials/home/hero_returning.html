@@ -1,8 +1,8 @@
 {% comment %}
     Hero для авторизованного (FR-HOME-01).
     Двухрежимный:
-      • Если есть progress — «Жалғастырайық»: крупная обложка, прогресс,
-        CTA на чтение. Фон тонируется hue текущей истории.
+      • Если есть progress — компактный resume-блок: маленькая обложка, название,
+        прогресс и CTA на чтение.
       • Если progress нет — «Бүгін не оқисың?» + жанр-чипы (нейтральный slate).
 
     Контекст: progress (опц., ReadingProgress), genres, current_user_name
@@ -10,78 +10,64 @@
 
 {% if progress %}
     {% with story=progress.story %}
-    {% with hue=story.primary_genre.hue|default:195 %}
-    <section class="relative overflow-hidden rounded-hero border border-slate-200"
-             style="background: linear-gradient(135deg, oklch(0.97 0.03 {{ hue }}) 0%, oklch(0.93 0.05 {{ hue }}) 100%);">
-
-        <div class="relative grid grid-cols-1 gap-6 px-7 py-7 sm:grid-cols-[160px_1fr] md:grid-cols-[200px_1fr] md:gap-8 md:px-10 md:py-9">
-
-            {# ── Обложка ── #}
-            <a href="{% url 'core:story_detail' slug=story.slug %}?chapter={{ progress.current_chapter }}#chapter-{{ progress.current_chapter }}"
-               class="group block">
-                {% include "components/cover_placeholder.html" with story=story cls="aspect-[2/3] w-full max-w-[160px] mx-auto rounded-md shadow-card-hover transition-transform group-hover:-translate-y-0.5" letter_cls="text-7xl" %}
+    {% with chap=progress.current_chapter|stringformat:"d" %}
+    {% url 'core:story_detail' slug=story.slug as detail_base %}
+    {% with continue_href=detail_base|add:"?chapter="|add:chap|add:"#chapter-"|add:chap %}
+    <section class="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
+        <div class="flex items-center gap-4">
+            <a href="{{ continue_href }}" class="group shrink-0" aria-label="«{{ story.title }}» оқуды жалғастыру">
+                {% include "components/cover_placeholder.html" with story=story cls="aspect-[2/3] w-[58px] rounded-md shadow-sm transition-transform group-hover:-translate-y-0.5 sm:w-[68px]" letter_cls="text-3xl sm:text-4xl" %}
             </a>
 
-            {# ── Контент ── #}
-            <div class="flex min-w-0 flex-col gap-3">
-                <div class="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-brand">
-                    Қайта қош келдіңіз{% if current_user_name %}, {{ current_user_name }}{% endif %}
+            <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span class="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-brand">Оқу үстінде</span>
+                    <span class="font-sans text-xs text-slate-500">{{ progress.current_chapter }} / {{ story.chapters }} бөлім</span>
                 </div>
 
-                <h1 class="font-sans text-[24px] font-bold leading-[1.15] -tracking-[0.01em] text-slate-900 md:text-[30px]">
-                    Жалғастырайық — <span class="text-brand">{{ progress.current_chapter }}-бөлім</span> сізді күтуде.
-                </h1>
+                <a href="{{ continue_href }}" class="mt-1 block truncate font-sans text-base font-bold leading-snug text-slate-900 hover:text-brand sm:text-lg">
+                    {{ story.title }}
+                </a>
 
-                <div class="flex flex-wrap items-center gap-2">
-                    {% include "components/genre_chip.html" with genre=story.primary_genre size="sm" %}
-                    <span class="font-sans text-xs text-slate-600">{{ story.author.name }}</span>
+                <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-sans text-xs text-slate-500">
+                    <span class="truncate">{{ story.author.name }}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{{ progress.minutes_left }} минут</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{{ progress.last_read_days }} күн бұрын</span>
                 </div>
 
-                <div class="font-sans text-base font-bold leading-snug text-slate-900 md:text-lg">
-                    «{{ story.title }}»
-                </div>
-
-                {# Progress bar #}
                 {% widthratio progress.current_chapter story.chapters 100 as pct %}
-                <div>
-                    <div class="h-1.5 overflow-hidden rounded-pill bg-white/70">
-                        <div class="h-full bg-brand" style="width: {{ pct }}%"></div>
-                    </div>
-                    <div class="mt-1.5 font-sans text-xs text-slate-600">
-                        {{ progress.current_chapter }} / {{ story.chapters }} бөлім
-                        · шамамен {{ progress.minutes_left }} минут
-                        · {{ progress.last_read_days }} күн бұрын
-                    </div>
+                <div class="mt-3 h-1 overflow-hidden rounded-pill bg-slate-200">
+                    <div class="h-full bg-brand" style="width: {{ pct }}%"></div>
                 </div>
-
-                {# CTA: одна основная кнопка + вторичная inline-ссылка #}
-                <div class="mt-1 flex flex-wrap items-center gap-4">
-                    {% with chap=progress.current_chapter|stringformat:"d" %}
-                    {% url 'core:story_detail' slug=story.slug as detail_base %}
-                    {% with continue_href=detail_base|add:"?chapter="|add:chap|add:"#chapter-"|add:chap %}
-                    {% include "components/button.html" with kind="primary" size="lg" label="Жалғастыру" icon="book" href=continue_href %}
-                    {% endwith %}
-                    {% endwith %}
-                    <a href="{% url 'core:genre_index' %}"
-                       class="inline-flex items-center gap-1 font-sans text-sm font-semibold text-slate-700 hover:text-brand">
-                        Басқа шығарма табу
-                        {% include "components/icon.html" with name="arrow-right" size=14 %}
-                    </a>
-                </div>
-
             </div>
+
+            <a href="{{ continue_href }}"
+               class="hidden h-9 shrink-0 items-center gap-1.5 rounded-md bg-brand px-3 font-sans text-sm font-semibold text-white hover:bg-brand-dark sm:inline-flex">
+                {% include "components/icon.html" with name="book" size=15 %}
+                Жалғастыру
+            </a>
+        </div>
+
+        <div class="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 pt-3 sm:hidden">
+            <a href="{{ continue_href }}"
+               class="inline-flex h-9 items-center gap-1.5 rounded-md bg-brand px-3 font-sans text-sm font-semibold text-white hover:bg-brand-dark">
+                {% include "components/icon.html" with name="book" size=15 %}
+                Жалғастыру
+            </a>
+            <a href="{% url 'core:catalog' %}" class="font-sans text-xs font-semibold text-slate-600 hover:text-brand">
+                Басқа шығарма
+            </a>
         </div>
     </section>
+    {% endwith %}
     {% endwith %}
     {% endwith %}
 
 {% else %}
     {# ── Fallback: авторизованный без progress (новый или прочитал всё) ── #}
     <section class="relative overflow-hidden rounded-hero border border-slate-200 bg-slate-50">
-        <span aria-hidden="true"
-              class="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full"
-              style="background: radial-gradient(closest-side, rgba(20,184,166,0.18), transparent)"></span>
-
         <div class="relative flex flex-col gap-6 px-7 py-7 md:px-10 md:py-9">
 
             <div class="max-w-[640px]">

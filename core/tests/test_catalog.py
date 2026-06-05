@@ -210,6 +210,15 @@ class CatalogPage(TestCase):
         """Mobile-кнопка диспатчит событие open-catalog-filters."""
         self.assertContains(self.response, 'open-catalog-filters')
 
+    def test_book_cards_show_short_annotations(self):
+        """Wide-карточки каталога показывают короткое описание из Story.annotation."""
+        self.assertContains(self.response, 'Үш дос жоғалған жолды іздеп шығады')
+        self.assertContains(self.response, 'Қараңғы патшалыққа түскен жас кейіпкер')
+
+    def test_book_cards_show_story_tags(self):
+        self.assertContains(self.response, 'арман')
+        self.assertContains(self.response, 'мистика')
+
 
 class CatalogFilterCombination(TestCase):
     """DEC-27: комбинации фильтров через query string."""
@@ -320,7 +329,7 @@ class TagsInFilterPanel(TestCase):
 
     def test_popular_tags_chips_on_catalog(self):
         r = self.client.get(reverse('core:catalog'))
-        self.assertContains(r, 'Танымал тегтер')
+        self.assertContains(r, 'Тегтер')
         # Хотя бы один из топовых accepted-тегов в HTML
         self.assertContains(r, 'жасөспірім')
 

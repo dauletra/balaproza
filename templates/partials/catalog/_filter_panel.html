@@ -82,52 +82,41 @@
         </noscript>
     </form>
 
-    {# ── Жанр — chip-cloud (вне формы; каждый chip — ссылка) ── #}
+    {# ── Жанр — lightweight text labels (вне формы; каждый label — ссылка) ── #}
     <div>
         <p class="mb-1.5 font-sans text-xs font-semibold text-slate-700">Жанр</p>
-        <div class="flex flex-wrap gap-1.5">
+        <div class="flex flex-wrap gap-x-3 gap-y-2">
             {% for g in genres %}
                 {% if g.slug == current_genre_slug %}
-                    {# Активный — со снятием × #}
                     <a href="{% url 'core:catalog' %}"
-                       class="inline-flex h-7 items-center gap-1 rounded-pill border-2 px-2.5 font-sans text-xs font-semibold transition-colors"
-                       style="background: oklch(0.96 0.04 {{ g.hue }});
-                              color: oklch(0.32 0.14 {{ g.hue }});
-                              border-color: oklch(0.55 0.14 {{ g.hue }});">
+                       class="inline-flex items-center gap-1.5 font-sans text-xs font-bold"
+                       style="color: oklch(0.32 0.14 {{ g.hue }});">
+                        <span aria-hidden="true" class="h-1.5 w-1.5 rounded-pill" style="background: oklch(0.55 0.14 {{ g.hue }});"></span>
                         {{ g.name }}
                         {% include "components/icon.html" with name="x" size=11 %}
                     </a>
                 {% else %}
-                    <a href="{% url 'core:genre_detail' slug=g.slug %}"
-                       class="inline-flex h-7 items-center rounded-pill border px-2.5 font-sans text-xs font-semibold transition-shadow hover:shadow-card-hover"
-                       style="background: oklch(0.96 0.04 {{ g.hue }});
-                              color: oklch(0.38 0.14 {{ g.hue }});
-                              border-color: oklch(0.86 0.08 {{ g.hue }});">
-                        {{ g.name }}
-                    </a>
+                    {% url 'core:genre_detail' slug=g.slug as genre_href %}
+                    {% include "components/genre_chip.html" with genre=g size="sm" href=genre_href %}
                 {% endif %}
             {% endfor %}
         </div>
     </div>
 
-    {# ── Танымал тегтер — chip-cloud (docs/11 Phase 3) ── #}
+    {# ── Тегтер — lightweight text links (docs/11 Phase 3) ── #}
     {% if popular_tags %}
         <div>
-            <p class="mb-1.5 font-sans text-xs font-semibold text-slate-700">Танымал тегтер</p>
-            <div class="flex flex-wrap gap-1.5">
-                {% for t in popular_tags %}
+            <p class="mb-1.5 font-sans text-xs font-semibold text-slate-700">Тегтер</p>
+            <div class="flex flex-wrap gap-x-3 gap-y-2">
+                {% for t in popular_tags|slice:":8" %}
                     {% if t.slug == current_tag_slug %}
-                        {# Активный тег — со снятием × #}
                         <a href="{% url 'core:catalog' %}"
-                           class="inline-flex h-7 items-center gap-1 rounded-pill border-2 border-brand bg-brand/5 px-2.5 font-sans text-xs font-semibold text-brand-dark">
-                            <span class="opacity-60">#</span>{{ t.name }}
+                           class="inline-flex items-center gap-1 font-sans text-xs font-bold text-brand-dark">
+                            <span class="text-brand">#</span>{{ t.name }}
                             {% include "components/icon.html" with name="x" size=11 %}
                         </a>
                     {% else %}
-                        <a href="{% url 'core:tag_detail' slug=t.slug %}"
-                           class="inline-flex h-7 items-center rounded-pill border border-slate-200 bg-slate-100 px-2.5 font-sans text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200">
-                            <span class="opacity-60">#</span>{{ t.name }}
-                        </a>
+                        {% include "components/tag_chip.html" with tag=t size="sm" %}
                     {% endif %}
                 {% endfor %}
             </div>

@@ -176,8 +176,8 @@ $dispatch('toast', { kind: 'success'|'info'|'warning'|'error', text: '...' })
 ### `search_popup`
 Глобальный quick-search модал. Открытие: хоткей **⌘K / Ctrl+K** или событие window `open-search`. Содержит до 5 произведений и 5 авторов по substring-совпадению. Enter → полноценная страница `/search/?q=`. Данные приходят как JSON-индекс через context_processor `search_index`. Подключён один раз в `base.html`.
 
-### `catalog_controls` ⚠️ DEPRECATED (DEC-27)
-Старая sort+status панель. После унификации каталога заменена секцией Сұрыптау/Мәртебесі внутри `_filter_panel`. Файл сохранён до полного refactor показов, но из шаблонов больше не подключается.
+### `catalog_controls` removed (DEC-27)
+Старая sort+status панель удалена. После унификации каталога её заменяет секция Сұрыптау/Мәртебесі внутри `partials/catalog/_filter_panel.html`.
 
 ### `school_links`
 Блок внешних ссылок «Авторлар мектебі» (DEC-22). Параметры: `links` (итерируемый), `layout` (`"list"` | `"grid"` | `"inline"`).

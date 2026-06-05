@@ -12,4 +12,7 @@
         {{ story.title }}
     </div>
     <div class="font-sans text-[11px] text-slate-500">{{ story.author.name }}</div>
+    {% for badge in story.badges|slice:":1" %}
+        <div class="font-sans text-[10px] font-bold text-brand-dark">{{ badge }}</div>
+    {% endfor %}
 </a>

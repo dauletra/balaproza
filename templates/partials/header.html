@@ -36,7 +36,12 @@
 
         {# ── Правый кластер (desktop) ── #}
         <nav class="ml-auto hidden items-center gap-6 md:flex" aria-label="Қолданушы әрекеттері">
-            {# Единственная контент-ссылка в хедере: остальные разделы доступны с главной и из footer (DEC-25) #}
+            <a href="{% url 'core:catalog' %}"
+               class="inline-flex items-center gap-1.5 font-sans text-[13px] font-bold {% if nav_active == 'catalog' %}text-brand-dark{% else %}text-brand hover:text-brand-dark{% endif %}">
+                {% include "components/icon.html" with name="book" size=15 %}
+                Оқу
+            </a>
+
             <a href="{% url 'core:contest_list' %}"
                class="inline-flex items-center gap-1.5 font-sans text-[13px] font-bold {% if nav_active == 'contests' %}text-brand-dark{% else %}text-brand hover:text-brand-dark{% endif %}">
                 {% include "components/icon.html" with name="trophy" size=15 %}

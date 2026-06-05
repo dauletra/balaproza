@@ -23,9 +23,9 @@
 Login, SignUp, Home, Home (с жанрами), Catalog (`/catalog/`), Search results, Genre detail, **Tag detail** (`/tag/<slug>/`), **Search popup (overlay, Cmd+K)**, **Catalog filter sheet** (bottom-sheet триггером `open-catalog-filters`, DEC-27), Story detail (v2 scrollspy + ShareButton), Reading, Profile, Profile edit, Notifications, My stories, Manage story, Story settings, New story, Contest list, 404 page.
 
 > **Mobile bottom nav** (плавающая пилюля 360×64):
-> - **Гость:** home / genres / login (FAB) / contests / search
-> - **Авторизованный:** home / contests / new_story (FAB) / notifications / profile
-> Library и my_submissions у авторизованных — через avatar-dropdown в хедере (десктоп) либо через профиль/конкурсы (mobile). Левый sidebar на десктопе отсутствует — DEC-25.
+> - **Гость:** home / catalog / login (FAB) / contests / search
+> - **Авторизованный:** home / library / new_story (FAB) / contests / profile
+> Library у авторизованных вынесена в mobile-nav и avatar-dropdown; my_submissions доступна через avatar-dropdown и конкурсные страницы. Левый sidebar на десктопе отсутствует — DEC-25.
 
 > ✅ **Решение DEC-16.** Версии-эксперименты из прототипа (Home v1/v2/v3, Story v1, Reading v1, Profile v1) — это история проектирования. В ТЗ за каноничные приняты **финальные**: Home FINAL (с разделением гость/возвращающийся), Story v2 (scrollspy), Reading v2 (popover) + dark, Profile v2 (без дубль-таба). Остальные версии в разработку не идут.
 

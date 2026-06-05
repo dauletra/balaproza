@@ -24,6 +24,7 @@
 | 09 | [`09-nonfunctional.md`](09-nonfunctional.md) | Доступность, производительность, безопасность, локализация |
 | 10 | [`10-resolved-decisions.md`](10-resolved-decisions.md) | Реестр закрытых несогласованностей и принятых решений |
 | 11 | [`11-tags.md`](11-tags.md) | UGC-теги: бизнес-правила, lifecycle, UI-поверхности, план внедрения, открытые вопросы |
+| 12 | [`12-domain-model-contract.md`](12-domain-model-contract.md) | Контракт будущих Django-моделей и query/service helpers для Ф14 |
 
 ## Как читать
 

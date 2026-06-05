@@ -298,7 +298,7 @@ class LibraryEmpty(TestCase):
     def test_saved_empty_shows_empty_state_with_cta(self):
         r = self.client.get(reverse('core:library'))
         self.assertContains(r, 'Сақталғандар жоқ')
-        self.assertContains(r, reverse('core:genre_index'))
+        self.assertContains(r, reverse('core:catalog'))
 
     def test_reading_empty(self):
         r = self.client.get(reverse('core:library') + '?tab=reading')

@@ -14,25 +14,34 @@
     </div>
 {% else %}
 
-<div class="flex flex-col gap-8">
+<div class="mx-auto flex max-w-[920px] flex-col gap-8">
 
     {# ─────────────────────── Шапка произведения ─────────────────────── #}
-    <header class="grid grid-cols-1 gap-6 sm:grid-cols-[180px_1fr] md:grid-cols-[220px_1fr]">
-        {% include "components/cover_placeholder.html" with story=story cls="aspect-[2/3] w-full rounded-lg shadow-card-hover" letter_cls="text-8xl" %}
+    <header class="grid grid-cols-[96px_minmax(0,1fr)] gap-4 sm:grid-cols-[136px_minmax(0,1fr)] sm:gap-5 md:grid-cols-[156px_minmax(0,1fr)] md:gap-6">
+        {% include "components/cover_placeholder.html" with story=story cls="aspect-[2/3] w-[96px] rounded-lg shadow-sm sm:w-[136px] md:w-[156px]" letter_cls="text-5xl sm:text-6xl" %}
 
-        <div class="flex flex-col gap-3">
-            <div class="flex flex-wrap gap-1.5">
+        <div class="min-w-0 flex flex-col gap-2.5">
+            <div class="flex flex-wrap gap-x-3 gap-y-1">
                 {% for g in story.genres_resolved %}
                     {% include "components/genre_chip.html" with genre=g size="sm" %}
                 {% endfor %}
             </div>
 
-            <h1 class="font-sans text-3xl font-bold leading-tight text-slate-900 sm:text-4xl">
+            <h1 class="font-sans text-2xl font-bold leading-tight text-slate-900 sm:text-3xl md:text-4xl">
                 {{ story.title }}
             </h1>
 
             {# docs/11: UGC-теги. Pending видны только автору (BR-TAG-07). #}
             {% include "components/tag_list.html" with tags=tags viewer_is_author=is_author %}
+
+            <div class="flex flex-wrap items-center gap-1.5">
+                {% if story.audience %}
+                    <span class="inline-flex h-7 items-center rounded-chip bg-slate-100 px-2.5 font-sans text-xs font-bold text-slate-600">{{ story.audience }}</span>
+                {% endif %}
+                {% for badge in story.badges %}
+                    <span class="inline-flex h-7 items-center rounded-chip bg-brand/5 px-2.5 font-sans text-xs font-bold text-brand-dark">{{ badge }}</span>
+                {% endfor %}
+            </div>
 
             <a href="{% url 'core:profile_other' username=story.author.username %}"
                class="inline-flex items-center gap-2 self-start font-sans text-sm text-slate-600 hover:text-brand">
@@ -40,7 +49,7 @@
                 <span>{{ story.author.name }}</span>
             </a>
 
-            <div class="mt-1 flex flex-wrap items-center gap-4">
+            <div class="mt-0.5 flex flex-wrap items-center gap-3">
                 {# FR-STORY-12: общий счётчик = сумма лайков глав; ставится в режиме чтения #}
                 {% include "components/stat_pill.html" with icon="heart" value=story.likes %}
                 {% include "components/stat_pill.html" with icon="eye" value=story.views %}
@@ -48,7 +57,13 @@
                 <span class="font-sans text-xs text-slate-500">· {{ story.chapters }} бөлім</span>
             </div>
 
-            <div class="mt-3 flex flex-wrap items-center gap-2.5">
+            <div class="mt-2 flex flex-wrap items-center gap-2.5">
+                <a href="#chapter-{{ chapter_number }}"
+                   class="inline-flex h-11 items-center gap-2 rounded-md bg-brand px-4 font-sans text-sm font-semibold text-white hover:bg-brand-dark">
+                    {% include "components/icon.html" with name="book" size=17 %}
+                    <span>Оқу</span>
+                </a>
+
                 <button type="button" aria-label="Сақтау"
                         class="grid h-11 w-11 place-items-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50">
                     {% include "components/icon.html" with name="bookmark" size=18 %}
@@ -69,7 +84,7 @@
     </header>
 
     {# ─────────────────────── Аннотация ─────────────────────── #}
-    <section class="rounded-lg border border-slate-200 bg-white p-6">
+    <section class="border-y border-slate-200 py-6">
         <h2 class="font-display text-xl font-bold text-slate-900">Аннотация</h2>
         <p class="mt-3 font-sans text-[15px] leading-[1.65] text-slate-700">
             Үш достың таңғажайып саяхаты. Олар әрқайсысы жоғалғанын іздеп жолға шығады, бірақ
@@ -79,9 +94,29 @@
         </p>
     </section>
 
+    {% if chapters %}
+        <details class="lg:hidden rounded-lg border border-slate-200 bg-white p-4" aria-label="Мобильді бөлімдер">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 font-sans text-sm font-bold text-slate-900">
+                <span>Бөлімдер</span>
+                <span class="font-sans text-xs font-semibold text-slate-500">{{ chapter_number }} / {{ chapters|length }}</span>
+            </summary>
+            <ol class="mt-3 flex flex-col gap-1 border-t border-slate-100 pt-3">
+                {% for c in chapters %}
+                    <li>
+                        <a href="{% url 'core:story_detail' slug=story.slug %}?chapter={{ c.number }}#chapter-{{ c.number }}"
+                           class="flex items-center gap-2 rounded-sm px-2 py-2 font-sans text-sm hover:bg-slate-50 {% if c.number == current_chapter_number %}text-brand{% else %}text-slate-700{% endif %}">
+                            <span class="w-6 shrink-0 text-right font-mono text-xs text-slate-400">{{ c.number }}</span>
+                            <span class="min-w-0 flex-1 truncate">{{ c.title }}</span>
+                        </a>
+                    </li>
+                {% endfor %}
+            </ol>
+        </details>
+    {% endif %}
+
     {# ─────────────────────── Текущая глава inline ─────────────────────── #}
     {% if current %}
-        <section id="chapter-{{ chapter_number }}" class="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
+        <section id="chapter-{{ chapter_number }}" class="scroll-mt-24 rounded-lg bg-white p-6 shadow-sm sm:p-8">
             <header class="mb-5">
                 <p class="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                     {{ chapter_number }}-бөлім · {{ chapters|length }} бөлімнен
@@ -153,7 +188,7 @@
         </section>
 
         {# ─────────────────────── Комментарии этой главы ─────────────────────── #}
-        <section class="rounded-lg border border-slate-200 bg-white p-6">
+        <section class="border-t border-slate-200 pt-6">
             <h2 class="mb-4 font-display text-xl font-bold text-slate-900">
                 {{ chapter_number }}-бөлім пікірлері
                 <span class="ml-1 font-sans text-sm font-normal text-slate-500">{{ comments|length }}</span>

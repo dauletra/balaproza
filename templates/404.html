@@ -18,8 +18,8 @@
     <div class="mt-2 flex flex-wrap items-center justify-center gap-2.5">
         {% url 'core:home' as home_href %}
         {% include "components/button.html" with kind="primary" label="Басты бет" icon="home" href=home_href %}
-        {% url 'core:genre_index' as cat_href %}
-        {% include "components/button.html" with kind="secondary" label="Жанрлар" icon="book" href=cat_href %}
+        {% url 'core:catalog' as cat_href %}
+        {% include "components/button.html" with kind="secondary" label="Оқу" icon="book" href=cat_href %}
     </div>
 
     <button type="button" @click="$dispatch('open-search')"
