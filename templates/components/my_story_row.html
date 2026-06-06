@@ -28,7 +28,11 @@
 
         {# Метрики + жанры #}
         <div class="flex flex-wrap items-center gap-3.5">
-            {% include "components/stat_pill.html" with icon="book" value=story.chapters|stringformat:"s"|add:" бөлім" %}
+            {% if story.is_single %}
+                {% include "components/stat_pill.html" with icon="book" value="бір бөлімді" %}
+            {% else %}
+                {% include "components/stat_pill.html" with icon="book" value=story.chapters|stringformat:"s"|add:" бөлім" %}
+            {% endif %}
             {% include "components/stat_pill.html" with icon="eye" value=story.views %}
             {% include "components/stat_pill.html" with icon="thumbs-up" value=story.likes %}
             {% include "components/stat_pill.html" with icon="message-caption" value=story.comments %}
@@ -38,7 +42,11 @@
     {# Действия — справа на десктопе, снизу на мобилке #}
     <div class="flex shrink-0 flex-wrap items-center gap-2">
         {% url 'core:chapter_new' slug=story.slug as new_ch_href %}
-        {% include "components/button.html" with kind="secondary" size="md" label="+ Бөлім" href=new_ch_href %}
+        {% if story.is_single %}
+            {% include "components/button.html" with kind="secondary" size="md" label="Мәтін" href=new_ch_href %}
+        {% else %}
+            {% include "components/button.html" with kind="secondary" size="md" label="+ Бөлім" href=new_ch_href %}
+        {% endif %}
         {% url 'core:manage_story' slug=story.slug as manage_href %}
         {% include "components/button.html" with kind="primary" size="md" label="Басқару" href=manage_href %}
     </div>

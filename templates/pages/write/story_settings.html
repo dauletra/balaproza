@@ -48,6 +48,20 @@
 
         {% include "components/textarea.html" with name="annotation" label="Аннотация" value=story.annotation rows=4 maxlength=500 required=True %}
 
+        <fieldset class="flex flex-col gap-2">
+            <legend class="mb-1 font-sans text-sm font-semibold text-slate-800">
+                Формат <span class="text-status-error-fg" aria-hidden="true">*</span>
+            </legend>
+            {% if story.is_single %}
+                {% include "components/radio_option.html" with name="format" value="single" label="Бір бөлімді шығарма" checked=True %}
+                {% include "components/radio_option.html" with name="format" value="serial" label="Көп бөлімді шығарма" %}
+            {% else %}
+                {% include "components/radio_option.html" with name="format" value="single" label="Бір бөлімді шығарма" %}
+                {% include "components/radio_option.html" with name="format" value="serial" label="Көп бөлімді шығарма" checked=True %}
+            {% endif %}
+            <p class="font-sans text-xs leading-relaxed text-slate-500">Бір бөлімді форматта оқырман бір цельный мәтін көреді; көп бөлімді форматта бөлімдер тізімі көрсетіледі.</p>
+        </fieldset>
+
         <label class="flex flex-col gap-1.5">
             <span class="font-sans text-sm font-semibold text-slate-800">
                 Негізгі жанр <span class="text-status-error-fg" aria-hidden="true">*</span>

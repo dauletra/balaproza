@@ -24,14 +24,29 @@ def _page_state(request) -> str:
 def home(request):
     """Главная — редакционная витрина. Гость vs возвращающийся (FR-HOME-01)."""
     is_signed_in = bool(request.session.get('signed_in'))
+    published = [s for s in stub_data.STORIES if s.status == 'Published']
+    genre_tabs = []
+    for genre in stub_data.GENRES:
+        stories = [s for s in stub_data.stories_by_genre(genre.slug) if s.status == 'Published'][:6]
+        genre_tabs.append({
+            'genre': genre,
+            'stories': stories,
+        })
     return render(request, 'pages/home.html', {
         'has_right_rail':  True,
         'page_state':      _page_state(request),
         'progress':        stub_data.SAMPLE_PROGRESS if is_signed_in else None,
         'hero_contest':    stub_data.HERO_CONTEST,
-        'book_of_week':    stub_data.BOOK_OF_WEEK,
+        'collections':     stub_data.COLLECTIONS,
         'genres':          stub_data.GENRES,
-        'top_stories':     stub_data.STORIES[:6],
+        'genre_tabs':      genre_tabs,
+        'top_stories':     sorted(published, key=lambda s: s.views, reverse=True)[:6],
+        'latest_stories':  list(reversed(published))[:6],
+        'age_10_stories':  [s for s in published if s.audience == '10+'][:6],
+        'short_stories':   [s for s in published if s.is_single and s.read_minutes <= 15][:6],
+        'serial_stories':  [s for s in published if s.is_serial][:6],
+        'young_author_stories': [s for s in stub_data.STORIES if s.author_username == 'aidana'][:6],
+        'popular_tags':    stub_data.popular_tags(8),
         'school_links':    stub_data.SCHOOL_LINKS,
     })
 
@@ -86,11 +101,20 @@ def _catalog_controls(request):
     """Достаёт sort/status из GET с валидацией по белым спискам."""
     valid_sorts = {k for k, _ in stub_data.CATALOG_SORTS}
     valid_status = {k for k, _ in stub_data.CATALOG_STATUS_FILTERS}
+    valid_audience = {k for k, _ in stub_data.CATALOG_AUDIENCE_FILTERS}
+    valid_length = {k for k, _ in stub_data.CATALOG_LENGTH_FILTERS}
+    valid_format = {k for k, _ in stub_data.CATALOG_FORMAT_FILTERS}
     sort = request.GET.get('sort', 'popularity')
     status = request.GET.get('status', '')
+    audience = request.GET.get('audience', '')
+    length = request.GET.get('length', '')
+    format = request.GET.get('format', '')
     return (
         sort if sort in valid_sorts else 'popularity',
         status if status in valid_status else '',
+        audience if audience in valid_audience else '',
+        length if length in valid_length else '',
+        format if format in valid_format else '',
     )
 
 
@@ -100,7 +124,7 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
     Используется search_results / catalog / genre_detail / (в Phase 3) tag_detail.
     """
     query = request.GET.get('q', '').strip()
-    sort, status = _catalog_controls(request)
+    sort, status, audience, length, format = _catalog_controls(request)
 
     empty_title, empty_text = "Шығарма табылмады", "Сүзгілерді өзгертіп көріңіз."
 
@@ -123,11 +147,16 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
                 'popular_tags': stub_data.popular_tags(),
                 'genre': None,
                 'query': '', 'sort': sort, 'status': status,
+                'audience': audience, 'length': length, 'format': format,
                 'sorts': stub_data.CATALOG_SORTS, 'statuses': stub_data.CATALOG_STATUS_FILTERS,
+                'audiences': stub_data.CATALOG_AUDIENCE_FILTERS, 'lengths': stub_data.CATALOG_LENGTH_FILTERS,
+                'formats': stub_data.CATALOG_FORMAT_FILTERS,
                 'empty_title': '', 'empty_text': '',
             })
         results = stub_data.filter_catalog(query=query, genre=genre_slug,
-                                           status=status, sort=sort)
+                                           status=status, sort=sort,
+                                           audience=audience, length=length,
+                                           format=format)
         empty_title = "Әзірге шығарма жоқ"
         empty_text = "Бұл жанрда әлі шығарма жарияланбаған."
     elif mode == 'tag':
@@ -141,19 +170,28 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
                 'popular_tags': stub_data.popular_tags(),
                 'genre': None,
                 'query': '', 'sort': sort, 'status': status,
+                'audience': audience, 'length': length, 'format': format,
                 'sorts': stub_data.CATALOG_SORTS, 'statuses': stub_data.CATALOG_STATUS_FILTERS,
+                'audiences': stub_data.CATALOG_AUDIENCE_FILTERS, 'lengths': stub_data.CATALOG_LENGTH_FILTERS,
+                'formats': stub_data.CATALOG_FORMAT_FILTERS,
                 'empty_title': '', 'empty_text': '',
             })
         results = stub_data.filter_catalog(query=query, tag=tag_slug,
-                                           status=status, sort=sort)
+                                           status=status, sort=sort,
+                                           audience=audience, length=length,
+                                           format=format)
         empty_title = "Бұл тегпен шығарма жоқ"
         empty_text = "Басқа тегтерді көріңіз немесе сүзгілерді өзгертіңіз."
     elif mode == 'search':
-        results = stub_data.filter_catalog(query=query, status=status, sort=sort)
+        results = stub_data.filter_catalog(query=query, status=status, sort=sort,
+                                           audience=audience, length=length,
+                                           format=format)
         empty_title = "Ештеңе табылмады"
         empty_text = f"«{query}» бойынша шығарма табылмады. Атауды тексеріп көріңіз."
     else:  # mode == 'catalog'
-        results = stub_data.filter_catalog(query=query, status=status, sort=sort)
+        results = stub_data.filter_catalog(query=query, status=status, sort=sort,
+                                           audience=audience, length=length,
+                                           format=format)
 
     return render(request, 'pages/catalog/catalog.html', {
         'has_right_rail': True,
@@ -162,8 +200,14 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
         'query':          query,
         'sort':           sort,
         'status':         status,
+        'audience':       audience,
+        'length':         length,
+        'format':         format,
         'sorts':          stub_data.CATALOG_SORTS,
         'statuses':       stub_data.CATALOG_STATUS_FILTERS,
+        'audiences':      stub_data.CATALOG_AUDIENCE_FILTERS,
+        'lengths':        stub_data.CATALOG_LENGTH_FILTERS,
+        'formats':        stub_data.CATALOG_FORMAT_FILTERS,
         'genres':         stub_data.GENRES,
         'current_genre_slug': genre_slug,
         'genre':          stub_data.GENRES_BY_SLUG.get(genre_slug) if genre_slug else None,
@@ -253,7 +297,10 @@ def story_detail(request, slug):
 
     # Тизер с разворотом — только для гл.1 при «голом» URL без ?chapter (первое
     # знакомство с произведением). Возвращающийся юзер или явный выбор главы → полный текст.
-    is_teaser = bool(current and chapter_number == 1 and not explicit_chapter and not has_progress_here)
+    is_teaser = bool(
+        current and chapter_number == 1 and not explicit_chapter
+        and not has_progress_here and not (story and story.is_single)
+    )
 
     return render(request, 'pages/story/story_detail.html', {
         'has_right_rail': True,
@@ -532,7 +579,7 @@ def search_index_json(request):
                 {
                     'slug':   s.slug,
                     'title':  s.title,
-                    'author': s.author.name if s.author else '',
+                    'author': s.author.public_name if s.author else '',
                     # Обложки лежат в /media/ (после Фазы интеграции реальных файлов)
                     'cover':  ('/media/' + s.cover) if s.cover else '',
                 }
@@ -540,7 +587,7 @@ def search_index_json(request):
                 if s.status == 'Published'
             ],
             'authors': [
-                {'username': a.username, 'name': a.name}
+                {'username': a.username, 'name': a.public_name}
                 for a in stub_data.AUTHORS
             ],
             # docs/11 Phase 3: теги в Cmd+K (только accepted)

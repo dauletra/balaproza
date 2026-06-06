@@ -1,15 +1,62 @@
-{% load static %}
 {% comment %}
     Правый рейл главной (docs/07.4 + FR-HOME-09).
-    Содержит только:
-      Авторлар мектебі  — блок внешних ссылок (FR-LINKS, DEC-22)
-
-    Конкурс вынесен в полосу под hero (partials/home/contest_banner.html).
-    Continue-reading переехал в hero_returning как hero-блок.
-
-    Контекст: school_links
+    Контекст: hero_contest, school_links
 {% endcomment %}
 <div class="flex flex-col gap-6">
+
+    {% if hero_contest and hero_contest.status == 'active' %}
+        <a href="{% url 'core:contest_detail' slug=hero_contest.slug %}"
+           class="group block overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-card-hover">
+            <div class="flex flex-col gap-4 p-5">
+                <div class="flex items-center justify-between gap-3">
+                    <span class="inline-flex w-fit items-center rounded-chip bg-promo-bg px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-[0.1em] text-[rgb(33,11,11)]">
+                        Белсенді байқау
+                    </span>
+                    {% include "components/contest_status.html" with status=hero_contest.status days_left=hero_contest.days_left %}
+                </div>
+
+                <div class="flex flex-col gap-1">
+                    <h3 class="font-sans text-[15px] font-bold leading-tight text-slate-900 group-hover:text-brand">
+                        {{ hero_contest.name }}
+                    </h3>
+                    <p class="font-sans text-xs leading-relaxed text-slate-600">
+                        {{ hero_contest.subtitle }}
+                    </p>
+                </div>
+
+                <dl class="grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 font-sans">
+                    <div>
+                        <dt class="text-[11px] uppercase tracking-wide text-slate-500">Қалды</dt>
+                        <dd class="mt-0.5 font-display text-lg font-bold text-slate-900">{{ hero_contest.days_left }} күн</dd>
+                    </div>
+                    {% if hero_contest.prize_kzt %}
+                        <div>
+                            <dt class="text-[11px] uppercase tracking-wide text-slate-500">Жүлде</dt>
+                            <dd class="mt-0.5 font-display text-lg font-bold text-brand">{{ hero_contest.prize_kzt|stringformat:"d" }} ₸</dd>
+                        </div>
+                    {% endif %}
+                </dl>
+
+                <span class="inline-flex items-center gap-1.5 font-sans text-sm font-semibold text-brand transition-transform group-hover:translate-x-0.5 group-hover:text-brand-dark">
+                    Қатысу
+                    {% include "components/icon.html" with name="arrow-right" size=14 %}
+                </span>
+            </div>
+        </a>
+    {% endif %}
+
+    {% if popular_tags %}
+        <section class="rounded-lg border border-slate-200 bg-white p-5">
+            <h3 class="mb-3 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                Танымал тегтер
+            </h3>
+            <div class="flex flex-wrap gap-2">
+                {% for t in popular_tags %}
+                    {% include "components/tag_chip.html" with tag=t size="sm" %}
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
 
     {# ── Авторлар мектебі — блок внешних ссылок (FR-LINKS, DEC-22) ── #}
     {% if school_links %}

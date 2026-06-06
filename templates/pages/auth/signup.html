@@ -10,7 +10,7 @@
         <img src="{% static 'img/logo.png' %}" alt="" class="mx-auto h-12 w-12">
         <h1 class="mt-4 font-display text-3xl font-bold text-slate-900">Тіркелу</h1>
         <p class="mt-1.5 font-sans text-sm text-slate-600">
-            Автор профильін толтыру. Аты-жөні міндетті, қалғаны — қалауыңыз бойынша.
+            Автор профильін толтыру. Алдымен көпшілік көретін авторлық атыңызды таңдаңыз.
         </p>
     </header>
 
@@ -20,8 +20,8 @@
           class="flex flex-col gap-6 rounded-hero border border-slate-200 bg-white p-6 sm:p-8">
         {% csrf_token %}
 
-        {# ── Аты-жөні (FR-AUTH-04) ── #}
-        {% include "components/input_field.html" with name="name" label="Аты-жөні" placeholder="Мысалы: Айдана Серікқызы" required=True autofocus=True maxlength=80 %}
+        {# ── Авторлық аты (FR-AUTH-04) ── #}
+        {% include "components/input_field.html" with name="name" label="Авторлық атыңыз" placeholder="Мысалы: aidana немесе aiqalam" required=True autofocus=True maxlength=80 %}
 
         {# ── Жынысы (FR-AUTH-04) ── #}
         <fieldset class="flex flex-col gap-2">

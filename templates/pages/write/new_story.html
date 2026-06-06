@@ -16,7 +16,7 @@
 
     <h1 class="mb-2 font-display text-3xl font-bold text-slate-900">Жаңа шығарма</h1>
     <p class="mb-8 font-sans text-sm text-slate-600">
-        Атау мен аннотация — міндетті. Бірінші бөлімді кейін, басқару бетінен қосасың.
+        Атау мен аннотация — міндетті. Әңгімені бір мәтінмен немесе бөлімдермен жаза аласыз.
     </p>
 
     <form method="post" action="{% url 'core:new_story' %}"
@@ -27,6 +27,15 @@
         {% include "components/input_field.html" with name="title" label="Атауы" placeholder="Шығарманың атауын жазыңыз" required=True autofocus=True maxlength=120 %}
 
         {% include "components/textarea.html" with name="annotation" label="Аннотация" placeholder="Не туралы, кімдерге арналған" rows=4 maxlength=500 required=True hint="Қысқа да түсінікті — оқырман осыдан таңдау жасайды." %}
+
+        <fieldset class="flex flex-col gap-2">
+            <legend class="mb-1 font-sans text-sm font-semibold text-slate-800">
+                Формат <span class="text-status-error-fg" aria-hidden="true">*</span>
+            </legend>
+            {% include "components/radio_option.html" with name="format" value="single" label="Бір бөлімді шығарма — рассказ, ертегі, эссе, новелла" checked=True %}
+            {% include "components/radio_option.html" with name="format" value="serial" label="Көп бөлімді шығарма — повесть, роман, серия" %}
+            <p class="font-sans text-xs leading-relaxed text-slate-500">Форматты кейін өзгертуге болады, бірақ оқырманға көрсетілуі осы таңдауға байланысты.</p>
+        </fieldset>
 
         {# Основной жанр — <select>, чтобы 12 опций нормально влазили. #}
         <label class="flex flex-col gap-1.5">

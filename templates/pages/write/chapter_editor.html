@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block title %}
-    {% if is_new %}Жаңа бөлім{% else %}{{ current.title|default:"Бөлім" }}{% endif %} ·
+    {% if story and story.is_single %}Мәтін{% elif is_new %}Жаңа бөлім{% else %}{{ current.title|default:"Бөлім" }}{% endif %} ·
     {% if story %}{{ story.title }}{% else %}{{ slug }}{% endif %} — Balaproza
 {% endblock %}
 
@@ -16,17 +16,19 @@
         <a href="{% url 'core:my_stories' %}" class="hover:text-brand">Менің шығармаларым</a> /
         <a href="{% url 'core:manage_story' slug=story.slug %}" class="hover:text-brand">{{ story.title }}</a> /
         <span class="text-slate-700">
-            {% if is_new %}жаңа бөлім{% else %}{{ chapter }}-бөлім{% endif %}
+            {% if story.is_single %}мәтін{% elif is_new %}жаңа бөлім{% else %}{{ chapter }}-бөлім{% endif %}
         </span>
     </p>
 
     <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
             <h1 class="font-display text-3xl font-bold text-slate-900">
-                {% if is_new %}Жаңа бөлім{% else %}Бөлімді өңдеу{% endif %}
+                {% if story.is_single %}Мәтінді өңдеу{% elif is_new %}Жаңа бөлім{% else %}Бөлімді өңдеу{% endif %}
             </h1>
             <p class="mt-1 font-sans text-sm text-slate-600">
-                {% if is_new %}
+                {% if story.is_single %}
+                    Толық мәтін. Сақтап жарияласаңыз — модерациядан өтеді.
+                {% elif is_new %}
                     Атау + мәтін. Сақтап жариялайсыз — модерациядан өтеді.
                 {% else %}
                     {{ chapter }}-бөлім · «{{ current.title|default:"" }}»
@@ -40,7 +42,11 @@
           class="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
         {% csrf_token %}
 
-        {% include "components/input_field.html" with name="title" label="Бөлім атауы" value=current.title placeholder="Мысалы: Алматыдан шығу" required=True autofocus=is_new maxlength=120 %}
+        {% if story.is_single %}
+            {% include "components/input_field.html" with name="title" label="Мәтін атауы" value=current.title|default:"Толық мәтін" placeholder="Толық мәтін" required=True autofocus=is_new maxlength=120 %}
+        {% else %}
+            {% include "components/input_field.html" with name="title" label="Бөлім атауы" value=current.title placeholder="Мысалы: Алматыдан шығу" required=True autofocus=is_new maxlength=120 %}
+        {% endif %}
 
         <label class="flex flex-col gap-1.5">
             <span class="flex items-baseline justify-between">
@@ -50,7 +56,7 @@
                 <span class="font-sans text-xs text-slate-500">{{ current.char_count|default:0 }} таңба</span>
             </span>
             <textarea name="body" rows="20" required
-                      placeholder="Бөлімнің толық мәтінін осында жазыңыз. Абзацтар екі жол ауысумен бөлінеді."
+                      placeholder="{% if story.is_single %}Шығарманың толық мәтінін осында жазыңыз. Абзацтар екі жол ауысумен бөлінеді.{% else %}Бөлімнің толық мәтінін осында жазыңыз. Абзацтар екі жол ауысумен бөлінеді.{% endif %}"
                       class="w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-4 py-3 font-serif text-base leading-[1.7] text-slate-900 placeholder:text-slate-500 placeholder:font-sans placeholder:text-sm focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30">{{ current.body|default:"" }}</textarea>
             <span class="font-sans text-xs text-slate-500">
                 Тұтас мәтінді сайтта қалай көрінетіндей пішімде көресіз — Georgia, ұзын жолдар.
@@ -69,7 +75,7 @@
                     {% include "components/icon.html" with name="check" size=14 %}
                     Жоба ретінде сақтау
                 </button>
-                <button type="submit" data-toast="Бөлім модерацияға жіберілді"
+                <button type="submit" data-toast="{% if story.is_single %}Мәтін модерацияға жіберілді{% else %}Бөлім модерацияға жіберілді{% endif %}"
                         class="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-5 font-sans text-sm font-bold text-white hover:bg-brand-dark">
                     {% include "components/icon.html" with name="paper-plane" size=14 %}
                     Жариялау

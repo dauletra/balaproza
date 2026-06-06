@@ -6,6 +6,7 @@
 """
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 
@@ -119,20 +120,25 @@ def blocked_tag_patterns_list() -> list:
 @dataclass(frozen=True)
 class Author:
     username: str   # без @
-    name: str
+    name: str       # реальное имя для кабинета/модерации/конкурсов
+    pen_name: str   # публичное авторское имя / псевдоним
     bio: str
     works: int
     followers: int
 
+    @property
+    def public_name(self) -> str:
+        return self.pen_name or f"@{self.username}"
+
 
 AUTHORS = [
-    Author("rudazov",   "Алмат Рысқали",     "Фэнтези, шытырман",      12, 8420),
-    Author("aygerim_k", "Айгерім Қасенова",  "Жас прозаик · Алматы",    3,  184),
-    Author("bekzhan_t", "Бекжан Тұрсынов",   "Қалалық әңгімелер",       5,  312),
-    Author("dina_books","Дина Айдарбекова",  "Балалар әдебиеті",        8,  542),
-    Author("sayyn",     "Сайын Нұрбекұлы",   "Фантастика, шытырман",    2,   96),
+    Author("rudazov",   "Алмат Рысқали",     "Rudazov",       "Фэнтези, шытырман",      12, 8420),
+    Author("aygerim_k", "Айгерім Қасенова",  "aiqalam",       "Жас прозаик · Алматы",    3,  184),
+    Author("bekzhan_t", "Бекжан Тұрсынов",   "BekTor",        "Қалалық әңгімелер",       5,  312),
+    Author("dina_books","Дина Айдарбекова",  "dina.books",    "Балалар әдебиеті",        8,  542),
+    Author("sayyn",     "Сайын Нұрбекұлы",   "sayyn",         "Фантастика, шытырман",    2,   96),
     # Демо-пользователь, под которым логинимся через фейк-сессию (см. core.views.login_view).
-    Author("aidana",    "Айдана Серікқызы",  "Жас прозаик · Тараз",     4,   23),
+    Author("aidana",    "Айдана Серікқызы",  "aidana",        "Жас прозаик · Тараз",     4,   23),
 ]
 
 AUTHORS_BY_USERNAME = {a.username: a for a in AUTHORS}
@@ -162,6 +168,7 @@ class Story:
     tags: tuple = ()
     audience: str = "10+"
     badges: tuple = ()
+    format: str = "serial"  # single | serial
 
     @property
     def author(self) -> Author:
@@ -181,14 +188,55 @@ class Story:
         """UGC-теги произведения как объекты Tag."""
         return tags_of(self)
 
+    @property
+    def is_single(self) -> bool:
+        return self.format == "single"
+
+    @property
+    def is_serial(self) -> bool:
+        return self.format != "single"
+
+    @property
+    def format_label(self) -> str:
+        return "Бір бөлімді" if self.is_single else "Көп бөлімді"
+
+    @property
+    def format_badge_label(self) -> str:
+        return "Бір оқылым" if self.is_single else "Серия"
+
+    @property
+    def reading_meta_label(self) -> str:
+        if self.is_single:
+            return f"{self.read_minutes} минут оқу"
+        return f"{self.chapters} бөлім"
+
+    @property
+    def total_chars(self) -> int:
+        """Approximate rendered volume for UI badges; real value comes from chapters when present."""
+        total = sum(c.char_count for c in chapters_of(self.slug))
+        return total or self.chapters * 1800
+
+    @property
+    def read_minutes(self) -> int:
+        """Reading-time badge for children and parents. 900 chars/min keeps Kazakh prose comfortable."""
+        return max(3, (self.total_chars + 899) // 900)
+
+    @property
+    def length_bucket(self) -> str:
+        if self.read_minutes <= 15:
+            return "short"
+        if self.read_minutes <= 35:
+            return "medium"
+        return "long"
+
 
 STORIES = [
     Story("dalney-berega",  "Алыс жағалауларда",     "sayyn",      "ipad_19b0bc4bcd9c1a1dc4c3cc12cf20dce5.webp", ("fantastika",  None),         12, 12482, 4821, 312, status="Published", annotation="Үш дос жоғалған жолды іздеп шығады. Таудағы сапар оларды өз қорқынышымен, достықпен және белгісіз ауылдың құпиясымен беттестіреді.", tags=("arman", "sayahat", "jasospirim"), audience="10+", badges=("Редакция таңдауы",)),
-    Story("temniy-lord",    "Күңгірт мырза",         "bekzhan_t",  "ipad_42f033cf1b9a2bcad744d05b9d429609.webp", ("fantezi",     "horror"),      8,  8920, 2440, 156, status="Published", annotation="Қараңғы патшалыққа түскен жас кейіпкер биліктің бағасын түсіне бастайды. Сиқыр, қорқыныш және таңдау туралы фэнтези.", tags=("mistika", "arman", "basqa-alem"), audience="14+"),
-    Story("igra-kuklovoda", "Қуыршақшының ойыны",    "dina_books", "ipad_499539963221e0fe36b0888bf8601067.webp", ("triller",     "drama"),      15, 18102, 6230, 421, status="Published", annotation="Мектептегі тыныш күндер бір жұмбақ ойыннан кейін өзгереді. Әр белгі жаңа күдікке апарады, ал шындық жақын жерде жасырынып тұр.", tags=("mistika", "jasospirim", "detektiv-jas"), audience="14+", badges=("Байқауға қатысады",)),
-    Story("kronchessii",    "Тас уәделер",           "rudazov",    "ipad_5916b4e19c616e74d008125ba9a1be8e.webp", ("shyttyrman",  "fantezi"),    24, 32540, 11200, 890, status="Published", annotation="Ескі қала қабырғаларындағы тасқа қашалған уәделер оянады. Кейіпкерлер өткеннің шартын бұзбай, болашақты сақтауға тырысады.", tags=("sayahat", "arman", "syikyr-akademiya")),
-    Story("arhimag",        "Сиқыршы: бөтен әлемдер","rudazov",    "ipad_940e074d12d6c3657199601ca568f1b3.jpg",  ("fantezi",     "shyttyrman"), 12, 12482, 4821, 312, status="Published", annotation="Жас сиқыршы бөтен әлемдердің есігін ашқанда, әр әлем өз ережесін ұсынады. Үйге қайту үшін ол күштен бұрын жауапкершілікті үйренеді.", tags=("syikyr-akademiya", "arman", "dostyk", "jasospirim", "mektep")),
-    Story("sila-imperii",   "Империя құдіреті",      "aygerim_k",  "ipad_992f1631a421d74ed5e1aa72717df374.webp", ("tarih",       "drama"),      18, 14200, 3890, 245, status="Published", annotation="Көне империяның шетінде өскен жас батыр тарихтың үлкен толқынына түседі. Бұл шығарма билік, адалдық және ел алдындағы таңдау туралы.", tags=("arman", "jasospirim")),
+    Story("temniy-lord",    "Күңгірт мырза",         "bekzhan_t",  "ipad_42f033cf1b9a2bcad744d05b9d429609.webp", ("fantezi",     "horror"),      3,  8920, 2440, 156, status="Published", annotation="Қараңғы патшалыққа түскен жас кейіпкер биліктің бағасын түсіне бастайды. Сиқыр, қорқыныш және таңдау туралы фэнтези.", tags=("mistika", "arman", "basqa-alem"), audience="14+"),
+    Story("igra-kuklovoda", "Қуыршақшының ойыны",    "dina_books", "ipad_499539963221e0fe36b0888bf8601067.webp", ("triller",     "drama"),       3, 18102, 6230, 421, status="Published", annotation="Мектептегі тыныш күндер бір жұмбақ ойыннан кейін өзгереді. Әр белгі жаңа күдікке апарады, ал шындық жақын жерде жасырынып тұр.", tags=("mistika", "jasospirim", "detektiv-jas"), audience="14+", badges=("Байқауға қатысады",)),
+    Story("kronchessii",    "Тас уәделер",           "rudazov",    "ipad_5916b4e19c616e74d008125ba9a1be8e.webp", ("shyttyrman",  "fantezi"),     3, 32540, 11200, 890, status="Published", annotation="Ескі қала қабырғаларындағы тасқа қашалған уәделер оянады. Кейіпкерлер өткеннің шартын бұзбай, болашақты сақтауға тырысады.", tags=("sayahat", "arman", "syikyr-akademiya")),
+    Story("arhimag",        "Сиқыршы: бөтен әлемдер","rudazov",    "ipad_940e074d12d6c3657199601ca568f1b3.jpg",  ("fantezi",     "shyttyrman"),  3, 12482, 4821, 312, status="Published", annotation="Жас сиқыршы бөтен әлемдердің есігін ашқанда, әр әлем өз ережесін ұсынады. Үйге қайту үшін ол күштен бұрын жауапкершілікті үйренеді.", tags=("syikyr-akademiya", "arman", "dostyk", "jasospirim", "mektep")),
+    Story("sila-imperii",   "Империя құдіреті",      "aygerim_k",  "ipad_992f1631a421d74ed5e1aa72717df374.webp", ("tarih",       "drama"),       1, 14200, 3890, 245, status="Published", annotation="Көне империяның шетінде өскен жас батыр тарихтың үлкен толқынына түседі. Бұл шығарма билік, адалдық және ел алдындағы таңдау туралы.", tags=("arman", "jasospirim"), format="single"),
 
     # ─ Произведения демо-пользователя «Айдана» (для WRITE-страниц) ─
     Story(
@@ -201,10 +249,11 @@ STORIES = [
     Story(
         slug="aidana-koshe",  title="Көше әндері",            author_username="aidana",
         cover="ipad_e655bb59097d8f25698466168d385969.webp", genres=("drama", "komediya"),
-        chapters=5, views=203, likes=18, comments=4,
+        chapters=1, views=203, likes=18, comments=4,
         status="OnProcess", annotation="Қаладағы бес адамның бір күні. Әрқайсысының өз әні.",
         secondary_genre="komediya",
         tags=("aua-ralighi", "dostyk", "mektep"),
+        format="single",
     ),
     Story(
         slug="aidana-erteg",  title="Ертегі ертеректегі",      author_username="aidana",
@@ -215,8 +264,9 @@ STORIES = [
     Story(
         slug="aidana-kysh",   title="Қыстың үнсіздігі",        author_username="aidana",
         cover="ipad_f0e918b204613b38cc0e04ba74e3e3ab.webp", genres=("drama", None),
-        chapters=12, views=872, likes=64, comments=9,
+        chapters=1, views=872, likes=64, comments=9,
         status="Completed", annotation="Қыстағы ауылда қалған әжемен өткізген бір ай. Аяқталған кітап.",
+        format="single",
     ),
 ]
 
@@ -242,101 +292,79 @@ class Chapter:
         return str(n)
 
 
-# Длинный lorem-текст для проверки скролла/тёмной темы (≈5 000 знаков)
-_SAMPLE_BODY = (
-    "Бірде ерте таңда, мен тауларға қарап тұрдым. Күн жаңа ғана шығып келе жатқан, "
-    "аспан алтын түсті болатын. Сандр менің жанымда үнсіз отырды — оның көздері "
-    "алыс белдеудегі бір нүктеге қадалған. Біз бұл саяхатты үш жыл бойы күткен едік, "
-    "енді міне, оның соңғы күні басталып қалды.\n\n"
-    "— Қалай ойлайсың, — деді ол ақырында, — біз барар жерімізге жеткен боламыз ба?\n\n"
-    "Мен жауап бере алмадым. Тауларды қарап тұрып, өзім де нақты білмейтінімді сездім. "
-    "Біздің картамыз әлдеқашан бұрмаланған, жетекшіміз бізді тастап кеткен, "
-    "ал алда не күтіп тұрғаны — белгісіз. Бірақ ішкі бір сезім «жалғастыр» деп "
-    "сыбырлап тұрды. Біз тұрып, жолға шықтық.\n\n"
-    "Жол қиын болды. Тастар сырғанап, жел әл-қуатымызды алып бара жатты. "
-    "Бірақ Сандр алға қарай батыл басып отырды, ал мен оның артынан ілесіп, "
-    "өзімді осы саяхатқа лайық деп сезінуге тырыстым. Ой үстінде өзіме «сен қажет «"
-    "емессің, сен мұнда бекерге», — деген дауыстар жиі келетін. Бірақ Сандр "
-    "оларды естіді ме білмеймін — сұрап көрген жоқпын.\n\n"
-    "Біз биік шыңға жетіп, шаршап отырған кезде, төмендегі алқаптан түтін көтерілгенін "
-    "байқадық. Ауыл! Демек, әлі де адам тұратын жерлер бар. Сандр маған қарап күлді — "
-    "оның көзінде үміт жанып тұрды. Біз бір-бірімізге қол беріп, тыныстап алдық та, "
-    "жолды жалғастырдық.\n\n"
-    "Ауылға жеткенде, біздің таңқалғанымыздай, бұл — ескі замандағы шағын тұрақ "
-    "болатын. Үйлер ағаштан, шатырлар сабаннан жасалған. Балалар көшеде ойнап жүр, "
-    "ересектер бір-бірімен қазақша сөйлеседі. Мен бұл диалектіні бұрын естіген емес "
-    "едім — Сандр да солай. Бірақ түсіну қиын болмады.\n\n"
-    "Аққалпақты бір қарт біздің қасымызға келді. Көзі жарқырап, бізді танығандай "
-    "қарады.\n\n"
-    "— Сіздерді күтіп жүрдім, — деді ол. — Кітапты алып келдіңіздер ме?\n\n"
-    "Мен Сандрға қарадым. Сандр маған қарады. Қандай кітап? Біз жай саяхатшылар "
-    "едік, ешқандай кітап туралы білмейтінбіз. Қарт қарсы жауапты күтпестен әрі "
-    "жалғастырды:\n\n"
-    "— Жоқ па? Онда сіздер жалғыз келдіңіздер. Бірақ келдіңіздер ғой — бұл да жақсы. "
-    "Жүріңіздер, шай ішеміз.\n\n"
-    "Біз оның артынан ердік. Менің басымда мың сұрақ ойнап жатты, бірақ оларды қою "
-    "уақыты әлі келмеген сияқты. Сандр да үнсіз. Ауыл арқылы өткен сайын мен "
-    "өзімізді бір ертегінің ішіне түсіп қалдық деген ойдан арыла алмадым.\n\n"
-    "Қарттың үйі шеттеу тұрды. Іші тар, бірақ жылы. Қабырғаларында ескі суреттер, "
-    "сөрелерде сары парақты кітаптар. Ол шай қайнатты, бізге нан мен балды жайып "
-    "берді. Біз ауыздан-ауыз қалай оның үйіне түскенімізді айта бастадық — карта, "
-    "жетекшінің кетуі, көп күн жүруіміз туралы. Қарт басын изеп, ара-арасында «иә, "
-    "иә» деп қойды.\n\n"
-    "Содан кейін ол маған қарап:\n\n"
-    "— Сенің жүрегің не дейді? — деп сұрады.\n\n"
-    "Бұл сұрақ мені есімнен айырғандай болды. Мен жүректі тыңдауды ұмытқан "
-    "адам сияқтымын. Күн сайын — жоспар, мақсат, нәтиже. Жүрек? Ол қашан "
-    "сөйледі еді? Мен жауап бере алмадым. Сандр да үнсіз отырды.\n\n"
-    "— Біз жалғастыруымыз керек пе? — деп сұрадым ақырында.\n\n"
-    "— Әрине, — деді қарт. — Бірақ басқа бағытта.\n\n"
-    "Сол түні мен ұйықтай алмадым. Сыртта жұлдыздар жанып тұрды, иттер алыста "
-    "үретін. Мен өзімнің не үшін осы жолға шыққанымды есіме түсіруге тырыстым — "
-    "ескерту ме, әлде үрей ме? Бір кезде Сандр оянып, маған қарап:\n\n"
-    "— Біз кейін қайтамыз ба? — деп сұрады.\n\n"
-    "— Білмеймін. Бірақ сенің ішкі дауысыңа сен. Бұл — менің қателігім, сені "
-    "соңыма еріткенім. Енді өз шешіміңді өзің жаса.\n\n"
-    "Ол маған ұзақ қарап тұрды. Содан кейін кірпігін жұмды. Мен сол түні бірінші "
-    "рет «бұл саяхаттың соңы — менің соңым емес» дегенді түсіндім. Ол өз жолын "
-    "табатын болады — менсіз де."
-)
+STORY_TEXTS_DIR = Path(__file__).resolve().parent / "story_texts"
+
+
+def _story_text(story_slug: str, chapter_number: int) -> str:
+    path = STORY_TEXTS_DIR / story_slug / f"{chapter_number:02d}.txt"
+    if not path.exists():
+        return ""
+    return path.read_text(encoding="utf-8").strip()
+
+
+def _chapter(story_slug: str, number: int, title: str, *, likes: int = 0, liked: bool = False) -> Chapter:
+    body = _story_text(story_slug, number)
+    return Chapter(number, title, len(body), body, likes=likes, liked=liked)
+
 
 
 CHAPTERS_BY_STORY: dict = {
     # Айдана / aidana — главы для manage_story и chapter_editor
     "aidana-tan": [
-        # Сумма = 12 800 знаков → попадает в окно 5000-15000 для CONT-чек-листа.
-        Chapter(1, "Алматыдан шығу",      1500, _SAMPLE_BODY),
-        Chapter(2, "Шу станциясы",         2100, ""),
-        Chapter(3, "Поезд жолдастары",     1900, ""),
-        Chapter(4, "Кешкі ас",             1700, ""),
-        Chapter(5, "Қап-қараңғы",          1800, ""),
-        Chapter(6, "Таң алдында",          1900, ""),
-        Chapter(7, "Тараз",                1100, ""),
-        Chapter(8, "Үй",                    800, ""),
+        _chapter("aidana-tan", 1, "Алматыдан шығу"),
+        _chapter("aidana-tan", 2, "Шу станциясы"),
+        _chapter("aidana-tan", 3, "Поезд жолдастары"),
+        _chapter("aidana-tan", 4, "Кешкі ас"),
+        _chapter("aidana-tan", 5, "Қап-қараңғы"),
+        _chapter("aidana-tan", 6, "Таң алдында"),
+        _chapter("aidana-tan", 7, "Тараз"),
+        _chapter("aidana-tan", 8, "Үй"),
     ],
     "aidana-koshe": [
-        Chapter(1, "Бірінші көше",         800, ""),
-        Chapter(2, "Темір жол қасында",    1200, ""),
-        Chapter(3, "Базар алдында",        950, ""),
-        Chapter(4, "Парк ішінде",          1100, ""),
-        Chapter(5, "Кеш батқанда",         700, ""),
+        _chapter("aidana-koshe", 1, "Толық мәтін"),
+    ],
+    "aidana-kysh": [
+        _chapter("aidana-kysh", 1, "Толық мәтін"),
+    ],
+    "temniy-lord": [
+        _chapter("temniy-lord", 1, "Қара тәж"),
+        _chapter("temniy-lord", 2, "Айна залы"),
+        _chapter("temniy-lord", 3, "Таңдау бағасы"),
+    ],
+    "igra-kuklovoda": [
+        _chapter("igra-kuklovoda", 1, "Бірінші белгі"),
+        _chapter("igra-kuklovoda", 2, "Жіптер"),
+        _chapter("igra-kuklovoda", 3, "Сахна артында"),
+    ],
+    "kronchessii": [
+        _chapter("kronchessii", 1, "Оянған қабырға"),
+        _chapter("kronchessii", 2, "Тасқа жазылған шарт"),
+        _chapter("kronchessii", 3, "Уәденің салмағы"),
+    ],
+    "arhimag": [
+        _chapter("arhimag", 1, "Бірінші есік"),
+        _chapter("arhimag", 2, "Бөтен заң"),
+        _chapter("arhimag", 3, "Үйге қайту шарты"),
     ],
     "dalney-berega": [
         # FR-STORY-12: лайки — на главу, не на произведение целиком.
         # Прогрессия лайков иллюстрирует «крючок»: первые главы заходят, к середине пик,
         # глава 4 — текущая для возвращающегося читателя (liked=True), последние ещё впереди.
-        Chapter(1, "Жолға шығу",           1800, _SAMPLE_BODY, likes=842),
-        Chapter(2, "Тауға көтерілу",       2400, _SAMPLE_BODY, likes=719),
-        Chapter(3, "Алғашқы кездесу",      3100, _SAMPLE_BODY, likes=1024),
-        Chapter(4, "Депрессия",            2800, _SAMPLE_BODY, likes=687, liked=True),
-        Chapter(5, "Жаңа карта",           2200, "",           likes=512),
-        Chapter(6, "Жаңбыр түн",           1900, "",           likes=438),
-        Chapter(7, "Тас үй",               2700, "",           likes=391),
-        Chapter(8, "Кездесу",              2100, "",           likes=287),
-        Chapter(9, "Жасырын есік",         3300, "",           likes=176),
-        Chapter(10, "Қайту",               2500, "",           likes=94),
-        Chapter(11, "Соңғы кеш",           1700, "",           likes=42),
-        Chapter(12, "Шеп",                 2900, "",           likes=18),
+        _chapter("dalney-berega", 1, "Жолға шығу", likes=842),
+        _chapter("dalney-berega", 2, "Тауға көтерілу", likes=719),
+        _chapter("dalney-berega", 3, "Алғашқы кездесу", likes=1024),
+        _chapter("dalney-berega", 4, "Депрессия", likes=687, liked=True),
+        _chapter("dalney-berega", 5, "Жаңа карта", likes=512),
+        _chapter("dalney-berega", 6, "Жаңбыр түн", likes=438),
+        _chapter("dalney-berega", 7, "Тас үй", likes=391),
+        _chapter("dalney-berega", 8, "Кездесу", likes=287),
+        _chapter("dalney-berega", 9, "Жасырын есік", likes=176),
+        _chapter("dalney-berega", 10, "Қайту", likes=94),
+        _chapter("dalney-berega", 11, "Соңғы кеш", likes=42),
+        _chapter("dalney-berega", 12, "Шеп", likes=18),
+    ],
+    "sila-imperii": [
+        _chapter("sila-imperii", 1, "Толық мәтін", likes=245),
     ],
 }
 
@@ -491,18 +519,18 @@ def search_stories(query: str) -> list:
         return []
     return [
         s for s in STORIES
-        if q in s.title.lower() or q in s.author.name.lower()
+        if q in s.title.lower() or q in s.author.public_name.lower() or q in s.author.username.lower() or q in s.author.name.lower()
     ]
 
 
 def search_authors(query: str, limit: int = 5) -> list:
-    """Substring-поиск по name и username автора (для search popup)."""
+    """Substring-поиск по public_name, username и real name автора (для search popup)."""
     q = (query or "").strip().lower()
     if not q:
         return []
     return [
         a for a in AUTHORS
-        if q in a.name.lower() or q in a.username.lower()
+        if q in a.public_name.lower() or q in a.username.lower() or q in a.name.lower()
     ][:limit]
 
 
@@ -519,8 +547,28 @@ CATALOG_STATUS_FILTERS = (
     ("OnProcess",  "Жазылып жатыр"),
 )
 
+CATALOG_AUDIENCE_FILTERS = (
+    ("",    "Барлығы"),
+    ("10+", "10+"),
+    ("14+", "14+"),
+)
 
-def apply_catalog_filters(stories: list, sort: str = "popularity", status: str = "") -> list:
+CATALOG_LENGTH_FILTERS = (
+    ("",       "Барлығы"),
+    ("short",  "15 минутқа дейін"),
+    ("medium", "15-35 минут"),
+    ("long",   "35 минуттан ұзақ"),
+)
+
+CATALOG_FORMAT_FILTERS = (
+    ("",       "Барлығы"),
+    ("single", "Бір бөлімді"),
+    ("serial", "Көп бөлімді"),
+)
+
+def apply_catalog_filters(stories: list, sort: str = "popularity", status: str = "",
+                          audience: str = "", length: str = "",
+                          format: str = "") -> list:
     """Применяет сорт + status-фильтр к списку Story.
 
     Используется search_results и genre_detail. Sort:
@@ -532,6 +580,12 @@ def apply_catalog_filters(stories: list, sort: str = "popularity", status: str =
     out = list(stories)
     if status:
         out = [s for s in out if s.status == status]
+    if audience:
+        out = [s for s in out if s.audience == audience]
+    if length:
+        out = [s for s in out if s.length_bucket == length]
+    if format:
+        out = [s for s in out if s.format == format]
 
     if sort == "alphabet":
         out.sort(key=lambda s: s.title.lower())
@@ -543,7 +597,9 @@ def apply_catalog_filters(stories: list, sort: str = "popularity", status: str =
 
 
 def filter_catalog(*, query: str = "", genre: str = "", tag: str = "",
-                   status: str = "", sort: str = "popularity") -> list:
+                   status: str = "", sort: str = "popularity",
+                   audience: str = "", length: str = "",
+                   format: str = "") -> list:
     """Единый фильтр-пайплайн для унифицированного каталога (DEC-27).
 
     Применяет все источники AND-комбинацией. Для пустых параметров — no-op.
@@ -563,7 +619,9 @@ def filter_catalog(*, query: str = "", genre: str = "", tag: str = "",
         else:
             out = []  # неизвестный/непринятый тег → пусто
 
-    return apply_catalog_filters(out, sort=sort, status=status)
+    return apply_catalog_filters(out, sort=sort, status=status,
+                                 audience=audience, length=length,
+                                 format=format)
 
 
 def related_stories(slug: str, limit: int = 6) -> list:
@@ -712,101 +770,84 @@ class Collection:
 
 COLLECTIONS = [
     Collection(
-        slug="zhaz-okyrman", name="Жаз оқырмандарына",
-        count=6, tint_hue=75, icon="planet",
+        slug="kulki-kerek", name="Күлкі керек болғанда",
+        count=4, tint_hue=60, icon="smile",
+        cover_slugs=("temniy-lord", "arhimag", "dalney-berega"),
+        curator="редакция",
+        description="Күнің ауыр болса да, бір-екі беттен кейін тынысың ашылатын жеңіл, жылы, тапқыр оқиғалар.",
+        story_slugs=("temniy-lord", "arhimag", "dalney-berega", "sila-imperii"),
+    ),
+    Collection(
+        slug="auyr-kun", name="Бәрі ауыр болып тұрғанда",
+        count=6, tint_hue=250, icon="drop",
         cover_slugs=("dalney-berega", "temniy-lord", "igra-kuklovoda"),
         curator="редакция",
-        description="Жазғы демалысқа арналған жеңіл әрі қызық оқу. Ұзақ түнгі поезд сапары немесе теңіз жағасында бір күн — осы тізіммен.",
+        description="Ішіңде көп сөз қалып, бірақ ешкімге айтқың келмейтін күндерге арналған тыныш әрі терең мәтіндер.",
         story_slugs=("dalney-berega", "temniy-lord", "igra-kuklovoda", "sila-imperii", "arhimag", "kronchessii"),
     ),
     Collection(
-        slug="bir-otyru", name="Бір отыруда оқу",
-        count=3, tint_hue=210, icon="book",
-        cover_slugs=("kronchessii", "dalney-berega", "temniy-lord"),
+        slug="algashky-mahabbat", name="Алғашқы махаббат",
+        count=4, tint_hue=8, icon="heart",
+        cover_slugs=("dalney-berega", "arhimag", "sila-imperii"),
         curator="редакция",
-        description="Қысқа форматтар — бір кешке. Әр шығарма 3 сағаттан аспайды.",
-        story_slugs=("temniy-lord", "dalney-berega", "sila-imperii"),
+        description="Айтылмай қалған сөздер, ыңғайсыз үнсіздік, қызғаныш және бірінші рет біреуді қатты ойлау туралы.",
+        story_slugs=("dalney-berega", "arhimag", "sila-imperii", "kronchessii"),
     ),
     Collection(
-        slug="kazak-avt", name="Қазақ авторлары",
+        slug="kazak-avt", name="Өзіңді бөтен сезінгенде",
         count=4, tint_hue=195, icon="feather",
         cover_slugs=("temniy-lord", "igra-kuklovoda", "kronchessii"),
-        curator="Бекжан Тұрсынов",
-        description="Қазақстандық авторлардың үздік шығармалары. Жас прозаиктерден танымал классиктерге дейін.",
+        curator="редакция",
+        description="Сыныпта, үйде немесе өз ойыңның ішінде жалғыз қалғандай сезілген сәттерге арналған оқиғалар.",
         story_slugs=("kronchessii", "arhimag", "sila-imperii", "dalney-berega"),
     ),
     Collection(
-        slug="korkynyshty", name="Қорқынышты түн",
+        slug="aramyzda-qubyzhyq", name="Арамыздағы құбыжықтар",
         count=3, tint_hue=25, icon="skull",
         cover_slugs=("igra-kuklovoda", "kronchessii", "dalney-berega"),
         curator="редакция",
-        description="Күн батқанда оқуға арналған. Тек ересектерге ұсынылады.",
+        description="Қорқыныш сыртта емес, кейде адамдардың ішінде жүргенін сездіретін триллер мен қараңғы фэнтези.",
         story_slugs=("igra-kuklovoda", "temniy-lord", "kronchessii"),
-    ),
-    # ── Настроенческие подборки ────────────────────────────────────────
-    Collection(
-        slug="kozzhasty-tun", name="Көзжасты түн",
-        count=5, tint_hue=250, icon="drop",
-        cover_slugs=("dalney-berega", "kronchessii", "temniy-lord"),
-        curator="редакция",
-        description="Ішкі үнсіздікке арналған шығармалар — қайғы, қимас сезім, өткен күндер туралы.",
-        story_slugs=("dalney-berega", "kronchessii", "temniy-lord", "sila-imperii", "arhimag"),
-    ),
-    Collection(
-        slug="mektep-kundeligi", name="Мектеп күнделігі",
-        count=4, tint_hue=130, icon="backpack",
-        cover_slugs=("temniy-lord", "arhimag", "sila-imperii"),
-        curator="редакция",
-        description="Мектеп жасындағы кейіпкерлер: сабақ, достық, алғашқы сезімдер.",
-        story_slugs=("temniy-lord", "arhimag", "sila-imperii", "kronchessii"),
-    ),
-    Collection(
-        slug="zhuldyzdan-kelgender", name="Жұлдыздан келгендер",
-        count=4, tint_hue=280, icon="planet",
-        cover_slugs=("sila-imperii", "arhimag", "kronchessii"),
-        curator="редакция",
-        description="Бөгде планеталық қонақтар, ғарыштық кездесулер және белгісіз әлемдер.",
-        story_slugs=("sila-imperii", "arhimag", "kronchessii", "igra-kuklovoda"),
     ),
     Collection(
         slug="kala-anyzdary", name="Қала аңыздары",
         count=5, tint_hue=15, icon="cityscape",
         cover_slugs=("igra-kuklovoda", "temniy-lord", "kronchessii"),
         curator="редакция",
-        description="Қалалық мифтер, түнгі көше әңгімелері, шынайылық пен сиқыр шегіндегі оқиғалар.",
+        description="Түнгі көше, жабық подъезд, ескі мектеп, біреу айтып берген сияқты көрінетін қауіпті әңгімелер.",
         story_slugs=("igra-kuklovoda", "temniy-lord", "kronchessii", "dalney-berega", "arhimag"),
     ),
     Collection(
-        slug="kalam-ustagan-kyzdar", name="Қалам ұстаған қыздар",
-        count=4, tint_hue=340, icon="feather",
-        cover_slugs=("dalney-berega", "arhimag", "kronchessii"),
+        slug="geimerler-turaly", name="Ойыннан кейін де ойда қалатын",
+        count=4, tint_hue=280, icon="planet",
+        cover_slugs=("sila-imperii", "arhimag", "kronchessii"),
         curator="редакция",
-        description="Қыз авторлардың шығармалары — нәзік, ашық және ерекше дауыстар.",
-        story_slugs=("dalney-berega", "arhimag", "kronchessii", "sila-imperii"),
+        description="Виртуал әлем, команда, жеңіс құмарлығы және экран сөнгеннен кейін басталатын шынайы таңдау.",
+        story_slugs=("sila-imperii", "arhimag", "kronchessii", "igra-kuklovoda"),
     ),
     Collection(
-        slug="zhana-zhyl-tuninde", name="Жаңа жыл түнінде",
-        count=3, tint_hue=0, icon="fir",
-        cover_slugs=("arhimag", "temniy-lord", "dalney-berega"),
+        slug="sport-minez", name="Спорт мінезді шыңдағанда",
+        count=4, tint_hue=130, icon="trophy",
+        cover_slugs=("sila-imperii", "dalney-berega", "kronchessii"),
         curator="редакция",
-        description="Мерекелік көңіл-күй, ғажайыпқа сенім және қыс кешінің жылуы.",
-        story_slugs=("arhimag", "temniy-lord", "dalney-berega"),
+        description="Жаттығу, жарыс, қысым, жеңіліс және өзіңді қайта жинап шығу туралы жігерлі мәтіндер.",
+        story_slugs=("sila-imperii", "dalney-berega", "kronchessii", "arhimag"),
     ),
     Collection(
-        slug="tiri-olikter", name="Тірі өліктер",
-        count=3, tint_hue=100, icon="skull",
-        cover_slugs=("igra-kuklovoda", "sila-imperii", "kronchessii"),
+        slug="mektep-qupiyalary", name="Мектептегі құпиялар",
+        count=4, tint_hue=145, icon="backpack",
+        cover_slugs=("igra-kuklovoda", "temniy-lord", "arhimag"),
         curator="редакция",
-        description="Зомби-апокалипсис, тірі қалу күресі және адамзаттан кейінгі әлем.",
-        story_slugs=("igra-kuklovoda", "sila-imperii", "kronchessii"),
+        description="Күнделік, сыныптағы сыбыс, жоғалған заттар және сабақтан кейін ашылатын кішкентай детективтер.",
+        story_slugs=("igra-kuklovoda", "temniy-lord", "arhimag", "kronchessii"),
     ),
     Collection(
-        slug="kulki-men-kuanysh", name="Күлкі мен қуаныш",
-        count=4, tint_hue=60, icon="smile",
-        cover_slugs=("temniy-lord", "arhimag", "dalney-berega"),
+        slug="bir-keshke", name="Бір кешке жететін қысқа мәтіндер",
+        count=3, tint_hue=210, icon="book",
+        cover_slugs=("sila-imperii", "dalney-berega", "temniy-lord"),
         curator="редакция",
-        description="Жеңіл, жылы, көңіл көтеретін шығармалар — кейде күлкі ең жақсы дәрі.",
-        story_slugs=("temniy-lord", "arhimag", "dalney-berega", "sila-imperii"),
+        description="Ұзақ серияға кірмей-ақ, бүгін бастап бүгін аяқтағың келетін қысқа әрі жинақы оқиғалар.",
+        story_slugs=("sila-imperii", "dalney-berega", "temniy-lord"),
     ),
 ]
 
@@ -1051,7 +1092,7 @@ LIBRARY_BY_USER: dict = {
     "aidana": [
         # ── Оқу үстіндегі ──
         LibraryEntry("dalney-berega",  "reading", "2 күн бұрын", progress_chapter=4),
-        LibraryEntry("kronchessii",    "reading", "1 апта бұрын", progress_chapter=11),
+        LibraryEntry("kronchessii",    "reading", "1 апта бұрын", progress_chapter=2),
         # ── Сақталған ──
         LibraryEntry("temniy-lord",    "saved",   "бүгін"),
         LibraryEntry("igra-kuklovoda", "saved",   "3 күн бұрын"),
@@ -1222,3 +1263,4 @@ PLATFORM_STATS = {
     "authors":   4_821,
     "contests":      3,
 }
+

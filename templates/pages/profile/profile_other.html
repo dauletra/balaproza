@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block title %}
-    {% if profile_user %}{{ profile_user.name }} (@{{ username }}){% else %}@{{ username }}{% endif %} — Balaproza
+    {% if profile_user %}{{ profile_user.public_name }} (@{{ username }}){% else %}@{{ username }}{% endif %} — Balaproza
 {% endblock %}
 
 {% block content %}
@@ -13,10 +13,10 @@
 {% else %}
     {# ── Шапка ── #}
     <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-        {% include "components/avatar.html" with size=96 name=profile_user.name username=profile_user.username %}
+        {% include "components/avatar.html" with size=96 name=profile_user.public_name username=profile_user.username %}
 
         <div class="flex min-w-0 flex-1 flex-col gap-1.5">
-            <h1 class="font-display text-3xl font-bold text-slate-900">{{ profile_user.name }}</h1>
+            <h1 class="font-display text-3xl font-bold text-slate-900">{{ profile_user.public_name }}</h1>
             <p class="font-sans text-sm text-slate-500">@{{ profile_user.username }}</p>
             {% if profile_user.bio %}
                 <p class="mt-1 font-sans text-sm leading-snug text-slate-700">{{ profile_user.bio }}</p>

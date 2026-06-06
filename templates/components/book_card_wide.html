@@ -24,7 +24,7 @@
                 </a>
                 <a href="{% url 'core:profile_other' username=story.author.username %}"
                    class="mt-0.5 block font-sans text-[13px] text-slate-500 hover:text-brand">
-                    {{ story.author.name }}
+                    {{ story.author.public_name }}
                 </a>
             </div>
             {% if status_key %}
@@ -48,6 +48,16 @@
             <p class="line-clamp-4 font-sans text-[13px] leading-snug text-slate-600">{{ description }}</p>
         {% endif %}
 
+        <div class="flex flex-wrap items-center gap-1.5">
+            {% if story.audience %}
+                <span class="inline-flex h-6 items-center rounded-chip bg-slate-100 px-2 font-sans text-[11px] font-bold text-slate-600">{{ story.audience }}</span>
+            {% endif %}
+            <span class="inline-flex h-6 items-center gap-1 rounded-chip bg-slate-100 px-2 font-sans text-[11px] font-semibold text-slate-600">
+                {% include "components/icon.html" with name="book" size=11 %}
+                {{ story.read_minutes }} минут оқу
+            </span>
+        </div>
+
         {% if story.tags_resolved %}
             {% include "components/tag_list.html" with tags=story.tags_resolved|slice:":3" viewer_is_author=False size="sm" %}
         {% endif %}
@@ -57,7 +67,6 @@
             {% include "components/stat_pill.html" with icon="thumbs-up" value=story.likes label=story.likes|stringformat:"d"|add:" ұнату" %}
             {% include "components/stat_pill.html" with icon="eye" value=story.views label=story.views|stringformat:"d"|add:" оқылды" %}
             {% include "components/stat_pill.html" with icon="message-caption" value=story.comments label=story.comments|stringformat:"d"|add:" пікір" %}
-            <span class="font-sans text-xs text-slate-500">· {{ story.chapters }} бөлім</span>
         </div>
     </div>
 </article>

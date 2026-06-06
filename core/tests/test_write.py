@@ -289,7 +289,7 @@ class ChapterEditorEdit(TestCase):
 
     def test_prefilled_chapter_body(self):
         ch = stub_data.chapter_of(self.SLUG, self.CH)
-        # Первые слова длинного _SAMPLE_BODY
+        # Первые слова длинного текста из core/story_texts
         self.assertContains(self.response, 'Бірде ерте таңда')
 
 

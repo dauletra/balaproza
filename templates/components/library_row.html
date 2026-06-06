@@ -20,7 +20,7 @@
 
         <a href="{% url 'core:profile_other' username=entry.story.author.username %}"
            class="font-sans text-xs text-slate-500 hover:text-brand">
-            {{ entry.story.author.name }}
+            {{ entry.story.author.public_name }}
         </a>
 
         {% if entry.story.genres_resolved %}
@@ -35,7 +35,7 @@
         <div class="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2">
             {% if entry.kind == "reading" %}
                 <span class="font-sans text-xs text-slate-600">
-                    {{ entry.progress_chapter }} / {{ entry.story.chapters }} бөлім
+                    {% if entry.story.is_single %}{{ entry.story.read_minutes }} минут оқу{% else %}{{ entry.progress_chapter }} / {{ entry.story.chapters }} бөлім{% endif %}
                 </span>
                 {% with chap=entry.progress_chapter|stringformat:"d" %}
                 {% url 'core:story_detail' slug=entry.story.slug as detail_base %}
@@ -44,11 +44,11 @@
                 {% endwith %}
                 {% endwith %}
             {% elif entry.kind == "saved" %}
-                <span class="font-sans text-xs text-slate-600">{{ entry.story.chapters }} бөлім</span>
+                <span class="font-sans text-xs text-slate-600">{% if entry.story.is_single %}бір бөлімді{% else %}{{ entry.story.chapters }} бөлім{% endif %}</span>
                 {% url 'core:story_detail' slug=entry.story.slug as read_href %}
                 {% include "components/button.html" with kind="secondary" label="Оқу" icon="book" href=read_href %}
             {% elif entry.kind == "done" %}
-                <span class="font-sans text-xs text-status-info-fg">Оқылды · {{ entry.story.chapters }} бөлім</span>
+                <span class="font-sans text-xs text-status-info-fg">Оқылды · {% if entry.story.is_single %}бір бөлімді{% else %}{{ entry.story.chapters }} бөлім{% endif %}</span>
                 {% url 'core:story_detail' slug=entry.story.slug as reread_href %}
                 {% include "components/button.html" with kind="secondary" label="Қайта оқу" href=reread_href %}
             {% endif %}

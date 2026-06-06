@@ -146,7 +146,7 @@ class ProfileMeAuthed(TestCase):
 
     def test_header_shows_name_and_username(self):
         r = self.client.get(reverse('core:profile_me'))
-        self.assertContains(r, 'Айдана Серікқызы')
+        self.assertContains(r, 'aidana')
         self.assertContains(r, '@aidana')
 
     def test_stats_block_present(self):
@@ -193,7 +193,7 @@ class ProfileOtherKnown(TestCase):
     def test_renders_for_guest(self):
         r = self.client.get(reverse('core:profile_other', kwargs={'username': self.USERNAME}))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'Алмат Рысқали')
+        self.assertContains(r, 'Rudazov')
         # Гость видит кнопку «Жазылу» — но это <a> на /auth/login/?next=
         self.assertContains(r, 'Жазылу')
         self.assertContains(r, '/auth/login/')

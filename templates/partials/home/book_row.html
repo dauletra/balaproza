@@ -11,9 +11,13 @@
 <section>
     {% include "components/section_header.html" with title=title eyebrow=eyebrow link=link|default:"барлығы →" link_href=link_href|default:"#" %}
 
-    <div class="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
-        {% for s in books|slice:":6" %}
-            {% include "components/book_card_small.html" with story=s %}
-        {% endfor %}
+    <div class="-mx-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 lg:overflow-visible">
+        <div class="flex w-max gap-3.5 lg:grid lg:w-full lg:grid-cols-6">
+            {% for s in books|slice:":6" %}
+                <div class="w-[138px] shrink-0 sm:w-[154px] lg:w-auto">
+                    {% include "components/book_card_small.html" with story=s %}
+                </div>
+            {% endfor %}
+        </div>
     </div>
 </section>

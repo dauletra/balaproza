@@ -90,6 +90,7 @@ Persisted fields:
 - `cover`
 - `annotation`
 - `status`
+- `format`: `single`, `serial`
 - `audience`
 - `primary_genre`
 - `secondary_genre`
@@ -110,11 +111,17 @@ Status UX labels:
 Notes:
 - `OnProcess` is a continuation state, not a moderation state.
 - Public catalog should only include `Published` and any explicitly allowed public states.
+- `format=single` is a one-shot work (story/essay/fairy tale/novella) rendered as full text without chapter index.
+- `format=serial` is a chaptered work rendered with chapter navigation.
+- Do not infer format from chapter count; authors choose it explicitly.
 - Current templates expect `primary_genre`, `genres_resolved`, `tags_resolved`, and `author`-like accessors.
 
 ### Chapter
 
 Source stub: `Chapter`, `CHAPTERS_BY_STORY`.
+
+Stub text bodies live outside `stub_data.py` in `core/story_texts/<story-slug>/<chapter-number>.txt`.
+`stub_data._chapter()` loads these files and derives `char_count` from the body text. Keep long prose out of `stub_data.py`.
 
 Persisted fields:
 - `story`
@@ -251,7 +258,7 @@ Current views rely on these helper shapes from `stub_data.py`. In F14 they shoul
 - `search_stories(query)`
 - `search_authors(query)`
 - `related_stories(story, limit=6)`
-- `filter_catalog(query="", genre="", tag="", status="", sort="popularity")`
+- `filter_catalog(query="", genre="", tag="", status="", sort="popularity", audience="", length="", format="")`
 - `library_of(user, kind=None)`
 - `reader_stats(user)`
 - `writer_stats(user)`
@@ -274,7 +281,8 @@ Templates should continue receiving objects with these attributes:
 
 Story:
 - `slug`, `title`, `cover`, `annotation`, `status`, `audience`
-- `views`, `likes`, `comments`, `chapters`
+- `format`, `format_label`, `is_single`, `is_serial`
+- `views`, `likes`, `comments`, `chapters`, `read_minutes`, `length_bucket`
 - `author`
 - `primary_genre`
 - `genres_resolved`

@@ -21,7 +21,7 @@
         </a>
         <h1 class="mt-3 font-display text-3xl font-bold text-slate-900">Профильді өңдеу</h1>
         <p class="mt-1.5 font-sans text-sm text-slate-600">
-            Аты-жөні, био және байланыс параметрлерін жаңартыңыз.
+            Авторлық атыңызды, ресми атыңызды және биоңызды жаңартыңыз.
         </p>
     </header>
 
@@ -31,8 +31,10 @@
           class="flex flex-col gap-6 rounded-hero border border-slate-200 bg-white p-6 sm:p-8">
         {% csrf_token %}
 
-        {# ── Аты-жөні (FR-AUTH-04) ── #}
-        {% include "components/input_field.html" with name="name" label="Аты-жөні" value=profile_user.name required=True maxlength=80 %}
+        {# ── Авторлық аты (FR-AUTH-04) ── #}
+        {% include "components/input_field.html" with name="pen_name" label="Авторлық атыңыз" value=profile_user.public_name required=True maxlength=80 %}
+
+        {% include "components/input_field.html" with name="name" label="Ресми аты-жөні" value=profile_user.name required=True maxlength=80 %}
 
         {# ── Жынысы ── #}
         <fieldset class="flex flex-col gap-2">

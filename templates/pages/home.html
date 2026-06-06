@@ -12,14 +12,11 @@
             {% include "partials/home/hero_guest.html" %}
         {% endif %}
 
-        {# ── Конкурс-полоса (выносит приз/таймер above the fold, в т.ч. на mobile) ── #}
-        {% include "partials/home/contest_banner.html" %}
-
-        {# ── Жанрлар — отдельный блок с тайлами (вариант B, см. genres_section) ── #}
+        {# ── Жанрлар — компактный переключатель с книжной полкой ── #}
         {% include "partials/home/genres_section.html" %}
 
         {% if page_state == 'loading' %}
-            {# ── Скелетон: Аптаның кітабы + один ряд карточек ── #}
+            {# ── Скелетон: редакциялық жинақтар + один ряд карточек ── #}
             {% include "components/skeleton_box.html" with h="h-[200px]" radius="hero" %}
             <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
                 {% for _ in '123456'|make_list %}
@@ -29,9 +26,19 @@
         {% elif page_state == 'error' %}
             {% include "components/error_state.html" with message="Басты бет контентін жүктеу мүмкін болмады." %}
         {% else %}
-            {% include "partials/home/book_of_week.html" %}
+            {% include "partials/home/collections.html" %}
 
             {% include "partials/home/book_row.html" with title="Ең көп оқылған кітаптар" books=top_stories %}
+
+            {% include "partials/home/book_row.html" with title="Жаңа шығармалар" eyebrow="редакциялық сөре" books=latest_stories link="каталог →" link_href="/catalog/?sort=recent" %}
+
+            {% include "partials/home/book_row.html" with title="10+ оқырманға" eyebrow="жас бойынша" books=age_10_stories link="10+ көру →" link_href="/catalog/?audience=10%2B" %}
+
+            {% include "partials/home/book_row.html" with title="Қысқа оқылатын әңгімелер" eyebrow="бір оқылым" books=short_stories link="қысқа мәтіндер →" link_href="/catalog/?format=single&length=short" %}
+
+            {% include "partials/home/book_row.html" with title="Жалғасып оқылатын сериялар" eyebrow="көп бөлімді" books=serial_stories link="сериялар →" link_href="/catalog/?format=serial" %}
+
+            {% include "partials/home/book_row.html" with title="Жас авторлар" eyebrow="жаңа дауыстар" books=young_author_stories link="автор болу →" link_href="/write/new/" %}
         {% endif %}
     </div>
 {% endblock %}

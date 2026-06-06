@@ -21,6 +21,7 @@ class IndexesAreConsistent(unittest.TestCase):
         self.assertEqual(len(stub_data.AUTHORS_BY_USERNAME), len(stub_data.AUTHORS))
         for a in stub_data.AUTHORS:
             self.assertIn(a.username, stub_data.AUTHORS_BY_USERNAME)
+            self.assertTrue(a.public_name)
 
     def test_stories_by_slug_covers_all(self):
         self.assertEqual(len(stub_data.STORIES_BY_SLUG), len(stub_data.STORIES))
@@ -55,6 +56,32 @@ class StoryRelations(unittest.TestCase):
         for s in stub_data.STORIES:
             with self.subTest(story=s.slug):
                 self.assertLessEqual(len(s.genres), 2)
+
+    def test_stub_chapters_have_loaded_body_text(self):
+        for slug, chapters in stub_data.CHAPTERS_BY_STORY.items():
+            for chapter in chapters:
+                with self.subTest(story=slug, chapter=chapter.number):
+                    self.assertTrue(chapter.body)
+                    self.assertGreater(chapter.char_count, 0)
+
+    def test_single_stories_have_one_loaded_chapter(self):
+        for story in stub_data.STORIES:
+            if not story.is_single:
+                continue
+            with self.subTest(story=story.slug):
+                chapters = stub_data.chapters_of(story.slug)
+                self.assertEqual(story.chapters, 1)
+                self.assertEqual(len(chapters), 1)
+                self.assertEqual(chapters[0].number, 1)
+
+    def test_public_reading_label_hides_minutes_for_serial(self):
+        for story in stub_data.STORIES:
+            with self.subTest(story=story.slug):
+                if story.is_single:
+                    self.assertIn("минут", story.reading_meta_label)
+                else:
+                    self.assertNotIn("минут", story.reading_meta_label)
+                    self.assertIn("бөлім", story.reading_meta_label)
 
 
 class CollectionRelations(unittest.TestCase):

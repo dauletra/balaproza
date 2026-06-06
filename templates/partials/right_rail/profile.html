@@ -40,11 +40,11 @@
         <ul class="flex flex-col gap-2.5">
             {% for a in following %}
                 <li class="flex items-center gap-3">
-                    {% include "components/avatar.html" with size=32 name=a.name username=a.username %}
+                    {% include "components/avatar.html" with size=32 name=a.public_name username=a.username %}
                     <div class="min-w-0 flex-1">
                         <a href="{% url 'core:profile_other' username=a.username %}"
                            class="block truncate font-sans text-sm font-semibold text-slate-900 hover:text-brand">
-                            {{ a.name }}
+                            {{ a.public_name }}
                         </a>
                         <span class="font-sans text-xs text-slate-500">{{ a.works }} шығарма</span>
                     </div>

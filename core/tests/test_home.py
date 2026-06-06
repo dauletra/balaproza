@@ -42,6 +42,14 @@ class HomeGuestMode(TestCase):
         self.assertContains(self.response, reverse('core:catalog'))
         self.assertContains(self.response, 'aria-label="Оқу"')
 
+    def test_short_shelf_contains_only_single_works(self):
+        self.assertTrue(self.response.context['short_stories'])
+        self.assertTrue(all(s.is_single for s in self.response.context['short_stories']))
+
+    def test_serial_shelf_contains_only_serial_works(self):
+        self.assertTrue(self.response.context['serial_stories'])
+        self.assertTrue(all(s.is_serial for s in self.response.context['serial_stories']))
+
 
 class HomeAuthedMode(TestCase):
 

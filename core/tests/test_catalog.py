@@ -187,6 +187,11 @@ class HelperFunctions(TestCase):
         self.assertEqual([s.slug for s in upper], [s.slug for s in lower])
         self.assertGreater(len(upper), 0)
 
+    def test_search_finds_author_pen_name(self):
+        result = stub_data.search_stories('Rudazov')
+        self.assertGreater(len(result), 0)
+        self.assertTrue(any(s.author.public_name == 'Rudazov' for s in result))
+
 
 # ───────────────── DEC-27: унифицированный catalog-движок ─────────────────
 
@@ -218,6 +223,10 @@ class CatalogPage(TestCase):
     def test_book_cards_show_story_tags(self):
         self.assertContains(self.response, 'арман')
         self.assertContains(self.response, 'мистика')
+
+    def test_book_cards_show_read_time_not_chapter_count_badge(self):
+        self.assertContains(self.response, 'минут оқу')
+        self.assertNotContains(self.response, '12 бөлім')
 
 
 class CatalogFilterCombination(TestCase):
@@ -279,6 +288,18 @@ class CatalogFilterHelper(TestCase):
         for s in out:
             self.assertIn('fantezi', s.genres)
             self.assertIn('mektep', s.tags)
+
+    def test_format_single_filters_one_shot_stories(self):
+        out = stub_data.filter_catalog(format='single')
+        self.assertGreater(len(out), 0)
+        for s in out:
+            self.assertTrue(s.is_single)
+
+    def test_length_and_format_combination_is_and(self):
+        out = stub_data.filter_catalog(format='single', length='short')
+        for s in out:
+            self.assertTrue(s.is_single)
+            self.assertEqual(s.length_bucket, 'short')
 
 
 # ───────────────── docs/11 Phase 3: /tag/<slug>/ ─────────────────

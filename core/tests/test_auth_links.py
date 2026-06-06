@@ -48,7 +48,7 @@ class SignupPage(TestCase):
 
     def test_has_name_input(self):
         self.assertContains(self.response, 'name="name"')
-        self.assertContains(self.response, 'Аты-жөні')
+        self.assertContains(self.response, 'Авторлық атыңыз')
 
     def test_gender_radios(self):
         self.assertContains(self.response, 'name="gender"')

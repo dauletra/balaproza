@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}{% if story %}{{ story.title }} — {{ story.author.name }}{% else %}Шығарма{% endif %} — Balaproza{% endblock %}
+{% block title %}{% if story %}{{ story.title }} — {{ story.author.public_name }}{% else %}Шығарма{% endif %} — Balaproza{% endblock %}
 
 {% block content %}
 {% if not story %}
@@ -14,7 +14,8 @@
     </div>
 {% else %}
 
-<div class="mx-auto flex max-w-[920px] flex-col gap-8">
+<div class="mx-auto flex max-w-[920px] flex-col gap-8"
+     x-data="{ readerSize: 'reader-size-base', readerWidth: 'reader-width-comfort', readerTheme: 'reader-theme-paper' }">
 
     {# ─────────────────────── Шапка произведения ─────────────────────── #}
     <header class="grid grid-cols-[96px_minmax(0,1fr)] gap-4 sm:grid-cols-[136px_minmax(0,1fr)] sm:gap-5 md:grid-cols-[156px_minmax(0,1fr)] md:gap-6">
@@ -45,8 +46,8 @@
 
             <a href="{% url 'core:profile_other' username=story.author.username %}"
                class="inline-flex items-center gap-2 self-start font-sans text-sm text-slate-600 hover:text-brand">
-                {% include "components/avatar.html" with size=24 name=story.author.name username=story.author.username %}
-                <span>{{ story.author.name }}</span>
+                {% include "components/avatar.html" with size=24 name=story.author.public_name username=story.author.username %}
+                <span>{{ story.author.public_name }}</span>
             </a>
 
             <div class="mt-0.5 flex flex-wrap items-center gap-3">
@@ -54,7 +55,8 @@
                 {% include "components/stat_pill.html" with icon="heart" value=story.likes %}
                 {% include "components/stat_pill.html" with icon="eye" value=story.views %}
                 {% include "components/stat_pill.html" with icon="message-caption" value=story.comments %}
-                <span class="font-sans text-xs text-slate-500">· {{ story.chapters }} бөлім</span>
+                <span class="font-sans text-xs text-slate-500">· {{ story.format_badge_label }}</span>
+                <span class="font-sans text-xs text-slate-500">· {{ story.reading_meta_label }}</span>
             </div>
 
             <div class="mt-2 flex flex-wrap items-center gap-2.5">
@@ -94,7 +96,7 @@
         </p>
     </section>
 
-    {% if chapters %}
+    {% if chapters and story.is_serial %}
         <details class="lg:hidden rounded-lg border border-slate-200 bg-white p-4" aria-label="Мобильді бөлімдер">
             <summary class="flex cursor-pointer list-none items-center justify-between gap-3 font-sans text-sm font-bold text-slate-900">
                 <span>Бөлімдер</span>
@@ -119,13 +121,15 @@
         <section id="chapter-{{ chapter_number }}" class="scroll-mt-24 rounded-lg bg-white p-6 shadow-sm sm:p-8">
             <header class="mb-5">
                 <p class="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    {{ chapter_number }}-бөлім · {{ chapters|length }} бөлімнен
+                    {% if story.is_single %}Толық мәтін{% else %}{{ chapter_number }}-бөлім · {{ chapters|length }} бөлімнен{% endif %}
                 </p>
-                <h2 class="mt-1 font-display text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">
-                    {{ current.title }}
-                </h2>
+                {% if story.is_serial %}
+                    <h2 class="mt-1 font-display text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">
+                        {{ current.title }}
+                    </h2>
+                {% endif %}
 
-                {% if current_chapter_number and not is_teaser %}
+                {% if current_chapter_number and not is_teaser and story.is_serial %}
                     {% widthratio current_chapter_number chapters|length 100 as pct %}
                     <div class="mt-4 h-1.5 overflow-hidden rounded-pill bg-slate-200">
                         <div class="h-full bg-brand" style="width: {{ pct }}%"></div>
@@ -136,10 +140,40 @@
                 {% endif %}
             </header>
 
+            <div class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                <div class="flex items-center gap-1">
+                    <button type="button" aria-label="Кіші қаріп" @click="readerSize = 'reader-size-base'"
+                            :class="readerSize == 'reader-size-base' ? 'border-brand text-brand' : 'border-slate-300 text-slate-600'"
+                            class="grid h-8 w-8 place-items-center rounded-md border bg-white font-sans text-xs font-bold hover:border-brand hover:text-brand">A</button>
+                    <button type="button" aria-label="Үлкен қаріп" @click="readerSize = 'reader-size-large'"
+                            :class="readerSize == 'reader-size-large' ? 'border-brand text-brand' : 'border-slate-300 text-slate-600'"
+                            class="grid h-8 w-8 place-items-center rounded-md border bg-white font-sans text-sm font-bold hover:border-brand hover:text-brand">A</button>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button type="button" aria-label="Тар жол" @click="readerWidth = 'reader-width-narrow'"
+                            :class="readerWidth == 'reader-width-narrow' ? 'border-brand text-brand' : 'border-slate-300 text-slate-600'"
+                            class="grid h-8 w-8 place-items-center rounded-md border bg-white text-slate-600 hover:border-brand hover:text-brand">{% include "components/icon.html" with name="list" size=14 %}</button>
+                    <button type="button" aria-label="Кең жол" @click="readerWidth = 'reader-width-comfort'"
+                            :class="readerWidth == 'reader-width-comfort' ? 'border-brand text-brand' : 'border-slate-300 text-slate-600'"
+                            class="grid h-8 w-8 place-items-center rounded-md border bg-white text-slate-600 hover:border-brand hover:text-brand">{% include "components/icon.html" with name="adjustments" size=14 %}</button>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button type="button" aria-label="Ақ фон" @click="readerTheme = 'reader-theme-paper'"
+                            :class="readerTheme == 'reader-theme-paper' ? 'border-brand' : 'border-slate-300'"
+                            class="h-8 w-8 rounded-md border bg-white hover:border-brand"></button>
+                    <button type="button" aria-label="Жылы фон" @click="readerTheme = 'reader-theme-warm'"
+                            :class="readerTheme == 'reader-theme-warm' ? 'border-brand' : 'border-slate-300'"
+                            class="h-8 w-8 rounded-md border bg-[#fff7ed] hover:border-brand"></button>
+                    <button type="button" aria-label="Түнгі фон" @click="readerTheme = 'reader-theme-night'"
+                            :class="readerTheme == 'reader-theme-night' ? 'border-brand' : 'border-slate-300'"
+                            class="h-8 w-8 rounded-md border bg-slate-900 hover:border-brand"></button>
+                </div>
+            </div>
+
             {% if is_teaser %}
                 {# Тизер первой главы: max-h + fade-gradient, разворот по клику. #}
                 <div x-data="{ expanded: false }" class="relative">
-                    <article :class="!expanded ? 'max-h-72 overflow-hidden' : ''"
+                    <article :class="[!expanded ? 'max-h-72 overflow-hidden' : '', readerSize, readerWidth, readerTheme]"
                              class="prose-reader font-sans text-[17px] leading-[1.75] text-slate-800">
                         {{ current.body|linebreaks }}
                     </article>
@@ -155,7 +189,8 @@
                     </div>
                 </div>
             {% else %}
-                <article class="prose-reader font-sans text-[17px] leading-[1.75] text-slate-800">
+                <article :class="[readerSize, readerWidth, readerTheme]"
+                         class="prose-reader font-sans text-[17px] leading-[1.75] text-slate-800">
                     {{ current.body|linebreaks }}
                 </article>
             {% endif %}
@@ -163,7 +198,28 @@
             {# FR-STORY-12: лайк главы #}
             {% include "components/chapter_like.html" with likes=current.likes liked=current.liked %}
 
+            <section class="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4"
+                     x-data="{ picked: '' }">
+                <h3 class="font-display text-sm font-bold text-slate-900">{% if story.is_single %}Оқығаннан кейін{% else %}Бұл бөлімнен кейін{% endif %}</h3>
+                <p class="mt-1 font-sans text-sm text-slate-600">Кейіпкердің келесі таңдауы қандай болуы мүмкін?</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    <button type="button" @click="picked = 'courage'"
+                            :class="picked == 'courage' ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white text-slate-700'"
+                            class="rounded-pill border px-3 py-1.5 font-sans text-xs font-semibold hover:border-brand">Батыл қадам</button>
+                    <button type="button" @click="picked = 'friend'"
+                            :class="picked == 'friend' ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white text-slate-700'"
+                            class="rounded-pill border px-3 py-1.5 font-sans text-xs font-semibold hover:border-brand">Досымен сөйлесу</button>
+                    <button type="button" @click="picked = 'secret'"
+                            :class="picked == 'secret' ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white text-slate-700'"
+                            class="rounded-pill border px-3 py-1.5 font-sans text-xs font-semibold hover:border-brand">Құпияны іздеу</button>
+                </div>
+                <p x-show="picked" x-cloak class="mt-3 font-sans text-xs font-semibold text-brand-dark">
+                    Таңдауыңыз белгіленді. {% if story.is_single %}Шығарма туралы{% else %}Бұл бөлім туралы{% endif %} пікірде ойыңызды кеңейте аласыз.
+                </p>
+            </section>
+
             {# Навигация между главами — full reload на ?chapter=N±1 с якорем на тексте #}
+            {% if story.is_serial %}
             <nav class="mt-8 flex items-center justify-between gap-3 border-t border-slate-200 pt-6 font-sans text-sm">
                 {% if has_prev %}
                     <a href="?chapter={{ chapter_number|add:'-1' }}#chapter-{{ chapter_number|add:'-1' }}"
@@ -185,12 +241,21 @@
                     <span class="font-sans text-xs text-slate-500">Бұл — соңғы бөлім</span>
                 {% endif %}
             </nav>
+            {% endif %}
         </section>
 
         {# ─────────────────────── Комментарии этой главы ─────────────────────── #}
         <section class="border-t border-slate-200 pt-6">
+            <div class="mb-5 rounded-md border border-status-info-fg/20 bg-status-info-bg px-4 py-3">
+                <div class="flex items-start gap-2.5">
+                    <span class="mt-0.5 text-status-info-fg">{% include "components/icon.html" with name="check" size=15 %}</span>
+                    <p class="font-sans text-xs leading-relaxed text-slate-700">
+                        Пікірлер мен жарияланымдар модерация ережелерімен қорғалады. Орынсыз мәтінді байқасаңыз, шағым батырмасын қолданыңыз.
+                    </p>
+                </div>
+            </div>
             <h2 class="mb-4 font-display text-xl font-bold text-slate-900">
-                {{ chapter_number }}-бөлім пікірлері
+                {% if story.is_single %}Шығарма пікірлері{% else %}{{ chapter_number }}-бөлім пікірлері{% endif %}
                 <span class="ml-1 font-sans text-sm font-normal text-slate-500">{{ comments|length }}</span>
             </h2>
 
@@ -200,7 +265,7 @@
                       class="mb-6 flex items-start gap-3">
                     {% include "components/avatar.html" with size=36 name=current_user_name %}
                     <div class="flex-1">
-                        <textarea rows="2" placeholder="Осы бөлім туралы пікіріңізді жазыңыз…"
+                        <textarea rows="2" placeholder="{% if story.is_single %}Осы шығарма туралы пікіріңізді жазыңыз…{% else %}Осы бөлім туралы пікіріңізді жазыңыз…{% endif %}"
                                   class="w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-2.5 font-sans text-sm placeholder:text-slate-500 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30"></textarea>
                         <div class="mt-2 flex justify-end">
                             {% include "components/button.html" with kind="primary" label="Жіберу" type="submit" icon="paper-plane" %}
@@ -217,12 +282,12 @@
                 {% for cm in comments %}
                     {% if cm.author %}
                         <div>
-                            {% include "components/comment.html" with author_name=cm.author.name date=cm.date text=cm.text likes=cm.likes liked=cm.liked badge=cm.is_author_badge|yesno:"Автор," allow_reply=signed_in %}
+                            {% include "components/comment.html" with author_name=cm.author.public_name date=cm.date text=cm.text likes=cm.likes liked=cm.liked badge=cm.is_author_badge|yesno:"Автор," allow_reply=signed_in %}
 
                             {# Replies (BR-30: один уровень — реплай-форма у реплая отсутствует) #}
                             {% for rp in cm.replies %}
                                 {% if rp.author %}
-                                    {% include "components/comment.html" with author_name=rp.author.name date=rp.date text=rp.text likes=rp.likes liked=rp.liked badge=rp.is_author_badge|yesno:"Автор," depth=1 allow_reply=False %}
+                                    {% include "components/comment.html" with author_name=rp.author.public_name date=rp.date text=rp.text likes=rp.likes liked=rp.liked badge=rp.is_author_badge|yesno:"Автор," depth=1 allow_reply=False %}
                                 {% endif %}
                             {% endfor %}
                         </div>
@@ -278,5 +343,12 @@
     /* Стилизация текста главы (linebreaks оборачивает абзацы в <p>, нужен ритм отступов) */
     .prose-reader p { margin-bottom: 1.1em; }
     .prose-reader p:last-child { margin-bottom: 0; }
+    .reader-size-base { font-size: 17px; line-height: 1.75; }
+    .reader-size-large { font-size: 19px; line-height: 1.8; }
+    .reader-width-narrow { max-width: 620px; margin-left: auto; margin-right: auto; }
+    .reader-width-comfort { max-width: 760px; margin-left: auto; margin-right: auto; }
+    .reader-theme-paper { background: #fff; color: rgb(30 41 59); }
+    .reader-theme-warm { background: #fff7ed; color: rgb(51 65 85); padding: 1rem; border-radius: var(--radius-md); }
+    .reader-theme-night { background: rgb(15 23 42); color: rgb(226 232 240); padding: 1rem; border-radius: var(--radius-md); }
 </style>
 {% endblock %}

@@ -51,7 +51,7 @@ class StoryDetailValidSlug(TestCase):
     def test_title_includes_story_and_author(self):
         story = stub_data.STORIES_BY_SLUG[STORY_SLUG]
         self.assertContains(self.response, story.title)
-        self.assertContains(self.response, story.author.name)
+        self.assertContains(self.response, story.author.public_name)
 
     def test_annotation_section_present(self):
         self.assertContains(self.response, 'Аннотация')
@@ -144,6 +144,21 @@ class StoryDetailChapterParam(TestCase):
         url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=abc'
         r = self.client.get(url)
         self.assertEqual(r.status_code, 200)
+
+
+class StoryDetailSingleWork(TestCase):
+    SLUG = 'sila-imperii'
+
+    def setUp(self):
+        self.response = self.client.get(reverse('core:story_detail', kwargs={'slug': self.SLUG}))
+
+    def test_single_work_uses_full_text_label(self):
+        self.assertContains(self.response, 'Толық мәтін')
+        self.assertContains(self.response, 'Бір оқылым')
+
+    def test_single_work_hides_chapter_navigation(self):
+        self.assertNotContains(self.response, 'aria-label="Мобильді бөлімдер"')
+        self.assertNotContains(self.response, 'Келесі бөлім')
 
 
 class StoryDetailPerChapterComments(TestCase):

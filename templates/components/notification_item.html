@@ -36,16 +36,16 @@
     <div class="min-w-0 flex-1">
         <p class="font-sans text-sm leading-snug text-slate-900">
             {% if n.kind == 'comment' and n.actor and n.story %}
-                <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.name }}</a>
+                <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.public_name }}</a>
                 <span class="text-slate-700">«{{ n.story.title }}» туындысына пікір қалдырды.</span>
             {% elif n.kind == 'like' and n.actor and n.story %}
-                <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.name }}</a>
+                <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.public_name }}</a>
                 <span class="text-slate-700">«<a href="{% url 'core:story_detail' slug=n.story.slug %}" class="font-semibold hover:text-brand">{{ n.story.title }}</a>» туындысын ұнатты.</span>
             {% elif n.kind == 'new_chapter' and n.story %}
                 <a href="{% url 'core:story_detail' slug=n.story.slug %}" class="font-bold hover:text-brand">{{ n.story.title }}</a>
                 <span class="text-slate-700">— жаңа бөлім қосылды.</span>
             {% elif n.kind == 'follower' and n.actor %}
-                <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.name }}</a>
+                <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.public_name }}</a>
                 <span class="text-slate-700">сізге жазылды.</span>
             {% elif n.kind == 'moderation' %}
                 <span class="font-bold">Модерация:</span>

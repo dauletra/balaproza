@@ -62,7 +62,7 @@
                 class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-50">
             {% include "components/icon.html" with name="adjustments" size=16 cls="text-slate-500" %}
             Сүзгілер
-            {% if query or status or current_genre_slug or current_tag_slug or sort != 'popularity' %}
+            {% if query or status or audience or length or format or current_genre_slug or current_tag_slug or sort != 'popularity' %}
                 <span aria-hidden="true" class="grid h-2 w-2 place-items-center rounded-pill bg-brand"></span>
             {% endif %}
         </button>
