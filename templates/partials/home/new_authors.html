@@ -7,6 +7,12 @@
     Ссылки «барлық авторлар» нет — отдельного маршрута со списком авторов
     в проекте не существует, а `href="#"` был бы тупиком.
 
+    `relative` на карточке обязателен: внутри `dl` лежат `dt.sr-only`
+    (`position:absolute`). Без позиционированного предка их containing block —
+    initial containing block, скроллер их не клипает, и они уезжают в координаты
+    документа до x≈653. Chrome на мобильном пересчитывает page-scale, ICB для
+    `position:fixed` раздувается, и нижнее меню/тосты/попапы улетают за экран.
+
     Контекст: new_authors (list of Author)
 {% endcomment %}
 <section>
@@ -16,7 +22,7 @@
         <div class="flex w-max gap-3.5 lg:grid lg:w-full lg:grid-cols-4">
             {% for a in new_authors|slice:":4" %}
                 <a href="{% url 'core:profile_other' username=a.username %}"
-                   class="group flex w-[168px] shrink-0 flex-col items-start gap-2.5 rounded-lg border border-slate-200 bg-white p-4 transition-shadow hover:shadow-card-hover sm:w-[196px] lg:w-auto lg:gap-3 lg:p-5">
+                   class="group relative flex w-[168px] shrink-0 flex-col items-start gap-2.5 rounded-lg border border-slate-200 bg-white p-4 transition-shadow hover:shadow-card-hover sm:w-[196px] lg:w-auto lg:gap-3 lg:p-5">
                     {% include "components/avatar.html" with size=44 name=a.public_name username=a.username %}
 
                     <div class="min-w-0 w-full">

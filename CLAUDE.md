@@ -202,6 +202,15 @@ def _login_as_aidana(client):
 - **Жанры** — только через `components/genre_chip.html` (DEC-14: `GenrePill` запрещён). У жанра есть `icon` (slug из спрайта) — используется в `genres_section` на главной для тайла «книжной полки»
 - **Теги (UGC)** — `components/tag_chip.html` (slate-style + `#`-префикс, отличается от цветного `genre_chip`). Pending-теги автоматически с пунктирной рамкой + бейдж «проверкада». Группа тегов на стори — через `components/tag_list.html` (фильтрует pending для не-автора, BR-TAG-07). Ввод тегов в формах — `components/tag_input.html` (Alpine, автокомплит, лимит 10, blocklist-валидация)
 - **Внешние ссылки** — `target="_blank" rel="noopener noreferrer"` (FR-LINKS-03)
+- **Абсолютное позиционирование внутри горизонтальных скроллеров — только с `relative`-предком.** В рядах вида `overflow-x-auto` + `flex w-max` (book_row, new_authors, любые карусели) каждая карточка обязана иметь `relative`. Иначе у любого потомка с `position:absolute` — включая **`sr-only`** (это `position:absolute` + `clip-path`), `absolute inset-y-0`, бейджи, оверлеи — containing block становится initial containing block. Такой элемент **не клипается скроллером** и уезжает в координаты документа на всю ширину ряда (в реальном баге — до x≈653 при вьюпорте 376).
+
+  Симптом на мобильном: `html.scrollWidth` сильно больше `clientWidth`, при этом `body.scrollWidth` в норме — верный признак именно этой ошибки. Chrome пересчитывает page-scale, ICB для `position:fixed` раздувается (653×1413 вместо 376×812), и **всё фиксированное улетает за экран**: mobile bottom nav, `toast_host`, `search_popup`, `delete_confirm_modal`, mobile-фильтры каталога. Страница при этом выглядит «почти нормально» — просто без нижнего меню, поэтому баг легко пропустить.
+
+  Проверка в консоли на 375px:
+  ```js
+  document.documentElement.scrollWidth === document.documentElement.clientWidth
+  ```
+  Если `false`, а `body.scrollWidth` совпадает с `clientWidth` — ищи абсолютный элемент без позиционированного предка.
 - **`{% include … with … %}` — ВСЕГДА в одну строку.** Django не парсит перенос строк внутри тега и выводит конструкцию как plain-текст. Если параметров много — пиши длинную строку, не разбивай:
   ```django
   {# ❌ ЛОМАЕТСЯ — рендерится как текст #}
