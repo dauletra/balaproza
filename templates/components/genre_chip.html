@@ -12,7 +12,12 @@
       ring:oklch(0.86 0.08 H)
 {% endcomment %}
 {% with sz=size|default:"sm" %}
-<a href="{{ href|default:'#' }}"
+{% comment %}
+    Дефолт по документации выше — /genres/<slug>/. Раньше здесь стоял '#',
+    и любой вызов без явного href давал мёртвую ссылку.
+{% endcomment %}
+{% url 'core:genre_detail' slug=genre.slug as genre_url %}
+<a href="{% firstof href genre_url '#' %}"
    class="inline-flex items-center gap-1.5 font-sans font-semibold transition-colors hover:text-brand-dark
           {% if sz == 'md' %}text-sm{% else %}text-xs{% endif %}"
    style="color: oklch(0.38 0.14 {{ genre.hue }});">

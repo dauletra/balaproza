@@ -5,8 +5,8 @@
 {% block content %}
 {% if not signed_in %}
     <div class="rounded-lg border border-amber-200 bg-amber-50 p-6">
-        <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}" class="font-semibold text-brand hover:underline">Кіріңіз</a>,
-        содан кейін жаңа шығарма жариялай аласыз.
+        <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}" class="font-semibold text-brand hover:underline">Кір</a>,
+        содан кейін жаңа шығарма жариялай аласың.
     </div>
 {% else %}
     <p class="mb-4 font-sans text-xs text-slate-500">
@@ -16,7 +16,7 @@
 
     <h1 class="mb-2 font-display text-3xl font-bold text-slate-900">Жаңа шығарма</h1>
     <p class="mb-8 font-sans text-sm text-slate-600">
-        Атау мен аннотация — міндетті. Әңгімені бір мәтінмен немесе бөлімдермен жаза аласыз.
+        Атау мен аннотация — міндетті. Әңгімені бір мәтінмен немесе бөлімдермен жаза аласың.
     </p>
 
     <form method="post" action="{% url 'core:new_story' %}"
@@ -24,7 +24,7 @@
           class="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
         {% csrf_token %}
 
-        {% include "components/input_field.html" with name="title" label="Атауы" placeholder="Шығарманың атауын жазыңыз" required=True autofocus=True maxlength=120 %}
+        {% include "components/input_field.html" with name="title" label="Атауы" placeholder="Шығарманың атауын жаз" required=True autofocus=True maxlength=120 %}
 
         {% include "components/textarea.html" with name="annotation" label="Аннотация" placeholder="Не туралы, кімдерге арналған" rows=4 maxlength=500 required=True hint="Қысқа да түсінікті — оқырман осыдан таңдау жасайды." %}
 
@@ -44,7 +44,7 @@
             </span>
             <select name="genre_primary" required
                     class="h-9 rounded-md border border-slate-300 bg-slate-50 px-3 font-sans text-sm text-slate-900 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30">
-                <option value="" disabled selected>Жанрды таңдаңыз</option>
+                <option value="" disabled selected>Жанрды таңда</option>
                 {% for g in genres %}
                     <option value="{{ g.slug }}">{{ g.name }}</option>
                 {% endfor %}

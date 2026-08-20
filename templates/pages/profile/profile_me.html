@@ -10,7 +10,7 @@
         <p class="font-sans text-sm text-slate-800">
             Профильді көру үшін
             <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}"
-               class="font-semibold text-brand hover:underline">кіріңіз</a>.
+               class="font-semibold text-brand hover:underline">кір</a>.
         </p>
     </div>
 {% else %}
@@ -64,7 +64,7 @@
                 {% endfor %}
             </div>
         {% else %}
-            {% include "components/empty_state.html" with icon="pen" title="Әлі шығарма жоқ" text="Алғашқы шығармаңызды жазып, оқырмандармен бөлісіңіз." cta_label="Жаңа шығарма" cta_href=new_story_href %}
+            {% include "components/empty_state.html" with icon="pen" title="Әлі шығарма жоқ" text="Алғашқы шығармаңды жазып, оқырмандармен бөліс." cta_label="Жаңа шығарма" cta_href=new_story_href %}
         {% endif %}
 
     {% elif tab == "library" %}
@@ -85,7 +85,7 @@
                 Толық кітапхана — <a href="{% url 'core:library' %}" class="font-semibold text-brand hover:underline">Кітапхана</a> бетінде.
             </p>
         {% else %}
-            {% include "components/empty_state.html" with icon="bookmark" title="Кітапхана бос" text="Шығарманы сақтап немесе оқуды бастап, осында жинаңыз." cta_label="Каталогқа" cta_href=catalog_href %}
+            {% include "components/empty_state.html" with icon="bookmark" title="Кітапхана бос" text="Шығарманы сақтап немесе оқуды бастап, осында жина." cta_label="Каталогқа" cta_href=catalog_href %}
         {% endif %}
 
     {% elif tab == "about" %}

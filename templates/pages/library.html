@@ -8,7 +8,7 @@
         <p class="font-sans text-sm text-slate-800">
             Кітапхананы көру үшін
             <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}"
-               class="font-semibold text-brand hover:underline">кіріңіз</a>.
+               class="font-semibold text-brand hover:underline">кір</a>.
         </p>
     </div>
 {% else %}
@@ -40,11 +40,11 @@
 
     {% if page_state == 'content' and not entries %}
         {% if tab == "saved" %}
-            {% include "components/empty_state.html" with icon="bookmark" title="Сақталғандар жоқ" text="Шығарма бетіндегі «Сақтау» түймесін басып, осында жинаңыз." cta_label="Каталогқа" cta_href=catalog_href %}
+            {% include "components/empty_state.html" with icon="bookmark" title="Сақталғандар жоқ" text="Шығарма бетіндегі «Сақтау» түймесін басып, осында жина." cta_label="Каталогқа" cta_href=catalog_href %}
         {% elif tab == "reading" %}
-            {% include "components/empty_state.html" with icon="book" title="Оқу үстіндегі шығарма жоқ" text="Шығарманы ашып оқуды бастаңыз — ол осында пайда болады." cta_label="Каталогқа" cta_href=catalog_href %}
+            {% include "components/empty_state.html" with icon="book" title="Оқу үстіндегі шығарма жоқ" text="Шығарманы ашып оқуды баста — ол осында пайда болады." cta_label="Каталогқа" cta_href=catalog_href %}
         {% elif tab == "done" %}
-            {% include "components/empty_state.html" with icon="check" title="Әлі ешнәрсе оқылмаған" text="Шығарманы соңына дейін оқып шықсаңыз — осы бөлімге өтеді." cta_label="Каталогқа" cta_href=catalog_href %}
+            {% include "components/empty_state.html" with icon="check" title="Әлі ешнәрсе оқылмаған" text="Шығарманы соңына дейін оқып шықсаң — осы бөлімге өтеді." cta_label="Каталогқа" cta_href=catalog_href %}
         {% endif %}
     {% endif %}
 {% endif %}

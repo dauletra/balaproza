@@ -10,18 +10,18 @@
         <img src="{% static 'img/logo.png' %}" alt="" class="mx-auto h-12 w-12">
         <h1 class="mt-4 font-display text-3xl font-bold text-slate-900">Тіркелу</h1>
         <p class="mt-1.5 font-sans text-sm text-slate-600">
-            Автор профильін толтыру. Алдымен көпшілік көретін авторлық атыңызды таңдаңыз.
+            Автор профильін толтыру. Алдымен көпшілік көретін авторлық атыңды таңда.
         </p>
     </header>
 
     <form method="post" action="{% url 'core:signup' %}"
-          @submit.prevent="$dispatch('toast', { kind:'success', text:'Тіркеуіңіз қабылданды (демо)' });
+          @submit.prevent="$dispatch('toast', { kind:'success', text:'Тіркеуің қабылданды (демо)' });
                            setTimeout(()=>$el.submit(), 250)"
           class="flex flex-col gap-6 rounded-hero border border-slate-200 bg-white p-6 sm:p-8">
         {% csrf_token %}
 
         {# ── Авторлық аты (FR-AUTH-04) ── #}
-        {% include "components/input_field.html" with name="name" label="Авторлық атыңыз" placeholder="Мысалы: aidana немесе aiqalam" required=True autofocus=True maxlength=80 %}
+        {% include "components/input_field.html" with name="name" label="Авторлық атың" placeholder="Мысалы: aidana немесе aiqalam" required=True autofocus=True maxlength=80 %}
 
         {# ── Жынысы (FR-AUTH-04) ── #}
         <fieldset class="flex flex-col gap-2">
@@ -38,7 +38,7 @@
         {% include "components/input_field.html" with name="age" type="number" label="Жасы" placeholder="14-18 аралығында" hint="Конкурсқа қатысу үшін 14-18 жас керек (BR-20)." %}
 
         {# ── Био (опц.) ── #}
-        {% include "components/textarea.html" with name="bio" label="Автор туралы" placeholder="Не туралы жазғыңыз келеді, өзіңіз туралы бірер жол" rows=4 maxlength=300 hint="Опциональды. Кейін профиль баптауларынан өзгертуге болады." %}
+        {% include "components/textarea.html" with name="bio" label="Автор туралы" placeholder="Не туралы жазғың келеді, өзің туралы бірер жол" rows=4 maxlength=300 hint="Опциональды. Кейін профиль баптауларынан өзгертуге болады." %}
 
         {# ── Согласие (FR-AUTH-05) ── #}
         {% include "components/checkbox.html" with name="agree" label="Тіркеле отырып, ереже мен құпиялылық саясатына келісемін" required=True %}

@@ -5,9 +5,9 @@
 {% endcomment %}
 <section x-data="{}">
     {% url 'core:collections' as collections_url %}
-    {% include "components/section_header.html" with title="Қазір не оқығыңыз келеді?" eyebrow="көңіл күйге қарай" link="барлық жинақтар →" link_href=collections_url link_class="hidden sm:inline" %}
+    {% include "components/section_header.html" with title="Қазір не оқығың келеді?" eyebrow="көңіл күйге қарай" link="барлығы →" link_href=collections_url %}
 
-    <div class="-mx-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0" @wheel.prevent="$el.scrollLeft += $event.deltaY">
+    <div class="-mx-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
         <div class="flex w-max gap-3.5">
             {% for c in collections|slice:":8" %}
                 <a href="{% url 'core:collection_detail' slug=c.slug %}"

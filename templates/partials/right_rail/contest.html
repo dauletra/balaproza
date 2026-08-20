@@ -1,4 +1,4 @@
-{% comment %}
+{% load balaproza %}{% comment %}
     Правый рейл CONT. Контекст:
       contest — Contest (None → ничего не рендерим)
 {% endcomment %}
@@ -16,7 +16,7 @@
             {% if contest.prize_kzt %}
                 <div class="flex items-center justify-between">
                     <dt class="text-slate-500">Сыйақы</dt>
-                    <dd class="font-bold text-slate-900">{{ contest.prize_kzt|stringformat:"d" }} ₸</dd>
+                    <dd class="font-bold text-slate-900">{{ contest.prize_kzt|spaced }} ₸</dd>
                 </div>
             {% endif %}
             <div class="flex items-center justify-between">

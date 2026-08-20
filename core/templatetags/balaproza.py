@@ -10,6 +10,39 @@ from django import template
 register = template.Library()
 
 
+@register.filter(name="compact_count")
+def compact_count(value):
+    """Компактный счётчик для карточек: 840 → 840, 8920 → 8,9 мың, 12482 → 12 мың.
+
+    На мобильном карточка узкая (138px), полное число просмотров съедает строку
+    с автором. Разделитель дробной части — запятая (казахская типографика).
+    """
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return value
+
+    if n < 1000:
+        return str(n)
+    if n < 10000:
+        return f"{n / 1000:.1f}".replace('.', ',') + " мың"
+    return f"{n // 1000} мың"
+
+
+@register.filter(name="spaced")
+def spaced(value):
+    """Разряды через неразрывный пробел: 500000 → 500 000.
+
+    Нужен для сумм в тенге: `stringformat:"d"` выводил «500000» сплошняком.
+    """
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return value
+
+    return f"{n:,}".replace(',', ' ')
+
+
 @register.filter(name="page_range")
 def page_range(total, current):
     """Список номеров страниц для пагинации.

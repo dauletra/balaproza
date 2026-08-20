@@ -1,20 +1,34 @@
-{% comment %}
-    BookCardSmall (docs/04.3). Обложка вертикальная, под ней title + author.
-    Используется в каруселях главной и т.п.
+{% load balaproza %}{% comment %}
+    BookCardSmall (docs/04.3). Обложка вертикальная, под ней title + автор + просмотры.
+    Используется в каруселях главной, секции жанров и т.п.
+
+    На обложке — чип длительности («7 мин» / «12 бөлім»). Раньше эта информация
+    приклеивалась к заголовку через слэш и на мобильном (карточка 138px)
+    срезалась вместе с ним через line-clamp-2 — то есть главный сигнал выбора
+    пропадал именно там, где он нужнее всего.
 
     Параметры:
-      story — объект Story (slug, title, primary_genre.hue, author)
+      story — объект Story (slug, title, primary_genre.hue, author, views)
 {% endcomment %}
 <a href="{% url 'core:story_detail' slug=story.slug %}"
    class="group flex flex-col gap-2 transition-transform hover:-translate-y-0.5">
     <div class="relative">
         {% include "components/cover_placeholder.html" with story=story cls="aspect-[2/3] w-full rounded-chip shadow-[0_1px_3px_rgba(0,0,0,0.08)] group-hover:shadow-card-hover" letter_cls="text-6xl" %}
-        
+        <span class="absolute bottom-1.5 left-1.5 inline-flex h-[20px] items-center rounded-chip bg-slate-900/75 px-1.5 font-sans text-[11px] font-semibold leading-none text-white">
+            {% if story.is_single %}{{ story.read_minutes }} мин{% else %}{{ story.chapters }} бөлім{% endif %}
+        </span>
     </div>
     <div class="flex flex-col gap-1">
         <div class="font-sans text-[13px] font-semibold leading-tight text-slate-900 line-clamp-2">
-            {{ story.title }}<span class="text-gray-500"> / {% if story.is_single %}{{ story.read_minutes }} мин{% else %}серия{% endif %}</span>
+            {{ story.title }}
         </div>
-        <div class="font-sans text-[11px] leading-tight text-slate-500">{{ story.author.public_name }}</div>
+        <div class="flex items-center gap-1.5 font-sans text-[11px] leading-tight text-slate-500">
+            <span class="min-w-0 truncate">{{ story.author.public_name }}</span>
+            <span aria-hidden="true" class="shrink-0">·</span>
+            <span class="inline-flex shrink-0 items-center gap-1">
+                {% include "components/icon.html" with name="eye" size=12 %}
+                {{ story.views|compact_count }}
+            </span>
+        </div>
     </div>
 </a>

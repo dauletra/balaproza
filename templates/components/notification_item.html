@@ -46,7 +46,7 @@
                 <span class="text-slate-700">— жаңа бөлім қосылды.</span>
             {% elif n.kind == 'follower' and n.actor %}
                 <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.public_name }}</a>
-                <span class="text-slate-700">сізге жазылды.</span>
+                <span class="text-slate-700">саған жазылды.</span>
             {% elif n.kind == 'moderation' %}
                 <span class="font-bold">Модерация:</span>
                 <span class="text-slate-700">{{ n.text }}</span>

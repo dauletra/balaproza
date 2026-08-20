@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Қош келдіңіз! — Balaproza{% endblock %}
+{% block title %}Қош келдің! — Balaproza{% endblock %}
 
 {% block content %}
 <div class="mx-auto max-w-2xl">
-    {# ── Hero «Қош келдіңіз» ── #}
+    {# ── Hero «Қош келдің» ── #}
     <section class="relative overflow-hidden rounded-hero text-white shadow-card-hover"
              style="background:
                 radial-gradient(circle at 92% 20%, rgba(227,255,134,0.50) 0%, rgba(227,255,134,0) 50%),
@@ -15,11 +15,11 @@
                 {% include "components/icon.html" with name="check" size=28 %}
             </span>
             <h1 class="font-display text-3xl font-bold leading-tight sm:text-4xl">
-                Қош келдіңіз, <span class="text-promo-bg">{{ current_user_name|default:"автор" }}</span>!
+                Қош келдің, <span class="text-promo-bg">{{ current_user_name|default:"автор" }}</span>!
             </h1>
             <p class="mt-1 max-w-md font-sans text-sm text-white/85">
-                Тіркеу аяқталды. Енді сіз — Balaproza платформасының авторысыз.
-                Алғашқы шығармаңыздан бастаңыз немесе оқыңыз.
+                Тіркеу аяқталды. Енді сен — Balaproza платформасының авторысың.
+                Алғашқы шығармаңнан баста немесе оқы.
             </p>
         </div>
     </section>
@@ -35,7 +35,7 @@
                 Алғашқы шығарма
             </h2>
             <p class="font-sans text-sm text-slate-600">
-                Идеяңыз дайын ба? Тікелей жазу бетіне өтіңіз — атау, аннотация, бірінші бөлім.
+                Идеяң дайын ба? Тікелей жазу бетіне өт — атау, аннотация, бірінші бөлім.
             </p>
         </a>
 
@@ -48,7 +48,7 @@
                 Алдымен оқу
             </h2>
             <p class="font-sans text-sm text-slate-600">
-                Каталогтан жанр, тег немесе атау бойынша шығарма тауып оқыңыз. Сақтаулар Кітапханада тұрады.
+                Каталогтан жанр, тег немесе атау бойынша шығарма тауып оқы. Сақтаулар Кітапханада тұрады.
             </p>
         </a>
 
@@ -61,7 +61,7 @@
                 Профильді толтыру
             </h2>
             <p class="font-sans text-sm text-slate-600">
-                Био, аватар, жасты қосыңыз — басқа оқырмандар сізді жақсырақ танысын.
+                Био, аватар, жасты қос — басқа оқырмандар сені жақсырақ танысын.
             </p>
         </a>
 
@@ -80,7 +80,7 @@
     </section>
 
     <p class="mt-8 text-center font-sans text-xs text-slate-500">
-        Сұрағыңыз бар ма? <a href="#" class="font-semibold text-brand hover:underline">Қолдау қызметіне</a> жазыңыз.
+        Сұрағың бар ма? <a href="#" class="font-semibold text-brand hover:underline">Қолдау қызметіне</a> жаз.
     </p>
 </div>
 {% endblock %}

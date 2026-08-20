@@ -38,6 +38,19 @@ GENRES = [
 
 GENRES_BY_SLUG = {g.slug: g for g in GENRES}
 
+# Витринные счётчики для hero главной: подросток должен с первого экрана понять
+# масштаб портала. Genre.count — единственный согласованный «объём» в стабе,
+# число авторов пока отдельной константой (в Ф14 заменится агрегатом по БД).
+STUB_AUTHOR_COUNT = 214
+
+
+def portal_stats() -> dict:
+    return {
+        'stories': sum(g.count for g in GENRES),
+        'authors': STUB_AUTHOR_COUNT,
+        'genres': len(GENRES),
+    }
+
 
 # ───────────────────────── Теги (docs/11 — UGC-таксономия) ─────────────────
 # Параллельно жанрам: до 10 на произведение (BR-TAG-01). Авторы создают
@@ -144,6 +157,15 @@ AUTHORS = [
 AUTHORS_BY_USERNAME = {a.username: a for a in AUTHORS}
 
 
+def new_authors(limit: int = 4) -> list:
+    """«Жаңа авторлар» для главной — те, у кого меньше всего подписчиков.
+
+    Социальное доказательство: подросток должен видеть, что здесь пишут такие
+    же начинающие, а не только авторы с восемью тысячами подписчиков.
+    """
+    return sorted(AUTHORS, key=lambda a: a.followers)[:limit]
+
+
 # ───────────────────────── Произведения ─────────────────────────
 
 @dataclass(frozen=True)
@@ -238,6 +260,109 @@ STORIES = [
     Story("arhimag",        "Сиқыршы: бөтен әлемдер","rudazov",    "ipad_940e074d12d6c3657199601ca568f1b3.jpg",  ("fantezi",     "shyttyrman"),  3, 12482, 4821, 312, status="Published", annotation="Жас сиқыршы бөтен әлемдердің есігін ашқанда, әр әлем өз ережесін ұсынады. Үйге қайту үшін ол күштен бұрын жауапкершілікті үйренеді.", tags=("syikyr-akademiya", "arman", "dostyk", "jasospirim", "mektep")),
     Story("sila-imperii",   "Империя құдіреті",      "aygerim_k",  "ipad_992f1631a421d74ed5e1aa72717df374.webp", ("tarih",       "drama"),       1, 14200, 3890, 245, status="Published", annotation="Көне империяның шетінде өскен жас батыр тарихтың үлкен толқынына түседі. Бұл шығарма билік, адалдық және ел алдындағы таңдау туралы.", tags=("arman", "jasospirim"), format="single"),
 
+    # ─ Витринный слой: заполняет ряды главной и покрывает пустые жанры ─
+    # Без него «Қысқа оқылатын әңгімелер» рендерился одной карточкой, а половина
+    # жанровых чипов вела в пустое состояние — раскладку было не на чем смотреть.
+    # cover="" оставлен намеренно у части историй: проверяем типографическую
+    # плашку cover_placeholder наравне с фото-обложками.
+    Story(
+        slug="kunnin-songy-sagaty", title="Күннің соңғы сағаты", author_username="sayyn",
+        cover="ipad_f8f1ea3b7e8133f930825b2da92a135e.webp", genres=("fantastika", None),
+        chapters=1, views=6410, likes=980, comments=64,
+        status="Published", format="single",
+        annotation="Күн батпай тұрып бір нәрсені үлгеру керек. Он жеті жасар бала уақыттың қалай тоқтайтынын біледі.",
+        tags=("arman", "jasospirim"), audience="10+",
+    ),
+    Story(
+        slug="mektep-koridory", title="Мектеп дәлізіндегі хат", author_username="aygerim_k",
+        cover="", genres=("romantika", "drama"),
+        chapters=1, views=9240, likes=2110, comments=188,
+        status="Published", format="single", secondary_genre="drama",
+        annotation="Партаның астынан табылған хат кімге жазылғаны белгісіз. Бірақ оны оқыған қыз енді бұрынғыдай жүре алмайды.",
+        tags=("mektep", "gashyqtyq", "jasospirim"), audience="10+",
+    ),
+    Story(
+        slug="atam-aityp-berdi", title="Атам айтып берген ертегі", author_username="dina_books",
+        cover="", genres=("erteg", None),
+        chapters=1, views=3120, likes=540, comments=41,
+        status="Published", format="single",
+        annotation="Ауылдағы жаз, кешкі шай және атаның бір ертегісі. Ол ертегіде жоғалған қой да, жоғалған бала да бар.",
+        tags=("dostyk", "mektep"), audience="10+",
+    ),
+    Story(
+        slug="konshi-bala", title="Көрші бала", author_username="bekzhan_t",
+        cover="", genres=("komediya", None),
+        chapters=1, views=7830, likes=1420, comments=133,
+        status="Published", format="single",
+        annotation="Көршінің баласы күнде бір нәрсе бүлдіреді. Бүгін ол менің велосипедімді ұрлады — бірақ себебі күлкілі.",
+        tags=("dostyk", "mektep", "jasospirim"), audience="10+",
+    ),
+    Story(
+        slug="tunge-deiin", title="Түнге дейін үш сағат", author_username="bekzhan_t",
+        cover="ipad_fe6ce3337de7c1c1bf18ef8bb0f3f9a3.webp", genres=("triller", None),
+        chapters=1, views=11470, likes=2890, comments=241,
+        status="Published", format="single",
+        annotation="Лифт екі қабат арасында тоқтады. Ішінде екеу, ал біреуі шындықты айтпай тұр.",
+        tags=("mistika", "detektiv-jas"), audience="14+",
+    ),
+    Story(
+        slug="almaty-ayazy", title="Алматы аязы", author_username="aygerim_k",
+        cover="", genres=("drama", None),
+        chapters=1, views=4980, likes=760, comments=58,
+        status="Published", format="single",
+        annotation="Қаңтардағы қала, жылымаған автобус және әкесімен алғаш рет ашық сөйлескен күн.",
+        tags=("jasospirim", "arman"), audience="14+",
+    ),
+    Story(
+        slug="balkonnan-korinetin", title="Балконнан көрінетін әлем", author_username="dina_books",
+        cover="", genres=("balalar", None),
+        chapters=1, views=2640, likes=430, comments=27,
+        status="Published", format="single",
+        annotation="Тоғызыншы қабаттан бүкіл ауланы көруге болады. Ал кейде — өзіңді де.",
+        tags=("dostyk", "arman"), audience="10+",
+    ),
+    Story(
+        slug="korkynyshty-koilek", title="Қорқынышты көйлек", author_username="bekzhan_t",
+        cover="", genres=("horror", None),
+        chapters=1, views=8150, likes=1630, comments=204,
+        status="Published", format="single",
+        annotation="Ескі шкафтан табылған көйлекті киген адам түнде өз атын ұмытады.",
+        tags=("mistika",), audience="14+",
+    ),
+    Story(
+        slug="zhuldyz-kartasy", title="Жұлдыз картасы", author_username="rudazov",
+        cover="", genres=("fantastika", "shyttyrman"),
+        chapters=9, views=15320, likes=3940, comments=387,
+        status="Published", secondary_genre="shyttyrman",
+        annotation="Ғарыш кемесінің картасында болмауға тиіс бір нүкте бар. Экипаж соған қарай бет алады.",
+        tags=("aua-ralighi", "sayahat", "arman"), audience="10+",
+        badges=("Редакция таңдауы",),
+    ),
+    Story(
+        slug="kokjal-anyzy", title="Көкжал аңызы", author_username="dina_books",
+        cover="", genres=("tarih", "erteg"),
+        chapters=6, views=6720, likes=1180, comments=94,
+        status="Published", secondary_genre="erteg",
+        annotation="Далада бір қасқыр туралы аңыз жүреді. Оны естіген әр ұрпақ басқаша айтады.",
+        tags=("sayahat", "dostyk"), audience="10+",
+    ),
+    Story(
+        slug="keiipkerge-hat", title="Кейіпкерге жазылған хат", author_username="aygerim_k",
+        cover="", genres=("fanfik", "romantika"),
+        chapters=5, views=10940, likes=3210, comments=452,
+        status="Published", secondary_genre="romantika",
+        annotation="Сүйікті кітабының кейіпкеріне хат жазған қыз кенет жауап алады.",
+        tags=("gashyqtyq", "syikyr-akademiya", "jasospirim"), audience="14+",
+    ),
+    Story(
+        slug="arqadagy-jaz", title="Арқадағы жаз", author_username="sayyn",
+        cover="", genres=("balalar", "drama"),
+        chapters=7, views=3890, likes=610, comments=45,
+        status="Published", secondary_genre="drama",
+        annotation="Жазғы каникул, ескі велосипед және ауылдағы жеті апта. Әр бөлім — бір апта.",
+        tags=("dostyk", "sayahat", "mektep"), audience="10+",
+    ),
+
     # ─ Произведения демо-пользователя «Айдана» (для WRITE-страниц) ─
     Story(
         slug="aidana-tan",    title="Таң алдында",            author_username="aidana",
@@ -319,6 +444,30 @@ CHAPTERS_BY_STORY: dict = {
         _chapter("aidana-tan", 6, "Таң алдында"),
         _chapter("aidana-tan", 7, "Тараз"),
         _chapter("aidana-tan", 8, "Үй"),
+    ],
+    "kunnin-songy-sagaty": [
+        _chapter("kunnin-songy-sagaty", 1, "Толық мәтін"),
+    ],
+    "mektep-koridory": [
+        _chapter("mektep-koridory", 1, "Толық мәтін"),
+    ],
+    "atam-aityp-berdi": [
+        _chapter("atam-aityp-berdi", 1, "Толық мәтін"),
+    ],
+    "konshi-bala": [
+        _chapter("konshi-bala", 1, "Толық мәтін"),
+    ],
+    "tunge-deiin": [
+        _chapter("tunge-deiin", 1, "Толық мәтін"),
+    ],
+    "almaty-ayazy": [
+        _chapter("almaty-ayazy", 1, "Толық мәтін"),
+    ],
+    "balkonnan-korinetin": [
+        _chapter("balkonnan-korinetin", 1, "Толық мәтін"),
+    ],
+    "korkynyshty-koilek": [
+        _chapter("korkynyshty-koilek", 1, "Толық мәтін"),
     ],
     "aidana-koshe": [
         _chapter("aidana-koshe", 1, "Толық мәтін"),
@@ -417,7 +566,7 @@ COMMENTS_BY_STORY: dict = {
                 StoryComment(
                     "sayyn", "1 сағат бұрын",
                     "Рахмет, Айгерім! Үшінші бөлім — менің ең қиналған сәтім болды. "
-                    "Сезіміңіз мен үшін маңызды.",
+                    "Сезімің мен үшін маңызды.",
                     likes=18, is_author_badge=True,
                 ),
                 StoryComment(
@@ -472,7 +621,7 @@ COMMENTS_BY_STORY: dict = {
             replies=(
                 StoryComment(
                     "rudazov", "3 сағат бұрын",
-                    "Иә, бұл әдейі. Кейіпкерлер 4-бөлімде ашылады. Шыдамдылықпен оқыңыз.",
+                    "Иә, бұл әдейі. Кейіпкерлер 4-бөлімде ашылады. Шыдамдылықпен оқы.",
                     likes=11, is_author_badge=True,
                 ),
             ),
@@ -1231,7 +1380,7 @@ NOTIFICATIONS_BY_USER: dict = {
         Notification(
             kind="comment", bucket="past_week", when="6 күн бұрын",
             actor_username="rudazov", story_slug="aidana-tan",
-            text="Жас автордың тілі жаңа да жанды. Әрі қарай жалғастырыңыз.",
+            text="Жас автордың тілі жаңа да жанды. Әрі қарай жалғастыр.",
             read=True,
         ),
     ],

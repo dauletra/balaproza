@@ -9,21 +9,6 @@
       link_href — куда вести (default: '#')
 {% endcomment %}
 <section>
-    {% include "components/section_header.html" with title=title eyebrow=eyebrow link=link|default:"барлығы →" link_href=link_href|default:"#" link_class="hidden lg:inline" %}
-
-    <div class="-mx-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 lg:overflow-visible">
-        <div class="flex w-max gap-3.5 lg:grid lg:w-full lg:grid-cols-6">
-            {% for s in books|slice:":6" %}
-                <div class="w-[138px] shrink-0 sm:w-[154px] lg:w-auto">
-                    {% include "components/book_card_small.html" with story=s %}
-                </div>
-            {% endfor %}
-
-            <a href="{{ link_href|default:'#' }}"
-               class="group flex aspect-[2/3] w-[138px] shrink-0 self-start flex-col items-center justify-center gap-2 rounded-chip border border-dashed border-slate-300 text-center text-slate-500 transition-colors hover:border-brand hover:bg-brand/5 hover:text-brand-dark sm:w-[154px] lg:hidden">
-                {% include "components/icon.html" with name="arrow-right" size=20 %}
-                <span class="font-sans text-[13px] font-semibold">Барлығы</span>
-            </a>
-        </div>
-    </div>
+    {% include "components/section_header.html" with title=title eyebrow=eyebrow link=link|default:"барлығы →" link_href=link_href|default:"#" %}
+    {% include "partials/home/_book_scroller.html" with books=books link_href=link_href|default:"#" %}
 </section>

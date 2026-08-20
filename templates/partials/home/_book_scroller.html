@@ -1,0 +1,40 @@
+{% comment %}
+    Общий скроллер карточек: горизонтальный свайп на мобильном, сетка 5 колонок с lg.
+    Используется и в book_row, и в секции жанров — жест по всей главной один
+    (горизонталь = «посмотреть варианты», вертикаль = «следующая тема»).
+
+    Почему пять, а не шесть. Колонка контента = ширина − padding − рейл:
+    928px на lg (рейл появляется только с xl) и 860px на xl+. Шесть колонок
+    давали 143 и 131px — то есть на десктопе обложки были МЕНЬШЕ мобильных
+    (138/154), а на 1024px с прежним lg-рейлом вырождались в 89px.
+    Пять дают 174 и 161 — размер растёт вместе с экраном, как и должно быть
+    у витрины книг.
+
+    Параметры:
+      books      — список Story (отрежется до :5)
+      link_href  — куда ведёт замыкающая карточка «Барлығы» (опц.)
+      empty_text — текст пустого состояния (опц.)
+{% endcomment %}
+{% if books %}
+    <div class="-mx-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 lg:overflow-visible">
+        <div class="flex w-max gap-3.5 lg:grid lg:w-full lg:grid-cols-5">
+            {% for s in books|slice:":5" %}
+                <div class="w-[138px] shrink-0 sm:w-[154px] lg:w-auto">
+                    {% include "components/book_card_small.html" with story=s %}
+                </div>
+            {% endfor %}
+
+            {% if link_href %}
+                <a href="{{ link_href }}"
+                   class="group flex aspect-[2/3] w-[138px] shrink-0 self-start flex-col items-center justify-center gap-2 rounded-chip border border-dashed border-slate-300 text-center text-slate-500 transition-colors hover:border-brand hover:bg-brand/5 hover:text-brand-dark sm:w-[154px] lg:hidden">
+                    {% include "components/icon.html" with name="arrow-right" size=20 %}
+                    <span class="font-sans text-[13px] font-semibold">Барлығы</span>
+                </a>
+            {% endif %}
+        </div>
+    </div>
+{% else %}
+    <div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center font-sans text-sm text-slate-500">
+        {{ empty_text|default:"Әзірге жарияланған шығарма жоқ." }}
+    </div>
+{% endif %}

@@ -1,36 +1,44 @@
 {% comment %}
-    HomeNewAuthors (FR-HOME-07). 4 карточки авторов.
+    HomeNewAuthors (FR-HOME-07). Социальное доказательство перед CTA «Автор болу»:
+    подросток должен увидеть, что здесь пишут такие же начинающие.
+
+    На мобильном — горизонтальный скроллер (тот же жест, что у рядов книг):
+    grid-cols-1 давал четыре карточки в столбик и ~760px высоты.
+    Ссылки «барлық авторлар» нет — отдельного маршрута со списком авторов
+    в проекте не существует, а `href="#"` был бы тупиком.
 
     Контекст: new_authors (list of Author)
 {% endcomment %}
 <section>
-    {% include "components/section_header.html" with title="Жаңа авторлар" hint="танысыңыз, жазылыңыз" link="барлық авторлар →" link_href="#" %}
+    {% include "components/section_header.html" with title="Жаңа авторлар" eyebrow="таныс" %}
 
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {% for a in new_authors|slice:":4" %}
-            <a href="{% url 'core:profile_other' username=a.username %}"
-               class="group flex flex-col items-start gap-3 rounded-lg border border-slate-200 bg-white p-5 transition-shadow hover:shadow-card-hover">
-                {% include "components/avatar.html" with size=56 name=a.public_name username=a.username %}
+    <div class="-mx-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 lg:overflow-visible">
+        <div class="flex w-max gap-3.5 lg:grid lg:w-full lg:grid-cols-4">
+            {% for a in new_authors|slice:":4" %}
+                <a href="{% url 'core:profile_other' username=a.username %}"
+                   class="group flex w-[168px] shrink-0 flex-col items-start gap-2.5 rounded-lg border border-slate-200 bg-white p-4 transition-shadow hover:shadow-card-hover sm:w-[196px] lg:w-auto lg:gap-3 lg:p-5">
+                    {% include "components/avatar.html" with size=44 name=a.public_name username=a.username %}
 
-                <div class="min-w-0">
-                    <div class="truncate font-sans text-sm font-bold text-slate-900 group-hover:text-brand">{{ a.public_name }}</div>
-                    <div class="truncate font-sans text-xs text-slate-500">@{{ a.username }}</div>
-                </div>
-
-                <p class="font-sans text-xs leading-snug text-slate-600">{{ a.bio }}</p>
-
-                <dl class="mt-auto flex w-full items-baseline gap-3 border-t border-slate-100 pt-3 font-sans text-xs text-slate-500">
-                    <div>
-                        <dt class="sr-only">Шығармалар</dt>
-                        <dd><span class="font-semibold text-slate-900">{{ a.works }}</span> шығарма</dd>
+                    <div class="min-w-0 w-full">
+                        <div class="truncate font-sans text-sm font-bold text-slate-900 group-hover:text-brand">{{ a.public_name }}</div>
+                        <div class="truncate font-sans text-xs text-slate-500">@{{ a.username }}</div>
                     </div>
-                    <span class="text-slate-300">·</span>
-                    <div>
-                        <dt class="sr-only">Жазылушылар</dt>
-                        <dd><span class="font-semibold text-slate-900">{{ a.followers }}</span> жазылушы</dd>
-                    </div>
-                </dl>
-            </a>
-        {% endfor %}
+
+                    <p class="line-clamp-2 font-sans text-xs leading-snug text-slate-600">{{ a.bio }}</p>
+
+                    <dl class="mt-auto flex w-full items-baseline gap-2 border-t border-slate-100 pt-2.5 font-sans text-xs text-slate-500 lg:gap-3 lg:pt-3">
+                        <div>
+                            <dt class="sr-only">Шығармалар</dt>
+                            <dd><span class="font-semibold text-slate-900">{{ a.works }}</span> шығарма</dd>
+                        </div>
+                        <span class="text-slate-300" aria-hidden="true">·</span>
+                        <div>
+                            <dt class="sr-only">Жазылушылар</dt>
+                            <dd><span class="font-semibold text-slate-900">{{ a.followers }}</span> жазылушы</dd>
+                        </div>
+                    </dl>
+                </a>
+            {% endfor %}
+        </div>
     </div>
 </section>

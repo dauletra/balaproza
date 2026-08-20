@@ -1,22 +1,27 @@
 {% comment %}
     SectionHeader (docs/04.7) — заголовок секции с опц. eyebrow и ссылкой «барлығы →».
 
+    Мобильный вариант компактнее (18px вместо 22px, mb-3 вместо mb-4): на телефоне
+    каждый заголовок отъедал ~17px от бюджета фолда × 6 секций.
+    Ссылка «барлығы →» имеет тап-зону 44px за счёт -my-2 py-2 (WCAG 2.5.5).
+
     Параметры:
-      title    — заголовок (Montserrat 600 22)
+      title    — заголовок (Montserrat 600 18/22)
       eyebrow  — мелкий up-надпись над title (опц., attention-цвет)
       hint     — серая подпись справа от title (опц.)
       link     — текст ссылки в правом верхнем углу (опц.)
       link_href — куда ведёт ссылка (default '#')
-      link_class — доп. классы для <a> (опц., напр. "hidden sm:inline" — скрыть на мобильном)
+      link_class — доп. классы для <a> (опц.). NB: не прятать ссылку на мобильном —
+                   иначе выход из ряда доступен только после свайпа всех карточек.
 {% endcomment %}
-<div class="mb-4 flex items-baseline justify-between">
-    <div>
+<div class="mb-3 flex items-baseline justify-between gap-3 sm:mb-4">
+    <div class="min-w-0">
         {% if eyebrow %}
-            <div class="mb-1 font-display text-[11px] font-semibold uppercase tracking-[0.12em] text-status-attention-fg">
+            <div class="mb-0.5 font-display text-[11px] font-semibold uppercase tracking-[0.12em] text-status-attention-fg sm:mb-1">
                 {{ eyebrow }}
             </div>
         {% endif %}
-        <h2 class="font-display text-[22px] font-semibold text-slate-900">
+        <h2 class="font-display text-[18px] font-semibold leading-tight text-slate-900 sm:text-[22px]">
             {{ title }}
             {% if hint %}
 {#                <span class="ml-2 font-sans text-[13px] font-normal text-slate-500">{{ hint }}</span>#}
@@ -25,7 +30,7 @@
     </div>
     {% if link %}
         <a href="{{ link_href|default:'#' }}"
-           class="font-sans text-[13px] font-semibold text-brand hover:text-brand-dark {{ link_class }}">
+           class="-my-2 shrink-0 py-2 font-sans text-[13px] font-semibold text-brand hover:text-brand-dark {{ link_class }}">
             {{ link }}
         </a>
     {% endif %}

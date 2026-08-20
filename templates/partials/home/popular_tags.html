@@ -1,0 +1,20 @@
+{% comment %}
+    Танымал тегтер в мобильном потоке главной.
+
+    Теги — самая «живая» навигация по интересам, но жили только в правом рейле
+    (hidden xl:block), то есть на телефоне были недоступны. Здесь блок обёрнут
+    в xl:hidden на стороне home.html — с xl его показывает рейл.
+
+    Контекст: popular_tags
+{% endcomment %}
+{% if popular_tags %}
+    <section>
+        {% url 'core:catalog' as catalog_url %}
+        {% include "components/section_header.html" with title="Танымал тегтер" eyebrow="қызығушылық бойынша" link="каталог →" link_href=catalog_url %}
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+            {% for t in popular_tags %}
+                {% include "components/tag_chip.html" with tag=t size="md" %}
+            {% endfor %}
+        </div>
+    </section>
+{% endif %}

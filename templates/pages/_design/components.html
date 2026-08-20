@@ -70,7 +70,7 @@
         </div>
 
         <div class="mt-6 grid gap-4 sm:grid-cols-2">
-            {% include "components/textarea.html" with name="bio1" label="Био" placeholder="Өзіңіз туралы..." maxlength=250 %}
+            {% include "components/textarea.html" with name="bio1" label="Био" placeholder="Өзің туралы..." maxlength=250 %}
             {% include "components/textarea.html" with name="bio2" label="С ошибкой" value="Тым қысқа" state="error" message="Кем дегенде 30 таңба" maxlength=250 %}
         </div>
 
@@ -222,7 +222,7 @@
         <div class="mb-6 rounded-md border border-slate-100 p-4">
             {% include "components/comment.html" with author_name="Айгерім Қасенова" date="5 сағат бұрын" text="Бірінші тарау қызықтыра түсті, бірақ кейіпкерлердің мотивациясы әлі түсініксіз. Авторға сұрақ: бұл қасақана ма?" likes=6 allow_reply=True reply_avatar_name="Айдана" %}
 
-            {% include "components/comment.html" with author_name="Алмат Рысқали" date="3 сағат бұрын" badge="Автор" text="Иә, бұл әдейі. Кейіпкерлер 4-бөлімде ашылады. Шыдамдылықпен оқыңыз." likes=11 depth=1 allow_reply=False %}
+            {% include "components/comment.html" with author_name="Алмат Рысқали" date="3 сағат бұрын" badge="Автор" text="Иә, бұл әдейі. Кейіпкерлер 4-бөлімде ашылады. Шыдамдылықпен оқы." likes=11 depth=1 allow_reply=False %}
 
             {% include "components/comment.html" with author_name="Бекжан Тұрсынов" date="1 сағат бұрын" text="Айгерімнің пікіріне қосыламын." likes=3 depth=1 allow_reply=False %}
         </div>
@@ -243,7 +243,7 @@
         <h3 class="mb-2 mt-6 font-display text-sm font-bold uppercase tracking-wide text-slate-600">8. Empty state (нет ни одного комментария)</h3>
         <div class="rounded-md border border-slate-100 p-4">
             <p class="rounded-md bg-slate-50 px-4 py-6 text-center font-sans text-sm text-slate-500">
-                Әлі пікір жоқ. Бірінші болыңыз.
+                Әлі пікір жоқ. Бірінші бол.
             </p>
         </div>
     </section>

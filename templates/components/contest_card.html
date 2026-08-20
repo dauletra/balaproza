@@ -1,4 +1,4 @@
-{% load static %}
+{% load static balaproza %}
 {% comment %}
     ContestCard (FR-CONT-01). Карточка конкурса для списка.
     Параметры:
@@ -15,7 +15,7 @@
         </div>
         {% if contest.prize_kzt %}
             <span class="absolute right-3 top-3 inline-flex h-7 items-center rounded-pill bg-promo-cta px-3 font-sans text-xs font-bold text-white">
-                {{ contest.prize_kzt|stringformat:"d" }} ₸
+                {{ contest.prize_kzt|spaced }} ₸
             </span>
         {% endif %}
     </div>

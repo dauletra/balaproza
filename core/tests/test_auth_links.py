@@ -48,7 +48,7 @@ class SignupPage(TestCase):
 
     def test_has_name_input(self):
         self.assertContains(self.response, 'name="name"')
-        self.assertContains(self.response, 'Авторлық атыңыз')
+        self.assertContains(self.response, 'Авторлық атың')
 
     def test_gender_radios(self):
         self.assertContains(self.response, 'name="gender"')
@@ -91,7 +91,7 @@ class SignupSuccessPage(TestCase):
 
     def test_greets_by_name(self):
         self.assertContains(self.response, 'Ержан')
-        self.assertContains(self.response, 'Қош келдіңіз')
+        self.assertContains(self.response, 'Қош келдің')
 
     def test_has_all_four_onboarding_cards(self):
         # FR-AUTH-03 → онбординг с 4 направлениями

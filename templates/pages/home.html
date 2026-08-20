@@ -3,36 +3,115 @@
 {% block title %}Балалар әдеби порталы — Balaproza{% endblock %}
 
 {% block content %}
-    <div class="flex flex-col gap-14">
+    {# Ритм секций: 40px на мобильном (было 56) — 6 секций × 16px экономии фолда. #}
+    <div class="flex flex-col gap-10 sm:gap-14">
 
-        {# ── HERO: компактный, ветвление гость / авторизованный (FR-HOME-01) ── #}
-        {% if signed_in %}
-            {% include "partials/home/hero_returning.html" %}
-        {% else %}
-            {% include "partials/home/hero_guest.html" %}
-        {% endif %}
+        {% comment %}
+            ФОЛД 1 (mobile ~480px): hero + первый ряд обложек.
+            Связка идёт с уменьшенным gap-6, чтобы обложки первого ряда
+            целиком попадали выше сгиба на 360×640.
+
+            Первым рядом идут короткие тексты: «прочитаю за 4 минуты» —
+            единственное обещание, которое подросток может проверить прямо
+            сейчас, не регистрируясь. Чип длительности на обложке делает его
+            видимым до открытия карточки.
+        {% endcomment %}
+        <div class="flex flex-col gap-6">
+            {% if signed_in %}
+                {% include "partials/home/hero_returning.html" %}
+            {% else %}
+                {% include "partials/home/hero_guest.html" %}
+            {% endif %}
+
+            {% if page_state == 'loading' %}
+                <div>
+                    {% include "components/skeleton_box.html" with w="w-[180px]" h="h-[22px]" radius="sm" %}
+                    <div class="mt-3 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
+                        {% for _ in '123456'|make_list %}
+                            {% include "components/skeleton_book_card_small.html" %}
+                        {% endfor %}
+                    </div>
+                </div>
+            {% elif page_state != 'error' %}
+                {% include "partials/home/book_row.html" with title="Қысқа оқылатын әңгімелер" eyebrow="бір оқылым" books=short_stories link_href="/catalog/?format=single&length=short" %}
+            {% endif %}
+        </div>
 
         {% if page_state == 'loading' %}
-            {# ── Скелетон: редакциялық жинақтар + один ряд карточек ── #}
-            {% include "components/skeleton_box.html" with h="h-[200px]" radius="hero" %}
-            <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                {% for _ in '123456'|make_list %}
-                    {% include "components/skeleton_book_card_small.html" %}
-                {% endfor %}
+            {% comment %}
+                Порядок скелетонов повторяет реальную раскладку: книга недели,
+                баннер конкурса, коллекции, полоса жанров с рядом. Иначе при
+                подстановке контента страница ощутимо дёргается.
+            {% endcomment %}
+            {% include "components/skeleton_box.html" with h="h-[340px]" radius="hero" %}
+            {% include "components/skeleton_box.html" with h="h-[185px]" radius="lg" cls="xl:hidden" %}
+            {% include "components/skeleton_box.html" with h="h-[212px]" radius="lg" %}
+            <div>
+                {% include "components/skeleton_box.html" with w="w-[140px]" h="h-[22px]" radius="sm" %}
+                <div class="mt-3 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
+                    {% for _ in '123456'|make_list %}
+                        {% include "components/skeleton_book_card_small.html" %}
+                    {% endfor %}
+                </div>
             </div>
         {% elif page_state == 'error' %}
             {% include "components/error_state.html" with message="Басты бет контентін жүктеу мүмкін болмады." %}
         {% else %}
+            {% comment %}
+                ФОЛД 2. Один сильный редакционный выбор сразу после ряда: для
+                подростка одна убедительная рекомендация работает лучше, чем
+                ещё шесть обложек.
+            {% endcomment %}
+            {% include "partials/home/book_of_week.html" %}
+
+            {% comment %}
+                Конкурс: приз и дедлайн — сильнейший мотиватор, а в правом
+                рейле он виден только с xl. В потоке рейл дублируется — с xl
+                баннер скрываем, чтобы один конкурс не показывался дважды.
+            {% endcomment %}
+            <div class="xl:hidden">
+                {% include "partials/home/contest_banner.html" %}
+            </div>
+
             {% include "partials/home/collections.html" %}
 
-            {# ── Жанрлар — компактный переключатель с книжной полкой ── #}
-            {% include "partials/home/genres_section.html" %}
+            {% comment %}
+                Граница зон. Выше — редакционная витрина (что читать сегодня),
+                ниже — навигация по таксономии (жанры, форматы, теги).
+                Раньше между всеми секциями стоял один и тот же gap, и две
+                разные по смыслу половины страницы читались как один поток.
+            {% endcomment %}
+            <div class="mt-4 sm:mt-6">
+                {% include "partials/home/genres_section.html" %}
+            </div>
 
-            {% include "partials/home/book_row.html" with title="Көп оқылған шығармалар" books=top_stories %}
-
-            {% include "partials/home/book_row.html" with title="Қысқа оқылатын әңгімелер" eyebrow="бір оқылым" books=short_stories link="қысқа мәтіндер →" link_href="/catalog/?format=single&length=short" %}
+            {% include "partials/home/book_row.html" with title="Көп оқылған шығармалар" books=top_stories link_href="/catalog/?sort=popular" %}
 
             {% include "partials/home/book_row.html" with title="Жалғасып жатқан шығармалар" eyebrow="көп бөлімді" books=serial_stories link="сериялар →" link_href="/catalog/?format=serial" %}
+
+            {% comment %}
+                ФОЛД 3. Теги — навигация по интересам, а не по жанрам. В рейле
+                они видны только с xl, поэтому в потоке держим мобильную копию.
+                Ссылки «Авторлар мектебі» сюда не дублируем: footer отдаёт их
+                inline на всех ширинах.
+            {% endcomment %}
+            <div class="xl:hidden">
+                {% include "partials/home/popular_tags.html" %}
+            </div>
+
+            {% comment %}
+                «Жаңа авторлар» стоят прямо перед CTA: сначала доказательство,
+                что здесь пишут такие же начинающие, потом предложение попробовать.
+            {% endcomment %}
+            <div class="mt-4 sm:mt-6">
+                {% include "partials/home/new_authors.html" %}
+            </div>
+
+            {% comment %}
+                CTA «Автор болу» переехала сюда из hero — здесь есть место
+                объяснить, что черновик никто не видит и публиковать необязательно.
+            {% endcomment %}
+            {% include "partials/home/become_author.html" %}
         {% endif %}
     </div>
 {% endblock %}

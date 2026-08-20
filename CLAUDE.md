@@ -183,9 +183,12 @@ def _login_as_aidana(client):
 - `open-delete-confirm` — открывает delete_confirm_modal с целью `{name, confirm_url}`
 
 ### Mobile bottom nav (5 слотов)
-- **Гость:** home / genres / login (FAB) / contests / search
-- **Авторизованный:** home / **contests** / new_story (FAB) / notifications / profile
-- Library и my_submissions у авторизованных доступны через avatar-dropdown в хедере (на десктопе) и через profile (на mobile). Sidebar исключён — DEC-25.
+- **Гость:** Басты / Оқу (catalog) / **Іздеу (FAB)** / Байқау / Кіру
+- **Авторизованный:** Басты / Кітапхана / **Жазу (FAB)** / Байқау / Профиль
+- У всех пунктов, кроме FAB, есть видимая подпись 10px — иконки без подписей опираются на неочевидные метафоры. У FAB подписи нет, только `aria-label`.
+- Гостевой FAB — поиск (открывает quick-search popup, href на `/search/` как no-JS fallback). Логин в FAB не ставить: самый заметный слот не должен требовать регистрации до получения ценности.
+- Конкурсы — иконка `trophy` (как в хедере), не `adjustments`.
+- Notifications у авторизованных — в хедере (колокольчик с бейджем), в нижнее меню не выносим. Library и my_submissions доступны через avatar-dropdown в хедере (на десктопе) и через profile (на mobile). Sidebar исключён — DEC-25.
 
 ## Стилистические правила для шаблонов
 

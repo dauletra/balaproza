@@ -28,10 +28,10 @@
             Шағым жіберу
         </h2>
         <p class="mt-1 font-sans text-sm text-slate-600">
-            Себебін көрсетіңіз. Модератор қарайды.
+            Себебін көрсет. Модератор қарайды.
         </p>
 
-        <form @submit.prevent="open = false; $dispatch('toast', { kind:'success', text:'Шағымыңыз жіберілді' })"
+        <form @submit.prevent="open = false; $dispatch('toast', { kind:'success', text:'Шағымың жіберілді' })"
               class="mt-5 flex flex-col gap-3">
             <fieldset class="flex flex-col gap-2.5">
                 <legend class="sr-only">Шағым себебі</legend>
@@ -60,7 +60,7 @@
             <label class="font-sans text-sm font-semibold text-slate-800">Қосымша түсініктеме</label>
             <textarea x-model="comment" rows="3" maxlength="500"
                       class="w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-2.5 font-sans text-sm text-slate-900 placeholder:text-slate-500 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30"
-                      placeholder="Қажет болса, толығырақ жазыңыз"></textarea>
+                      placeholder="Қажет болса, толығырақ жаз"></textarea>
 
             <div class="mt-2 flex justify-end gap-2.5">
                 <button type="button" @click="open = false"

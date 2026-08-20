@@ -6,9 +6,9 @@
 {% if not signed_in %}
     <div class="rounded-lg border border-amber-200 bg-amber-50 p-6">
         <p class="font-sans text-sm text-slate-800">
-            Өтінімдеріңізді көру үшін
+            Өтінімдеріңді көру үшін
             <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}"
-               class="font-semibold text-brand hover:underline">кіріңіз</a>.
+               class="font-semibold text-brand hover:underline">кір</a>.
         </p>
     </div>
 {% else %}
@@ -21,7 +21,7 @@
         <div>
             <h1 class="font-display text-3xl font-bold text-slate-900">Менің өтінімдерім</h1>
             <p class="mt-1 font-sans text-sm text-slate-600">
-                Сіз қатысқан байқаулар және өтінім күйі (BR-41).
+                Сен қатысқан байқаулар және өтінім күйі (BR-41).
             </p>
         </div>
         <a href="{% url 'core:contest_list' %}"
@@ -71,7 +71,7 @@
         </div>
     {% else %}
         {% url 'core:contest_list' as cl_href %}
-        {% include "components/empty_state.html" with icon="paper-plane" title="Әлі өтінім жоқ" text="Белсенді байқауларға қатысып, оларды осында табыңыз." cta_label="Конкурстарға" cta_href=cl_href %}
+        {% include "components/empty_state.html" with icon="paper-plane" title="Әлі өтінім жоқ" text="Белсенді байқауларға қатысып, оларды осында тап." cta_label="Конкурстарға" cta_href=cl_href %}
     {% endif %}
 {% endif %}
 {% endblock %}

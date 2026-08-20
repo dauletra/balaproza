@@ -33,17 +33,17 @@
                 </a>
             {% elif is_followed %}
                 <form method="post" action="#"
-                      @submit.prevent="$dispatch('toast', { kind:'success', text:'Жазылудан бас тарттыңыз (демо)' })">
+                      @submit.prevent="$dispatch('toast', { kind:'success', text:'Жазылудан бас тарттың (демо)' })">
                     {% csrf_token %}
                     <button type="submit"
                             class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
                         {% include "components/icon.html" with name="check" size=14 %}
-                        Жазылдыңыз
+                        Жазылдың
                     </button>
                 </form>
             {% else %}
                 <form method="post" action="#"
-                      @submit.prevent="$dispatch('toast', { kind:'success', text:'Жазылдыңыз (демо)' })">
+                      @submit.prevent="$dispatch('toast', { kind:'success', text:'Жазылдың (демо)' })">
                     {% csrf_token %}
                     <button type="submit"
                             class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:border-brand hover:text-brand">

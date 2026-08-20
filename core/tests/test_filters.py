@@ -1,8 +1,29 @@
-"""Custom template filter `page_range`."""
+"""Custom template filters `page_range` и `compact_count`."""
 
 import unittest
 
-from core.templatetags.balaproza import page_range
+from core.templatetags.balaproza import compact_count, page_range
+
+
+class CompactCount(unittest.TestCase):
+
+    def test_under_1000_stays_as_is(self):
+        self.assertEqual(compact_count(0), '0')
+        self.assertEqual(compact_count(840), '840')
+        self.assertEqual(compact_count(999), '999')
+
+    def test_thousands_get_one_decimal_with_comma(self):
+        self.assertEqual(compact_count(1000), '1,0 мың')
+        self.assertEqual(compact_count(8920), '8,9 мың')
+        self.assertEqual(compact_count(9999), '10,0 мың')
+
+    def test_ten_thousand_and_above_drops_decimal(self):
+        self.assertEqual(compact_count(10000), '10 мың')
+        self.assertEqual(compact_count(12482), '12 мың')
+
+    def test_invalid_input_passes_through(self):
+        self.assertEqual(compact_count(None), None)
+        self.assertEqual(compact_count('abc'), 'abc')
 
 
 class PageRange(unittest.TestCase):

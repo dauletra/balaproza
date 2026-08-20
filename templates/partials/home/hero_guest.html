@@ -1,26 +1,47 @@
 {% comment %}
-    Guest hero (FR-HOME-01): компактный вход на портал.
-    Основное действие — видимый поиск по произведениям; второе — авторская CTA.
+    Guest hero (FR-HOME-01) — компактный вход на портал.
 
-    Контекст: genres
+    Мобильный бюджет: ~180px, чтобы первый ряд обложек целиком помещался
+    в первый фолд (360×640 → ~480px под шапкой). Ради этого из hero убраны
+    чипы жанров (живут в секции «Жанрлар бойынша») и кнопка «Автор болу»
+    на мобильном (живёт в блоке become_author ниже по странице).
+
+    Подзаголовок теперь сообщает ЦЕННОСТЬ (здесь пишут ровесники), а не
+    механику поиска; строка счётчиков даёт масштаб портала с первого экрана.
+
+    Поиск: на мобильном — поле-триггер quick-search popup (без JS деградирует
+    в обычную ссылку на /search/); на sm+ — настоящая форма.
+
+    Контекст: portal_stats
 {% endcomment %}
-<section class="relative overflow-hidden rounded-hero border border-slate-200 bg-slate-50">
+<section x-data class="relative overflow-hidden rounded-hero border border-slate-200 bg-slate-50">
     <div class="absolute inset-y-0 left-0 w-[5px] bg-brand"></div>
-    <div class="px-5 py-5 sm:px-6 sm:py-6 md:px-8">
+    <div class="px-4 py-4 sm:px-6 sm:py-6 md:px-8">
         <div class="max-w-[720px]">
-            <div class="font-display text-xs font-semibold text-brand">
-                Balaproza
-            </div>
-            <h1 class="mt-1 font-sans text-[26px] font-bold leading-[1.16] text-slate-900 sm:text-[30px]">
+            <h1 class="font-sans text-[24px] font-bold leading-[1.16] text-slate-900 sm:text-[30px]">
                 Бүгін не оқимыз?
             </h1>
-            <p class="mt-2 max-w-[620px] font-sans text-sm leading-[1.55] text-slate-600">
-                Қазақ тіліндегі балалар мен жасөспірімдерге арналған шығарма, автор, жанр немесе тег табыңыз.
+            <p class="mt-1.5 max-w-[620px] font-sans text-[13px] leading-[1.45] text-slate-600 sm:mt-2 sm:text-sm sm:leading-[1.55]">
+                Құрдастарың жазған қазақша әңгімелер мен повестер. Оқы, ұнатқаныңды сақта.
+            </p>
+            <p class="mt-1 font-sans text-[12px] leading-[1.4] text-slate-500">
+                {{ portal_stats.stories }} шығарма
+                <span aria-hidden="true">·</span> {{ portal_stats.authors }} автор
+                <span aria-hidden="true">·</span> {{ portal_stats.genres }} жанр
             </p>
         </div>
 
-        <div class="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center">
-            <form action="{% url 'core:search_results' %}" method="get" class="flex min-h-[48px] flex-1 items-center gap-2 rounded-search border border-slate-200 bg-white px-3 shadow-sm focus-within:border-brand">
+        <div class="mt-3 flex flex-col gap-3 sm:mt-5 lg:flex-row lg:items-center">
+            {# Mobile: триггер popup. Href оставлен рабочим — это no-JS fallback. #}
+            <a href="{% url 'core:search_results' %}"
+               @click.prevent="$dispatch('open-search')"
+               class="flex h-11 items-center gap-2 rounded-search border border-slate-200 bg-white px-3 shadow-sm sm:hidden">
+                {% include "components/icon.html" with name="search" size=18 cls="shrink-0 text-slate-500" %}
+                <span class="min-w-0 truncate font-sans text-sm text-slate-400">Шығарма, автор, жанр немесе тег</span>
+            </a>
+
+            {# sm+: настоящая форма поиска. #}
+            <form action="{% url 'core:search_results' %}" method="get" class="hidden min-h-[48px] flex-1 items-center gap-2 rounded-search border border-slate-200 bg-white px-3 shadow-sm focus-within:border-brand sm:flex">
                 <label for="home-search" class="sr-only">Іздеу</label>
                 {% include "components/icon.html" with name="search" size=18 cls="shrink-0 text-slate-500" %}
                 <input id="home-search" type="search" name="q" placeholder="Шығарма, автор, жанр немесе тег" class="min-w-0 flex-1 bg-transparent font-sans text-sm text-slate-900 outline-none placeholder:text-slate-400">
@@ -29,23 +50,17 @@
                 </button>
             </form>
 
-            <a href="{% url 'core:signup' %}" class="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-md bg-slate-900 px-5 font-sans text-sm font-semibold text-white transition-colors hover:bg-slate-700">
+            {% comment %}
+                Вход только через Telegram, профиль создаётся автоматически
+                (см. pages/auth/login.html), поэтому CTA ведёт на login, а не
+                на signup: signup — это форма заполнения профиля уже вошедшего.
+                next сохраняет намерение: после входа человек попадает туда,
+                что ему пообещала кнопка.
+            {% endcomment %}
+            {% url 'core:new_story' as write_next %}
+            <a href="{% url 'core:login' %}?next={{ write_next|urlencode }}" class="hidden h-12 shrink-0 items-center justify-center gap-2 rounded-md bg-slate-900 px-5 font-sans text-sm font-semibold text-white transition-colors hover:bg-slate-700 sm:inline-flex">
                 {% include "components/icon.html" with name="pen" size=16 %}
                 Автор болу
-            </a>
-        </div>
-
-        <div class="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" aria-label="Жылдам жанрлар">
-            {% for genre in genres|slice:":4" %}
-                {% url 'core:genre_detail' slug=genre.slug as genre_url %}
-                <a href="{{ genre_url }}" class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-chip border border-slate-200 bg-white px-3 font-sans text-xs font-semibold text-slate-700 transition-colors hover:border-brand hover:text-brand">
-                    <span aria-hidden="true" class="h-1.5 w-1.5 rounded-pill" style="background: oklch(0.55 0.14 {{ genre.hue }});"></span>
-                    {{ genre.name }}
-                </a>
-            {% endfor %}
-            <a href="{% url 'core:catalog' %}" class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-chip border border-slate-200 bg-white px-3 font-sans text-xs font-semibold text-slate-700 transition-colors hover:border-brand hover:text-brand">
-                Каталог
-                {% include "components/icon.html" with name="arrow-right" size=14 %}
             </a>
         </div>
     </div>

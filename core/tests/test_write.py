@@ -147,7 +147,7 @@ class NewStoryGuestSeesGate(TestCase):
     def test_guest_sees_login_hint_no_form(self):
         r = self.client.get(reverse('core:new_story'))
         self.assertNotContains(r, 'name="title"')
-        self.assertContains(r, 'Кіріңіз')
+        self.assertContains(r, 'Кір')
 
 
 # ───────────────────────── Manage story ─────────────────────────

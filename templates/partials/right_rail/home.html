@@ -1,4 +1,4 @@
-{% comment %}
+{% load balaproza %}{% comment %}
     Правый рейл главной (docs/07.4 + FR-HOME-09).
     Контекст: hero_contest, school_links
 {% endcomment %}
@@ -41,7 +41,7 @@
                     Оқуға шабыт
                 </div>
                 <p class="font-sans text-sm leading-relaxed text-slate-600">
-                    Басқа авторларды оқу өз мәтініңізге жаңа ырғақ табуға көмектеседі.
+                    Басқа авторларды оқу өз мәтініңе жаңа ырғақ табуға көмектеседі.
                 </p>
                 <a href="{% url 'core:catalog' %}" class="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 font-sans text-sm font-semibold text-slate-700 transition-colors hover:border-brand hover:text-brand">
                     {% include "components/icon.html" with name="book" size=15 %}
@@ -55,7 +55,7 @@
                 Автор болып көру
             </div>
             <p class="font-sans text-sm leading-relaxed text-slate-600">
-                Ойыңыздағы оқиғаны черновикке түсіріп көріңіз. Жариялау бірден міндетті емес.
+                Ойыңдағы оқиғаны черновикке түсіріп көр. Жариялау бірден міндетті емес.
             </p>
             <a href="{% url 'core:new_story' %}" class="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-slate-900 px-3 font-sans text-sm font-semibold text-white transition-colors hover:bg-slate-700">
                 {% include "components/icon.html" with name="pen" size=15 %}
@@ -92,7 +92,7 @@
                     {% if hero_contest.prize_kzt %}
                         <div>
                             <dt class="text-[11px] uppercase tracking-wide text-slate-500">Жүлде</dt>
-                            <dd class="mt-0.5 font-display text-lg font-bold text-brand">{{ hero_contest.prize_kzt|stringformat:"d" }} ₸</dd>
+                            <dd class="mt-0.5 font-display text-lg font-bold text-brand">{{ hero_contest.prize_kzt|spaced }} ₸</dd>
                         </div>
                     {% endif %}
                 </dl>

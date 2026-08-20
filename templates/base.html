@@ -38,7 +38,7 @@
 
         {# Правый рейл рендерим только если страница явно прокинула has_right_rail=True. #}
         {% if has_right_rail %}
-            <aside class="hidden w-[300px] shrink-0 lg:block">
+            <aside class="hidden w-[300px] shrink-0 xl:block">
                 {% block right_rail %}{% endblock %}
             </aside>
         {% endif %}

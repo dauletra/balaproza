@@ -1,7 +1,7 @@
 {% comment %}
     Mobile bottom-sheet с filter-panel внутри.
     Открывается событием 'open-catalog-filters' (window dispatch).
-    Виден только на mobile (lg:hidden) — на десктопе фильтры в правом рейле.
+    Виден до xl — с xl фильтры живут в правом рейле.
 
     UX: change в radio → form submit → navigate с новыми query → sheet исчезает
     вместе со старым DOM. Никакого «применить» — изменения применяются мгновенно.
@@ -9,7 +9,7 @@
 <div x-data="{ open: false }"
      @open-catalog-filters.window="open = true"
      @keydown.escape.window="open = false"
-     class="lg:hidden">
+     class="xl:hidden">
 
     {# Backdrop #}
     <div x-show="open" x-cloak x-transition.opacity

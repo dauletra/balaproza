@@ -40,8 +40,10 @@ class HomeGuestMode(TestCase):
         self.assertNotContains(self.response, 'Менің шығармаларым')
 
     def test_mobile_guest_reading_entry_goes_to_catalog(self):
+        # Раньше пункт назывался только через aria-label; теперь у него есть
+        # видимая подпись, и дублирующий aria-label был бы лишним.
         self.assertContains(self.response, reverse('core:catalog'))
-        self.assertContains(self.response, 'aria-label="Оқу"')
+        self.assertContains(self.response, '>Оқу</span>')
 
     def test_short_shelf_contains_only_single_works(self):
         self.assertTrue(self.response.context['short_stories'])
@@ -53,10 +55,10 @@ class HomeGuestMode(TestCase):
 
     def test_collections_render_before_genres(self):
         html = self.response.content.decode()
-        self.assertLess(html.index('Қазір не оқығыңыз келеді?'), html.index('Жанрлар бойынша'))
+        self.assertLess(html.index('Қазір не оқығың келеді?'), html.index('Жанрлар бойынша'))
 
     def test_home_uses_five_main_rows(self):
-        self.assertContains(self.response, 'Қазір не оқығыңыз келеді?')
+        self.assertContains(self.response, 'Қазір не оқығың келеді?')
         self.assertContains(self.response, 'Жанрлар бойынша')
         self.assertContains(self.response, 'Көп оқылған шығармалар')
         self.assertContains(self.response, 'Қысқа оқылатын әңгімелер')
@@ -64,6 +66,269 @@ class HomeGuestMode(TestCase):
         self.assertNotContains(self.response, 'Жаңа шығармалар')
         self.assertNotContains(self.response, '10+ оқырманға')
         self.assertNotContains(self.response, 'Жас авторлар')
+
+class HomeMobileFirstFold(TestCase):
+    """Фолд 1 на мобильном: hero должен быть коротким, а обложки — сразу под ним.
+
+    Подросток заходит с телефона; если весь первый экран занят поиском,
+    ценность портала не считывается.
+    """
+
+    def setUp(self):
+        self.response = self.client.get(reverse('core:home'))
+        self.html = self.response.content.decode()
+
+    def test_hero_states_portal_scale(self):
+        """Счётчики в hero дают масштаб портала с первого экрана."""
+        stats = self.response.context['portal_stats']
+        self.assertEqual(stats['genres'], 12)
+        self.assertGreater(stats['stories'], 0)
+        self.assertContains(self.response, f"{stats['stories']} шығарма")
+        self.assertContains(self.response, f"{stats['authors']} автор")
+
+    def test_hero_says_peers_write_here(self):
+        """Подзаголовок сообщает ценность (пишут ровесники), а не механику поиска."""
+        self.assertContains(self.response, 'Құрдастарың жазған')
+
+    def test_first_row_renders_before_collections(self):
+        """Первый ряд обложек идёт сразу за hero — выше редакционных сборников."""
+        self.assertLess(
+            self.html.index('Қысқа оқылатын әңгімелер'),
+            self.html.index('Қазір не оқығың келеді?'),
+        )
+
+    def test_first_row_is_actually_filled(self):
+        """Ряд в первом фолде обязан быть наполнен — пустой ряд убивает всю раскладку.
+
+        Долгое время здесь было ровно одно произведение: у одиночных рассказов
+        не было текстов в core/story_texts/, и ряд приходилось подменять другим.
+        """
+        self.assertGreaterEqual(len(self.response.context['short_stories']), 4)
+
+    def test_author_cta_moved_out_of_hero_into_own_block(self):
+        """«Автор болу» больше не занимает бюджет фолда: CTA-блок ниже по странице."""
+        self.assertLess(
+            self.html.index('Қысқа оқылатын әңгімелер'),
+            self.html.index('Сенің әңгімең'),
+        )
+
+    def test_row_all_link_is_not_hidden_on_mobile(self):
+        """Выход «барлығы →» не должен требовать свайпа всех карточек ряда."""
+        self.assertContains(self.response, 'барлығы →')
+        self.assertNotContains(self.response, 'hidden lg:inline')
+
+    def test_cards_show_duration_chip(self):
+        """Длительность живёт на обложке, а не внутри обрезаемого заголовка."""
+        self.assertContains(self.response, 'мин')
+        self.assertContains(self.response, 'бөлім')
+
+
+class HomeMobileSecondFold(TestCase):
+    """Фолд 2: конкурс в потоке + секция жанров без псевдотабов."""
+
+    def setUp(self):
+        self.response = self.client.get(reverse('core:home'))
+        self.html = self.response.content.decode()
+
+    def test_contest_is_visible_in_flow_not_only_in_rail(self):
+        """Приз и дедлайн раньше жили только в правом рейле (hidden lg:block)."""
+        contest = self.response.context['hero_contest']
+        self.assertEqual(self.html.count('Белсенді байқау'), 2)  # поток + рейл
+        self.assertContains(self.response, f'{contest.days_left} күн')
+
+    def test_prize_has_thousand_separators(self):
+        """`stringformat:"d"` выводил «500000» сплошняком."""
+        self.assertContains(self.response, '500 000 ₸')
+
+    def test_contest_banner_hidden_on_desktop_to_avoid_duplicate(self):
+        """С xl конкурс показывает правый рейл — в потоке баннер прячется."""
+        import re
+        wrapper = re.search(
+            r'<div class="xl:hidden">\s*<a[^>]*>[\s\S]*?Белсенді байқау', self.html,
+        )
+        self.assertIsNotNone(wrapper)
+
+    def test_genres_render_only_active_genre(self):
+        """DEC-15 + вес страницы: в разметке один жанр, а не все двенадцать.
+
+        Раньше view отдавал genre_tabs — по 6 карточек на каждый из 12 жанров,
+        и все они уезжали в DOM ради шести видимых.
+        """
+        self.assertNotIn('genre_tabs', self.response.context)
+        active = self.response.context['active_genre']
+        self.assertEqual(active.slug, 'fantastika')
+        stories = self.response.context['active_genre_stories']
+        self.assertTrue(stories)
+        self.assertLessEqual(len(stories), 6)
+        self.assertTrue(all(active.slug in s.genres for s in stories))
+
+    def test_genre_switch_uses_real_url(self):
+        r = self.client.get(reverse('core:home') + '?genre=triller')
+        self.assertEqual(r.context['active_genre'].slug, 'triller')
+        self.assertTrue(all(
+            'triller' in s.genres for s in r.context['active_genre_stories']
+        ))
+
+    def test_unknown_genre_falls_back_to_first(self):
+        r = self.client.get(reverse('core:home') + '?genre=joq-zhanr')
+        self.assertEqual(r.context['active_genre'].slug, 'fantastika')
+
+    def test_genre_links_carry_anchor_for_sticky_header(self):
+        """Без якоря тап по чипу выбрасывал в начало страницы."""
+        self.assertContains(self.response, '?genre=triller#zhanrlar')
+        self.assertContains(self.response, 'id="zhanrlar"')
+
+    def test_every_genre_has_at_least_one_published_story(self):
+        """Пустой чип — тупик: подросток тапает жанр и упирается в заглушку."""
+        from core import stub_data
+        for genre in stub_data.GENRES:
+            with self.subTest(genre=genre.slug):
+                published = [s for s in stub_data.stories_by_genre(genre.slug)
+                             if s.status == 'Published']
+                self.assertTrue(published)
+
+
+class HomeMobileThirdFold(TestCase):
+    """Фолд 3: содержимое правого рейла не должно теряться на телефоне."""
+
+    def setUp(self):
+        self.response = self.client.get(reverse('core:home'))
+        self.html = self.response.content.decode()
+
+    def test_popular_tags_are_in_flow_not_only_in_rail(self):
+        self.assertTrue(self.response.context['popular_tags'])
+        # Поток + рейл: каждый тег встречается ровно дважды.
+        first = self.response.context['popular_tags'][0]
+        self.assertEqual(self.html.count(f'#</span>{first.name}'), 2)
+
+    def test_tags_block_hidden_on_desktop_to_avoid_duplicate(self):
+        """Первое вхождение — блок в потоке (main идёт раньше aside).
+        Он обязан лежать внутри ближайшей обёртки xl:hidden."""
+        idx = self.html.index('Танымал тегтер')
+        wrapper = self.html.rindex('<div class="xl:hidden">', 0, idx)
+        self.assertLess(idx - wrapper, 800)
+
+    def test_school_links_are_not_duplicated_into_flow(self):
+        """Footer отдаёт ссылки inline на всех ширинах, поэтому третьего блока
+        в мобильном потоке быть не должно.
+
+        Три вхождения строки — это заголовок виджета в правом рейле плюс
+        заголовок и aria-label списка в footer. Четвёртое = новый блок.
+        """
+        self.assertEqual(self.html.count('Авторлар мектебі'), 3)
+
+
+class MobileBottomNav(TestCase):
+    """Фаза 4 · docs/07.6. Нижнее меню — единственная постоянная навигация
+    на телефоне, поэтому слоты проверяем явно."""
+
+    def test_guest_fab_is_search_not_login(self):
+        """Самый заметный слот не должен требовать регистрации до ценности."""
+        r = self.client.get(reverse('core:home'))
+        html = r.content.decode()
+        fab = html[html.index('bg-brand text-white shadow-tg-btn') - 400:]
+        self.assertIn('aria-label="Іздеу"', fab)
+        self.assertNotIn('aria-label="Кіру"', html)
+
+    def test_guest_search_appears_once_in_nav(self):
+        """Пятый слот дублировал поиск — теперь там вход."""
+        r = self.client.get(reverse('core:home'))
+        html = r.content.decode()
+        nav = html[html.index('aria-label="Мобильді мәзір"'):html.index('</nav>', html.index('aria-label="Мобильді мәзір"'))]
+        self.assertEqual(nav.count('aria-label="Іздеу"'), 1)
+        self.assertIn('>Кіру</span>', nav)
+
+    def test_nav_items_have_visible_labels(self):
+        r = self.client.get(reverse('core:home'))
+        for label in ('Басты', 'Оқу', 'Байқау', 'Кіру'):
+            with self.subTest(label=label):
+                self.assertContains(r, f'>{label}</span>')
+
+    def test_contests_use_trophy_icon_like_header(self):
+        """Раньше конкурсы были помечены иконкой «ползунки»."""
+        r = self.client.get(reverse('core:home'))
+        html = r.content.decode()
+        nav = html[html.index('aria-label="Мобильді мәзір"'):html.index('</nav>', html.index('aria-label="Мобильді мәзір"'))]
+        self.assertIn('#icon-trophy', nav)
+        self.assertNotIn('#icon-adjustments', nav)
+
+    def test_authed_fab_is_create_story(self):
+        session = self.client.session
+        session['signed_in'] = True
+        session['user_username'] = 'aidana'
+        session.save()
+        r = self.client.get(reverse('core:home'))
+        html = r.content.decode()
+        nav = html[html.index('aria-label="Мобильді мәзір"'):html.index('</nav>', html.index('aria-label="Мобильді мәзір"'))]
+        self.assertIn('aria-label="Жаңа шығарма"', nav)
+        for label in ('Басты', 'Кітапхана', 'Байқау', 'Профиль'):
+            with self.subTest(label=label):
+                self.assertIn(f'>{label}</span>', nav)
+
+
+class HomeEditorialBlocks(TestCase):
+    """Фаза 7 · book_of_week и new_authors были написаны, но не подключены."""
+
+    def setUp(self):
+        self.response = self.client.get(reverse('core:home'))
+        self.html = self.response.content.decode()
+
+    def test_book_of_week_is_rendered(self):
+        self.assertContains(self.response, 'Аптаның кітабы')
+        story = self.response.context['book_of_week'].story
+        self.assertContains(self.response, f'«{story.title}»')
+
+    def test_book_of_week_sits_right_after_first_row(self):
+        """Одна сильная рекомендация идёт раньше конкурса и коллекций."""
+        self.assertLess(self.html.index('Аптаның кітабы'), self.html.index('Белсенді байқау'))
+        self.assertLess(self.html.index('Қысқа оқылатын'), self.html.index('Аптаның кітабы'))
+
+    def test_new_authors_precede_become_author_cta(self):
+        """Сначала доказательство, что здесь пишут новички, потом призыв."""
+        self.assertContains(self.response, 'Жаңа авторлар')
+        self.assertLess(self.html.index('Жаңа авторлар'), self.html.index('Сенің әңгімең'))
+
+    def test_new_authors_shows_least_followed(self):
+        usernames = [a.username for a in self.response.context['new_authors']]
+        self.assertEqual(usernames[0], 'aidana')  # 23 подписчика — меньше всех
+        self.assertNotIn('rudazov', usernames)    # 8420 — не «жаңа автор»
+
+    def test_no_dead_placeholder_links(self):
+        """Отдельного списка авторов в проекте нет — href="#" был бы тупиком."""
+        self.assertNotContains(self.response, 'барлық авторлар')
+
+    def test_genre_chip_links_to_genre_page(self):
+        """genre_chip по документации ведёт на /genres/<slug>/, а отдавал '#'."""
+        story = self.response.context['book_of_week'].story
+        self.assertContains(
+            self.response,
+            reverse('core:genre_detail', kwargs={'slug': story.primary_genre.slug}),
+        )
+
+
+class GuestAuthorCta(TestCase):
+    """Гостевые CTA расходились: hero вёл на signup, become_author — на login."""
+
+    def setUp(self):
+        self.response = self.client.get(reverse('core:home'))
+
+    def test_both_ctas_point_to_login(self):
+        """signup — форма профиля уже вошедшего; вход только через Telegram."""
+        self.assertNotContains(self.response, reverse('core:signup'))
+        self.assertContains(self.response, reverse('core:login'))
+
+    def test_cta_preserves_writing_intent(self):
+        """После входа человек должен попасть туда, что обещала кнопка."""
+        self.assertContains(
+            self.response,
+            reverse('core:login') + '?next=' + reverse('core:new_story'),
+        )
+
+    def test_login_honours_that_next(self):
+        target = reverse('core:new_story')
+        r = self.client.post(reverse('core:login') + f'?next={target}')
+        self.assertRedirects(r, target)
+
 
 class HomeAuthedMode(TestCase):
 
@@ -83,7 +348,7 @@ class HomeAuthedMode(TestCase):
 
     def test_default_focuses_started_writing(self):
         self.assertEqual(self.response.context['hero_focus'], 'writing')
-        self.assertContains(self.response, 'Мәтініңіз күтіп тұр')
+        self.assertContains(self.response, 'Мәтінің күтіп тұр')
 
     def test_context_has_active_work_for_writer_resume(self):
         self.assertEqual(self.response.context['active_work'].slug, 'aidana-koshe')
@@ -122,8 +387,20 @@ class HomeAuthedMode(TestCase):
         r = self.client.get(reverse('core:home') + '?hero_state=writing')
         self.assertEqual(r.context['hero_focus'], 'writing')
         self.assertIsNone(r.context['progress'])
-        self.assertContains(r, 'Мәтініңіз күтіп тұр')
+        self.assertContains(r, 'Мәтінің күтіп тұр')
         self.assertContains(r, 'Оқуға шығарма табу')
+
+    def test_writing_focus_keeps_reading_progress_on_mobile(self):
+        """Правый рейл скрыт до lg — прогресс чтения должен быть и в потоке.
+
+        Иначе пишущий автор теряет «продолжить чтение» на телефоне целиком.
+        """
+        html = self.response.content.decode()
+        self.assertEqual(self.response.context['hero_focus'], 'writing')
+        self.assertIsNotNone(self.response.context['progress'])
+        # Слим-строка в основном потоке помечена xl:hidden — рейл её дублирует с xl.
+        self.assertIn('xl:hidden', html)
+        self.assertEqual(html.count('Оқу үстінде'), 2)
 
 
 class HeaderContestsLink(TestCase):

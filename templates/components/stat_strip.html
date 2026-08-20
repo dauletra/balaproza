@@ -1,0 +1,29 @@
+{% comment %}
+    StatStrip — компактная полоса из четырёх чисел для мобильного потока.
+
+    Нужна там, где показатели живут в правом рейле: рейл появляется только
+    с xl, и до этой ширины цифры пропадали полностью. Полосой, а не сеткой
+    2×2, чтобы блок стоил ~72px вместо ~150.
+
+    Параметры (все обязательны):
+      l1..l4 — подписи
+      v1..v4 — значения
+{% endcomment %}
+<dl class="grid grid-cols-4 gap-2 rounded-lg border border-slate-200 bg-white px-3 py-3 text-center">
+    <div class="min-w-0">
+        <dt class="truncate font-sans text-[11px] text-slate-500">{{ l1 }}</dt>
+        <dd class="mt-0.5 font-display text-lg font-bold leading-none text-slate-900">{{ v1 }}</dd>
+    </div>
+    <div class="min-w-0">
+        <dt class="truncate font-sans text-[11px] text-slate-500">{{ l2 }}</dt>
+        <dd class="mt-0.5 font-display text-lg font-bold leading-none text-slate-900">{{ v2 }}</dd>
+    </div>
+    <div class="min-w-0">
+        <dt class="truncate font-sans text-[11px] text-slate-500">{{ l3 }}</dt>
+        <dd class="mt-0.5 font-display text-lg font-bold leading-none text-slate-900">{{ v3 }}</dd>
+    </div>
+    <div class="min-w-0">
+        <dt class="truncate font-sans text-[11px] text-slate-500">{{ l4 }}</dt>
+        <dd class="mt-0.5 font-display text-lg font-bold leading-none text-slate-900">{{ v4 }}</dd>
+    </div>
+</dl>

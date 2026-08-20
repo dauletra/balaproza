@@ -53,7 +53,7 @@
             <template x-if="!q.trim()">
                 <div class="px-4 py-8 text-center">
                     <p class="font-sans text-sm text-slate-500">
-                        Жазуды бастаңыз... <kbd class="ml-1 rounded-sm border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold">⌘K</kbd>
+                        Жазуды баста... <kbd class="ml-1 rounded-sm border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold">⌘K</kbd>
                     </p>
                 </div>
             </template>
@@ -162,9 +162,10 @@
     </div>
 </div>
 
-{# ── Lazy fetch индекса ── #}
-{# Данные приходят с /api/search-index.json только при первом открытии popup.
-   Это не нагружает каждый HTML и не ломает SEO/тесты. #}
+{% comment %}
+    Lazy fetch индекса. Данные приходят с /api/search-index.json только при
+    первом открытии popup. Это не нагружает каждый HTML и не ломает SEO/тесты.
+{% endcomment %}
 <script>
 function searchPopup() {
     return {

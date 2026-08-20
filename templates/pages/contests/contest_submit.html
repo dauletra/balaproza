@@ -16,7 +16,7 @@
         <p class="font-sans text-sm text-slate-800">
             Қатысу үшін
             <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}"
-               class="font-semibold text-brand hover:underline">кіріңіз</a>.
+               class="font-semibold text-brand hover:underline">кір</a>.
         </p>
     </div>
 {% else %}
@@ -29,15 +29,15 @@
     <header class="mb-6">
         <h1 class="font-display text-3xl font-bold text-slate-900">Өтінім беру</h1>
         <p class="mt-1.5 font-sans text-sm text-slate-600">
-            «{{ contest.name }}» байқауына қатысу үшін шығармаңызды таңдап, талаптарды растаңыз.
+            «{{ contest.name }}» байқауына қатысу үшін шығармаңды таңдап, талаптарды раста.
         </p>
     </header>
 
     {% if already_submitted %}
         <div class="rounded-lg border border-status-attention-fg/30 bg-status-attention-bg/30 p-5">
-            <h2 class="font-display text-base font-bold text-slate-900">Сіз бұл байқауға өтінім бергенсіз</h2>
+            <h2 class="font-display text-base font-bold text-slate-900">Сен бұл байқауға өтінім бергенсің</h2>
             <p class="mt-1 font-sans text-sm text-slate-700">
-                Ереже BR-23: бір автор — бір өтінім. Күйін «<a href="{% url 'core:my_submissions' %}" class="font-semibold text-brand hover:underline">Менің өтінімдерім</a>» бетінен қараңыз.
+                Ереже BR-23: бір автор — бір өтінім. Күйін «<a href="{% url 'core:my_submissions' %}" class="font-semibold text-brand hover:underline">Менің өтінімдерім</a>» бетінен қара.
             </p>
         </div>
     {% else %}
@@ -77,7 +77,7 @@
                     {% endfor %}
                 {% else %}
                     <p class="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center font-sans text-sm text-slate-600">
-                        Сізде әлі жарияланған шығарма жоқ.
+                        Сенде әлі жарияланған шығарма жоқ.
                         <a href="{% url 'core:new_story' %}" class="font-semibold text-brand hover:underline">Жаңа шығарма жазу</a>.
                     </p>
                 {% endif %}
@@ -119,7 +119,7 @@
                     <div class="mb-1 rounded-md bg-slate-50 p-3">
                         <p class="font-sans text-xs leading-relaxed text-slate-700">
                             <strong>AI</strong> — бұл ChatGPT, Claude, Gemini сияқты жасанды интеллект құралдары.
-                            Адал болыңыз: жауабыңыз жұмысты алып тастамайды, бірақ жалған жауап анықталса —
+                            Адал бол: жауабың жұмысты алып тастамайды, бірақ жалған жауап анықталса —
                             жұмыс байқаудан шеттетіледі.
                         </p>
                         <details class="mt-2">
@@ -127,8 +127,8 @@
                                 Не санауға болады?
                             </summary>
                             <ul class="mt-2 list-disc pl-4 font-sans text-xs leading-relaxed text-slate-600">
-                                <li><strong>Жоқ</strong> — мәтінді толық өзіңіз жаздыңыз, AI ешқандай көмек көрсетпеді.</li>
-                                <li><strong>Жартылай</strong> — идея ойлап табуға, кейіпкер атын таңдауға немесе грамматиканы тексеруге AI қолдандыңыз.</li>
+                                <li><strong>Жоқ</strong> — мәтінді толық өзің жаздың, AI ешқандай көмек көрсетпеді.</li>
+                                <li><strong>Жартылай</strong> — идея ойлап табуға, кейіпкер атын таңдауға немесе грамматиканы тексеруге AI қолдандың.</li>
                                 <li><strong>Иә</strong> — мәтіннің едәуір бөлігін AI жазды немесе қайта өңдеді.</li>
                             </ul>
                         </details>

@@ -12,14 +12,14 @@
         {# ── Левая колонка ── #}
         <div class="relative">
             <div class="mb-2 font-display text-xs font-semibold uppercase tracking-[0.14em] text-promo-bg">
-                Қазір қосылыңыз
+                Қазір қосыл
             </div>
             <h2 class="font-sans text-[32px] font-bold leading-[1.05] -tracking-[0.01em] md:text-[38px]">
                 {% if signed_in %}
-                    Бірінші тарауыңызды
-                    <span class="text-promo-bg">бүгін</span> жазыңыз.
+                    Бірінші тарауыңды
+                    <span class="text-promo-bg">бүгін</span> жаз.
                 {% else %}
-                    Сіздің әңгімеңіз
+                    Сенің әңгімең
                     <span class="text-promo-bg">әлемге</span> керек.
                 {% endif %}
             </h2>
@@ -27,7 +27,7 @@
                 {% if signed_in %}
                     Жариялау тегін. Авторлық сақталады. Модерация 1-2 күн ішінде.
                 {% else %}
-                    Жариялау тегін. Авторлық сақталады. Telegram арқылы бір минутта тіркеліңіз.
+                    Жариялау тегін. Авторлық сақталады. Telegram арқылы бір минутта тіркел.
                 {% endif %}
             </p>
         </div>
@@ -38,8 +38,12 @@
                 {% url 'core:new_story' as cta_href %}
                 {% include "components/button.html" with kind="primary" size="lg" full=True label="Шығарма жазу" icon="pen" href=cta_href %}
             {% else %}
-                {% url 'core:login' as cta_href %}
-                {% include "components/button.html" with kind="primary" size="lg" full=True label="Telegram арқылы кіру" icon="paper-plane" href=cta_href %}
+                {# Тот же вход, что и у CTA в hero: login + next на создание шығарма. #}
+                {% url 'core:new_story' as write_next %}
+                {% url 'core:login' as login_url %}
+                {% with cta_href=login_url|add:"?next="|add:write_next %}
+                    {% include "components/button.html" with kind="primary" size="lg" full=True label="Telegram арқылы кіру" icon="paper-plane" href=cta_href %}
+                {% endwith %}
             {% endif %}
         </div>
     </div>

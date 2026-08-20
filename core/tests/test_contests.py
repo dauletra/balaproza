@@ -173,8 +173,9 @@ class ContestDetailKnown(TestCase):
         c = stub_data.CONTESTS_BY_SLUG[self.SLUG]
         self.assertContains(self.response, c.name)
         self.assertContains(self.response, c.subtitle)
-        # Призовой фонд в ₸
-        self.assertContains(self.response, '500000')
+        # Призовой фонд в ₸ — с разрядами через неразрывный пробел (фильтр `spaced`).
+        # Раньше stringformat:"d" печатал «500000» сплошняком.
+        self.assertContains(self.response, '500 000 ₸')
 
     def test_shows_description_and_conditions(self):
         self.assertContains(self.response, 'Республикалық')
@@ -241,7 +242,7 @@ class ContestSubmitGuest(TestCase):
     def test_guest_sees_gate(self):
         r = self.client.get(reverse('core:contest_submit', kwargs={'slug': 'bolashak-mektebi'}))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'кіріңіз')
+        self.assertContains(r, 'кір')
         # формы не показываем гостю
         self.assertNotContains(r, 'name="story_slug"')
 
@@ -292,7 +293,7 @@ class ContestSubmitAlreadyDone(TestCase):
         self.response = self.client.get(reverse('core:contest_submit', kwargs={'slug': self.SLUG}))
 
     def test_shows_already_submitted_block(self):
-        self.assertContains(self.response, 'Сіз бұл байқауға өтінім бергенсіз')
+        self.assertContains(self.response, 'Сен бұл байқауға өтінім бергенсің')
 
     def test_no_form_when_already_submitted(self):
         # форма выбора произведения отсутствует
@@ -316,7 +317,7 @@ class MySubmissionsGuest(TestCase):
 
     def test_guest_sees_gate(self):
         r = self.client.get(reverse('core:my_submissions'))
-        self.assertContains(r, 'кіріңіз')
+        self.assertContains(r, 'кір')
 
 
 class MySubmissionsAuthed(TestCase):

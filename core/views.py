@@ -50,13 +50,17 @@ def home(request):
         hero_focus = 'empty'
 
     published = [s for s in stub_data.STORIES if s.status == 'Published']
-    genre_tabs = []
-    for genre in stub_data.GENRES:
-        stories = [s for s in stub_data.stories_by_genre(genre.slug) if s.status == 'Published'][:6]
-        genre_tabs.append({
-            'genre': genre,
-            'stories': stories,
-        })
+
+    # Секция жанров: активный жанр берём из ?genre= (DEC-15 — переключение через
+    # реальный URL, а не x-show). Рендерим только его — раньше в разметку уходило
+    # 12 панелей × 6 карточек ради шести видимых.
+    active_genre = stub_data.GENRES_BY_SLUG.get(
+        request.GET.get('genre', ''), stub_data.GENRES[0],
+    )
+    active_genre_stories = [
+        s for s in stub_data.stories_by_genre(active_genre.slug) if s.status == 'Published'
+    ][:5]
+
     return render(request, 'pages/home.html', {
         'has_right_rail':  True,
         'page_state':      _page_state(request),
@@ -66,13 +70,14 @@ def home(request):
         'hero_contest':    stub_data.HERO_CONTEST,
         'collections':     stub_data.COLLECTIONS,
         'genres':          stub_data.GENRES,
-        'genre_tabs':      genre_tabs,
-        'top_stories':     sorted(published, key=lambda s: s.views, reverse=True)[:6],
-        'latest_stories':  list(reversed(published))[:6],
-        'age_10_stories':  [s for s in published if s.audience == '10+'][:6],
-        'short_stories':   [s for s in published if s.is_single and s.read_minutes <= 15][:6],
-        'serial_stories':  [s for s in published if s.is_serial][:6],
-        'young_author_stories': [s for s in stub_data.STORIES if s.author_username == 'aidana'][:6],
+        'active_genre':         active_genre,
+        'active_genre_stories': active_genre_stories,
+        'book_of_week':    stub_data.BOOK_OF_WEEK,
+        'new_authors':     stub_data.new_authors(4),
+        'top_stories':     sorted(published, key=lambda s: s.views, reverse=True)[:5],
+        'short_stories':   [s for s in published if s.is_single and s.read_minutes <= 15][:5],
+        'serial_stories':  [s for s in published if s.is_serial][:5],
+        'portal_stats':    stub_data.portal_stats(),
         'popular_tags':    stub_data.popular_tags(8),
         'school_links':    stub_data.SCHOOL_LINKS,
     })

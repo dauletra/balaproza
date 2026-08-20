@@ -6,7 +6,11 @@
     Параметры:
       tag   — объект Tag (имеет .slug, .name, .status)
       href  — куда вести (default: /tag/<slug>/ для accepted; '#' для pending)
-      size  — 'sm' (h-7 text-xs, default) | 'md' (h-8 text-sm)
+      size  — 'sm' (text-xs, min-h 32, default) | 'md' (text-sm, min-h 40)
+
+    min-h держит тап-зону: чип остаётся текстовым (без фона, чтобы не спорить
+    с genre_chip), но высота строки 16px давала цель ниже даже минимума
+    WCAG 2.5.8. Визуально размер шрифта не меняется — растёт только hit-area.
 
     Pending-статус определяется автоматически по tag.status.
     Фильтрация видимости pending для нечитающего автора — в `tag_list.html`.
@@ -17,7 +21,7 @@
 <a href="{% firstof href accepted_link '#' %}"
    class="inline-flex items-center gap-1 font-sans transition-colors
           {% if tag.status == 'pending' %}text-slate-400 underline decoration-dashed underline-offset-4{% else %}text-slate-500 hover:text-brand{% endif %}
-          {% if sz == 'md' %}text-sm{% else %}text-xs{% endif %}">
+          {% if sz == 'md' %}min-h-[40px] text-sm{% else %}min-h-[32px] text-xs{% endif %}">
     <span class="text-slate-400">#</span>{{ tag.name }}
     {% if tag.status == 'pending' %}
         <span class="ml-0.5 font-display text-[9px] font-bold uppercase tracking-wider text-slate-400"

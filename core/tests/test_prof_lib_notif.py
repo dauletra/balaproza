@@ -126,7 +126,7 @@ class ProfileMeGuest(TestCase):
     def test_guest_sees_gate(self):
         r = self.client.get(reverse('core:profile_me'))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'кіріңіз')
+        self.assertContains(r, 'кір')
         # Реальные данные не светим
         self.assertNotContains(r, 'Айдана Серікқызы')
 
@@ -201,17 +201,17 @@ class ProfileOtherKnown(TestCase):
     def test_authed_sees_follow_button(self):
         _login_as(self.client, 'bekzhan_t')   # bekzhan_t подписан на rudazov
         r = self.client.get(reverse('core:profile_other', kwargs={'username': self.USERNAME}))
-        # «Уже подписан» — кнопка «Жазылдыңыз» + toast «отписка»
-        self.assertContains(r, 'Жазылдыңыз')
-        self.assertContains(r, 'Жазылудан бас тарттыңыз')
+        # «Уже подписан» — кнопка «Жазылдың» + toast «отписка»
+        self.assertContains(r, 'Жазылдың')
+        self.assertContains(r, 'Жазылудан бас тарттың')
 
     def test_authed_not_following_sees_subscribe(self):
         _login_as(self.client, 'sayyn')       # sayyn НЕ подписан на rudazov
         r = self.client.get(reverse('core:profile_other', kwargs={'username': self.USERNAME}))
-        # «Не подписан» — кнопка «Жазылу»; toast подписки тут есть («Жазылдыңыз (демо)»),
+        # «Не подписан» — кнопка «Жазылу»; toast подписки тут есть («Жазылдың (демо)»),
         # но toast отписки — нет.
         self.assertContains(r, 'Жазылу')
-        self.assertNotContains(r, 'Жазылудан бас тарттыңыз')
+        self.assertNotContains(r, 'Жазылудан бас тарттың')
 
     def test_works_tab_lists_author_stories(self):
         r = self.client.get(reverse('core:profile_other', kwargs={'username': self.USERNAME}))
@@ -244,7 +244,7 @@ class LibraryGuest(TestCase):
     def test_guest_sees_gate(self):
         r = self.client.get(reverse('core:library'))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'кіріңіз')
+        self.assertContains(r, 'кір')
         self.assertNotContains(r, 'Алыс жағалауларда')
 
 
@@ -316,7 +316,7 @@ class NotificationsGuest(TestCase):
     def test_guest_sees_gate(self):
         r = self.client.get(reverse('core:notifications'))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'кіріңіз')
+        self.assertContains(r, 'кір')
 
 
 class NotificationsAuthed(TestCase):
@@ -338,7 +338,7 @@ class NotificationsAuthed(TestCase):
         # Уникальные тексты по типам
         self.assertContains(self.response, 'пікір қалдырды')   # comment
         self.assertContains(self.response, 'ұнатты')           # like
-        self.assertContains(self.response, 'сізге жазылды')    # follower
+        self.assertContains(self.response, 'саған жазылды')    # follower
         self.assertContains(self.response, 'жаңа бөлім')       # new_chapter
         self.assertContains(self.response, 'Модерация')        # moderation
         self.assertContains(self.response, 'Байқау')           # contest
