@@ -24,6 +24,31 @@ def _page_state(request) -> str:
 def home(request):
     """Главная — редакционная витрина. Гость vs возвращающийся (FR-HOME-01)."""
     is_signed_in = bool(request.session.get('signed_in'))
+    username = request.session.get('user_username') if is_signed_in else None
+    my_stories = stub_data.my_stories_of(username) if username else []
+    active_work = next((s for s in my_stories if s.status == 'OnProcess'), my_stories[0] if my_stories else None)
+    progress = stub_data.SAMPLE_PROGRESS if is_signed_in else None
+
+    # Design-system demo override for the four authenticated hero states.
+    hero_state_demo = request.GET.get('hero_state')
+    if is_signed_in and hero_state_demo in {'empty', 'reading', 'writing', 'full'}:
+        if hero_state_demo == 'empty':
+            progress = None
+            active_work = None
+        elif hero_state_demo == 'reading':
+            active_work = None
+        elif hero_state_demo == 'writing':
+            progress = None
+
+    if not is_signed_in:
+        hero_focus = 'guest'
+    elif active_work:
+        hero_focus = 'writing'
+    elif progress:
+        hero_focus = 'reading'
+    else:
+        hero_focus = 'empty'
+
     published = [s for s in stub_data.STORIES if s.status == 'Published']
     genre_tabs = []
     for genre in stub_data.GENRES:
@@ -35,7 +60,9 @@ def home(request):
     return render(request, 'pages/home.html', {
         'has_right_rail':  True,
         'page_state':      _page_state(request),
-        'progress':        stub_data.SAMPLE_PROGRESS if is_signed_in else None,
+        'progress':        progress,
+        'active_work':     active_work,
+        'hero_focus':      hero_focus,
         'hero_contest':    stub_data.HERO_CONTEST,
         'collections':     stub_data.COLLECTIONS,
         'genres':          stub_data.GENRES,

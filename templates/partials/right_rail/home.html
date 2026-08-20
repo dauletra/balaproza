@@ -4,6 +4,66 @@
 {% endcomment %}
 <div class="flex flex-col gap-6">
 
+    {% if signed_in and hero_focus == 'writing' %}
+        {% if progress %}
+            {% with story=progress.story %}
+            {% with chap=progress.current_chapter|stringformat:"d" %}
+            {% url 'core:story_detail' slug=story.slug as detail_base %}
+            {% with continue_href=detail_base|add:"?chapter="|add:chap|add:"#chapter-"|add:chap %}
+            <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="mb-3 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                    Оқу үстінде
+                </div>
+                <div class="flex gap-3">
+                    <a href="{{ continue_href }}" class="shrink-0">
+                        {% include "components/cover_placeholder.html" with story=story cls="aspect-[2/3] w-[54px] rounded-md shadow-sm" letter_cls="text-3xl" %}
+                    </a>
+                    <div class="min-w-0 flex-1">
+                        <a href="{{ continue_href }}" class="block truncate font-sans text-sm font-bold text-slate-900 hover:text-brand">
+                            {{ story.title }}
+                        </a>
+                        <p class="mt-1 font-sans text-xs leading-relaxed text-slate-500">
+                            {{ progress.current_chapter }} / {{ story.chapters }} бөлім · {{ progress.minutes_left }} минут
+                        </p>
+                    </div>
+                </div>
+                <a href="{{ continue_href }}" class="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 font-sans text-sm font-semibold text-slate-700 transition-colors hover:border-brand hover:text-brand">
+                    {% include "components/icon.html" with name="book" size=15 %}
+                    Оқуды жалғастыру
+                </a>
+            </section>
+            {% endwith %}
+            {% endwith %}
+            {% endwith %}
+        {% else %}
+            <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="mb-2 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                    Оқуға шабыт
+                </div>
+                <p class="font-sans text-sm leading-relaxed text-slate-600">
+                    Басқа авторларды оқу өз мәтініңізге жаңа ырғақ табуға көмектеседі.
+                </p>
+                <a href="{% url 'core:catalog' %}" class="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 font-sans text-sm font-semibold text-slate-700 transition-colors hover:border-brand hover:text-brand">
+                    {% include "components/icon.html" with name="book" size=15 %}
+                    Оқуға шығарма табу
+                </a>
+            </section>
+        {% endif %}
+    {% elif signed_in and hero_focus == 'reading' %}
+        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="mb-2 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                Автор болып көру
+            </div>
+            <p class="font-sans text-sm leading-relaxed text-slate-600">
+                Ойыңыздағы оқиғаны черновикке түсіріп көріңіз. Жариялау бірден міндетті емес.
+            </p>
+            <a href="{% url 'core:new_story' %}" class="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-slate-900 px-3 font-sans text-sm font-semibold text-white transition-colors hover:bg-slate-700">
+                {% include "components/icon.html" with name="pen" size=15 %}
+                Жазып көру
+            </a>
+        </section>
+    {% endif %}
+
     {% if hero_contest and hero_contest.status == 'active' %}
         <a href="{% url 'core:contest_detail' slug=hero_contest.slug %}"
            class="group block overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-card-hover">

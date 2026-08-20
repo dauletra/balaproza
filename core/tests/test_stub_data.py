@@ -95,6 +95,12 @@ class CollectionRelations(unittest.TestCase):
                 for s in covers:
                     self.assertIsInstance(s, stub_data.Story)
 
+    def test_collections_have_enough_stories_for_quick_pick_grid(self):
+        for c in stub_data.COLLECTIONS:
+            with self.subTest(collection=c.slug):
+                self.assertGreaterEqual(len(c.stories), 5)
+                self.assertGreaterEqual(c.count, 5)
+
 
 class BookOfWeekAndProgressResolve(unittest.TestCase):
 

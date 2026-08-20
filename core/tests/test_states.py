@@ -18,7 +18,7 @@ class HomeStates(TestCase):
 
     # Маркер, который рендерится ТОЛЬКО в content-режиме главной
     # (внутри if/else, отсутствует в hero / right_rail / new_authors / footer).
-    CONTENT_MARKER = 'Ең көп оқылған'
+    CONTENT_MARKER = 'Көп оқылған шығармалар'
 
     def test_default_state_is_content(self):
         r = self.client.get(reverse('core:home'))

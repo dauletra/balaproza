@@ -12,9 +12,6 @@
             {% include "partials/home/hero_guest.html" %}
         {% endif %}
 
-        {# ── Жанрлар — компактный переключатель с книжной полкой ── #}
-        {% include "partials/home/genres_section.html" %}
-
         {% if page_state == 'loading' %}
             {# ── Скелетон: редакциялық жинақтар + один ряд карточек ── #}
             {% include "components/skeleton_box.html" with h="h-[200px]" radius="hero" %}
@@ -28,17 +25,14 @@
         {% else %}
             {% include "partials/home/collections.html" %}
 
-            {% include "partials/home/book_row.html" with title="Ең көп оқылған кітаптар" books=top_stories %}
+            {# ── Жанрлар — компактный переключатель с книжной полкой ── #}
+            {% include "partials/home/genres_section.html" %}
 
-            {% include "partials/home/book_row.html" with title="Жаңа шығармалар" eyebrow="редакциялық сөре" books=latest_stories link="каталог →" link_href="/catalog/?sort=recent" %}
-
-            {% include "partials/home/book_row.html" with title="10+ оқырманға" eyebrow="жас бойынша" books=age_10_stories link="10+ көру →" link_href="/catalog/?audience=10%2B" %}
+            {% include "partials/home/book_row.html" with title="Көп оқылған шығармалар" books=top_stories %}
 
             {% include "partials/home/book_row.html" with title="Қысқа оқылатын әңгімелер" eyebrow="бір оқылым" books=short_stories link="қысқа мәтіндер →" link_href="/catalog/?format=single&length=short" %}
 
-            {% include "partials/home/book_row.html" with title="Жалғасып оқылатын сериялар" eyebrow="көп бөлімді" books=serial_stories link="сериялар →" link_href="/catalog/?format=serial" %}
-
-            {% include "partials/home/book_row.html" with title="Жас авторлар" eyebrow="жаңа дауыстар" books=young_author_stories link="автор болу →" link_href="/write/new/" %}
+            {% include "partials/home/book_row.html" with title="Жалғасып жатқан шығармалар" eyebrow="көп бөлімді" books=serial_stories link="сериялар →" link_href="/catalog/?format=serial" %}
         {% endif %}
     </div>
 {% endblock %}

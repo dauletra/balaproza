@@ -13,8 +13,8 @@
         </div>
     </div>
 
-    <div class="relative mb-4">
-        <div class="-mx-4 overflow-x-auto px-4 pb-1 pr-[150px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 sm:pr-[160px]" role="tablist" aria-label="Жанрлар" @wheel.prevent="$el.scrollLeft += $event.deltaY">
+    <div class="relative mb-4 -mx-4 sm:mx-0">
+        <div class="overflow-x-auto px-4 pb-1 pr-[150px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:px-0 sm:pr-[160px]" role="tablist" aria-label="Жанрлар" @wheel.prevent="$el.scrollLeft += $event.deltaY">
             <div class="flex w-max min-w-full items-center gap-5">
                 {% for item in genre_tabs %}
                     <button type="button"
@@ -32,7 +32,7 @@
             </div>
         </div>
         <a href="{{ genre_index_url }}" class="absolute right-0 top-0 z-10 shrink-0 bg-slate-100 pb-1 pl-5 font-display text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-colors before:absolute before:bottom-0 before:left-0 before:top-0 before:w-px before:bg-slate-300 before:shadow-[-10px_0_18px_rgba(243,244,246,0.95)] after:absolute after:bottom-0 after:left-[-28px] after:top-0 after:w-7 after:bg-linear-to-r after:from-transparent after:to-slate-100 hover:text-brand-dark">
-            Барлық жанрлар
+            Барлығы
         </a>
     </div>
 
