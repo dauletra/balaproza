@@ -26,7 +26,7 @@
 Нужны [uv](https://docs.astral.sh/uv/) и Node.js 20+.
 
 ```bash
-git clone <repo-url> balaproza_v1
+git clone https://github.com/dauletra/balaproza.git
 ```
 
 ```bash
