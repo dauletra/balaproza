@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Заметки для Claude Code по проекту `balaproza_v1`. Платформа — Balaproza, казахоязычный детский литературный портал. Подробное ТЗ — в [`docs/`](docs/) (модули 01-11).
+Заметки для Claude Code по проекту `balaproza_v1`. Платформа — Balaproza, казахоязычный детский литературный портал. Подробное ТЗ — в [`docs/`](docs/) (модули 00-18, 06 выведен из обращения).
 
 ## Текущий фокус
 
@@ -65,12 +65,12 @@ balaproza_v1/
 │   │                             # /me/edit/, 5 legal routes
 │   ├── context_processors.py     # auth_state, nav_state, site_links
 │   ├── templatetags/balaproza.py # filter page_range (для pagination)
-│   └── tests/                    # 315 тестов в 12 файлах (см. ниже)
+│   └── tests/                    # 405 тестов в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
 │   ├── 404.html / 500.html       # branded error pages (500 — standalone, без base.html)
-│   ├── components/               # ~55 атомов и composites (см. docs/04)
+│   ├── components/               # 50 атомов и composites (см. docs/04)
 │   │                             # включая cover_placeholder (двухрежимный: <img> если
 │   │                             # story.cover задан, иначе типографическая плашка OKLCH +
 │   │                             # буква по primary genre.hue),
@@ -107,7 +107,7 @@ balaproza_v1/
 │   ├── fonts/                    # 4 variable woff2
 │   └── vendor/{alpine,htmx}.min.js
 ├── static_src/input.css          # Tailwind v4 @import + @theme c токенами
-├── docs/                         # ТЗ модулями 00-11 (приоритет над прототипом)
+├── docs/                         # ТЗ модулями 00-18 (приоритет над прототипом)
 ├── package.json                  # @tailwindcss/cli + npm-скрипты dev/build
 ├── pyproject.toml + uv.lock
 └── manage.py
@@ -145,7 +145,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 315 тестов
+uv run python manage.py test core       # все 405 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 
@@ -154,6 +154,10 @@ uv run python manage.py test core.tests.test_<file>
 - `test_auth.py`, `test_context.py`, `test_filters.py`, `test_stub_data.py`
 - `test_home.py`, `test_story.py`, `test_catalog.py`, `test_write.py`
 - `test_prof_lib_notif.py`, `test_contests.py`, `test_auth_links.py`, `test_states.py`
+- `test_desktop_layout.py` — регрессии каркаса: рейл только на `xl`, ряды по 5 карточек,
+  контейнер шапки = контейнер страницы, скелетон повторяет сетку контента, деньги через `spaced`
+- `test_template_lint.py` — статический лint шаблонов: запрещает многострочные `{# … #}`
+  и `{% … %}` (Django молча выводит их как текст)
 
 Логин в тестах:
 ```python
@@ -221,6 +225,32 @@ def _login_as_aidana(client):
   {% include "components/comment.html" with author_name=cm.author.name text=cm.text %}
   ```
   То же правило для других тегов: `{% url %}`, `{% if %}` — без переносов внутри.
+
+## Документация — обязательна к обновлению
+
+**Изменение, затрагивающее FR / BR / DEC, обновляет соответствующий модуль ТЗ в том же коммите.** Не «потом» и не отдельной задачей: за три августовских коммита ТЗ разошлось с кодом в 26 местах именно потому, что такого правила не было.
+
+Куда смотреть — [`docs/14-implementation-map.md`](docs/14-implementation-map.md):
+- **§14.2-14.9** — карта «требование → view → шаблон → тест»;
+- **§14.10** — обратная карта «меняешь файл X → обнови документ Y». Начинать отсюда.
+
+Частые случаи:
+
+| Меняешь | Обнови |
+|---------|--------|
+| Токен в `@theme` | `docs/02` |
+| Новое OKLCH-значение в шаблоне | `docs/03 §3.3` — реестр ролей; новые пары `L C` без внесения запрещены |
+| `mobile_nav.html` | `docs/07 §7.6` — единственный авторитет |
+| Состав секций главной | `docs/05` FR-HOME-*, `docs/14 §14.3` |
+| Сигнатуру хелпера в `stub_data.py` | `docs/12 §12.3` |
+| Строку интерфейса | сверить с `docs/16` (обращение на «сен», словарь статусов) |
+| Новый компонент или тест-файл | `docs/04` / `docs/15` + счётчики в `README.md` и `CLAUDE.md` |
+
+**Решение не правится — оно отменяется новым.** Передумал насчёт DEC-NN — добавляй новый DEC со ссылкой «отменяет DEC-NN», старый помечай перечёркнутым. История решений и есть ценность реестра. Аннулированные номера FR/BR/DEC не переиспользуются.
+
+**Невыполненное помечается явно** (⛔ + объяснение), иначе документ выглядит описанием факта. Так помечены NFR-30, NFR-41, DEC-12.
+
+Проверяемая часть этого правила закрыта тестом `core/tests/test_docs_sync.py`: счётчики, пути к файлам, имена токенов и хелперов, тексты статусов, наличие шапки со сверкой. Он не проверяет смысл — только имена и числа.
 
 ## Что НЕ делать
 

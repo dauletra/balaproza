@@ -1,5 +1,7 @@
 # 12. Domain model contract for F14
 
+> `Обновлён: 2026-08-20` · `Сверен с кодом: 5d39adb`
+
 This document is the implementation contract for replacing `core/stub_data.py` with real Django models. It does not introduce models yet; it fixes the fields, relationships, computed values, and query helpers that the current templates already depend on.
 
 ## 12.1 Product boundary
@@ -20,274 +22,83 @@ Secondary scenarios stay minimal until real usage exists:
 
 ## 12.2 Core models
 
-### User / Author profile
+Fields are **not listed here.** Every stub dataclass is in `core/stub_data.py`, twenty lines above the data it holds — a prose copy of those field lists would be a second source that silently rots, which is exactly what happened to §12.3 before this revision.
 
-Source stub: `Author`.
+What the table carries instead is the part `stub_data.py` cannot state: what must survive the migration and why.
 
-Persisted fields:
-- `username`
-- `name`
-- `bio`
-- `gender`
-- `age`
-- profile/avatar seed or uploaded avatar later
-
-Computed/query values:
-- `works_count`
-- `followers_count`
-- `following_count`
-- reader/writer stats
-
-Notes:
-- DEC-01 stays: there is no separate Reader role. Any signed-in user can read, write, comment, save, and submit.
-- Follows can remain a small relation and should not drive MVP navigation.
-
-### Genre
-
-Source stub: `Genre`.
-
-Persisted fields:
-- `slug`
-- `name`
-- `hue`
-- `icon`
-- optional ordering
-
-Computed/query values:
-- published story count
-
-Notes:
-- `/genres/` is an overview page.
-- `/catalog/` is the primary reading entry.
-- `/genres/<slug>/` is a catalog filter entry, not a separate engine.
-
-### Tag
-
-Source stub: `Tag`, `TAGS`, `BLOCKED_TAG_PATTERNS`.
-
-Persisted fields:
-- `slug`
-- `name`
-- `status`: `pending`, `accepted`, `rejected`
-- `usage_count` can be cached or computed
-
-Relationships:
-- many-to-many with `Story`
-
-Business rules:
-- story can have up to 10 tags.
-- pending tags are visible to the author, hidden from public catalog and public story views.
-- blocked patterns stay admin-managed after F14.
-
-### Story
-
-Source stub: `Story`.
-
-Persisted fields:
-- `slug`
-- `title`
-- `author`
-- `cover`
-- `annotation`
-- `status`
-- `format`: `single`, `serial`
-- `audience`
-- `primary_genre`
-- `secondary_genre`
-- timestamps: created, updated, published
-
-Relationships:
-- author: user/profile
-- genres: primary and optional secondary
-- tags: many-to-many
-
-Status UX labels:
-- `NotPublished` -> `Жоба`
-- `OnModeration` -> `Модерацияда`
-- `Published` -> `Жарияланды`
-- `Completed` -> `Аяқталды`
-- `OnProcess` -> `Жазылып жатыр`
-
-Notes:
-- `OnProcess` is a continuation state, not a moderation state.
-- Public catalog should only include `Published` and any explicitly allowed public states.
-- `format=single` is a one-shot work (story/essay/fairy tale/novella) rendered as full text without chapter index.
-- `format=serial` is a chaptered work rendered with chapter navigation.
-- Do not infer format from chapter count; authors choose it explicitly.
-- Current templates expect `primary_genre`, `genres_resolved`, `tags_resolved`, and `author`-like accessors.
-
-### Chapter
-
-Source stub: `Chapter`, `CHAPTERS_BY_STORY`.
-
-Stub text bodies live outside `stub_data.py` in `core/story_texts/<story-slug>/<chapter-number>.txt`.
-`stub_data._chapter()` loads these files and derives `char_count` from the body text. Keep long prose out of `stub_data.py`.
-
-Persisted fields:
-- `story`
-- `number`
-- `title`
-- `body`
-- `char_count`
-- `likes_count` can be cached or computed
-
-Business rules:
-- one-based chapter numbers.
-- story detail reads one chapter via `?chapter=N`.
-- right rail uses chapters as the chapter index.
-
-### Collection
-
-Source stub: `Collection`.
-
-Persisted fields:
-- `slug`
-- `name`
-- `description`
-- `curator`
-- `icon`
-- ordering
-
-Relationships:
-- ordered many-to-many with `Story`
-
-Notes:
-- Collections remain separate from contests.
-- Collections are editorial curation, not smart auto-filters in MVP.
-
-### Contest
-
-Source stub: `Contest`.
-
-Persisted fields:
-- `slug`
-- `name`
-- `subtitle`
-- `description`
-- `status`: `active`, `finished`
-- `deadline`
-- `prize_kzt`
-- rules/checklist fields
-
-Relationships:
-- submissions
-
-Notes:
-- Contests remain separate from collections.
-- Moderation/admin UI is Django admin for MVP.
-
-### Submission
-
-Source stub: `Submission`.
-
-Persisted fields:
-- `contest`
-- `story`
-- `author`
-- `status`: `reviewing`, `accepted`, `rejected`
-- `submitted_at`
-- AI declaration fields
-- age self-declaration field
-
-Business rules:
-- one story can be submitted once per contest by the author.
-- eligibility is a query/service concern, not template logic.
-
-### LibraryEntry
-
-Source stub: `LibraryEntry`.
-
-Persisted fields:
-- `user`
-- `story`
-- `kind`: `saved`, `reading`, `done`
-- `current_chapter`
-- `updated_at`
-
-Computed/query values:
-- minutes left
-- progress percent
-
-Notes:
-- Mobile nav prioritizes library for signed-in users.
-- Continue reading should be a first-class reader workflow.
-
-### Comment
-
-Source stub: `StoryComment`.
-
-Persisted fields:
-- `story`
-- `chapter` nullable
-- `author`
-- `text`
-- `created_at`
-- `parent` nullable
-- `likes_count` can be cached or computed
-
-Business rules:
-- one reply level only in MVP.
-- reply form and comment-like persistence can wait until after the core model migration.
-
-### Notification
-
-Source stub: `Notification`.
-
-Persisted fields:
-- `user`
-- `kind`
-- `actor`
-- `story`
-- `contest`
-- `text`
-- `created_at`
-- `read_at`
-
-Notes:
-- Notifications should stay secondary in MVP.
-- Header badge and notifications page are enough.
+| Model | Stub source | Must survive F14 |
+|-------|-------------|------------------|
+| **User / Author** | `Author` | DEC-01 holds: no separate Reader role — any signed-in user reads, writes, comments, saves and submits. Follows stay a small relation and must not drive navigation |
+| **Genre** | `Genre` | Closed reference of 12 (DEC-11). `/genres/` is an overview page, `/catalog/` the primary reading entry, `/genres/<slug>/` a catalog filter entry — **not** a separate engine (DEC-27) |
+| **Tag** | `Tag`, `TAGS`, `BLOCKED_TAG_PATTERNS` | Up to 10 per story (BR-TAG-01). `status`: `pending` / `accepted` / `rejected`. Pending visible to the author, hidden from public catalog and story views (BR-TAG-07). Blocked patterns stay admin-managed |
+| **Story** | `Story` | `OnProcess` is a continuation state, **not** a moderation state. Public catalog carries only `Published` and explicitly allowed public states. `format` is chosen by the author, never inferred from chapter count (DEC-28). Status labels — `components/status_badge.html`, see [16 §16.3](16-content-voice.md) |
+| **Chapter** | `Chapter`, `CHAPTERS_BY_STORY` | One-based numbers. Bodies live **outside** `stub_data.py` in `core/story_texts/<slug>/<n>.txt`; `_chapter()` loads them and derives `char_count`. Keep long prose out of the data module. Read via `?chapter=N` — no separate route (DEC-30) |
+| **Collection** | `Collection` | Ordered many-to-many with `Story`. Editorial curation by a moderator, not a smart auto-filter, and separate from contests (DEC-27) |
+| **Contest** | `Contest` | `status`: `active` / `finished`. Separate from collections. Admin UI is Django admin for MVP (DEC-23) |
+| **Submission** | `Submission` | One story per author per contest (BR-23). Eligibility is a query/service concern, never template logic (BR-22, BR-24) |
+| **LibraryEntry** | `LibraryEntry` | `kind`: `saved` / `reading` / `done`, non-overlapping (BR-60/61). Continue-reading is a first-class reader workflow — it drives both the hero and the mobile nav |
+| **Comment** | `StoryComment` | One reply level only (BR-30). Anchored to a chapter via `chapter_number`; `None` means the whole work. Reply form and comment-like persistence can wait |
+| **Notification** | `Notification` | Secondary in MVP: header badge plus the notifications page are enough (BR-70…72) |
 
 ## 12.3 Query/service helpers to preserve
 
-Current views rely on these helper shapes from `stub_data.py`. In F14 they should move to query/service functions, not into templates:
+Current views rely on these helpers from `stub_data.py`. In F14 they should move to query/service functions, not into templates.
 
-- `my_stories_of(user)`
-- `chapters_of(story)`
-- `comments_of_chapter(story, chapter_number)`
-- `stories_by_genre(slug)`
-- `search_stories(query)`
-- `search_authors(query)`
-- `related_stories(story, limit=6)`
-- `filter_catalog(query="", genre="", tag="", status="", sort="popularity", audience="", length="", format="")`
-- `library_of(user, kind=None)`
-- `reader_stats(user)`
-- `writer_stats(user)`
-- `is_following(me, them)`
-- `following_of(user)`
-- `followers_of(user)`
-- `notifications_for_user(user)`
-- `unread_count_for_user(user)`
-- `submissions_of(user)`
-- `has_submission(user, contest)`
-- `submission_checklist(story, contest)`
-- `eligible_for_contest(user, contest)`
-- `tag_by_slug(slug)`
-- `tags_of(story)`
-- `popular_tags(limit=8)`
+**Signatures below are the actual ones in the code.** Note that every helper takes a **string key** (`username`, `story_slug`, `genre_slug`, `contest_slug`), not a model object — stub dataclasses are frozen and unlinked. F14 may switch these to objects, but that is a deliberate signature change touching every call site, not a free refactor.
+
+Catalog and search:
+- `filter_catalog(*, query="", genre="", tag="", status="", sort="popularity", audience="", length="", format="") -> list[Story]`
+- `apply_catalog_filters(stories, sort="popularity", status="", ...) -> list[Story]`
+- `stories_by_genre(genre_slug: str) -> list[Story]`
+- `search_stories(query: str) -> list[Story]`
+- `search_authors(query: str, limit=5) -> list[Author]`
+- `related_stories(slug: str, limit=6) -> list[Story]`
+
+Story and chapters:
+- `chapters_of(story_slug: str) -> list[Chapter]`
+- `chapter_of(story_slug: str, number: int) -> Chapter | None`
+- `comments_of(story_slug: str) -> list[StoryComment]`
+- `comments_of_chapter(story_slug: str, chapter_number: int) -> list[StoryComment]`
+
+Author workspace, library, social:
+- `my_stories_of(username: str) -> list[Story]`
+- `writer_stats(username: str) -> dict`
+- `library_of(username: str, kind: str = "") -> list[LibraryEntry]`
+- `reader_stats(username: str) -> dict`
+- `is_following(me: str, them: str) -> bool`
+- `following_of(username: str) -> list[Author]`
+- `followers_of(username: str) -> list[Author]`
+- `notifications_for_user(username: str) -> dict`
+- `unread_count_for_user(username: str) -> int`
+
+Contests:
+- `submissions_of(username: str) -> list[Submission]`
+- `has_submission(username: str, contest_slug: str) -> bool`
+- `submission_checklist(story: Story, contest: Contest) -> list`
+- `eligible_for_contest(username: str, contest_slug: str) -> list[Story]`
+
+Tags (module 11):
+- `tag_by_slug(slug: str) -> Tag | None`
+- `tags_of(story: Story) -> list[Tag]`
+- `popular_tags(limit=10) -> list[Tag]`
+- `is_blocked(name: str) -> bool`
+- `accepted_tags_json() -> list`
+- `blocked_tag_patterns_list() -> list`
+
+Home page:
+- `portal_stats() -> dict` — counters in the guest hero (FR-HOME-01)
+- `new_authors(limit=4) -> list[Author]`
 
 ## 12.4 Template contract
 
 Templates should continue receiving objects with these attributes:
 
-Story:
-- `slug`, `title`, `cover`, `annotation`, `status`, `audience`
-- `format`, `format_label`, `is_single`, `is_serial`
-- `views`, `likes`, `comments`, `chapters`, `read_minutes`, `length_bucket`
-- `author`
-- `primary_genre`
-- `genres_resolved`
-- `tags_resolved`
-- `badges`
+Story — stored fields plus computed properties. In the stubs the computed ones are `@property` on the dataclass; after F14 they may become model properties, annotations, or denormalised columns, but the template-facing names must not change.
+
+- stored: `slug`, `title`, `cover`, `annotation`, `status`, `audience`, `badges`, `chapters`, `views`, `likes`, `comments`
+- resolved relations: `author`, `primary_genre`, `genres_resolved`, `tags_resolved`
+- format (DEC-28): `format`, `format_label`, `format_badge_label`, `is_single`, `is_serial`
+- reading effort: `total_chars`, `read_minutes`, `length_bucket`, `reading_meta_label`
 
 Author:
 - `username`, `name`, `bio`, `works`, `followers`

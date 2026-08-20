@@ -1,5 +1,7 @@
 # 11 · Теги (Tags) — UGC-таксономия
 
+> `Обновлён: 2026-08-20` · `Сверен с кодом: 5d39adb`
+
 ## 11.1 Назначение
 
 Жанры (модуль 03) — закрытый справочник 12 категорий, заданный редакцией. Теги — открытая UGC-таксономия: авторы сами придумывают ключевые слова, описывающие детали произведения («мектеп», «достық», «саяхат», «сиқыр-академиясы»). Теги дополняют жанры, а не заменяют их.
@@ -43,28 +45,10 @@
 
 ## 11.4 Модель данных (для Ф14)
 
-```python
-@dataclass
-class Tag:
-    slug: str                # auto: lower + transliterate (мектеп → mektep)
-    name: str                # оригинал (отображается)
-    status: str              # 'pending' | 'accepted' | 'rejected'
-    created_by: str          # username
-    created_at: datetime
-    usage_count: int         # денормализовано, для сортировки автокомплита
-    moderator_note: str = '' # причина rejected
+Контракт на модели — в [12 §12.2](12-domain-model-contract.md) (строки `Tag` и `Story`), не здесь. Специфичное для тегов:
 
-class Story:
-    # ...existing fields...
-    tags: tuple[str, ...] = ()   # slug-список, max 10 (BR-TAG-01)
-
-# Блок-лист — отдельная таблица, чтобы модератор мог редактировать без релиза
-class TagBlock:
-    pattern: str        # exact или regex
-    reason: str         # коммент для модератора
-    added_by: str
-    added_at: datetime
-```
+- `Tag`: `slug` (авто: lower + транслитерация, мектеп → `mektep`), `name` (оригинал, отображается), `status`, `created_by`, `created_at`, `usage_count` (денормализован для сортировки автокомплита), `moderator_note` (причина `rejected`).
+- **Блок-лист — отдельная таблица**, а не константа в коде: модератор обязан редактировать его без релиза (NFR-52). Поля: `pattern` (exact или regex), `reason`, `added_by`, `added_at`.
 
 ## 11.5 UI-поверхности
 
@@ -74,9 +58,9 @@ class TagBlock:
 | **WRITE · story_settings** | То же поле | редактирование уже существующих тегов |
 | **STORY · детальная** | Ряд под genre-chips | `accepted` — нейтральные slate-чипы (отличается от цветного `genre_chip`); `pending` — только автору с бейджем «проверкада» |
 | **CAT · /tag/<slug>/** | Новый маршрут | каталог-страница, отфильтрованная по тегу |
-| **CAT · controls** | Catalog filter section | секция «Тегтер» (V2-кандидат) |
-| **CAT · search popup (Cmd+K)** | Группа результатов | раздел «Тегтер» наряду со Story/Author (V2) |
-| **HOME · сайдбар** | Виджет «Танымал тегтер» | топ-10 `accepted` по `usage_count` (V2-кандидат) |
+| **CAT · фильтр-панель** | `_filter_panel` / `_filter_sheet` | chip-cloud «Танымал тегтер»; активный тег — чип с ×-снятием |
+| **CAT · search popup (Cmd+K)** | Группа результатов | раздел «Тегтер» наряду со Story/Author; `search_index_json` отдаёт только `accepted` |
+| **HOME** | Секция «Танымал тегтер» + виджет в правом рейле | топ `accepted` по `usage_count`. В потоке — `partials/home/popular_tags.html` под `xl:hidden`, в рейле — `partials/right_rail/home.html` (FR-HOME-08/11) |
 | **MOD · Django admin** | Tag-список + фильтр по status | bulk accept/reject/block; редактор блок-листа (DEC-23) |
 
 ## 11.6 Новые компоненты
@@ -87,114 +71,48 @@ class TagBlock:
 | `tag_list.html` | Ряд тегов с overflow «+N more» при количестве > k |
 | `tag_input.html` | Alpine-компонент: input + dropdown автокомплита (из `accepted_tags`), валидация blocklist, чипы добавленных с ×, счётчик |
 
-## 11.7 Стаб-данные (фаза 1)
+## 11.7 Стаб-данные
 
-Расширение `stub_data.py`:
+Живут в `core/stub_data.py`: 12 тегов в `TAGS` (10 `accepted` + 2 `pending` для иллюстрации модерации), блок-лист в `BLOCKED_TAG_PATTERNS`, привязка к произведениям через `Story.tags` (кортеж slug-ов). Целостность держит `test_stub_data.py`.
 
-```python
-@dataclass(frozen=True)
-class Tag:
-    slug: str
-    name: str
-    status: str               # 'pending' | 'accepted'
-    usage_count: int
+Хелперы — фактические сигнатуры:
 
-TAGS = [
-    Tag('mektep',           'мектеп',           'accepted', 42),
-    Tag('dostyk',           'достық',           'accepted', 38),
-    Tag('sayahat',          'саяхат',           'accepted', 24),
-    Tag('jasospirim',       'жасөспірім',       'accepted', 56),
-    Tag('gashyqtyq',        'ғашықтық',         'accepted', 31),
-    Tag('mistika',          'мистика',          'accepted', 18),
-    Tag('syikyr-akademiya', 'сиқыр-академиясы', 'accepted', 12),
-    Tag('arman',            'арман',            'accepted', 27),
-    Tag('detektiv-jas',     'жас детектив',     'accepted',  9),
-    Tag('aua-ralighi',      'ауыл-қала',        'accepted', 14),
-    # pending — для иллюстрации модерации
-    Tag('basqa-alem',       'басқа әлем',       'pending',   3),
-    Tag('experimental',     'эксперимент',      'pending',   1),
-]
+- `popular_tags(limit=10)` — сортировка по `usage_count`
+- `tag_by_slug(slug: str)`
+- `tags_of(story: Story)` — resolved из `story.tags`
+- `is_blocked(name: str)`
+- `accepted_tags_json()` — плоский список для автокомплита в `tag_input`
+- `blocked_tag_patterns_list()` — блок-лист для inline-валидации формы
 
-BLOCKED_TAG_PATTERNS = {
-    # MVP-минимум, пополняется через Django admin
-    'spam', 'реклама', 'политика',
-}
+Отдельных `accepted_tags()`, `suggest_tags()` и `stories_by_tag()` нет: автокомплит и блок-лист уходят в шаблон одним JSON-списком и фильтруются на клиенте, а выборка по тегу идёт через общий движок каталога — `filter_catalog(tag=slug)` (DEC-27).
 
-# Story.tags хранит slug-list, поле добавляется в Ф14:
-#   Story("dalney-berega", ..., tags=("mektep", "dostyk", "syikyr-akademiya"))
-```
+## 11.8 Статус внедрения
 
-Helpers:
-- `accepted_tags() -> list[Tag]`
-- `popular_tags(limit=10) -> list[Tag]` — sort by `usage_count` desc
-- `tag_by_slug(slug) -> Optional[Tag]`
-- `is_blocked(name) -> bool`
-- `suggest_tags(prefix, limit=5) -> list[Tag]` — для автокомплита
-- `tags_of(story) -> list[Tag]` — resolved из `story.tags`
-- `stories_by_tag(slug, status='accepted') -> list[Story]`
+**Фазы 1–3 закрыты.** Сделано: `Tag` и хелперы в стабах, `tag_chip` / `tag_list` / `tag_input`, теги на странице произведения с фильтрацией pending (BR-TAG-07), поле тегов в `new_story` и `story_settings` с blocklist-валидацией, маршрут `/tag/<slug>/`, чипы тегов в фильтр-панели каталога, группа «Тегтер» в Cmd+K, виджет «Танымал тегтер» на главной и в рейле.
 
-## 11.8 План внедрения (поэтапно)
+Попутно закрыта **фаза 2.5** — унификация каталог-движка (DEC-27): она была предусловием, иначе `/tag/<slug>/` стал бы третьим клоном шаблона `search_results` / `genre_detail`. Привязка «что где лежит» — [14 §14.4](14-implementation-map.md).
 
-### Фаза 1 — Стаб и компоненты (дизайн-итерация) ✓ ГОТОВО
-- [x] `Tag` dataclass + `TAGS` seed + helpers в `stub_data.py`
-- [x] `Story.tags` поле (с дефолтом `()`) + теги назначены 8 стори
-- [x] `components/tag_chip.html`
-- [x] `components/tag_list.html`
-- [x] Показ тегов на `story_detail.html` (ряд под genre-chips)
-- [x] Smoke-тесты: `tag_chip` рендерится; pending-бейдж — только автору (BR-TAG-07)
+**Фаза 4 — модерация, после Ф14** (нужны модели в БД):
 
-### Фаза 2 — Write-форма ✓ ГОТОВО
-- [x] `components/tag_input.html` (Alpine: автокомплит, чипы, счётчик)
-- [x] Интеграция в `pages/write/new_story.html` и `story_settings.html`
-- [x] Inline-ошибка при попадании в blocklist + длина + дубль + лимит
-- [x] Showcase состояний в `_design/components.html` (секция «Теги»)
-
-### Фаза 2.5 — Унификация каталог-движка (предусловие к Фазе 3, см. DEC-27)
-Цель: убрать дубликат между `search_results` и `genre_detail` (90% одинаковые) и подготовить базу под `/tag/<slug>/`, чтобы Фаза 3 не плодила третий клон шаблона.
-
-- [ ] Извлечь `partials/catalog/_book_list.html` — список карточек + empty-state
-      (переиспользуется каталогом И коллекциями)
-- [ ] Извлечь `partials/catalog/_filter_bar.html` — активные фильтры как чипы с ×
-      (genre / tag / search query) + сортировка/статус
-- [ ] Извлечь hero-партиалы:
-      `partials/catalog/_hero_search.html`, `_hero_genre.html`
-- [ ] Создать общий `pages/catalog/catalog.html` — собирает hero + filter_bar + book_list
-- [ ] View-функция `catalog(request, *, genre=None, tag=None, query=None)`
-      — единый pipeline через `apply_catalog_filters` с поддержкой комбинаций
-- [ ] Тонкие обёртки-view: `search_results`, `genre_detail` делегируют в `catalog`
-- [ ] Поддержка комбинаций через query-string: `/genres/triller/?tag=mektep`
-- [ ] Тесты: проверить что старые URL по-прежнему работают и рендерят те же маркеры
-
-**Что НЕ меняется в этой фазе:** коллекции (`collections.html`, `collection_detail.html`)
-остаются отдельным типом — они переиспользуют только `_book_list.html`,
-не каталог-движок (DEC-27).
-
-### Фаза 3 — Теги в унифицированном каталоге ✓ ГОТОВО
-- [x] Маршрут `/tag/<slug>/` → тонкая view-обёртка `tag_detail` → `_render_catalog(mode='tag')`
-- [x] `partials/catalog/_hero_tag.html` (slate + `#`-стиль, отличается от genre-hue)
-- [x] Tag показывается как chip в правом рейле (`_filter_panel`) с ×-снятием на активном
-- [x] Pending/unknown теги → error-блок «Тег табылмады» (BR-TAG-07)
-- [x] Multi-tag в UI пока один за раз; `filter_catalog(tag=slug)` поддерживает combinations
-- [x] `tag_chip.html` дефолтный href = `/tag/<slug>/` для accepted, `#` для pending
-- [x] Search popup (Cmd+K): группа результатов «Тегтер»; `search_index_json` отдаёт только accepted
-- [ ] Правый рейл главной: виджет «Танымал тегтер» (V2-кандидат, опц. — не делали)
-
-### Фаза 4 — Модерация (после Ф14, когда модели в БД)
-- [ ] Django admin: `Tag`-список с фильтром по `status`
-- [ ] Custom actions: Accept selected / Reject (with note) / Block
-- [ ] `TagBlock`-модель + admin для блок-листа
-- [ ] Notification flow: автор получает уведомление при rejected/blocked
-- [ ] SLA: модерация тегов в течение N дней (open question)
+- [ ] Django admin: список `Tag` с фильтром по `status`, bulk-действия accept / reject (with note) / block
+- [ ] Модель `TagBlock` + admin для блок-листа
+- [ ] Уведомление автору при `rejected` / `blocked` (BR-TAG-08)
+- [ ] SLA модерации тегов — открытый вопрос [Q-09](18-open-questions.md)
 
 ## 11.9 Открытые вопросы
 
-1. **Видимость pending-тегов в публичном каталоге** — скрывать полностью или показывать с бейджем «проверкада»? *Предложение: скрывать в публике, видны только автору.*
-2. **Multi-tag фильтр** — AND или OR при выборе двух тегов? *Предложение: AND в V1.*
-3. **Alias/synonyms** — модератор объединяет «школа» = «мектеп»? *Предложение: вне MVP, V2.*
-4. **Auto-suggest из текста главы** — извлекать ключевые слова автоматически и предлагать? *Предложение: вне MVP, V3.*
-5. **SLA модерации тегов** — сколько часов/дней? *Open.*
-6. **Кто может блокировать паттерн** — любой модератор или только суперюзер? *Open.*
-7. **Тег в book_card_small** — показывать ли 1-2 топ-тега под названием в каточках главной/каталога? *Предложение: нет, только на детальной (карточка перегружается).*
+Переехали в общий реестр — **[18-open-questions.md](18-open-questions.md)**:
+
+| Вопрос | В реестре |
+|--------|-----------|
+| Multi-tag фильтр: AND или OR | Q-07 |
+| Кто может блокировать паттерн | Q-08 |
+| SLA модерации тегов | Q-09 |
+| Тег в `book_card_small` | Q-13 |
+| Alias/synonyms («школа» = «мектеп») | Q-14 |
+| Auto-suggest из текста главы | Q-15 |
+
+**Закрыт:** видимость pending-тегов в публичном каталоге. Скрываются от публики, автору видны с пунктирной рамкой и бейджем «проверкада»; фильтрует `tag_list.html` по `viewer_is_author`. Зафиксировано как BR-TAG-07, см. [18 §18.4](18-open-questions.md) Q-C1.
 
 ## 11.10 Связи с другими модулями
 
