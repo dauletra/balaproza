@@ -86,7 +86,7 @@
     --color-status-warning-bg:    rgb(253, 246, 178);
     --color-status-attention-fg:  rgb(180, 52, 3);     /* Тексеруде */
     --color-status-attention-bg:  rgb(254, 235, 200);
-    --color-status-error-fg:      rgb(155, 28, 28);    /* Жарияланбаған */
+    --color-status-error-fg:      rgb(155, 28, 28);    /* Отказ и удаление (DEC-39) */
     --color-status-error-bg:      rgb(253, 232, 232);
 
     /* — Бейдж непрочитанных (DEC-07) — */

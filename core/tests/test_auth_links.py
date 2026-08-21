@@ -169,3 +169,48 @@ class SchoolLinksGlobalContextProcessor(TestCase):
             list(r.context['school_links_global']),
             list(stub_data.SCHOOL_LINKS),
         )
+
+
+class AuthGateIsOneComponent(TestCase):
+    """Гейт гостя — один компонент, а не девять копий.
+
+    Блок «войди, чтобы посмотреть» был скопирован в девяти шаблонах слово в
+    слово и расходился только поводом; `new_story` вдобавок несла свою
+    формулировку с обратным порядком слов и без единого класса типографики.
+    Проверяем оба конца: повод на месте и ссылка возвращает на ту же страницу.
+    """
+
+    def _gated(self):
+        contest = stub_data.ACTIVE_CONTESTS[0].slug
+        return [
+            ('core:my_stories',     {},                  'Шығармаларыңды басқару үшін'),
+            ('core:new_story',      {},                  'Жаңа шығарма жариялау үшін'),
+            ('core:library',        {},                  'Кітапхананы көру үшін'),
+            ('core:notifications',  {},                  'Хабарламаларды көру үшін'),
+            ('core:profile_me',     {},                  'Профильді көру үшін'),
+            ('core:profile_me_edit', {},                 'Профильді өңдеу үшін'),
+            ('core:my_submissions', {},                  'Өтінімдеріңді көру үшін'),
+            ('core:contest_submit', {'slug': contest},   'Қатысу үшін'),
+        ]
+
+    def test_every_gated_page_states_its_reason(self):
+        for name, kwargs, reason in self._gated():
+            with self.subTest(page=name):
+                self.assertContains(self.client.get(reverse(name, kwargs=kwargs)), reason)
+
+    def test_login_link_returns_to_the_same_page(self):
+        for name, kwargs, _ in self._gated():
+            url = reverse(name, kwargs=kwargs)
+            with self.subTest(page=name):
+                self.assertContains(
+                    self.client.get(url), f"{reverse('core:login')}?next={url}")
+
+    def test_the_gate_disappears_once_signed_in(self):
+        session = self.client.session
+        session['signed_in'] = True
+        session['user_name'] = 'Айдана'
+        session['user_username'] = 'aidana'
+        session.save()
+        for name, kwargs, reason in self._gated():
+            with self.subTest(page=name):
+                self.assertNotContains(self.client.get(reverse(name, kwargs=kwargs)), reason)

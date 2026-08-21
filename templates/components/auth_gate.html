@@ -1,0 +1,27 @@
+{% comment %}
+    AuthGate — что видит гость на личной странице (LIB, NOTIF, PROF, WRITE, CONT).
+
+    Параметры:
+      reason — зачем входить, без точки: «Кітапхананы көру үшін»
+      title  — заголовок h1 (опц.). Страница за гейтом своего h1 не рендерит,
+               поэтому там, где он важен для структуры документа, передаём его сюда.
+
+    Блок был скопирован в девяти шаблонах слово в слово, расходясь только
+    одной фразой. Ссылка везде несёт `?next=` — обработка на стороне
+    `_safe_next` во view, она отвергает абсолютные адреса.
+
+    Цвет остался сырым `amber-*`, а не парой `status-warning-*`: токен
+    рассчитан на пилюлю 22px (`rgb(253,246,178)` — насыщенный жёлтый) и на
+    панели в 6 отступов кричит. Это единственное место в проекте с
+    внереестровым цветом, и оно ждёт своей пары в @theme — см. docs/02.
+{% endcomment %}
+<div class="rounded-lg border border-amber-200 bg-amber-50 p-6">
+    {% if title %}
+        <h1 class="font-display text-xl font-bold text-slate-900">{{ title }}</h1>
+    {% endif %}
+    <p class="{% if title %}mt-2 {% endif %}font-sans text-sm text-slate-600">
+        {{ reason }}
+        <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}"
+           class="font-semibold text-brand hover:underline">кір</a>.
+    </p>
+</div>

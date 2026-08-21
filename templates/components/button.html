@@ -16,11 +16,6 @@
       aria_label — для иконочной кнопки
 {% endcomment %}
 {% with k=kind|default:"primary" sz=size|default:"md" %}
-{% spaceless %}
-{% if k == "primary" %}{% if disabled %}
-    {% with cls="bg-brand text-white opacity-50 cursor-not-allowed" %}{% endwith %}
-{% endif %}{% endif %}
-{% endspaceless %}
 {% if href %}<a href="{{ href }}"{% if aria_label %} aria-label="{{ aria_label }}"{% endif %}{% else %}<button type="{{ type|default:'button' }}"{% if disabled %} disabled{% endif %}{% if aria_label %} aria-label="{{ aria_label }}"{% endif %}{% endif %}
    class="inline-flex items-center justify-center gap-2 rounded-md font-sans font-bold transition-colors
           {% if sz == 'lg' %}h-11 px-6 text-base{% else %}h-9 px-5 text-sm{% endif %}

@@ -1,5 +1,6 @@
 """WRITE: авторский кабинет — my_stories, new, manage, settings, chapter_editor."""
 
+from django.template.loader import render_to_string
 from django.test import TestCase
 from django.urls import reverse
 
@@ -112,6 +113,38 @@ class MyStoriesAuthedEmpty(TestCase):
         # CTA-кнопка в empty state
         self.assertContains(self.response, 'Жаңа шығарма жазу')
         self.assertContains(self.response, reverse('core:new_story'))
+
+
+class DraftBadgeIsNotAnError(TestCase):
+    """DEC-39: «Жоба» — нейтральный бейдж, а не красный.
+
+    `NotPublished` — дефолт нового произведения (BR-10), то есть первое, что
+    видит автор, создав работу. Красным помечено то, что действительно
+    означает отказ или необратимое действие, а не нормальный этап пути.
+    """
+
+    def test_draft_is_neutral(self):
+        html = render_to_string('components/status_badge.html', {'key': 'NotPublished'})
+        self.assertIn('Жоба', html)
+        self.assertIn('bg-slate-100', html)
+        self.assertNotIn('status-error', html)
+
+    def test_rejection_still_reads_as_error(self):
+        html = render_to_string(
+            'components/badge.html', {'kind': 'error', 'label': 'Қабылданбады'})
+        self.assertIn('status-error', html)
+
+    def test_other_statuses_keep_their_semantics(self):
+        expected = {
+            'Published':    'status-published',
+            'OnProcess':    'status-warning',
+            'Completed':    'status-info',
+            'OnModeration': 'status-attention',
+        }
+        for key, token in expected.items():
+            with self.subTest(status=key):
+                html = render_to_string('components/status_badge.html', {'key': key})
+                self.assertIn(token, html)
 
 
 class SingleStoryTextButtonOpensExistingText(TestCase):
@@ -268,7 +301,9 @@ class NewStoryGuestSeesGate(TestCase):
     def test_guest_sees_login_hint_no_form(self):
         r = self.client.get(reverse('core:new_story'))
         self.assertNotContains(r, 'name="title"')
-        self.assertContains(r, 'Кір')
+        # Формулировка общая для всех гейтов: «<повод> кір.» (components/auth_gate.html)
+        self.assertContains(r, 'Жаңа шығарма жариялау үшін')
+        self.assertContains(r, reverse('core:login'))
 
 
 # ───────────────────────── Manage story ─────────────────────────

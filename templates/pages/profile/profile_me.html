@@ -6,13 +6,7 @@
 
 {% block content %}
 {% if not signed_in %}
-    <div class="rounded-lg border border-amber-200 bg-amber-50 p-6">
-        <p class="font-sans text-sm text-slate-800">
-            Профильді көру үшін
-            <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}"
-               class="font-semibold text-brand hover:underline">кір</a>.
-        </p>
-    </div>
+    {% include "components/auth_gate.html" with reason="Профильді көру үшін" %}
 {% else %}
     {# ── Шапка профиля ── #}
     <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">

@@ -94,8 +94,9 @@
 | `skeleton_box.html`, `skeleton_circle.html`, `skeleton_text.html` | Примитивы: прямоугольник, круг, строки текста |
 | `skeleton_book_card_small.html`, `skeleton_book_card_wide.html` | Скелетоны карточек. **Сетка обязана совпадать с сеткой контента** — иначе страница дёргается при подстановке; закрыто тестом. Включая брейкпоинты: `skeleton_book_card_wide` повторяет и мобильную обложку 88×132, и двухстрочную аннотацию |
 | `skeleton_comment.html`, `skeleton_chapter_text.html`, `skeleton_my_story_row.html`, `skeleton_notification_item.html` | Скелетоны под конкретные строки |
-| `empty_state.html` | Иконка, заголовок, подсказка, опц. CTA |
+| `empty_state.html` | Иконка, заголовок, подсказка, опц. CTA. **Единственный пустой стейт** — `my_stories` держала свою копию с тем же заголовком, что у `profile_me`, но другим текстом |
 | `error_state.html` | Ошибка загрузки + «Қайта көру». Есть `compact`-вариант для inline |
+| `auth_gate.html` | Что видит гость на личной странице (LIB, NOTIF, PROF, WRITE, CONT). Параметры: `reason` («Кітапхананы көру үшін», без точки) и опц. `title`. Блок был скопирован в девяти шаблонах слово в слово. Цвет остался сырым `amber-*`: пара `status-warning-*` рассчитана на пилюлю 22px и на панели кричит — единственное место с внереестровым цветом, ждёт своей пары в `@theme` |
 
 > ✅ **Решение DEC-14.** В прототипе сосуществовали `GenrePill` (плоский текст) и `GenreChip` (цветной). Остаётся только `GenreChip`.
 
