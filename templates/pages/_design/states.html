@@ -143,7 +143,13 @@
             <div>
                 <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Content</p>
                 <div class="rounded-lg border border-slate-200 bg-white p-5">
-                    {% include "components/comment.html" with c=sample_comment %}
+                    {% comment %}
+                        Раньше здесь стоял `with c=sample_comment` — параметра
+                        `c` компонент не принимает, и showcase три месяца
+                        рисовал пустую оболочку: аватар «?», ни имени, ни
+                        текста. Данные во view были, сломан был вызов.
+                    {% endcomment %}
+                    {% include "components/comment.html" with comment_id=sample_comment.id author_name=sample_comment.author.public_name author_username=sample_comment.author.username date=sample_comment.date text=sample_comment.text likes=sample_comment.likes liked=sample_comment.liked %}
                 </div>
             </div>
         </div>

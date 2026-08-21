@@ -59,7 +59,6 @@
     --font-display: "Montserrat", system-ui, sans-serif;       /* заголовки */
     --font-sans:    "Open Sans", system-ui, sans-serif;         /* основной */
     --font-ui:      "Inter", system-ui, sans-serif;             /* акценты */
-    --font-serif:   Georgia, "Times New Roman", serif;          /* книга в режиме чтения */
 
     /* — Бренд (DEC-06 — единый accent teal) — */
     --color-brand:        rgb(3, 102, 114);

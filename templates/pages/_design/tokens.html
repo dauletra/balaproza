@@ -95,12 +95,12 @@
                 <div class="font-mono text-xs text-slate-500">font-ui · Inter (акценты)</div>
                 <p class="mt-1 font-ui text-sm font-medium">жауап беру · 12 жауап</p>
             </div>
-            <div class="rounded-md bg-white p-5 shadow-sm">
-                <div class="font-mono text-xs text-slate-500">font-serif · Georgia (книга в режиме чтения)</div>
-                <p class="mt-1 font-serif text-base leading-relaxed">
-                    Бірде, ерте таңда, мен тауларға қарап тұрдым. Күн жаңа ғана шығып келе жатқан, аспан алтын түсті болатын…
-                </p>
-            </div>
+            {% comment %}
+                Блок Georgia убран вместе с токеном --font-serif (DEC-35):
+                три месяца он показывал гарнитуру, которой не набирается
+                ни один экран продукта. Текст главы — font-sans, и редактор
+                теперь тоже.
+            {% endcomment %}
         </div>
 
         <h3 class="mt-6 mb-2 font-display text-lg font-bold">Размерная шкала</h3>

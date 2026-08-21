@@ -43,6 +43,18 @@ def spaced(value):
     return f"{n:,}".replace(',', ' ')
 
 
+@register.filter(name="belongs_to")
+def belongs_to(comment, username):
+    """Свой ли это комментарий — для набора пунктов меню (BR-33).
+
+    Фильтр, а не вычисление во view: комментарии вложены (BR-30), и view
+    пришлось бы разворачивать нити в плоскую структуру только ради одного
+    булева поля. Логика владения живёт в `StoryComment.belongs_to`.
+    """
+    checker = getattr(comment, "belongs_to", None)
+    return bool(checker and checker(username or ""))
+
+
 @register.filter(name="page_range")
 def page_range(total, current):
     """Список номеров страниц для пагинации.

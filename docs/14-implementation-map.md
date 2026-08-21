@@ -20,7 +20,7 @@
 | View | `core/views.py` (≈40 функций) | **Тонкие**: читают из `stub_data`, собирают контекст, рендерят. Бизнес-логики нет |
 | Маршруты | `core/urls.py`, `app_name='core'` | Все URL проекта, кроме `/admin/` |
 | Общий контекст | `core/context_processors.py` | `auth_state`, `nav_state`, `site_links` |
-| Фильтры | `core/templatetags/balaproza.py` | `compact_count`, `spaced`, `page_range` |
+| Фильтры | `core/templatetags/balaproza.py` | `compact_count`, `spaced`, `page_range`, `belongs_to` |
 | Шаблоны | корневая `templates/` (109 файлов) | 50 компонентов · 28 партиалов · 27 страниц · `base.html` · `404/500` |
 | Токены | `static_src/input.css`, блок `@theme` | Единственный источник цветов, радиусов, теней ([02](02-design-system.md)) |
 | Тесты | `core/tests/` (16 файлов, 425 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
@@ -127,8 +127,11 @@
 | FR-STORY-04 | `partials/story/chapter_list.html` (рейл / `<details>` / sheet) + прогресс | `test_story.StoryDetailReadingProgress`, `test_story.ChapterListShowsLikes` |
 | Панель чтения на mobile | событие `reading-mode`, `mobile_nav` уступает место (docs/07 §7.6) | `test_story.StoryReadingPanel` |
 | FR-STORY-05 | `components/comment.html`, `CommentLoginGate` | `test_story.StoryDetailGuestVsAuth`, `test_home.StoryDetailHasGate` |
+| FR-STORY-05 (меню, BR-33) | `open-report` с целью `comment:<id>` / `open-delete-confirm`; фильтр `belongs_to` | `test_story.CommentMenu` |
+| FR-STORY-05 (лайк, BR-31) | Alpine-toggle в `comment.html` | `test_story.CommentLike` |
+| FR-STORY-05 (ответы, BR-30) | форма ответа при `depth == 0` | `test_story.CommentReplies` |
 | FR-STORY-06 | `?chapter=N`, prev/next через `?chapter=N±1` | `test_story.StoryDetailChapterParam` |
-| FR-STORY-07, 08 | Alpine-компонент `storyReader` + `localStorage` (`bp-reader-*`) | `test_story.StoryReaderSettings` |
+| FR-STORY-07, 08 (DEC-35) | `storyReader` + `localStorage` (`bp-reader-*`); мера — `max-width: 68ch` | `test_story.StoryReaderSettings`, `test_story.ChapterTextMeasure` |
 | FR-STORY-09 | `components/report_modal.html`, событие `open-report` (в подвале страницы) | `test_story.StoryDetailGuestVsAuth`, `test_story.StoryDetailReportPlacement` |
 | FR-STORY-10 | `components/share_button.html` | — |
 | FR-STORY-11 | `related_stories(slug, limit=6)` | `test_stub_data.StoryRelations` |
@@ -236,7 +239,6 @@ Showcase-маршруты `/_design/tokens/`, `/_design/components/`, `/_design/
 | Сохранение настроек чтения между главами | Разметка проверена, само поведение `localStorage` — только вручную в браузере (§14.5) |
 | sRGB-fallback для OKLCH (DEC-12, NFR-41) | Не реализован; варианты решения в [03 §3.5](03-genre-color-system.md) |
 | Вынос строк в локализацию (NFR-30) | Не реализовано, отложено осознанно |
-| Гарнитура Serif в чтении (`--font-serif`) | Токен есть, применения нет — [02 §2.2](02-design-system.md) |
 | Модерация тегов (Фаза 4 модуля 11) | После Ф14 — нужны модели |
 | OG-метаданные, sitemap.xml, robots.txt (NFR-62, NFR-63) | Не сделано, обязательно к запуску |
 | «Апта челленджі» из [13 §13.9](13-product-culture.md) | Запланировано, не реализовано |

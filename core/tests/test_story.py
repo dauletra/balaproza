@@ -352,7 +352,9 @@ class StoryDetailReportPlacement(TestCase):
         _login(self.client)
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
         html = r.content.decode()
-        self.assertLess(html.index('Басқа шығармалар'), html.index('open-report'))
+        # Ищем именно жалобу на произведение: `open-report` теперь есть ещё и
+        # в меню каждого комментария, с целью `comment:<id>` (BR-33).
+        self.assertLess(html.index('Басқа шығармалар'), html.index("target: 'story:"))
 
 
 class StoryReaderSettings(TestCase):
@@ -370,15 +372,66 @@ class StoryReaderSettings(TestCase):
         self.assertContains(self.response, 'settingsOpen')
 
     def test_all_three_axes_still_available(self):
-        for value in ('reader-size-large', 'reader-width-narrow', 'reader-theme-night'):
+        for value in ('reader-size-large', 'reader-lead-tight', 'reader-theme-night'):
             with self.subTest(value=value):
                 self.assertContains(self.response, value)
 
     def test_choice_survives_the_jump_to_the_next_chapter(self):
         """Навигация по главам — full reload, поэтому выбор лежит в localStorage."""
-        for key in ('bp-reader-size', 'bp-reader-width', 'bp-reader-theme'):
+        for key in ('bp-reader-size', 'bp-reader-lead', 'bp-reader-theme'):
             with self.subTest(key=key):
                 self.assertContains(self.response, key)
+
+
+class ChapterTextMeasure(TestCase):
+    """DEC-35: длина строки задана явно, а не остатком от отступов.
+
+    На 375px контейнер px-4 и карточка p-6 оставляли тексту 295px — около
+    35 знаков при комфортных 45-75. Причём все три настройки работали
+    против читателя: ось ширины на телефоне не делала ничего, крупный кегль
+    сужал меру, а тёплый и ночной фон добавляли свой padding.
+    """
+
+    def setUp(self):
+        self.response = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
+
+    def test_measure_is_pinned_in_ch(self):
+        """68ch привязано к кеглю: мера не плывёт при увеличении шрифта."""
+        self.assertContains(self.response, 'max-width: 68ch')
+
+    def test_card_goes_full_bleed_on_mobile(self):
+        """-mx-4 гасит px-4 контейнера: тексту 343px вместо 295."""
+        self.assertContains(self.response, '-mx-4')
+        self.assertContains(self.response, 'sm:mx-0')
+
+    def test_theme_no_longer_narrows_the_line(self):
+        """Отрицательное поле гасит горизонтальный padding подложки."""
+        self.assertContains(self.response, 'margin-inline: -1rem')
+
+    def test_size_and_lead_are_separate_properties(self):
+        """Раньше обе оси трогали line-height, и порядок правил решал, чья возьмёт."""
+        html = self.response.content.decode()
+        self.assertIn('.reader-size-base  { font-size: 17px; }', html)
+        self.assertIn('.reader-lead-tight { line-height: 1.6; }', html)
+
+    def test_long_word_cannot_break_the_column(self):
+        self.assertContains(self.response, 'overflow-wrap: break-word')
+
+    def test_chapter_text_is_long_enough_to_show_the_problem(self):
+        """На тексте в три абзаца ни мера, ни прогресс, ни панель не проявляются."""
+        body = stub_data.chapter_of(STORY_SLUG, 3).body
+        self.assertGreater(len(body), 2000, 'нужна длинная глава для проверки чтения')
+
+
+class ChapterProgressNotDuplicated(TestCase):
+    """Счётчик «N / M» в шапке главы и в панели чтения — один и тот же."""
+
+    def test_header_progress_hidden_on_mobile(self):
+        _login(self.client)
+        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=4'
+        html = self.client.get(url).content.decode()
+        idx = html.index('Оқылды:')
+        self.assertIn('sm:block', html[idx - 200:idx])
 
 
 class StoryReadingPanel(TestCase):
@@ -548,6 +601,138 @@ class WhatsNextPlacement(TestCase):
         for chapter in (3, self.LAST):
             with self.subTest(chapter=chapter):
                 self.assertEqual(1, self._html(chapter).count('id="related-heading"'))
+
+
+class CommentMenu(TestCase):
+    """Меню трёх точек: набор пунктов зависит от того, чей комментарий.
+
+    Кнопка три месяца висела без обработчика — ни события, ни цели.
+    """
+
+    # У dalney-berega гл.3: комментарий aidana (свой для демо-логина)
+    # и комментарий aygerim_k (чужой).
+    URL_KW = {'slug': STORY_SLUG}
+
+    def _get(self):
+        url = reverse('core:story_detail', kwargs=self.URL_KW) + '?chapter=3'
+        return self.client.get(url)
+
+    def test_menu_button_is_wired(self):
+        r = self._get()
+        self.assertContains(r, 'Пікір мәзірі')
+        self.assertContains(r, 'Сілтемені көшіру')
+
+    def test_guest_gets_only_the_link_item(self):
+        r = self._get()
+        self.assertContains(r, 'Сілтемені көшіру')
+        self.assertNotContains(r, 'Шағым жіберу')
+        self.assertNotContains(r, 'target: \'comment:')
+
+    def test_authed_can_report_someone_elses_comment(self):
+        _login(self.client)
+        r = self._get()
+        self.assertContains(r, 'Шағым жіберу')
+        self.assertContains(r, "target: 'comment:")
+
+    def test_own_comment_offers_delete_not_report(self):
+        """На свой комментарий жаловаться некому — его удаляют."""
+        _login(self.client)
+        html = self._get().content.decode()
+        own = next(c for c in stub_data.comments_of_chapter(STORY_SLUG, 3)
+                   if c.belongs_to('aidana'))
+        block = html[html.index(f'id="comment-{own.id}"'):]
+        block = block[:block.index('</article>')]
+        self.assertIn('Жою', block)
+        self.assertNotIn('Шағым жіберу', block)
+
+    def test_comment_id_is_stable_across_processes(self):
+        """Скопированная ссылка должна работать и завтра — hash() не годится."""
+        c = stub_data.comments_of_chapter(STORY_SLUG, 3)[0]
+        self.assertEqual(c.id, c.id)
+        self.assertRegex(c.id, r'^[a-z_]+-\d{4}$')
+
+
+class ReportUsesItsOwnIcon(TestCase):
+    """Три точки — иконка контейнера («ещё варианты»), а не действия.
+
+    На «Шағым жіберу» они стояли в двух местах сразу, и в меню комментария
+    получалось «ещё варианты → ещё варианты». Жалоба помечена флажком —
+    конвенцией YouTube, Instagram и Reddit.
+    """
+
+    def _html(self):
+        _login(self.client)
+        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=3'
+        return self.client.get(url).content.decode()
+
+    def test_report_actions_use_the_flag(self):
+        html = self._html()
+        self.assertIn('#icon-flag', html)
+
+    def test_dots_left_only_on_the_menu_trigger(self):
+        """Единственное законное место точек — кнопка, открывающая меню."""
+        html = self._html()
+        self.assertNotIn('#icon-dots-vertical', html)
+        trigger_at = html.index('aria-label="Пікір мәзірі"')
+        self.assertIn('#icon-dots-horizontal', html[trigger_at:trigger_at + 400])
+
+    def test_moderation_notice_uses_a_shield_not_a_checkmark(self):
+        """Галочка говорит «готово», а фраза — «защищено правилами»."""
+        html = self._html()
+        notice_at = html.index('модерация ережелерімен')
+        self.assertIn('#icon-shield', html[notice_at - 500:notice_at])
+
+
+class CommentLike(TestCase):
+    """BR-31: лайк комментария переключается, гость уходит на логин."""
+
+    def test_like_is_interactive(self):
+        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
+        self.assertContains(r, 'aria-label="Ұнату"')
+        self.assertContains(r, 'toggle()')
+
+    def test_guest_is_gated_to_login(self):
+        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
+        self.assertContains(r, reverse('core:login'))
+
+
+class CommentReplies(TestCase):
+    """BR-30: один уровень ответов — на ответ ответить нельзя."""
+
+    def test_authed_gets_a_reply_form(self):
+        _login(self.client)
+        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
+        self.assertContains(r, 'Жауап беру')
+        self.assertContains(r, 'пікіріне жауап жаз')
+
+    def test_guest_reply_leads_to_login(self):
+        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
+        self.assertContains(r, 'Жауап беру')
+        self.assertNotContains(r, 'пікіріне жауап жаз')
+
+    def test_reply_itself_has_no_reply_button(self):
+        """Инвариант вложенности держит компонент, а не сторона вызова."""
+        _login(self.client)
+        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=2'
+        html = self.client.get(url).content.decode()
+        reply = stub_data.comments_of_chapter(STORY_SLUG, 2)[-1].replies[0]
+        block = html[html.index(f'id="comment-{reply.id}"'):]
+        block = block[:block.index('</article>')]
+        self.assertNotIn('Жауап беру', block)
+
+
+class CommentAuthorLinks(TestCase):
+    """Имя и аватар ведут на профиль; аватар красится по username."""
+
+    def test_name_links_to_profile(self):
+        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
+        author = stub_data.comments_of_chapter(STORY_SLUG, 1)[0].author
+        self.assertContains(r, reverse('core:profile_other',
+                                       kwargs={'username': author.username}))
+
+    def test_no_dead_hash_links_left(self):
+        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
+        self.assertNotContains(r, '<a href="#" class="font-sans text-[13px]')
 
 
 class StoryLinksBackToItsCollections(TestCase):

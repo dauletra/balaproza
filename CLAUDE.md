@@ -22,7 +22,7 @@
 ### Frontend
 - **Tailwind CSS v4** через npm-пакет `@tailwindcss/cli` (`package.json`)
 - **Alpine.js 3.14.9** + **htmx 2.0.4** — self-hosted (`static/vendor/*.min.js`)
-- **Self-hosted variable WOFF2 fonts** (`static/fonts/`): Montserrat (display), Open Sans (sans), Inter (ui), Georgia (serif — системный)
+- **Self-hosted variable WOFF2 fonts** (`static/fonts/`): Montserrat (display), Open Sans (sans), Inter (ui). Серифной гарнитуры нет — токен удалён (DEC-35)
 - Исходный CSS: `static_src/input.css` (содержит `@theme` с токенами, см. ниже)
 - Скомпилированный CSS: `static/css/output.css`
 - **Команды Tailwind запускает пользователь сам**:
@@ -67,8 +67,9 @@ balaproza_v1/
 │   │                             # + /catalog/, /tag/<slug>/, /api/search-index.json,
 │   │                             # /me/edit/, 5 legal routes
 │   ├── context_processors.py     # auth_state, nav_state, site_links
-│   ├── templatetags/balaproza.py # filter page_range (для pagination)
-│   └── tests/                    # 470 тестов в 16 файлах (см. ниже)
+│   ├── templatetags/balaproza.py # filters: compact_count, spaced, page_range,
+│   │                             # belongs_to (свой ли комментарий — BR-33)
+│   └── tests/                    # 492 тестов в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -124,7 +125,7 @@ balaproza_v1/
 ## Дизайн-токены (в `static_src/input.css`, секция `@theme`)
 
 - **Цвета**: `--color-brand` (бирюзовый), `--color-brand-dark`, slate-50…900, status-пары (`--color-status-published-bg`/`-fg`, и т.д. для `info`/`warning`/`attention`/`error`), `--color-notif`, `--color-promo-bg`/`-cta`, `--color-tg-1`/`-tg-2` (Telegram-градиент)
-- **Шрифты**: `--font-display` (Montserrat), `--font-sans` (Open Sans), `--font-ui` (Inter), `--font-serif` (Georgia)
+- **Шрифты**: `--font-display` (Montserrat), `--font-sans` (Open Sans), `--font-ui` (Inter)
 - **Радиусы**: `--radius-{xs(2),sm(4),chip(6),md(8),lg(12),hero(16),search(24),pill(9999)}`
 - **Тени**: `--shadow-{card-hover,bottom-nav,tg-btn,modal}`
 - **Цвета жанров** — OKLCH через inline-style `oklch(0.96 0.04 {{ hue }})` (см. `components/genre_chip.html`)
@@ -154,7 +155,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 470 тестов
+uv run python manage.py test core       # все 492 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 
@@ -209,7 +210,8 @@ def _login_as_aidana(client):
 
 - **Радиусы — только токены**: `rounded-{xs,sm,chip,md,lg,hero,search,pill}`. НЕ `rounded-2xl`/`3xl`/etc.
 - **Произвольные значения** — через arbitrary syntax: `h-[26px]` (не `h-6.5`), `px-[52px]` (не `px-13`), `bg-white/10` (не `bg-white/8`)
-- **Иконки** — только через `components/icon.html` + спрайт (`templates/components/icons/_sprite.html`). Если нужной иконки нет — добавить новый `<symbol>` в спрайт
+- **Иконки** — только через `components/icon.html` + спрайт (`templates/components/icons/_sprite.html`). Если нужной иконки нет — добавить новый `<symbol>` в спрайт, а не брать похожую по наличию.
+- **Три точки (`dots-*`) — только на кнопке, открывающей меню.** Они значат «ещё варианты», то есть помечают контейнер, а не действие. На пункте меню или на самостоятельной кнопке они не значат ничего. Жалоба — `flag`, защита/модерация — `shield` (docs/04 §4.2)
 - **Эмодзи запрещены** в шаблонах, stub_data и любом контенте проекта. Стандартные emoji-символы (☀️ 📖 😢 🎒 👽 🌆 🇰🇿 🕯️ ✍️ 🎄 🧟 😄 и т.п.) выглядят дёшево и роняют уровень дизайна. Альтернативы: SVG-иконка через `components/icon.html`, типографический акцент (крупная буква), абстрактный геометрический паттерн OKLCH, либо ничего. Это правило касается и текстового контента — приветствий, заголовков, описаний
 - **Обложки произведений** — `components/cover_placeholder.html` (двухрежимный): если `story.cover` непустой → рендерит `<img src="/media/{cover}">` с object-cover; иначе — типографическая плашка OKLCH + буква + «корешок» по hue primary жанра. Не использовать `{% static story.cover %}` напрямую — путь к файлу инкапсулирован в компоненте
 - **Аватары** — `components/avatar.html` (буквенные инициалы на OKLCH-фоне по длине seed=username+name). Передавать `username` для стабильного цвета

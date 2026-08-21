@@ -5,6 +5,7 @@
 Не импортировать в продакшен-логику — это сугубо для рендера шаблонов.
 """
 
+import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -750,6 +751,25 @@ class StoryComment:
     def author(self):
         return AUTHORS_BY_USERNAME.get(self.author_username)
 
+    @property
+    def id(self) -> str:
+        """Устойчивый идентификатор комментария.
+
+        Нужен трём вещам сразу: якорю `#comment-<id>` в ссылке на
+        комментарий, цели `comment:<id>` для жалобы (BR-33) и цели
+        удаления. Пока данных нет в БД, вычисляем из автора и даты —
+        после Ф14 здесь будет первичный ключ.
+        """
+        # crc32, а не hash(): встроенный hash строк рандомизируется от
+        # запуска к запуску, и скопированная сегодня ссылка завтра вела бы
+        # в пустоту.
+        digest = zlib.crc32(self.text.encode("utf-8")) % 10000
+        return f"{self.author_username}-{digest:04d}"
+
+    def belongs_to(self, username: str) -> bool:
+        """Свой комментарий: меню предлагает «Жою», а не «Шағым» (BR-33)."""
+        return bool(username) and self.author_username == username
+
 
 COMMENTS_BY_STORY: dict = {
     # Богатый набор — иллюстрирует все кейсы дизайна:
@@ -797,7 +817,16 @@ COMMENTS_BY_STORY: dict = {
             "Бұл бөлім — шедевр.",
             chapter_number=4,
         ),
-        # 5) С одним ответом от автора — на 2-ю главу
+        # 5) Свой комментарий демо-пользователя — на 3-ю главу.
+        # Нужен, чтобы ветка «свой» в меню (Жою вместо Шағым, BR-33) вообще
+        # была видна: без него дизайн-фаза показывала только чужие.
+        StoryComment(
+            "aidana", "4 сағат бұрын",
+            "Қарттың «жүректерің не дейді?» деген сұрағынан кейін кітапты жауып, біраз ойланып отырдым.",
+            likes=6,
+            chapter_number=3,
+        ),
+        # 6) С одним ответом от автора — на 2-ю главу
         StoryComment(
             "rudazov", "1 апта бұрын",
             "Стилистика Брэдбериге ұқсайды — бұл мен үшін үлкен мадақ. Жалғастыр!",
