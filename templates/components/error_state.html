@@ -13,7 +13,7 @@
 
     {% if compact %}
         <span class="grid h-8 w-8 shrink-0 place-items-center rounded-pill bg-status-error-bg text-status-error-fg">
-            {% include "components/icon.html" with name="x" size=16 %}
+            {% include "components/icon.html" with name="x" size=16 only %}
         </span>
         <div class="min-w-0 flex-1">
             <p class="font-sans text-sm font-semibold text-slate-900">
@@ -25,12 +25,12 @@
         </div>
         <a href="{{ retry_href|default:request.path }}"
            class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-status-error-fg bg-white px-3 font-sans text-xs font-bold text-status-error-fg hover:bg-status-error-bg">
-            {% include "components/icon.html" with name="arrow-right" size=12 %}
+            {% include "components/icon.html" with name="arrow-right" size=12 only %}
             Қайта көру
         </a>
     {% else %}
         <span class="mb-3 inline-grid h-12 w-12 place-items-center rounded-pill bg-status-error-bg text-status-error-fg">
-            {% include "components/icon.html" with name="x" size=24 %}
+            {% include "components/icon.html" with name="x" size=24 only %}
         </span>
         <h3 class="font-display text-lg font-bold text-slate-900">
             {{ title|default:"Бір нәрсе сәтсіз болды" }}
@@ -41,7 +41,7 @@
         <div class="mt-5">
             <a href="{{ retry_href|default:request.path }}"
                class="inline-flex h-9 items-center gap-2 rounded-md border border-status-error-fg bg-white px-5 font-sans text-sm font-bold text-status-error-fg hover:bg-status-error-bg">
-                {% include "components/icon.html" with name="arrow-right" size=14 %}
+                {% include "components/icon.html" with name="arrow-right" size=14 only %}
                 Қайта жүктеу
             </a>
         </div>

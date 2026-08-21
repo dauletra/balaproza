@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static balaproza %}
 
 {% block title %}{% if story %}{{ story.title }} · басқару{% else %}Шығарма{% endif %} — Balaproza{% endblock %}
 
@@ -37,15 +37,22 @@
                 {% else %}
                     {% include "components/stat_pill.html" with icon="book" value=story.chapters|stringformat:"s"|add:" бөлім" %}
                 {% endif %}
-                {% include "components/stat_pill.html" with icon="eye" value=story.views %}
-                {% include "components/stat_pill.html" with icon="thumbs-up" value=story.likes %}
-                {% include "components/stat_pill.html" with icon="message-caption" value=story.comments %}
+                {% include "components/stat_pill.html" with icon="eye" value=story.views|spaced label=story.views|spaced|add:" оқылым" %}
+                {% include "components/stat_pill.html" with icon="thumbs-up" value=story.likes|spaced label=story.likes|spaced|add:" ұнату" %}
+                {% include "components/stat_pill.html" with icon="message-caption" value=story.comments|spaced label=story.comments|spaced|add:" пікір" %}
             </div>
 
             <div class="mt-2 flex flex-wrap items-center gap-2.5">
+                {% comment %}
+                    «Мәтінді өңдеу» ведёт в существующую главу одночастного —
+                    см. тот же разбор в components/my_story_row.html.
+                    new_ch_href объявлен вне ветки: им же пользуется пустое
+                    состояние списка глав ниже по шаблону.
+                {% endcomment %}
                 {% url 'core:chapter_new' slug=story.slug as new_ch_href %}
                 {% if story.is_single %}
-                    {% include "components/button.html" with kind="primary" label="Мәтінді өңдеу" icon="pen" href=new_ch_href %}
+                    {% if story.text_chapter %}{% url 'core:chapter_edit' slug=story.slug chapter=story.text_chapter as text_href %}{% else %}{% url 'core:chapter_new' slug=story.slug as text_href %}{% endif %}
+                    {% include "components/button.html" with kind="primary" label="Мәтінді өңдеу" icon="pen" href=text_href %}
                 {% else %}
                     {% include "components/button.html" with kind="primary" label="Бөлім қосу" icon="plus" href=new_ch_href %}
                 {% endif %}
@@ -56,7 +63,7 @@
                 {% url 'core:story_detail' slug=story.slug as view_href %}
                 <a href="{{ view_href }}"
                    class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
-                    {% include "components/icon.html" with name="eye" size=16 %}
+                    {% include "components/icon.html" with name="eye" size=16 only %}
                     Сайтта қарау
                 </a>
             </div>
@@ -73,27 +80,27 @@
         </div>
         <ul class="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <li class="flex items-start gap-2 rounded-md bg-slate-50 px-3 py-2">
-                <span class="mt-0.5 {% if story.annotation %}text-status-published-fg{% else %}text-slate-400{% endif %}">{% include "components/icon.html" with name="check" size=14 %}</span>
+                <span class="mt-0.5 {% if story.annotation %}text-status-published-fg{% else %}text-slate-400{% endif %}">{% include "components/icon.html" with name="check" size=14 only %}</span>
                 <span class="font-sans text-xs text-slate-700">Аннотация жазылған</span>
             </li>
             <li class="flex items-start gap-2 rounded-md bg-slate-50 px-3 py-2">
-                <span class="mt-0.5 {% if chapters %}text-status-published-fg{% else %}text-slate-400{% endif %}">{% include "components/icon.html" with name="check" size=14 %}</span>
+                <span class="mt-0.5 {% if chapters %}text-status-published-fg{% else %}text-slate-400{% endif %}">{% include "components/icon.html" with name="check" size=14 only %}</span>
                 <span class="font-sans text-xs text-slate-700">{% if story.is_single %}Мәтін қосылған{% else %}Кемінде бір бөлім бар{% endif %}</span>
             </li>
             <li class="flex items-start gap-2 rounded-md bg-slate-50 px-3 py-2">
-                <span class="mt-0.5 {% if story.cover %}text-status-published-fg{% else %}text-slate-400{% endif %}">{% include "components/icon.html" with name="check" size=14 %}</span>
+                <span class="mt-0.5 {% if story.cover %}text-status-published-fg{% else %}text-slate-400{% endif %}">{% include "components/icon.html" with name="check" size=14 only %}</span>
                 <span class="font-sans text-xs text-slate-700">Мұқаба дайын</span>
             </li>
             <li class="flex items-start gap-2 rounded-md bg-slate-50 px-3 py-2">
-                <span class="mt-0.5 {% if story.tags %}text-status-published-fg{% else %}text-slate-400{% endif %}">{% include "components/icon.html" with name="check" size=14 %}</span>
+                <span class="mt-0.5 {% if story.tags %}text-status-published-fg{% else %}text-slate-400{% endif %}">{% include "components/icon.html" with name="check" size=14 only %}</span>
                 <span class="font-sans text-xs text-slate-700">Тегтер таңдалған</span>
             </li>
             <li class="flex items-start gap-2 rounded-md bg-slate-50 px-3 py-2">
-                <span class="mt-0.5 {% if story.status == 'Published' or story.status == 'OnModeration' or story.status == 'Completed' %}text-status-published-fg{% else %}text-slate-400{% endif %}">{% include "components/icon.html" with name="check" size=14 %}</span>
+                <span class="mt-0.5 {% if story.status == 'Published' or story.status == 'OnModeration' or story.status == 'Completed' %}text-status-published-fg{% else %}text-slate-400{% endif %}">{% include "components/icon.html" with name="check" size=14 only %}</span>
                 <span class="font-sans text-xs text-slate-700">Мәртебе тексеруге дайын</span>
             </li>
             <li class="flex items-start gap-2 rounded-md bg-slate-50 px-3 py-2">
-                <span class="mt-0.5 text-status-published-fg">{% include "components/icon.html" with name="check" size=14 %}</span>
+                <span class="mt-0.5 text-status-published-fg">{% include "components/icon.html" with name="check" size=14 only %}</span>
                 <span class="font-sans text-xs text-slate-700">Жас белгісі: {{ story.audience }}</span>
             </li>
         </ul>
@@ -125,7 +132,7 @@
                                 {% if c.top_reaction %}
                                     <span aria-hidden="true">·</span>
                                     <span class="inline-flex items-center gap-1 text-slate-600">
-                                        {% include "components/icon.html" with name=c.top_reaction.icon size=12 %}
+                                        {% include "components/icon.html" with name=c.top_reaction.icon size=12 only %}
                                         {{ c.top_reaction.label }} · {{ c.likes }}
                                     </span>
                                     <span class="text-slate-400">({{ c.top_reaction.hint }})</span>
@@ -137,14 +144,14 @@
                             <a href="{% url 'core:chapter_edit' slug=story.slug chapter=c.number %}"
                                aria-label="Өңдеу"
                                class="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700">
-                                {% include "components/icon.html" with name="pen" size=14 %}
+                                {% include "components/icon.html" with name="pen" size=14 only %}
                             </a>
                             {% with chap=c.number|stringformat:"d" %}
                             {% url 'core:story_detail' slug=story.slug as detail_base %}
                             <a href="{{ detail_base }}?chapter={{ chap }}#chapter-{{ chap }}"
                                aria-label="Сайтта қарау" target="_blank"
                                class="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700">
-                                {% include "components/icon.html" with name="eye" size=14 %}
+                                {% include "components/icon.html" with name="eye" size=14 only %}
                             </a>
                             {% endwith %}
                         </div>
@@ -174,7 +181,7 @@
         <button type="button" x-data
                 @click="$dispatch('open-delete-confirm', { name: '{{ story.title|escapejs }}', confirm_url: '#' })"
                 class="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-status-error-fg bg-white px-5 font-sans text-sm font-bold text-status-error-fg hover:bg-status-error-bg">
-            {% include "components/icon.html" with name="trash" size=14 %}
+            {% include "components/icon.html" with name="trash" size=14 only %}
             Шығарманы өшіру
         </button>
     </section>

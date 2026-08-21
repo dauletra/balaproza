@@ -74,6 +74,25 @@ class StoryRelations(unittest.TestCase):
                 self.assertEqual(len(chapters), 1)
                 self.assertEqual(chapters[0].number, 1)
 
+    def test_text_chapter_points_at_the_existing_text(self):
+        """`Story.text_chapter` — куда ведёт кнопка «Мәтін» (FR-WRITE-05)."""
+        for story in stub_data.STORIES:
+            with self.subTest(story=story.slug):
+                if story.is_single:
+                    self.assertEqual(story.text_chapter, 1)
+                else:
+                    self.assertIsNone(story.text_chapter)
+
+    def test_text_chapter_is_none_when_no_text_written_yet(self):
+        # У свежесозданного `single` главы ещё нет — кнопка обязана вести
+        # в новый редактор, а не в несуществующую главу.
+        fresh = stub_data.Story(
+            slug="brand-new", title="Жаңа", author_username="aidana",
+            cover="", genres=("drama", None),
+            chapters=0, views=0, likes=0, comments=0, format="single",
+        )
+        self.assertIsNone(fresh.text_chapter)
+
     def test_public_reading_label_hides_minutes_for_serial(self):
         for story in stub_data.STORIES:
             with self.subTest(story=story.slug):
@@ -225,3 +244,40 @@ class RecentViewsAreConsistent(unittest.TestCase):
         for s in stub_data.STORIES:
             with self.subTest(story=s.slug):
                 self.assertLessEqual(s.recent_views, s.views)
+
+
+class DeclaredChapterCountMatchesLoadedChapters(unittest.TestCase):
+    """`Story.chapters` не должен обещать больше, чем стаб умеет показать.
+
+    `aidana-erteg` объявляла 3 бөлім без единой записи в `CHAPTERS_BY_STORY`:
+    список «Менің шығармаларым» показывал «3 бөлім», а «Басқару» открывалась
+    пустой. Записи главы обязаны нести текст (см.
+    `test_stub_chapters_have_loaded_body_text`), поэтому честное значение там —
+    ноль, а не три пустые главы.
+    """
+
+    # Каталожные сериалы, у которых текст глав не написан вовсе. В авторском
+    # кабинете их никто не открывает, но публичная страница произведения
+    # обещает бөлім, которых нет. Гэп известен и ждёт наполнения story_texts/;
+    # список заморожен, чтобы к нему не добавилось новых произведений.
+    KNOWN_TEXTLESS = {
+        "zhuldyz-kartasy", "kokjal-anyzy", "keiipkerge-hat", "arqadagy-jaz",
+    }
+
+    def test_counts_match_wherever_text_is_authored(self):
+        for story in stub_data.STORIES:
+            if story.slug in self.KNOWN_TEXTLESS:
+                continue
+            with self.subTest(story=story.slug):
+                self.assertEqual(story.chapters, len(stub_data.chapters_of(story.slug)))
+
+    def test_the_list_of_textless_stories_has_not_grown(self):
+        textless = {
+            s.slug for s in stub_data.STORIES
+            if s.chapters and not stub_data.chapters_of(s.slug)
+        }
+        self.assertEqual(
+            textless, self.KNOWN_TEXTLESS,
+            "Произведение обещает бөлім, которых нет в CHAPTERS_BY_STORY. "
+            "Либо напиши текст в core/story_texts/, либо поставь chapters=0.",
+        )

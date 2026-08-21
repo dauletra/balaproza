@@ -1,9 +1,14 @@
+{% load balaproza %}
 {% comment %}
     Строка в списке «Менің шығармаларым»: обложка + название + StatusBadge + метрики
     + быстрые действия (Басқару / Бөлім қосу).
 
     Параметры:
       story — Story с обязательным .status
+
+    Числа здесь через `spaced`, а не `compact_count`: это авторский кабинет,
+    строка широкая, и автору нужна точная цифра по своей работе, а не «1,0 мың».
+    `compact_count` остаётся для узких читательских карточек каталога.
 {% endcomment %}
 <article class="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 transition-shadow hover:shadow-card-hover sm:flex-row sm:items-center">
 
@@ -33,19 +38,26 @@
             {% else %}
                 {% include "components/stat_pill.html" with icon="book" value=story.chapters|stringformat:"s"|add:" бөлім" %}
             {% endif %}
-            {% include "components/stat_pill.html" with icon="eye" value=story.views %}
-            {% include "components/stat_pill.html" with icon="thumbs-up" value=story.likes %}
-            {% include "components/stat_pill.html" with icon="message-caption" value=story.comments %}
+            {% include "components/stat_pill.html" with icon="eye" value=story.views|spaced label=story.views|spaced|add:" оқылым" %}
+            {% include "components/stat_pill.html" with icon="thumbs-up" value=story.likes|spaced label=story.likes|spaced|add:" ұнату" %}
+            {% include "components/stat_pill.html" with icon="message-caption" value=story.comments|spaced label=story.comments|spaced|add:" пікір" %}
         </div>
     </div>
 
     {# Действия — справа на десктопе, снизу на мобилке #}
     <div class="flex shrink-0 flex-wrap items-center gap-2">
-        {% url 'core:chapter_new' slug=story.slug as new_ch_href %}
+        {% comment %}
+            У одночастного произведения текст один, и «Мәтін» обязан вести
+            именно в него. Раньше обе ветки указывали на chapter_new: автор
+            жал «Мәтін», получал пустой редактор и сохранял вторую главу у
+            книги, у которой текст один по определению.
+        {% endcomment %}
         {% if story.is_single %}
-            {% include "components/button.html" with kind="secondary" size="md" label="Мәтін" href=new_ch_href %}
+            {% if story.text_chapter %}{% url 'core:chapter_edit' slug=story.slug chapter=story.text_chapter as text_href %}{% else %}{% url 'core:chapter_new' slug=story.slug as text_href %}{% endif %}
+            {% include "components/button.html" with kind="secondary" size="md" label="Мәтін" icon="pen" href=text_href %}
         {% else %}
-            {% include "components/button.html" with kind="secondary" size="md" label="+ Бөлім" href=new_ch_href %}
+            {% url 'core:chapter_new' slug=story.slug as new_ch_href %}
+            {% include "components/button.html" with kind="secondary" size="md" label="Бөлім" icon="plus" href=new_ch_href %}
         {% endif %}
         {% url 'core:manage_story' slug=story.slug as manage_href %}
         {% include "components/button.html" with kind="primary" size="md" label="Басқару" href=manage_href %}

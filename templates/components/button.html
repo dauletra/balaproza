@@ -34,8 +34,8 @@
           {% elif k == 'promo' %}
               bg-promo-cta text-white hover:opacity-90
           {% endif %}">
-    {% if icon %}{% include "components/icon.html" with name=icon size=16 %}{% endif %}
+    {% if icon %}{% include "components/icon.html" with name=icon size=16 only %}{% endif %}
     {% if label %}<span>{{ label }}</span>{% endif %}
-    {% if icon_right %}{% include "components/icon.html" with name=icon_right size=16 %}{% endif %}
+    {% if icon_right %}{% include "components/icon.html" with name=icon_right size=16 only %}{% endif %}
 {% if href %}</a>{% else %}</button>{% endif %}
 {% endwith %}

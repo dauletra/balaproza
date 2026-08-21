@@ -11,7 +11,7 @@
 <div class="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
     {% if icon %}
         <span class="mb-3 inline-grid h-12 w-12 place-items-center rounded-pill bg-slate-100 text-slate-500">
-            {% include "components/icon.html" with name=icon size=24 %}
+            {% include "components/icon.html" with name=icon size=24 only %}
         </span>
     {% endif %}
     <h3 class="font-display text-lg font-bold text-slate-900">{{ title }}</h3>

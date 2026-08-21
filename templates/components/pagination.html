@@ -17,12 +17,12 @@
         <a href="{{ base }}{% if qs %}?{{ qs }}&amp;{% else %}?{% endif %}page={{ prev }}"
            aria-label="Алдыңғы бет"
            class="grid h-9 w-9 place-items-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-100">
-            {% include "components/icon.html" with name="chevron-left" size=16 %}
+            {% include "components/icon.html" with name="chevron-left" size=16 only %}
         </a>
     {% else %}
         <span aria-hidden="true"
               class="grid h-9 w-9 place-items-center rounded-md border border-slate-200 text-slate-300">
-            {% include "components/icon.html" with name="chevron-left" size=16 %}
+            {% include "components/icon.html" with name="chevron-left" size=16 only %}
         </span>
     {% endif %}
 
@@ -50,12 +50,12 @@
         <a href="{{ base }}{% if qs %}?{{ qs }}&amp;{% else %}?{% endif %}page={{ next }}"
            aria-label="Келесі бет"
            class="grid h-9 w-9 place-items-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-100">
-            {% include "components/icon.html" with name="chevron-right" size=16 %}
+            {% include "components/icon.html" with name="chevron-right" size=16 only %}
         </a>
     {% else %}
         <span aria-hidden="true"
               class="grid h-9 w-9 place-items-center rounded-md border border-slate-200 text-slate-300">
-            {% include "components/icon.html" with name="chevron-right" size=16 %}
+            {% include "components/icon.html" with name="chevron-right" size=16 only %}
         </span>
     {% endif %}
 </nav>

@@ -24,12 +24,12 @@
                 <span class="min-w-0 flex-1 truncate">{{ c.title }}</span>
                 {% if c.likes %}
                     <span class="inline-flex shrink-0 items-center gap-1 font-sans text-[11px] text-slate-400" aria-label="{{ c.likes }} ұнату">
-                        {% include "components/icon.html" with name="heart" size=11 %}
+                        {% include "components/icon.html" with name="heart" size=11 only %}
                         <span aria-hidden="true">{{ c.likes }}</span>
                     </span>
                 {% endif %}
                 {% if c.number == current_chapter_number %}
-                    {% include "components/icon.html" with name="bookmark-filled" size=12 cls="shrink-0 text-brand" %}
+                    {% include "components/icon.html" with name="bookmark-filled" size=12 cls="shrink-0 text-brand" only %}
                 {% endif %}
             </a>
         </li>

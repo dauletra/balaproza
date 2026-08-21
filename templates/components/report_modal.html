@@ -21,12 +21,12 @@
 
         <button type="button" @click="open = false" aria-label="Жабу"
                 class="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-pill text-slate-500 hover:bg-slate-100">
-            {% include "components/icon.html" with name="x" size=18 %}
+            {% include "components/icon.html" with name="x" size=18 only %}
         </button>
 
         {# Тот же флажок, что на кнопке-триггере: модалка подтверждает нажатое #}
         <div class="grid h-12 w-12 place-items-center rounded-pill bg-status-warning-bg text-status-warning-fg">
-            {% include "components/icon.html" with name="flag" size=22 %}
+            {% include "components/icon.html" with name="flag" size=22 only %}
         </div>
 
         <h2 id="report-modal-title" class="mt-4 font-display text-xl font-bold text-slate-900">

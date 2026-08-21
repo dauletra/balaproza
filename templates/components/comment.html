@@ -70,14 +70,14 @@
                 <button type="button" @click="open = !open"
                         :aria-expanded="open" aria-haspopup="menu" aria-label="Пікір мәзірі"
                         class="grid h-11 w-11 -mr-2 place-items-center rounded-pill text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-                    {% include "components/icon.html" with name="dots-horizontal" size=16 %}
+                    {% include "components/icon.html" with name="dots-horizontal" size=16 only %}
                 </button>
 
                 <div x-show="open" x-cloak x-transition role="menu"
                      class="absolute right-0 z-20 mt-1 w-56 rounded-md border border-slate-200 bg-white py-1 shadow-modal">
                     <button type="button" role="menuitem" @click="copyLink()"
                             class="flex min-h-11 w-full items-center gap-2.5 px-4 text-left font-sans text-sm text-slate-800 hover:bg-slate-50">
-                        {% include "components/icon.html" with name="paper-plane" size=15 cls="text-slate-400" %}
+                        {% include "components/icon.html" with name="paper-plane" size=15 cls="text-slate-400" only %}
                         Сілтемені көшіру
                     </button>
 
@@ -85,14 +85,14 @@
                         <button type="button" role="menuitem"
                                 @click="open = false; $dispatch('open-delete-confirm', { name: 'Пікір', confirm_url: '#' })"
                                 class="flex min-h-11 w-full items-center gap-2.5 border-t border-slate-100 px-4 text-left font-sans text-sm text-status-error-fg hover:bg-slate-50">
-                            {% include "components/icon.html" with name="trash" size=15 %}
+                            {% include "components/icon.html" with name="trash" size=15 only %}
                             Жою
                         </button>
                     {% elif signed_in %}
                         <button type="button" role="menuitem"
                                 @click="open = false; $dispatch('open-report', { target: 'comment:{{ comment_id }}' })"
                                 class="flex min-h-11 w-full items-center gap-2.5 border-t border-slate-100 px-4 text-left font-sans text-sm text-slate-800 hover:bg-slate-50">
-                            {% include "components/icon.html" with name="flag" size=15 cls="text-slate-400" %}
+                            {% include "components/icon.html" with name="flag" size=15 cls="text-slate-400" only %}
                             Шағым жіберу
                         </button>
                     {% endif %}
@@ -123,8 +123,8 @@
             <button type="button" @click="toggle()" :aria-pressed="liked" aria-label="Ұнату"
                     :class="liked ? 'text-status-error-fg' : 'text-slate-500 hover:text-slate-700'"
                     class="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2">
-                <template x-if="liked">{% include "components/icon.html" with name="heart-filled" size=14 %}</template>
-                <template x-if="!liked">{% include "components/icon.html" with name="heart" size=14 %}</template>
+                <template x-if="liked">{% include "components/icon.html" with name="heart-filled" size=14 only %}</template>
+                <template x-if="!liked">{% include "components/icon.html" with name="heart" size=14 only %}</template>
                 <span x-text="count">{{ likes|default:0 }}</span>
             </button>
 

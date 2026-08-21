@@ -142,3 +142,104 @@ class AlpineDirectivesAreInScope(TestCase):
             'Добавь пустой x-data на сам элемент или на его контейнер:\n  '
             + '\n  '.join(offenders),
         )
+
+
+class IconIncludesAreIsolated(unittest.TestCase):
+    """`components/icon.html` подключается только с `only`.
+
+    `{% include … with … %}` наследует весь родительский контекст. У кнопки,
+    бейджа и пилюли есть параметр `label`, и он молча доезжал до иконки —
+    та превращалась в `<svg role="img" aria-label="…">` с той же подписью,
+    что и стоящий рядом текст. Скринридер читал её дважды.
+
+    Ни один вызов в проекте не передаёт `label` иконке осознанно, так что
+    все такие имена были результатом утечки.
+    """
+
+    def test_every_icon_include_carries_only(self):
+        offenders = []
+        for path in _templates():
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                if 'include "components/icon.html"' not in line:
+                    continue
+                for fragment in line.split('include "components/icon.html"')[1:]:
+                    tag = fragment.split("%}", 1)[0]
+                    if " only" not in tag:
+                        rel = path.relative_to(TEMPLATES_DIR.parent)
+                        offenders.append(f"{rel}:{number}  {line.strip()[:70]}")
+
+        self.assertFalse(
+            offenders,
+            "icon.html без `only` — родительский `label` утечёт в иконку и "
+            "скринридер прочитает подпись дважды:\n" + "\n".join(offenders),
+        )
+
+
+class IconLabelsDoNotDuplicateText(TestCase):
+    """Озвученная иконка не должна повторять текст, рядом с которым стоит.
+
+    Дублирование ловим по отрендеренному DOM, а не по исходникам: подпись
+    может доехать до иконки любым путём — через `include`, через `{% with %}`,
+    через контекст-процессор. Правило одно: если у `<svg role="img">` имя
+    совпадает с текстом его контейнера, это имя лишнее.
+    """
+
+    VOID = {'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+            'link', 'meta', 'source', 'track', 'wbr'}
+
+    class _Scan(HTMLParser):
+        def __init__(self, void):
+            super().__init__(convert_charrefs=True)
+            self.void = void
+            self.stack = []        # [[tag, [текст], [подписи икон]]]
+            self.duplicates = []
+
+        def handle_starttag(self, tag, attrs):
+            flat = dict(attrs)
+            if tag == 'svg' and flat.get('role') == 'img' and flat.get('aria-label'):
+                if self.stack:
+                    self.stack[-1][2].append(flat['aria-label'])
+            if tag not in self.void:
+                self.stack.append([tag, [], []])
+
+        def handle_data(self, data):
+            if self.stack:
+                self.stack[-1][1].append(data)
+
+        def handle_endtag(self, tag):
+            for i in range(len(self.stack) - 1, -1, -1):
+                if self.stack[i][0] != tag:
+                    continue
+                closed = self.stack[i]
+                del self.stack[i:]
+                text = " ".join("".join(closed[1]).split())
+                for label in closed[2]:
+                    if text and " ".join(label.split()) == text:
+                        self.duplicates.append((closed[0], label))
+                if self.stack:
+                    self.stack[-1][1].append(text)
+                return
+
+    def test_no_icon_repeats_its_neighbours_text(self):
+        from django.urls import reverse
+        from core.tests.test_urls_smoke import PUBLIC_URLS
+
+        session = self.client.session
+        session['signed_in'] = True
+        session['user_name'] = 'Айдана'
+        session['user_username'] = 'aidana'
+        session.save()
+
+        offenders = []
+        for name, kwargs, label in PUBLIC_URLS:
+            parser = self._Scan(self.VOID)
+            parser.feed(self.client.get(reverse(name, kwargs=kwargs)).content.decode())
+            for tag, dup in parser.duplicates:
+                offenders.append(f'{label}: <{tag}> — иконка повторяет «{dup}»')
+
+        self.assertFalse(
+            offenders,
+            "Иконка озвучена тем же текстом, что и её контейнер — подпись "
+            "прозвучит дважды. Убери label у иконки (обычно это утечка "
+            "контекста, лечится `only`):\n  " + "\n  ".join(sorted(set(offenders))),
+        )

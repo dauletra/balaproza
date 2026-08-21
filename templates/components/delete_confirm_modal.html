@@ -23,7 +23,7 @@
          class="relative w-full max-w-md rounded-hero bg-white p-7 shadow-modal sm:p-9">
 
         <div class="grid h-12 w-12 place-items-center rounded-pill bg-status-error-bg text-status-error-fg">
-            {% include "components/icon.html" with name="trash" size=22 %}
+            {% include "components/icon.html" with name="trash" size=22 only %}
         </div>
 
         <h2 id="del-modal-title" class="mt-4 font-display text-xl font-bold text-slate-900">
@@ -41,7 +41,7 @@
             <button type="button"
                     @click="open = false; $dispatch('toast', { kind: 'error', text: name + ' өшірілді' })"
                     class="inline-flex h-9 items-center gap-2 rounded-md bg-status-error-fg px-5 font-sans text-sm font-bold text-white hover:opacity-90">
-                {% include "components/icon.html" with name="trash" size=14 %}
+                {% include "components/icon.html" with name="trash" size=14 only %}
                 Өшіру
             </button>
         </div>

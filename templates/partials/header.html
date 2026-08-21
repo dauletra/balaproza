@@ -21,7 +21,7 @@
         <form action="{% url 'core:search_results' %}" method="get"
               class="ml-6 hidden h-9 max-w-[520px] flex-1 items-center gap-2.5 rounded-search bg-slate-100 px-4 md:flex">
             <label for="header-search" class="sr-only">Іздеу</label>
-            {% include "components/icon.html" with name="search" size=20 cls="text-slate-600" %}
+            {% include "components/icon.html" with name="search" size=20 cls="text-slate-600" only %}
             <input id="header-search" type="search" name="q" value="{{ request.GET.q|default:'' }}"
                    placeholder="Шығарма немесе автор іздеу..."
                    @focus="$event.target.blur(); $dispatch('open-search')"
@@ -36,26 +36,26 @@
         <button type="button" aria-label="Іздеу"
                 @click="$dispatch('open-search')"
                 class="ml-auto -m-2 rounded-pill p-2 hover:bg-slate-100 md:hidden">
-            {% include "components/icon.html" with name="search" size=22 cls="text-slate-600" %}
+            {% include "components/icon.html" with name="search" size=22 cls="text-slate-600" only %}
         </button>
 
         {# ── Правый кластер (desktop) ── #}
         <nav class="ml-auto hidden items-center gap-6 md:flex" aria-label="Қолданушы әрекеттері">
             <a href="{% url 'core:catalog' %}"
                class="inline-flex items-center gap-1.5 font-sans text-[13px] font-bold {% if nav_active == 'catalog' %}text-brand-dark{% else %}text-brand hover:text-brand-dark{% endif %}">
-                {% include "components/icon.html" with name="book" size=15 %}
+                {% include "components/icon.html" with name="book" size=15 only %}
                 Оқу
             </a>
 
             <a href="{% url 'core:contest_list' %}"
                class="inline-flex items-center gap-1.5 font-sans text-[13px] font-bold {% if nav_active == 'contests' %}text-brand-dark{% else %}text-brand hover:text-brand-dark{% endif %}">
-                {% include "components/icon.html" with name="trophy" size=15 %}
+                {% include "components/icon.html" with name="trophy" size=15 only %}
                 Байқаулар
             </a>
 
             <a href="{% url 'core:new_story' %}"
                class="inline-flex items-center gap-1.5 font-sans text-[13px] font-bold text-brand hover:text-brand-dark">
-                {% include "components/icon.html" with name="pen" size=15 %}
+                {% include "components/icon.html" with name="pen" size=15 only %}
                 Шығарма жазу
             </a>
 
@@ -64,7 +64,7 @@
                 <a href="{% url 'core:notifications' %}"
                    aria-label="Хабарламалар{% if unread_notifications %} ({{ unread_notifications }} оқылмаған){% endif %}"
                    class="relative -m-2 rounded-pill p-2 hover:bg-slate-100">
-                    {% include "components/icon.html" with name="bell" size=22 cls="text-slate-600" %}
+                    {% include "components/icon.html" with name="bell" size=22 cls="text-slate-600" only %}
                     {% if unread_notifications %}
                         <span aria-hidden="true"
                               class="absolute -top-0.5 -right-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-pill bg-notif px-1 font-sans text-[10px] font-bold text-notif-fg">
@@ -80,9 +80,9 @@
                             class="flex items-center gap-2 rounded-pill hover:bg-slate-100">
                         {# Аватар-заглушка (Avatar-компонент придёт в Ф5) #}
                         <span class="grid h-9 w-9 place-items-center rounded-pill bg-slate-200 text-slate-500" aria-hidden="true">
-                            {% include "components/icon.html" with name="user-circle" size=24 %}
+                            {% include "components/icon.html" with name="user-circle" size=24 only %}
                         </span>
-                        {% include "components/icon.html" with name="chevron-right" size=12 cls="rotate-90 text-slate-500" %}
+                        {% include "components/icon.html" with name="chevron-right" size=12 cls="rotate-90 text-slate-500" only %}
                     </button>
 
                     <div x-show="open" x-cloak x-transition
@@ -90,29 +90,29 @@
                          class="absolute right-0 mt-2 w-56 rounded-md border border-slate-200 bg-white shadow-modal">
                         <a href="{% url 'core:profile_me' %}" role="menuitem"
                            class="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                            {% include "components/icon.html" with name="user-circle" size=16 cls="text-slate-500" %}
+                            {% include "components/icon.html" with name="user-circle" size=16 cls="text-slate-500" only %}
                             Профиль
                         </a>
                         <a href="{% url 'core:my_stories' %}" role="menuitem"
                            class="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                            {% include "components/icon.html" with name="pen" size=16 cls="text-slate-500" %}
+                            {% include "components/icon.html" with name="pen" size=16 cls="text-slate-500" only %}
                             Менің шығармаларым
                         </a>
                         <a href="{% url 'core:library' %}" role="menuitem"
                            class="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                            {% include "components/icon.html" with name="book" size=16 cls="text-slate-500" %}
+                            {% include "components/icon.html" with name="book" size=16 cls="text-slate-500" only %}
                             Кітапхана
                         </a>
                         <a href="{% url 'core:my_submissions' %}" role="menuitem"
                            class="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                            {% include "components/icon.html" with name="paper-plane" size=16 cls="text-slate-500" %}
+                            {% include "components/icon.html" with name="paper-plane" size=16 cls="text-slate-500" only %}
                             Менің заявкаларым
                         </a>
                         <form action="{% url 'core:logout' %}" method="post" role="none" class="border-t border-slate-200">
                             {% csrf_token %}
                             <button type="submit" role="menuitem"
                                     class="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
-                                {% include "components/icon.html" with name="x" size=16 cls="text-slate-500" %}
+                                {% include "components/icon.html" with name="x" size=16 cls="text-slate-500" only %}
                                 Шығу
                             </button>
                         </form>

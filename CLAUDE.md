@@ -77,7 +77,7 @@ balaproza_v1/
 │   ├── context_processors.py     # auth_state, nav_state, site_links
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced, page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 570 тестов в 16 файлах (см. ниже)
+│   └── tests/                    # 587 тестов в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -171,7 +171,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 570 тестов
+uv run python manage.py test core       # все 587 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 
@@ -201,7 +201,8 @@ def _login_as_aidana(client):
 - **Все шаблоны в корневой `templates/`** (не в `core/templates/`)
 - `base.html` определяет блоки `title`, `content`, `right_rail` — каждая страница может переопределить рейл
 - `base.html` глобально подключает: sprite, alpine/htmx, toast_host, **search_popup** (Cmd+K), favicon, theme-color
-- **`has_right_rail` флаг** (DEC-25): `<aside>` правого рейла рендерится только если view передал `'has_right_rail': True` в контекст. Иначе контент тянется на всю ширину контейнера. См. `home`, `story_detail`, `profile_me/other`, `contest_detail/submit`, `manage_story`, `chapter_editor`, `my_stories`, `new_story`, `story_settings`
+- **`has_right_rail` флаг** (DEC-25): `<aside>` правого рейла рендерится только если view передал `'has_right_rail': True` в контекст. Иначе контент тянется на всю ширину контейнера. См. `home`, `story_detail`, `profile_me/other`, `contest_detail/submit`, `manage_story`, `chapter_editor`, `my_stories`, `new_story`, `story_settings`.
+  **Флаг ставится по наличию данных рейла, а не безусловно.** `my_stories` и `manage_story` слали `True` всегда, а `right_rail/writer.html` пуст без `stats` — гость и неизвестный slug получали пустую колонку в 300px, которая просто сдвигала контент от центра. Закрыто `test_write.MyStoriesGuestHasNoEmptyRail`
 - **Container**: `max-w-[1280px]` (после удаления sidebar) с padding `lg:px-12`
 - В компонентах используем `{% comment %}…{% endcomment %}` для документации параметров (НЕ многострочный `{# … #}` — Django парсит его как single-line)
 - В именах template-переменных нельзя начинать с `_` (Django блокирует) — использовать `rid`, `id` и т.п.
@@ -233,6 +234,9 @@ def _login_as_aidana(client):
 - **Радиусы — только токены**: `rounded-{xs,sm,chip,md,lg,hero,search,pill}`. НЕ `rounded-2xl`/`3xl`/etc.
 - **Произвольные значения** — через arbitrary syntax: `h-[26px]` (не `h-6.5`), `px-[52px]` (не `px-13`), `bg-white/10` (не `bg-white/8`)
 - **Иконки** — только через `components/icon.html` + спрайт (`templates/components/icons/_sprite.html`). Если нужной иконки нет — добавить новый `<symbol>` в спрайт, а не брать похожую по наличию.
+  **Подключать всегда с `only`**: `{% include "components/icon.html" with name="pen" size=16 only %}`. Без него include наследует родительский контекст, и `label` кнопки/бейджа/пилюли утекает в иконку — та получает `role="img"` с той же подписью, что и текст рядом, и скринридер читает её дважды («Жаңа шығарма Жаңа шығарма»). Осознанно `label` иконке не передаёт ни один вызов в проекте. Закрыто `test_template_lint.IconIncludesAreIsolated` + `IconLabelsDoNotDuplicateText`
+- **Метрики в `stat_pill`** — всегда с `label` (полная озвучка с числом: `story.views|spaced|add:" оқылым"`). Значение под `aria-hidden`, иконка декоративная — без подписи цифры пропадают из озвучки целиком. Подпись рендерится в `sr-only`, а не в `aria-label`: у `<span>` с role=generic имя не выставляется
+- **Числа: `compact_count` — читателю, `spaced` — автору.** Узкие карточки каталога сжимают («2,1 мың»), авторский кабинет показывает точное с разрядами («1 042»). `stringformat:"d"` не форматирует ничего и запрещён
 - **Три точки (`dots-*`) — только на кнопке, открывающей меню.** Они значат «ещё варианты», то есть помечают контейнер, а не действие. На пункте меню или на самостоятельной кнопке они не значат ничего. Жалоба — `flag`, защита/модерация — `shield` (docs/04 §4.2)
 - **Эмодзи запрещены** в шаблонах, stub_data и любом контенте проекта. Стандартные emoji-символы (☀️ 📖 😢 🎒 👽 🌆 🇰🇿 🕯️ ✍️ 🎄 🧟 😄 и т.п.) выглядят дёшево и роняют уровень дизайна. Альтернативы: SVG-иконка через `components/icon.html`, типографический акцент (крупная буква), абстрактный геометрический паттерн OKLCH, либо ничего. Это правило касается и текстового контента — приветствий, заголовков, описаний
 - **Обложки произведений** — `components/cover_placeholder.html` (двухрежимный): если `story.cover` непустой → рендерит `<img src="/media/{cover}">` с object-cover; иначе — типографическая плашка OKLCH + буква + «корешок» по hue primary жанра. Не использовать `{% static story.cover %}` напрямую — путь к файлу инкапсулирован в компоненте

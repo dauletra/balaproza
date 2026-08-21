@@ -28,7 +28,7 @@
                     </div>
                 </div>
                 <a href="{{ continue_href }}" class="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 font-sans text-sm font-semibold text-slate-700 transition-colors hover:border-brand hover:text-brand">
-                    {% include "components/icon.html" with name="book" size=15 %}
+                    {% include "components/icon.html" with name="book" size=15 only %}
                     Оқуды жалғастыру
                 </a>
             </section>
@@ -44,7 +44,7 @@
                     Басқа авторларды оқу өз мәтініңе жаңа ырғақ табуға көмектеседі.
                 </p>
                 <a href="{% url 'core:catalog' %}" class="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 font-sans text-sm font-semibold text-slate-700 transition-colors hover:border-brand hover:text-brand">
-                    {% include "components/icon.html" with name="book" size=15 %}
+                    {% include "components/icon.html" with name="book" size=15 only %}
                     Оқуға шығарма табу
                 </a>
             </section>
@@ -58,7 +58,7 @@
                 Ойыңдағы оқиғаны черновикке түсіріп көр. Жариялау бірден міндетті емес.
             </p>
             <a href="{% url 'core:new_story' %}" class="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-slate-900 px-3 font-sans text-sm font-semibold text-white transition-colors hover:bg-slate-700">
-                {% include "components/icon.html" with name="pen" size=15 %}
+                {% include "components/icon.html" with name="pen" size=15 only %}
                 Жазып көру
             </a>
         </section>
@@ -99,7 +99,7 @@
 
                 <span class="inline-flex items-center gap-1.5 font-sans text-sm font-semibold text-brand transition-transform group-hover:translate-x-0.5 group-hover:text-brand-dark">
                     Қатысу
-                    {% include "components/icon.html" with name="arrow-right" size=14 %}
+                    {% include "components/icon.html" with name="arrow-right" size=14 only %}
                 </span>
             </div>
         </a>

@@ -96,7 +96,7 @@
                        style="color: oklch(0.32 0.14 {{ opt.genre.hue }});">
                         <span aria-hidden="true" class="h-1.5 w-1.5 rounded-pill" style="background: oklch(0.55 0.14 {{ opt.genre.hue }});"></span>
                         {{ opt.genre.name }}
-                        {% include "components/icon.html" with name="x" size=11 %}
+                        {% include "components/icon.html" with name="x" size=11 only %}
                     </a>
                 {% else %}
                     {% include "components/genre_chip.html" with genre=opt.genre size="sm" href=opt.href %}
@@ -115,7 +115,7 @@
                         <a href="{{ opt.href }}"
                            class="inline-flex min-h-9 items-center gap-1 font-sans text-xs font-bold text-brand-dark">
                             <span class="text-brand">#</span>{{ opt.tag.name }}
-                            {% include "components/icon.html" with name="x" size=11 %}
+                            {% include "components/icon.html" with name="x" size=11 only %}
                         </a>
                     {% else %}
                         {% include "components/tag_chip.html" with tag=opt.tag size="sm" href=opt.href %}

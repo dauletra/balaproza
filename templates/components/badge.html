@@ -15,7 +15,7 @@
     {% elif k == 'error' %}bg-status-error-bg text-status-error-fg
     {% elif k == 'notif' %}bg-notif text-notif-fg
     {% else %}bg-slate-100 text-slate-700{% endif %}">
-    {% if icon %}{% include "components/icon.html" with name=icon size=12 %}{% endif %}
+    {% if icon %}{% include "components/icon.html" with name=icon size=12 only %}{% endif %}
     {{ label }}
 </span>
 {% endwith %}

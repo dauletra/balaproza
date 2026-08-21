@@ -36,14 +36,14 @@
             <a href="{% url 'core:search_results' %}"
                @click.prevent="$dispatch('open-search')"
                class="flex h-11 items-center gap-2 rounded-search border border-slate-200 bg-white px-3 shadow-sm sm:hidden">
-                {% include "components/icon.html" with name="search" size=18 cls="shrink-0 text-slate-500" %}
+                {% include "components/icon.html" with name="search" size=18 cls="shrink-0 text-slate-500" only %}
                 <span class="min-w-0 truncate font-sans text-sm text-slate-400">Шығарма, автор, жанр немесе тег</span>
             </a>
 
             {# sm+: настоящая форма поиска. #}
             <form action="{% url 'core:search_results' %}" method="get" class="hidden min-h-[48px] flex-1 items-center gap-2 rounded-search border border-slate-200 bg-white px-3 shadow-sm focus-within:border-brand sm:flex">
                 <label for="home-search" class="sr-only">Іздеу</label>
-                {% include "components/icon.html" with name="search" size=18 cls="shrink-0 text-slate-500" %}
+                {% include "components/icon.html" with name="search" size=18 cls="shrink-0 text-slate-500" only %}
                 <input id="home-search" type="search" name="q" placeholder="Шығарма, автор, жанр немесе тег" class="min-w-0 flex-1 bg-transparent font-sans text-sm text-slate-900 outline-none placeholder:text-slate-400">
                 <button type="submit" class="inline-flex h-9 shrink-0 items-center justify-center rounded-md bg-brand px-4 font-sans text-sm font-semibold text-white transition-colors hover:bg-brand-dark">
                     Іздеу
@@ -59,7 +59,7 @@
             {% endcomment %}
             {% url 'core:new_story' as write_next %}
             <a href="{% url 'core:login' %}?next={{ write_next|urlencode }}" class="hidden h-12 shrink-0 items-center justify-center gap-2 rounded-md bg-slate-900 px-5 font-sans text-sm font-semibold text-white transition-colors hover:bg-slate-700 sm:inline-flex">
-                {% include "components/icon.html" with name="pen" size=16 %}
+                {% include "components/icon.html" with name="pen" size=16 only %}
                 Автор болу
             </a>
         </div>

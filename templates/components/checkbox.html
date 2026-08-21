@@ -21,7 +21,7 @@
           :class="on ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white text-transparent'"
           class="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-sm border
                  peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40 peer-focus-visible:ring-offset-2">
-        {% include "components/icon.html" with name="check" size=14 %}
+        {% include "components/icon.html" with name="check" size=14 only %}
     </span>
     {% if label %}
         <span class="font-sans text-xs leading-snug text-slate-700">{{ label }}</span>

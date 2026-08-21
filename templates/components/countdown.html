@@ -11,7 +11,7 @@
 <span class="inline-flex items-center gap-1.5 rounded-pill font-sans font-semibold
              {% if sz == 'md' %}h-9 px-3 text-sm{% else %}h-7 px-2.5 text-xs{% endif %}
              {% if muted %}bg-slate-100 text-slate-700{% else %}bg-status-attention-bg text-status-attention-fg{% endif %}">
-    {% include "components/icon.html" with name="adjustments" size=12 %}
+    {% include "components/icon.html" with name="adjustments" size=12 only %}
     {{ days }} күн қалды
 </span>
 {% endwith %}

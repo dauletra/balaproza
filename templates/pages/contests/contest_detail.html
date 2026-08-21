@@ -41,7 +41,7 @@
             <div class="mt-5 flex flex-wrap items-center gap-3">
                 {% if already_submitted %}
                     <span class="inline-flex h-10 items-center gap-2 rounded-md bg-white/15 px-5 font-sans text-sm font-bold text-white ring-1 ring-white/40">
-                        {% include "components/icon.html" with name="check" size=16 %}
+                        {% include "components/icon.html" with name="check" size=16 only %}
                         Өтінім берілген
                     </span>
                     <a href="{% url 'core:my_submissions' %}" class="font-sans text-xs text-white/85 hover:underline">
@@ -50,7 +50,7 @@
                 {% else %}
                     <a href="{% url 'core:contest_submit' slug=contest.slug %}"
                        class="inline-flex h-10 items-center gap-2 rounded-md bg-promo-cta px-6 font-sans text-base font-bold text-white hover:opacity-90">
-                        {% include "components/icon.html" with name="paper-plane" size=16 %}
+                        {% include "components/icon.html" with name="paper-plane" size=16 only %}
                         Қатысу
                     </a>
                 {% endif %}
@@ -93,7 +93,7 @@
                             {% elif t.state == 'active' %}bg-status-attention-bg text-status-attention-fg
                             {% else %}bg-slate-100 text-slate-500{% endif %}">
                             {% if t.state == 'done' %}
-                                {% include "components/icon.html" with name="check" size=12 %}
+                                {% include "components/icon.html" with name="check" size=12 only %}
                             {% elif t.state == 'active' %}
                                 <span class="h-2 w-2 rounded-pill bg-status-attention-fg"></span>
                             {% else %}

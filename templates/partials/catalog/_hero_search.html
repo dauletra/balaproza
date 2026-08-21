@@ -8,14 +8,14 @@
     <form action="{% url 'core:search_results' %}" method="get"
           class="flex h-11 max-w-2xl items-center gap-2.5 rounded-md border border-slate-300 bg-slate-50 px-4 has-[input:focus]:border-brand has-[input:focus]:bg-white has-[input:focus]:ring-2 has-[input:focus]:ring-brand/30">
         <label for="search-q" class="sr-only">Іздеу</label>
-        {% include "components/icon.html" with name="search" size=18 cls="text-slate-500" %}
+        {% include "components/icon.html" with name="search" size=18 cls="text-slate-500" only %}
         <input id="search-q" type="search" name="q" value="{{ query }}" autofocus
                placeholder="Шығарма немесе автор іздеу..."
                class="min-w-0 flex-1 bg-transparent font-sans text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none">
         {% if query %}
             <a href="{% url 'core:search_results' %}" aria-label="Тазалау"
                class="-mr-2 grid h-8 w-8 place-items-center rounded-pill text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-                {% include "components/icon.html" with name="x" size=14 %}
+                {% include "components/icon.html" with name="x" size=14 only %}
             </a>
         {% endif %}
     </form>

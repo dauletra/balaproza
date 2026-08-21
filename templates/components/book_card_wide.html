@@ -76,7 +76,7 @@
                 <span class="inline-flex h-6 items-center rounded-chip bg-slate-100 px-2 font-sans text-[11px] font-bold text-slate-600">{{ story.audience }}</span>
             {% endif %}
             <span class="inline-flex h-6 items-center gap-1 rounded-chip bg-slate-100 px-2 font-sans text-[11px] font-semibold text-slate-600">
-                {% include "components/icon.html" with name="book" size=11 %}
+                {% include "components/icon.html" with name="book" size=11 only %}
                 {{ story.read_minutes }} минут оқу
             </span>
         </div>

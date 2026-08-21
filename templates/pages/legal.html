@@ -7,7 +7,7 @@
     <header class="mb-6">
         <a href="{% url 'core:home' %}"
            class="inline-flex items-center gap-1.5 font-sans text-sm font-semibold text-slate-600 hover:text-brand">
-            {% include "components/icon.html" with name="chevron-right" size=12 cls="rotate-180" %}
+            {% include "components/icon.html" with name="chevron-right" size=12 cls="rotate-180" only %}
             Басты бетке
         </a>
         <h1 class="mt-3 font-display text-3xl font-bold text-slate-900">{{ page_title }}</h1>

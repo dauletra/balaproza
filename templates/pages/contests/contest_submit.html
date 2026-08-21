@@ -94,7 +94,7 @@
                                     {% if item.passed %}bg-status-published-bg text-status-published-fg
                                     {% else %}bg-status-warning-bg text-status-warning-fg{% endif %}">
                                     {% if item.passed %}
-                                        {% include "components/icon.html" with name="check" size=12 %}
+                                        {% include "components/icon.html" with name="check" size=12 only %}
                                     {% else %}
                                         <span class="text-xs font-bold">!</span>
                                     {% endif %}

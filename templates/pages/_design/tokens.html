@@ -152,7 +152,7 @@
         <div class="grid grid-cols-3 gap-3 rounded-md bg-white p-6 text-slate-700 shadow-sm sm:grid-cols-5 lg:grid-cols-8">
             {% for name in icon_names %}
                 <div class="flex flex-col items-center gap-1 rounded-sm p-2 text-center hover:bg-slate-50">
-                    {% include "components/icon.html" with name=name size=24 %}
+                    {% include "components/icon.html" with name=name size=24 only %}
                     <span class="font-mono text-[10px] text-slate-500">{{ name }}</span>
                 </div>
             {% endfor %}
@@ -160,19 +160,19 @@
 
         <h3 class="mt-6 mb-2 font-display text-lg font-bold">Бренд-иконки соцсетей</h3>
         <div class="flex flex-wrap items-center gap-6 rounded-md bg-white p-6 shadow-sm">
-            {% include "components/icon.html" with name="telegram"  size=24 %}
-            {% include "components/icon.html" with name="instagram" size=24 cls="text-slate-800" %}
-            {% include "components/icon.html" with name="tiktok"    size=24 cls="text-slate-900" %}
-            {% include "components/icon.html" with name="youtube"   size=24 %}
+            {% include "components/icon.html" with name="telegram"  size=24 only %}
+            {% include "components/icon.html" with name="instagram" size=24 cls="text-slate-800" only %}
+            {% include "components/icon.html" with name="tiktok"    size=24 cls="text-slate-900" only %}
+            {% include "components/icon.html" with name="youtube"   size=24 only %}
         </div>
 
         <h3 class="mt-6 mb-2 font-display text-lg font-bold">Размеры и цвета</h3>
         <div class="flex flex-wrap items-end gap-6 rounded-md bg-white p-6 shadow-sm">
-            {% include "components/icon.html" with name="bell" size=16 cls="text-slate-600" %}
-            {% include "components/icon.html" with name="bell" size=20 cls="text-slate-700" %}
-            {% include "components/icon.html" with name="bell" size=24 cls="text-brand" %}
-            {% include "components/icon.html" with name="bell" size=32 cls="text-notif" %}
-            {% include "components/icon.html" with name="bell" size=40 cls="text-status-published-fg" %}
+            {% include "components/icon.html" with name="bell" size=16 cls="text-slate-600" only %}
+            {% include "components/icon.html" with name="bell" size=20 cls="text-slate-700" only %}
+            {% include "components/icon.html" with name="bell" size=24 cls="text-brand" only %}
+            {% include "components/icon.html" with name="bell" size=32 cls="text-notif" only %}
+            {% include "components/icon.html" with name="bell" size=40 cls="text-status-published-fg" only %}
         </div>
     </section>
 

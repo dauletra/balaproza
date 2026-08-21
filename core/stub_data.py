@@ -244,6 +244,20 @@ class Story:
         return self.format != "single"
 
     @property
+    def text_chapter(self) -> int | None:
+        """Номер главы с текстом одночастного произведения; None — текста ещё нет.
+
+        У `single` глава ровно одна, и кнопка «Мәтін» обязана вести в неё, а не
+        в пустой редактор: иначе автор сохранит вторую главу у книги, у которой
+        текст один по определению. Для сериала возвращает None — там «Бөлім
+        қосу» и правда создаёт новую главу.
+        """
+        if not self.is_single:
+            return None
+        chapters = chapters_of(self.slug)
+        return chapters[0].number if chapters else None
+
+    @property
     def format_label(self) -> str:
         return "Бір бөлімді" if self.is_single else "Көп бөлімді"
 
@@ -421,7 +435,13 @@ STORIES = [
     Story(
         slug="aidana-erteg",  title="Ертегі ертеректегі",      author_username="aidana",
         cover="ipad_eec6a1375d9124c7348c7579b8d2db33.jpg", genres=("erteg", None),
-        chapters=3, views=0, likes=0, comments=0,
+        # chapters=0 — это фикстура «произведение без глав» для manage_story
+        # (test_write.ManageStoryEmptyChapters). Раньше здесь стояло 3: карточка
+        # в «Менің шығармаларым» обещала 3 бөлім, а «Басқару» открывалась
+        # пустой. Записи в CHAPTERS_BY_STORY обязаны нести текст
+        # (test_stub_data.test_stub_chapters_have_loaded_body_text), поэтому
+        # честное здесь — ноль, а не три пустые главы.
+        chapters=0, views=0, likes=0, comments=0,
         status="OnModeration", recent_views=0, annotation="Дәстүрлі ертегі формасында жазылған заманауи тарих.",
     ),
     Story(

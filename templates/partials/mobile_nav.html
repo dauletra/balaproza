@@ -33,39 +33,39 @@
         {# 1 · Главная #}
         <a href="{% url 'core:home' %}"
            class="flex flex-1 flex-col items-center justify-center gap-0.5{% if nav_active == 'home' %} text-brand{% else %} text-slate-800{% endif %}">
-            {% include "components/icon.html" with name="home" size=22 %}
+            {% include "components/icon.html" with name="home" size=22 only %}
             <span class="font-sans text-[10px] font-semibold leading-none">Басты</span>
         </a>
         {# 2 · Кітапхана #}
         <a href="{% url 'core:library' %}"
            class="flex flex-1 flex-col items-center justify-center gap-0.5{% if nav_active == 'library' %} text-brand{% else %} text-slate-800{% endif %}">
-            {% include "components/icon.html" with name="book" size=22 %}
+            {% include "components/icon.html" with name="book" size=22 only %}
             <span class="font-sans text-[10px] font-semibold leading-none">Кітапхана</span>
         </a>
         {# 3 · FAB · создать · brand #}
         <div class="flex flex-1 items-center justify-center">
             <a href="{% url 'core:new_story' %}" aria-label="Жаңа шығарма"
                class="grid h-11 w-11 place-items-center rounded-pill bg-brand text-white shadow-tg-btn hover:bg-brand-dark">
-                {% include "components/icon.html" with name="plus" size=20 %}
+                {% include "components/icon.html" with name="plus" size=20 only %}
             </a>
         </div>
         {# 4 · Байқаулар #}
         <a href="{% url 'core:contest_list' %}"
            class="flex flex-1 flex-col items-center justify-center gap-0.5{% if nav_active == 'contests' %} text-brand{% else %} text-slate-800{% endif %}">
-            {% include "components/icon.html" with name="trophy" size=22 %}
+            {% include "components/icon.html" with name="trophy" size=22 only %}
             <span class="font-sans text-[10px] font-semibold leading-none">Байқау</span>
         </a>
         {# 5 · Профиль #}
         <a href="{% url 'core:profile_me' %}"
            class="flex flex-1 flex-col items-center justify-center gap-0.5{% if nav_active == 'profile' %} text-brand{% else %} text-slate-800{% endif %}">
-            {% include "components/icon.html" with name="user-circle" size=22 %}
+            {% include "components/icon.html" with name="user-circle" size=22 only %}
             <span class="font-sans text-[10px] font-semibold leading-none">Профиль</span>
         </a>
     {% else %}
         {# 1 · Главная #}
         <a href="{% url 'core:home' %}"
            class="flex flex-1 flex-col items-center justify-center gap-0.5{% if nav_active == 'home' %} text-brand{% else %} text-slate-800{% endif %}">
-            {% include "components/icon.html" with name="home" size=22 %}
+            {% include "components/icon.html" with name="home" size=22 only %}
             <span class="font-sans text-[10px] font-semibold leading-none">Басты</span>
         </a>
         {% comment %}
@@ -74,7 +74,7 @@
         {% endcomment %}
         <a href="{% url 'core:collections' %}"
            class="flex flex-1 flex-col items-center justify-center gap-0.5{% if nav_active == 'catalog' %} text-brand{% else %} text-slate-800{% endif %}">
-            {% include "components/icon.html" with name="book" size=22 %}
+            {% include "components/icon.html" with name="book" size=22 only %}
             <span class="font-sans text-[10px] font-semibold leading-none">Оқу</span>
         </a>
         {# 3 · FAB · поиск · brand. Href — no-JS fallback на страницу поиска. #}
@@ -82,19 +82,19 @@
             <a href="{% url 'core:search_results' %}" aria-label="Іздеу"
                @click.prevent="$dispatch('open-search')"
                class="grid h-11 w-11 place-items-center rounded-pill bg-brand text-white shadow-tg-btn hover:bg-brand-dark">
-                {% include "components/icon.html" with name="search" size=20 %}
+                {% include "components/icon.html" with name="search" size=20 only %}
             </a>
         </div>
         {# 4 · Байқаулар #}
         <a href="{% url 'core:contest_list' %}"
            class="flex flex-1 flex-col items-center justify-center gap-0.5{% if nav_active == 'contests' %} text-brand{% else %} text-slate-800{% endif %}">
-            {% include "components/icon.html" with name="trophy" size=22 %}
+            {% include "components/icon.html" with name="trophy" size=22 only %}
             <span class="font-sans text-[10px] font-semibold leading-none">Байқау</span>
         </a>
         {# 5 · Кіру #}
         <a href="{% url 'core:login' %}?next={{ request.get_full_path|urlencode }}"
            class="flex flex-1 flex-col items-center justify-center gap-0.5 text-slate-800">
-            {% include "components/icon.html" with name="arrow-right-to-bracket" size=22 %}
+            {% include "components/icon.html" with name="arrow-right-to-bracket" size=22 only %}
             <span class="font-sans text-[10px] font-semibold leading-none">Кіру</span>
         </a>
     {% endif %}

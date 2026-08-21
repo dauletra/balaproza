@@ -27,7 +27,7 @@
 
         <button type="button" @click="open = false" aria-label="Жабу"
                 class="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-pill text-slate-500 hover:bg-slate-100">
-            {% include "components/icon.html" with name="x" size=18 %}
+            {% include "components/icon.html" with name="x" size=18 only %}
         </button>
 
         <div class="text-center">
@@ -45,7 +45,7 @@
             <a href="{% url 'core:login' %}"
                class="inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-pill font-sans text-sm font-bold text-white shadow-tg-btn hover:opacity-90"
                style="background: linear-gradient(180deg, var(--color-tg-1), var(--color-tg-2))">
-                {% include "components/icon.html" with name="telegram" size=18 %}
+                {% include "components/icon.html" with name="telegram" size=18 only %}
                 Сайтқа кіру
             </a>
 

@@ -3,11 +3,25 @@
 
     Параметры:
       icon  — thumbs-up | eye | message-caption | ...
-      value — число/строка
-      label — для aria (опц., тип «4 821 ұнату»)
+      value — число/строка для глаза (обычно через compact_count или spaced)
+      label — полная озвучка пилюли, включая число: «4 821 ұнату».
+
+    `label` обязателен везде, где пилюля несёт данные. Иконка декоративная, а
+    значение помечено aria-hidden, чтобы скринридер не читал голое число, —
+    без подписи метрика исчезала из озвучки целиком, и карточка автора
+    звучала как «Таң алдында, Жазылып жатыр, Бөлім, Басқару», без единой цифры.
+
+    Раньше подпись висела как `aria-label` на этом же <span> и всё равно не
+    доходила: у role=generic имя не выставляется. Нужен настоящий текст, он в
+    sr-only — а это position:absolute, потому на пилюле стоит `relative`
+    (см. CLAUDE.md про абсолютные элементы без позиционированного предка).
 {% endcomment %}
-<span class="inline-flex items-center gap-1.5 font-sans text-xs text-slate-600"
-      {% if label %}aria-label="{{ label }}"{% endif %}>
-    {% include "components/icon.html" with name=icon size=12 cls="text-slate-600" %}
-    <span aria-hidden="true">{{ value }}</span>
+<span class="relative inline-flex items-center gap-1.5 font-sans text-xs text-slate-600">
+    {% include "components/icon.html" with name=icon size=12 cls="text-slate-600" only %}
+    {% if label %}
+        <span aria-hidden="true">{{ value }}</span>
+        <span class="sr-only">{{ label }}</span>
+    {% else %}
+        <span>{{ value }}</span>
+    {% endif %}
 </span>

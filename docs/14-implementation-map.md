@@ -23,7 +23,7 @@
 | Фильтры | `core/templatetags/balaproza.py` | `compact_count`, `spaced`, `page_range`, `belongs_to` |
 | Шаблоны | корневая `templates/` (113 файлов) | 51 компонент · 31 партиал · 27 страниц · спрайт иконок · `base.html` · `404/500` |
 | Токены | `static_src/input.css`, блок `@theme` | Единственный источник цветов, радиусов, теней ([02](02-design-system.md)) |
-| Тесты | `core/tests/` (16 файлов, 570 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
+| Тесты | `core/tests/` (16 файлов, 587 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
 
 **Шаблоны — не в `core/templates/`, а в корневой `templates/`.** Это задано `TEMPLATES.DIRS` в `config/settings.py`.
 
@@ -175,10 +175,17 @@
 | FR-WRITE-03 | `manage_story` | `pages/write/manage_story.html` | `test_write.ManageStoryKnown`, `ManageStoryEmptyChapters` |
 | FR-WRITE-04 | `story_settings` | `pages/write/story_settings.html` | `test_write.StorySettingsForm`, `TagInputOnStorySettings` |
 | FR-WRITE-05 | `chapter_editor` | `pages/write/chapter_editor.html` | `test_write.ChapterEditorNew`, `ChapterEditorEdit` |
+| FR-WRITE-05 (вход в текст `single`) | `Story.text_chapter` | `components/my_story_row.html`, `pages/write/manage_story.html` | `test_write.SingleStoryTextButtonOpensExistingText` |
 | FR-WRITE-06 | `components/delete_confirm_modal.html` | — | — |
 | FR-WRITE-07 / BR-10, BR-11 | `Story.status` | `components/status_badge.html` | `test_write.MyStoriesAuthedHasItems` |
 
 Все страницы раздела требуют авторизации и для гостя отдают gate — закрыто `MyStoriesGuest`, `NewStoryGuestSeesGate`.
+
+Три правила, на которых кабинет уже ломался:
+
+- **«Мәтін» у одночастного ведёт в существующую главу.** Обе ветки кнопки указывали на `chapter_new`, и автор сохранял вторую главу у книги, у которой текст один. Источник истины — `Story.text_chapter`, а не `story.is_single` в шаблоне.
+- **Числа здесь через `spaced`, не `compact_count`.** Кабинет широкий, и автору нужна точная цифра по своей работе. `compact_count` остаётся читательским карточкам каталога. До этого на одном экране жили три формата одного счётчика: `1042` в строке, `2,1 мың` в полосе и `stringformat:"d"` (то есть ничего) в рейле. Закрыто `MyStoryRowMetricsAreAnnounced`.
+- **`has_right_rail` выставляется только вместе со `stats`.** Рейл писателя пуст без них, а флаг стоял безусловно — гость и неизвестный slug получали пустую колонку в 300px. Закрыто `MyStoriesGuestHasNoEmptyRail`.
 
 ## 14.7 PROF / LIB / NOTIF
 

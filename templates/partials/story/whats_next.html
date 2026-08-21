@@ -22,7 +22,7 @@
                 <a href="{% url 'core:collection_detail' slug=c.slug %}"
                    class="inline-flex min-h-11 items-center gap-2 rounded-pill px-4 py-1.5 font-sans text-[13px] font-semibold transition-transform hover:-translate-y-0.5"
                    style="background: oklch(0.95 0.05 {{ c.tint_hue }}); color: oklch(0.32 0.13 {{ c.tint_hue }}); box-shadow: inset 0 0 0 1px oklch(0.86 0.08 {{ c.tint_hue }});">
-                    {% include "components/icon.html" with name=c.icon size=14 %}
+                    {% include "components/icon.html" with name=c.icon size=14 only %}
                     {{ c.name }}
                 </a>
             {% endfor %}

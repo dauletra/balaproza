@@ -1,7 +1,14 @@
+{% load balaproza %}
 {% comment %}
     Правый рейл WRITE-страниц (docs/07.4 · «Авторский кабинет — статистика писателя»).
 
     Контекст: stats (dict из writer_stats) — может быть None для гостя.
+    View не выставляет has_right_rail без stats, так что пустой <aside>
+    на 300px больше не отъедает ширину у гостевого гейта.
+
+    Числа через `spaced`: раньше стоял `stringformat:"d"`, который ничего не
+    форматирует, — рейл показывал «2117», а полоса под шапкой на мобильном
+    «2,1 мың». Один и тот же счётчик в двух видах на одном экране.
 {% endcomment %}
 {% if stats %}
 <div class="flex flex-col gap-6">
@@ -21,11 +28,11 @@
             </div>
             <div>
                 <dt class="font-sans text-xs text-slate-500">Оқылды</dt>
-                <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.views|stringformat:"d" }}</dd>
+                <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.views|spaced }}</dd>
             </div>
             <div>
                 <dt class="font-sans text-xs text-slate-500">Ұнатулар</dt>
-                <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.likes|stringformat:"d" }}</dd>
+                <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.likes|spaced }}</dd>
             </div>
         </dl>
 
@@ -52,7 +59,7 @@
         </p>
         <a href="{% url 'core:new_story' %}"
            class="mt-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-white font-sans text-sm font-bold text-brand hover:bg-slate-50">
-            {% include "components/icon.html" with name="plus" size=16 %}
+            {% include "components/icon.html" with name="plus" size=16 only %}
             Жаңа шығарма
         </a>
     </section>

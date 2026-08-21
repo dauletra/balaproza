@@ -8,8 +8,16 @@
       label     — если задан, иконка становится <svg role="img" aria-label="…">,
                   иначе aria-hidden="true" (декоративная).
 
+    ВАЖНО: подключать ТОЛЬКО с `only`. `{% include … with %}` наследует весь
+    родительский контекст, и у вызывающего компонента `label` (текст кнопки,
+    подпись бейджа) молча утекал сюда — иконка получала role="img" с той же
+    подписью, что и стоящий рядом текст, и скринридер читал её дважды:
+    «Жаңа шығарма Жаңа шығарма». Ни один вызов в проекте не передаёт `label`
+    осознанно, так что все такие имена были результатом утечки.
+    Закрыто тестом test_template_lint.IconLabelsDoNotDuplicateText.
+
     Пример:
-      {% include "components/icon.html" with name="bell" size=22 cls="text-slate-700" %}
+      {% include "components/icon.html" with name="bell" size=22 cls="text-slate-700" only %}
 {% endcomment %}
 <svg width="{{ size|default:20 }}" height="{{ size|default:20 }}"
      class="inline-block flex-shrink-0 {{ cls }}"

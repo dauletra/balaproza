@@ -18,17 +18,17 @@
         {% elif n.kind == 'contest' %}bg-status-warning-bg text-status-warning-fg
         {% else %}bg-slate-100 text-slate-500{% endif %}">
         {% if n.kind == 'comment' %}
-            {% include "components/icon.html" with name="message-caption" size=16 %}
+            {% include "components/icon.html" with name="message-caption" size=16 only %}
         {% elif n.kind == 'like' %}
-            {% include "components/icon.html" with name="heart-filled" size=16 %}
+            {% include "components/icon.html" with name="heart-filled" size=16 only %}
         {% elif n.kind == 'new_chapter' %}
-            {% include "components/icon.html" with name="book" size=16 %}
+            {% include "components/icon.html" with name="book" size=16 only %}
         {% elif n.kind == 'follower' %}
-            {% include "components/icon.html" with name="user-circle" size=18 %}
+            {% include "components/icon.html" with name="user-circle" size=18 only %}
         {% elif n.kind == 'moderation' %}
-            {% include "components/icon.html" with name="check" size=16 %}
+            {% include "components/icon.html" with name="check" size=16 only %}
         {% elif n.kind == 'contest' %}
-            {% include "components/icon.html" with name="bookmark-filled" size=16 %}
+            {% include "components/icon.html" with name="bookmark-filled" size=16 only %}
         {% endif %}
     </span>
 

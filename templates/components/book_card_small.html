@@ -26,7 +26,7 @@
             <span class="min-w-0 truncate">{{ story.author.public_name }}</span>
             <span aria-hidden="true" class="shrink-0">·</span>
             <span class="inline-flex shrink-0 items-center gap-1">
-                {% include "components/icon.html" with name="eye" size=12 %}
+                {% include "components/icon.html" with name="eye" size=12 only %}
                 {{ story.views|compact_count }}
             </span>
         </div>

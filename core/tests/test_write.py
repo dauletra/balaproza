@@ -4,6 +4,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from core import stub_data
+from core.templatetags.balaproza import spaced
 
 
 def _login_as_aidana(client):
@@ -111,6 +112,124 @@ class MyStoriesAuthedEmpty(TestCase):
         # CTA-кнопка в empty state
         self.assertContains(self.response, 'Жаңа шығарма жазу')
         self.assertContains(self.response, reverse('core:new_story'))
+
+
+class SingleStoryTextButtonOpensExistingText(TestCase):
+    """«Мәтін» у одночастного ведёт в его главу, а не в пустой редактор.
+
+    Обе ветки кнопки указывали на `chapter_new`. У `single` глава ровно одна,
+    и автор, нажав «Мәтін», получал чистый редактор: сохранение завело бы
+    вторую главу у книги, у которой текст один по определению.
+    """
+
+    SINGLE_WITH_TEXT = 'aidana-koshe'
+    SERIAL = 'aidana-tan'
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+        self.response = self.client.get(reverse('core:my_stories'))
+
+    def _edit_url(self, slug, number):
+        return reverse('core:chapter_edit', kwargs={'slug': slug, 'chapter': number})
+
+    def _new_url(self, slug):
+        return reverse('core:chapter_new', kwargs={'slug': slug})
+
+    def test_every_single_with_text_links_to_that_chapter(self):
+        for story in stub_data.my_stories_of('aidana'):
+            if not story.text_chapter:
+                continue
+            with self.subTest(story=story.slug):
+                self.assertContains(
+                    self.response, self._edit_url(story.slug, story.text_chapter))
+                self.assertNotContains(self.response, self._new_url(story.slug))
+
+    def test_serial_still_offers_a_new_chapter(self):
+        self.assertContains(self.response, self._new_url(self.SERIAL))
+
+    def test_manage_page_edits_the_same_chapter(self):
+        response = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.SINGLE_WITH_TEXT}))
+        self.assertContains(response, self._edit_url(self.SINGLE_WITH_TEXT, 1))
+        self.assertNotContains(response, self._new_url(self.SINGLE_WITH_TEXT))
+
+
+class MyStoryRowMetricsAreAnnounced(TestCase):
+    """Метрики строки должны звучать словами (a11y).
+
+    Значение в `stat_pill` помечено aria-hidden, а иконка декоративная. Пока
+    подпись не передавалась, все четыре цифры уходили из озвучки целиком:
+    карточка читалась как «Таң алдында, Жазылып жатыр, Мәтін, Басқару».
+    """
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+        self.response = self.client.get(reverse('core:my_stories'))
+
+    def test_metrics_carry_spoken_labels(self):
+        story = stub_data.STORIES_BY_SLUG['aidana-tan']   # 1042 / 87 / 12
+        self.assertContains(self.response, f'{spaced(story.views)} оқылым')
+        self.assertContains(self.response, f'{spaced(story.likes)} ұнату')
+        self.assertContains(self.response, f'{spaced(story.comments)} пікір')
+
+    def test_labels_are_reachable_by_screen_readers(self):
+        # sr-only, а не aria-label: у <span> с role=generic имя не выставляется
+        views = spaced(stub_data.STORIES_BY_SLUG['aidana-tan'].views)
+        self.assertContains(self.response, f'class="sr-only">{views} оқылым')
+
+    def test_counts_are_exact_not_compacted(self):
+        # Авторский кабинет показывает точное число, «1,0 мың» здесь не годится
+        self.assertNotContains(self.response, '1,0 мың')
+
+
+class MyStoriesGuestHasNoEmptyRail(TestCase):
+    """Гость не должен получать пустую колонку рейла в 300px.
+
+    `has_right_rail` стоял безусловно, а `right_rail/writer.html` пуст без
+    stats — на xl рядом с гейтом висел пустой <aside>, сдвигавший его от центра.
+    """
+
+    def test_no_aside_for_guest(self):
+        response = self.client.get(reverse('core:my_stories'))
+        self.assertNotContains(response, '<aside')
+
+    def test_author_still_gets_the_rail(self):
+        _login_as_aidana(self.client)
+        response = self.client.get(reverse('core:my_stories'))
+        self.assertContains(response, '<aside')
+
+    def test_unknown_story_has_no_rail(self):
+        _login_as_aidana(self.client)
+        response = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': 'no-such-story'}))
+        self.assertContains(response, 'Шығарма табылмады')
+        self.assertNotContains(response, '<aside')
+
+
+class MyStoriesLoadingHidesRealNumbers(TestCase):
+    """DEC-17: в loading полоса статистики уступает место скелетону.
+
+    Она рендерилась выше проверки page_state, и рядом со скелетонами списка
+    стояли настоящие агрегаты — страница выглядела наполовину загруженной.
+    Считаем вхождения подписи: «Жазылушы» стоит и в полосе (xl:hidden), и в
+    правом рейле, поэтому проверяем именно исчезновение второго экземпляра.
+    """
+
+    LABEL = 'Жазылушы'
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+
+    def _count(self, url):
+        return self.client.get(url).content.decode().count(self.LABEL)
+
+    def test_stat_strip_is_replaced_by_a_skeleton(self):
+        loading = reverse('core:my_stories') + '?state=loading'
+        self.assertEqual(self._count(loading), 1)          # остался только рейл
+        self.assertContains(self.client.get(loading), 'animate-pulse')
+
+    def test_strip_returns_when_loaded(self):
+        self.assertEqual(self._count(reverse('core:my_stories')), 2)
 
 
 # ───────────────────────── New story ─────────────────────────

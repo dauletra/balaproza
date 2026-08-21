@@ -27,7 +27,7 @@
                 <span class="grid h-7 w-7 place-items-center rounded-pill"
                       style="background: oklch(0.86 0.08 {{ collection.tint_hue }}); color: oklch(0.28 0.14 {{ collection.tint_hue }});"
                       aria-hidden="true">
-                    {% include "components/icon.html" with name=collection.icon size=14 %}
+                    {% include "components/icon.html" with name=collection.icon size=14 only %}
                 </span>
                 Жинақ · {{ collection.count }} шығарма
             </p>

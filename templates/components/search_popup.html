@@ -34,7 +34,7 @@
         {# ── Поле ввода ── #}
         <form action="{% url 'core:search_results' %}" method="get"
               class="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
-            {% include "components/icon.html" with name="search" size=20 cls="text-slate-500" %}
+            {% include "components/icon.html" with name="search" size=20 cls="text-slate-500" only %}
             <input x-ref="input"
                    x-model="q"
                    type="search" name="q"

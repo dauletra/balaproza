@@ -27,7 +27,7 @@
             {% if link_href %}
                 <a href="{{ link_href }}"
                    class="group flex aspect-[2/3] w-[138px] shrink-0 self-start flex-col items-center justify-center gap-2 rounded-chip border border-dashed border-slate-300 text-center text-slate-500 transition-colors hover:border-brand hover:bg-brand/5 hover:text-brand-dark sm:w-[154px] lg:hidden">
-                    {% include "components/icon.html" with name="arrow-right" size=20 %}
+                    {% include "components/icon.html" with name="arrow-right" size=20 only %}
                     <span class="font-sans text-[13px] font-semibold">Барлығы</span>
                 </a>
             {% endif %}

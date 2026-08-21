@@ -548,11 +548,15 @@ def _current_username(request) -> str:
 def my_stories(request):
     username = _current_username(request)
     stories = stub_data.my_stories_of(username) if username else []
+    stats = stub_data.writer_stats(username) if username else None
     return render(request, 'pages/write/my_stories.html', {
-        'has_right_rail': True,
+        # Рейл писателя целиком построен на stats: без них
+        # partials/right_rail/writer.html не рендерит ничего, и гость получал
+        # пустую колонку в 300px, которая просто сдвигала гейт от центра.
+        'has_right_rail': bool(stats),
         'page_state': _page_state(request),
         'stories':    stories,
-        'stats':      stub_data.writer_stats(username) if username else None,
+        'stats':      stats,
     })
 
 
@@ -569,12 +573,15 @@ def new_story(request):
 
 def manage_story(request, slug):
     story = stub_data.STORIES_BY_SLUG.get(slug)
+    stats = stub_data.writer_stats(story.author_username) if story else None
     return render(request, 'pages/write/manage_story.html', {
-        'has_right_rail': True,
+        # То же, что в my_stories: неизвестный slug отдаёт «Шығарма табылмады»,
+        # и рядом с ним не должно висеть пустого рейла.
+        'has_right_rail': bool(stats),
         'slug':     slug,
         'story':    story,
         'chapters': stub_data.chapters_of(slug),
-        'stats':    stub_data.writer_stats(story.author_username) if story else None,
+        'stats':    stats,
     })
 
 

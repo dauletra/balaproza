@@ -29,7 +29,7 @@
                 {% csrf_token %}
                 <button type="submit"
                         class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
-                    {% include "components/icon.html" with name="check" size=14 %}
+                    {% include "components/icon.html" with name="check" size=14 only %}
                     Барлығын оқылды деп белгілеу
                 </button>
             </form>

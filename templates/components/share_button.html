@@ -48,7 +48,7 @@
     <button type="button" @click="share()" @click.outside="open = false"
             aria-label="{{ btn_label }}"
             class="inline-flex h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-50 {{ btn_cls|default:'' }}">
-        {% include "components/icon.html" with name="paper-plane" size=16 %}
+        {% include "components/icon.html" with name="paper-plane" size=16 only %}
         <span>{{ btn_label }}</span>
     </button>
 
@@ -59,18 +59,18 @@
         <a :href="tgUrl()" target="_blank" rel="noopener noreferrer"
            role="menuitem" @click="open = false"
            class="flex items-center gap-3 px-4 py-2 font-sans text-sm text-slate-800 hover:bg-slate-50">
-            {% include "components/icon.html" with name="telegram" size=16 %}
+            {% include "components/icon.html" with name="telegram" size=16 only %}
             <span>Telegram</span>
         </a>
         <a :href="waUrl()" target="_blank" rel="noopener noreferrer"
            role="menuitem" @click="open = false"
            class="flex items-center gap-3 px-4 py-2 font-sans text-sm text-slate-800 hover:bg-slate-50">
-            {% include "components/icon.html" with name="message-caption" size=16 %}
+            {% include "components/icon.html" with name="message-caption" size=16 only %}
             <span>WhatsApp</span>
         </a>
         <button type="button" @click="copy()" role="menuitem"
                 class="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-2 text-left font-sans text-sm text-slate-800 hover:bg-slate-50">
-            {% include "components/icon.html" with name="check" size=16 cls="text-slate-400" %}
+            {% include "components/icon.html" with name="check" size=16 cls="text-slate-400" only %}
             <span>Сілтемені көшіру</span>
         </button>
     </div>

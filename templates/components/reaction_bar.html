@@ -64,7 +64,7 @@
                         : 'border-slate-300 bg-white text-slate-600 hover:border-brand hover:text-brand'"
                     class="relative flex min-h-[72px] w-[88px] flex-col items-center justify-center gap-1 rounded-md border px-1 font-sans transition-colors">
                 <span class="relative grid h-6 w-6 place-items-center">
-                    {% include "components/icon.html" with name=item.reaction.icon size=20 %}
+                    {% include "components/icon.html" with name=item.reaction.icon size=20 only %}
                     <span x-show="bursting === '{{ item.reaction.slug }}'" x-cloak
                           class="absolute inset-0 animate-ping rounded-pill bg-brand opacity-40"></span>
                 </span>
