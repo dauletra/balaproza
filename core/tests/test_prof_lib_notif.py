@@ -245,8 +245,11 @@ class ProfileMeAuthed(TestCase):
     def test_about_tab_shows_bio(self):
         r = self.client.get(reverse('core:profile_me') + '?tab=about')
         self.assertContains(r, 'Жас прозаик')
-        # Стори списка не видим
-        self.assertNotContains(r, 'Таң алдында')
+        # Списка работ здесь нет. «Таң алдында» проверять нельзя: эта работа
+        # подана на конкурс и законно стоит в конкурсной истории (FR-PROF-07).
+        # Берём работу, которая никуда не подавалась.
+        self.assertNotContains(r, 'Көше әндері')
+        self.assertNotContains(r, 'my_story_row')
 
     def test_about_tab_shows_private_block_to_owner(self):
         r = self.client.get(reverse('core:profile_me') + '?tab=about')
@@ -412,6 +415,88 @@ class ProfileAchievementsRender(TestCase):
         """Дубль числа работ уже вычищали из рейла — не возвращаем его в шапку."""
         body = (TEMPLATES / 'partials' / 'profile' / '_header.html').read_text(encoding='utf-8')
         self.assertNotIn('шығарма', body)
+
+
+class ContestHistoryPrivacy(TestCase):
+    """FR-PROF-07 / BR-74a: публично — участие, не приговор."""
+
+    JURY_NOTE = 'Көлемі шарттан асып кеткен'
+
+    def test_helper_hides_note_from_strangers(self):
+        public = stub_data.contest_history('aidana')
+        mine = stub_data.contest_history('aidana', is_self=True)
+        self.assertEqual([i['note'] for i in public], ['', ''])
+        self.assertTrue(any(self.JURY_NOTE in i['note'] for i in mine))
+
+    def test_helper_hides_rejection_and_review_from_strangers(self):
+        # Публично «қаралуда» и «қабылданбады» одинаково выглядят участием,
+        # поэтому отказ нельзя ни увидеть, ни отличить от ожидания.
+        for item in stub_data.contest_history('aidana'):
+            with self.subTest(contest=item['contest'].slug):
+                self.assertIn(item['result'], ('', *stub_data.PUBLIC_CONTEST_RESULTS))
+        mine = {i['result'] for i in stub_data.contest_history('aidana', is_self=True)}
+        self.assertEqual(mine, {'reviewing', 'rejected'})
+
+    def test_winner_is_derived_from_contest_not_status(self):
+        # У dina_books заявка помечена accepted, а победа лежит в
+        # Contest.winners: без вывода из данных «Жеңімпаз» не появился бы.
+        hist = stub_data.contest_history('dina_books')
+        winners = [i for i in hist if i['result'] == 'winner']
+        self.assertEqual(len(winners), 1)
+        self.assertEqual(winners[0]['contest'].slug, 'zhas-aldym-2023')
+
+    def test_row_count_matches_the_facts_line(self):
+        """Строк столько же, сколько подач — иначе отказ считается вычитанием."""
+        for username in stub_data.SUBMISSIONS_BY_USER:
+            with self.subTest(user=username):
+                self.assertEqual(
+                    len(stub_data.contest_history(username)),
+                    len(stub_data.submissions_of(username)),
+                )
+
+    def test_newest_first(self):
+        years = [i['year'] for i in stub_data.contest_history('aidana')]
+        self.assertEqual(years, sorted(years, reverse=True))
+
+    def test_non_public_work_is_not_named_to_strangers(self):
+        # BR-73: подача на конкурс не должна раскрывать снятую с публикации
+        # работу. В фикстуре все поданные работы публичны, поэтому проверяем
+        # само правило, а не текущее совпадение данных.
+        for username in stub_data.SUBMISSIONS_BY_USER:
+            for item in stub_data.contest_history(username):
+                with self.subTest(user=username, contest=item['contest'].slug):
+                    if item['story'] is not None:
+                        self.assertTrue(item['story'].is_public)
+
+    def test_page_hides_jury_note_from_strangers(self):
+        r = self.client.get(reverse('core:profile_other', kwargs={'username': 'aidana'}) + '?tab=about')
+        self.assertContains(r, 'Байқаулар')
+        self.assertContains(r, 'Алтын қалам')
+        self.assertNotContains(r, self.JURY_NOTE)
+        self.assertNotContains(r, 'Қабылданбады')
+        self.assertNotContains(r, 'Қаралуда')
+
+    def test_page_shows_own_result_and_note(self):
+        _login_as_aidana(self.client)
+        r = self.client.get(reverse('core:profile_me') + '?tab=about')
+        self.assertContains(r, self.JURY_NOTE)
+        self.assertContains(r, 'Қабылданбады')
+        self.assertContains(r, 'Қаралуда')
+
+    def test_page_shows_winner_badge(self):
+        r = self.client.get(reverse('core:profile_other', kwargs={'username': 'dina_books'}) + '?tab=about')
+        self.assertContains(r, 'Жеңімпаз')
+        self.assertContains(r, '2023')
+
+    def test_history_empty_for_author_without_submissions(self):
+        self.assertEqual(stub_data.contest_history('aygerim_k'), [])
+        r = self.client.get(reverse('core:profile_other', kwargs={'username': 'aygerim_k'}) + '?tab=about')
+        self.assertEqual(r.context['contest_history'], [])
+        # Слово «Байқаулар» само по себе не показатель — оно есть в шапке
+        # и в подвале. Проверяем, что нет ни одного названия конкурса.
+        for c in stub_data.CONTESTS:
+            with self.subTest(contest=c.slug):
+                self.assertNotContains(r, c.name)
 
 
 class ProfileTemplatesShareParts(TestCase):

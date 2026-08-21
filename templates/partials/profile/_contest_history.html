@@ -1,0 +1,55 @@
+{% comment %}
+    Конкурсная биография автора (FR-PROF-07). Внутри вкладки «Туралы»,
+    общая для своего и чужого профиля.
+
+    Что видно постороннему, решает `stub_data.contest_history` (BR-74a), а
+    не этот шаблон: наверх поднимаются только победа и принятие, «қаралуда»
+    и «қабылданбады» публично неотличимы, комментарий жюри приходит пустым.
+    Прятать что-то ещё здесь — значит завести второе место, где живёт
+    правило приватности, и однажды разойтись с первым.
+
+    Строк ровно столько, сколько подач: число «N байқау» в шапке профиля
+    сходится со списком, и отказ нельзя вычислить вычитанием.
+
+    Контекст:
+      contest_history — stub_data.contest_history(username, is_self=...)
+{% endcomment %}
+{% if contest_history %}
+    <div class="mt-6 border-t border-slate-100 pt-5">
+        <h3 class="mb-3 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+            Байқаулар
+        </h3>
+        <ul class="flex flex-col gap-3">
+            {% for item in contest_history %}
+                <li class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span class="font-sans text-xs tabular-nums text-slate-400">{{ item.year }}</span>
+                    <a href="{% url 'core:contest_detail' slug=item.contest.slug %}"
+                       class="font-sans text-sm font-semibold text-slate-900 hover:text-brand">
+                        {{ item.contest.name }}
+                    </a>
+                    {% if item.result_label %}
+                        {% if item.result == "winner" %}
+                            {% include "components/badge.html" with kind="info" label=item.result_label icon="trophy" only %}
+                        {% elif item.result == "accepted" %}
+                            {% include "components/badge.html" with kind="published" label=item.result_label icon="check" only %}
+                        {% elif item.result == "reviewing" %}
+                            {% include "components/badge.html" with kind="attention" label=item.result_label only %}
+                        {% else %}
+                            {% include "components/badge.html" with kind="error" label=item.result_label only %}
+                        {% endif %}
+                    {% endif %}
+                    {% if item.story %}
+                        <span class="w-full font-sans text-sm text-slate-600">
+                            <a href="{% url 'core:story_detail' slug=item.story.slug %}" class="hover:text-brand hover:underline">{{ item.story.title }}</a>
+                        </span>
+                    {% endif %}
+                    {% if item.note %}
+                        <p class="w-full font-sans text-xs leading-snug text-slate-500">
+                            <span class="font-semibold">Қазылардан:</span> {{ item.note }}
+                        </p>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}

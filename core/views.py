@@ -688,6 +688,7 @@ def profile_me(request):
         'stats':           stub_data.reader_stats(username) if username else None,
         'achievements':    stub_data.achievements_of(username) if username else [],
         'contests_n':      len(stub_data.submissions_of(username)) if username else 0,
+        'contest_history': stub_data.contest_history(username, is_self=True) if username else [],
         'following':       following,
         'new_story_href':  reverse('core:new_story'),
         'catalog_href':    reverse('core:catalog'),
@@ -734,6 +735,8 @@ def profile_other(request, username):
         # выдаёт вычитанием, что какая-то заявка отклонена (BR-74a).
         'achievements':  stub_data.achievements_of(username),
         'contests_n':    len(stub_data.submissions_of(username)),
+        # is_self=False режет результат и комментарий жюри (BR-74a)
+        'contest_history': stub_data.contest_history(username),
         'following':     following,
         'is_followed':   stub_data.is_following(me, username) if me else False,
     })

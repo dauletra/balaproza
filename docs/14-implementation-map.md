@@ -201,6 +201,8 @@
 | DEC-25 (рейл по данным) | `has_right_rail = bool(...)` в обоих profile-view | `ProfileMeGuestRail`, `ProfileOtherKnown.test_guest_gets_no_empty_rail` |
 | FR-PROF-01…04 (разметка) | `partials/profile/_header.html`, `_stats.html`, `_about.html` — общие для обоих профилей | `ProfileTemplatesShareParts` |
 | BR-73 (приватные поля) | `_about.html`, блок «Тек саған көрінеді» | `ProfileOtherKnown.test_about_hides_private_fields`, `ProfileMeAuthed.test_about_tab_shows_private_block_to_owner` |
+| FR-PROF-07 / BR-74a | `stub_data.contest_history` → `partials/profile/_contest_history.html` | `ContestHistoryPrivacy` |
+| `Contest.year` | `stub_data.CONTESTS` | `test_contests.ContestYear` |
 | FR-PROF-05 | `profile_me_edit` → `/me/edit/` | `ProfileMeAuthed` |
 | FR-PROF-06 / BR-ACH-01…05 | `stub_data.achievements_of` (+ `READ_TIERS`, `tier_for`, `winning_stories_of`) | `test_stub_data.Achievements`, `ReadTiers` |
 | FR-PROF-06 (рендер) | `partials/profile/_achievements.html` + строка фактов в `_header.html` | `ProfileAchievementsRender` |

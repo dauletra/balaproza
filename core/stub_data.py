@@ -1593,6 +1593,11 @@ class Contest:
     days_left: Optional[int]     # для active
     prize_kzt: Optional[int]     # для active
     submissions: int
+    # Год проведения. Нужен конкурсной биографии автора (FR-PROF-07): там
+    # «2023» на месте, а «1 жыл бұрын» из `Submission.submitted_relative`
+    # устаревает каждый день и в списке достижений выглядит странно.
+    # Без значения по умолчанию: новый конкурс без года завести нельзя.
+    year: int
     cover: str = "img/book1.jpg"
     description: str = ""
     conditions: tuple = ()       # bullet points
@@ -1616,7 +1621,7 @@ class Contest:
 CONTESTS = [
     Contest(
         "bolashak-mektebi", "«Болашақтың мектебі»", "Оқушыларға арналған әдеби байқау",
-        status="active", days_left=12, prize_kzt=500_000, submissions=87,
+        status="active", days_left=12, prize_kzt=500_000, submissions=87, year=2026,
         cover="img/book1.jpg",
         description=(
             "Республикалық мектеп оқушыларына арналған әдеби байқау. Мақсаты — "
@@ -1641,7 +1646,7 @@ CONTESTS = [
     ),
     Contest(
         "altyn-qalam-2024", "Алтын қалам — 2024", "Жас прозаиктер байқауы",
-        status="active", days_left=14, prize_kzt=300_000, submissions=42,
+        status="active", days_left=14, prize_kzt=300_000, submissions=42, year=2024,
         cover="img/book2.jpg",
         description=(
             "Қазақ тіліндегі жас прозаиктердің ұлттық байқауы. "
@@ -1667,7 +1672,7 @@ CONTESTS = [
     ),
     Contest(
         "zhas-aldym-2023", "Жас алдым — 2023", "Жабылды",
-        status="finished", days_left=None, prize_kzt=None, submissions=156,
+        status="finished", days_left=None, prize_kzt=None, submissions=156, year=2023,
         cover="img/book3.jpg",
         description="2023 жылғы байқау аяқталды. Жеңімпаздар: «Күңгірт мырза», «Қуыршақшының ойыны».",
         # Те же две работы, что названы в description. Расхождение между
@@ -1750,6 +1755,55 @@ def submissions_of(username: str) -> list:
 def has_submission(username: str, contest_slug: str) -> bool:
     """BR-23: один автор — одна работа на конкретный конкурс."""
     return any(s.contest_slug == contest_slug for s in submissions_of(username))
+
+
+# Подписи результата — те же слова, что в «Менің өтінімдерім» (BR-41),
+# плюс «Жеңімпаз» для победы: победа выводится из `Contest.winners`,
+# отдельного статуса заявки под неё нет.
+CONTEST_RESULT_LABELS = {
+    "winner":    "Жеңімпаз",
+    "accepted":  "Қабылданды",
+    "reviewing":  "Қаралуда",
+    "rejected":  "Қабылданбады",
+}
+
+# Что из результата видит посторонний (BR-74a). Всё остальное публично
+# выглядит просто участием.
+PUBLIC_CONTEST_RESULTS = ("winner", "accepted")
+
+
+def contest_history(username: str, *, is_self: bool = False) -> list:
+    """Конкурсная биография автора (FR-PROF-07), свежие сверху.
+
+    Правило приватности (BR-74a): публично видно **участие без статуса**.
+    Наверх поднимаются только победа и принятие; «қаралуда» и
+    «қабылданбады» публично неотличимы друг от друга, и отказ поэтому
+    нельзя ни увидеть, ни вычислить сравнением с числом заявок — строк
+    столько же, сколько подач.
+
+    Комментарий жюри не покидает личный кабинет никогда: у `aidana` это
+    «Көлемі шарттан асып кеткен», и на чужом экране ему делать нечего.
+
+    Публично работа показывается только пока она публична (BR-73): подача
+    на конкурс не должна раскрывать снятое с публикации произведение.
+    """
+    out = []
+    for sub in submissions_of(username):
+        contest, story = sub.contest, sub.story
+        if not contest or not story:
+            continue
+        result = "winner" if story.slug in contest.winners else sub.status
+        if not is_self and result not in PUBLIC_CONTEST_RESULTS:
+            result = ""
+        out.append({
+            "contest":      contest,
+            "story":        story if (is_self or story.is_public) else None,
+            "year":         contest.year,
+            "result":       result,
+            "result_label": CONTEST_RESULT_LABELS.get(result, ""),
+            "note":         sub.note if is_self else "",
+        })
+    return sorted(out, key=lambda i: (-i["year"], i["contest"].name))
 
 
 def submission_checklist(story: "Story", contest: "Contest") -> list:

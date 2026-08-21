@@ -58,6 +58,8 @@ balaproza_v1/
 │   │                             # following_of, followers_of, notifications_for_user,
 │   │                             # unread_count_for_user, collections_of, trending_tags,
 │   │                             # submissions_of, has_submission,
+│   │                             # contest_history (FR-PROF-07 — правило приватности
+│   │                             # BR-74a живёт ЗДЕСЬ, не в шаблоне),
 │   │                             # submission_checklist (BR-22), eligible_for_contest,
 │   │                             # tag_by_slug, tags_of, is_blocked, popular_tags,
 │   │                             # accepted_tags_json, blocked_tag_patterns_list
@@ -85,7 +87,7 @@ balaproza_v1/
 │   ├── context_processors.py     # auth_state, nav_state, site_links
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced, page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 667 тестов в 16 файлах (см. ниже)
+│   └── tests/                    # 679 тестов в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -188,7 +190,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 667 тестов
+uv run python manage.py test core       # все 679 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 

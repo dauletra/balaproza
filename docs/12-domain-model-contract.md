@@ -101,6 +101,7 @@ Author workspace, library, social:
 Contests:
 - `submissions_of(username: str) -> list[Submission]`
 - `has_submission(username: str, contest_slug: str) -> bool`
+- `contest_history(username: str, *, is_self: bool = False) -> list[dict]` — конкурсная биография (FR-PROF-07). Правило видимости живёт здесь, а не в шаблоне (BR-74a): при `is_self=False` результат режется до победы/принятия, `note` приходит пустым, непубличная работа не называется. Второе место с тем же правилом однажды разошлось бы с первым
 - `submission_checklist(story: Story, contest: Contest) -> list`
 - `eligible_for_contest(username: str, contest_slug: str) -> list[Story]`
 
@@ -138,6 +139,7 @@ Author:
 - `works` — **производное**, как `Collection.count`: число публичных работ автора. Было хранимым литералом и врало у всех шести авторов сразу, а рендерится в шести местах, включая карточку автора на странице произведения. Черновики в него не входят (BR-10: публично не видны)
 
 Contest:
+- `year: int` — год проведения, без значения по умолчанию. Нужен конкурсной биографии: «1 жыл бұрын» из `Submission.submitted_relative` устаревает каждый день
 - `winners: tuple[str]` — слаги **произведений**-победителей, не имена авторов; автор выводится через `Story.author_username`. Второй литерал с именем разошёлся бы с первым ровно так же, как хранимый `Author.works` разошёлся с числом произведений. У active-конкурса пусто
 - `winner_stories` — производное: `Story` по слагам, неизвестные молча отбрасываются
 

@@ -449,3 +449,20 @@ class SubmissionIntegrity(TestCase):
             slugs = [s.contest_slug for s in subs]
             with self.subTest(user=username):
                 self.assertEqual(len(slugs), len(set(slugs)))
+
+
+class ContestYear(TestCase):
+
+    def test_every_contest_has_a_year(self):
+        for c in stub_data.CONTESTS:
+            with self.subTest(contest=c.slug):
+                self.assertGreater(c.year, 2000)
+
+    def test_year_matches_slug_when_slug_carries_one(self):
+        """«altyn-qalam-2024» с годом 2023 — расхождение, которое видит читатель."""
+        import re
+        for c in stub_data.CONTESTS:
+            m = re.search(r'-(\d{4})$', c.slug)
+            if m:
+                with self.subTest(contest=c.slug):
+                    self.assertEqual(c.year, int(m.group(1)))
