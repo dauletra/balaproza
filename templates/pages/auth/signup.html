@@ -14,7 +14,7 @@
         </p>
     </header>
 
-    <form method="post" action="{% url 'core:signup' %}"
+    <form method="post" action="{% url 'core:signup' %}" x-data
           @submit.prevent="$dispatch('toast', { kind:'success', text:'Тіркеуің қабылданды (демо)' });
                            setTimeout(()=>$el.submit(), 250)"
           class="flex flex-col gap-6 rounded-hero border border-slate-200 bg-white p-6 sm:p-8">

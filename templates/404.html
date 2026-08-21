@@ -22,7 +22,7 @@
         {% include "components/button.html" with kind="secondary" label="Оқу" icon="book" href=cat_href %}
     </div>
 
-    <button type="button" @click="$dispatch('open-search')"
+    <button type="button" x-data @click="$dispatch('open-search')"
             class="mt-1 inline-flex items-center gap-1.5 font-sans text-sm font-semibold text-brand hover:underline">
         {% include "components/icon.html" with name="search" size=14 %}
         Іздеу ашу

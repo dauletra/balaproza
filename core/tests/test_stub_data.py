@@ -212,3 +212,16 @@ class TrendingTagsShowMovementNotArchive(unittest.TestCase):
             [t.slug for t in stub_data.trending_tags(6)],
             [t.slug for t in stub_data.popular_tags(6)],
         )
+
+
+class RecentViewsAreConsistent(unittest.TestCase):
+    """Окно в 14 дней — подмножество накопленного (DEC-36).
+
+    `recent_views > views` означало бы, что за две недели прочитали больше,
+    чем за всё время. В стабе это опечатка, после Ф14 — сломанный агрегат.
+    """
+
+    def test_recent_never_exceeds_total(self):
+        for s in stub_data.STORIES:
+            with self.subTest(story=s.slug):
+                self.assertLessEqual(s.recent_views, s.views)

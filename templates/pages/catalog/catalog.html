@@ -7,11 +7,14 @@
       mode              — 'search' | 'genre' | 'tag' | 'catalog'
       results           — list of Story (после filter_catalog)
       query             — текущий ?q=
-      sort, status      — текущие фильтры
-      sorts, statuses   — справочники
-      genres            — список Genre (для chip-cloud в panel)
-      current_genre_slug — slug активного жанра (для genre-mode и chip-выделения)
+      sort, sort_label  — текущая сортировка и её подпись
+      filter_groups     — пять осей сүзгі для панели
+      genre_options / tag_options — ссылки жанров и тегов с сохранением состояния
+      active_chips      — включённые оси, каждая со ссылкой «снять именно эту»
+      active_count      — сколько осей включено (бейдж на кнопке)
+      clear_href        — сброс сүзгі без выхода из раздела
       genre             — Genre-объект (только в genre-mode)
+      not_found_slug    — slug несуществующего жанра/тега (для error-блока)
       empty_title/text  — кастомные сообщения empty-state (опц.)
 {% endcomment %}
 
@@ -23,19 +26,19 @@
 
     {# Error-state: неизвестный жанр — рендерим только error-блок, без списка/контролов #}
     {% if mode == 'genre' and not genre %}
-        <div class="rounded-lg border border-slate-200 bg-white p-10 text-center">
+        <div class="rounded-lg border border-slate-200 bg-white p-6 text-center sm:p-10">
             <h1 class="font-display text-2xl font-bold text-slate-900">Жанр табылмады</h1>
-            <p class="mt-2 font-sans text-sm text-slate-600">Slug: <code>{{ current_genre_slug }}</code></p>
+            <p class="mt-2 font-sans text-sm text-slate-600">Slug: <code>{{ not_found_slug }}</code></p>
             <a href="{% url 'core:genre_index' %}" class="mt-4 inline-block font-sans text-sm font-semibold text-brand hover:underline">
                 ← Барлық жанрлар
             </a>
         </div>
         {% include "partials/catalog/_filter_sheet.html" %}
     {% elif mode == 'tag' and not current_tag %}
-        <div class="rounded-lg border border-slate-200 bg-white p-10 text-center">
+        <div class="rounded-lg border border-slate-200 bg-white p-6 text-center sm:p-10">
             <h1 class="font-display text-2xl font-bold text-slate-900">Тег табылмады</h1>
             <p class="mt-2 font-sans text-sm text-slate-600">
-                Slug: <code>{{ current_tag_slug }}</code>. Мүмкін, әлі модерациядан өтпеген.
+                Slug: <code>{{ not_found_slug }}</code>. Мүмкін, әлі модерациядан өтпеген.
             </p>
             <a href="{% url 'core:catalog' %}" class="mt-4 inline-block font-sans text-sm font-semibold text-brand hover:underline">
                 ← Каталогқа
@@ -55,34 +58,97 @@
         {% include "partials/catalog/_hero_catalog.html" %}
     {% endif %}
 
-    {# ── Mobile: trigger «Сүзгілер» + счётчик ── #}
-    <div class="mb-4 flex items-center justify-between gap-3 xl:hidden">
-        <button type="button"
+    {% comment %}
+        Пресеты «Не оқимын?» (docs/13 §13.6) — готовые ответы на вопрос
+        состояния, а не набор атрибутов. Стоят в контенте, а не внутри панели
+        сүзгі: на телефоне панель живёт за модалкой, и главный вход в чтение
+        оказался бы спрятан под кнопкой. Счётчик у каждого настоящий — чип,
+        ведущий в пустоту, хуже отсутствующего чипа.
+    {% endcomment %}
+    {% if presets %}
+        <div class="mb-4 flex flex-wrap gap-1.5">
+            {% for p in presets %}
+                <a href="{{ p.href }}"
+                   {% if p.active %}aria-current="true"{% endif %}
+                   class="inline-flex min-h-9 items-center gap-1.5 rounded-pill border px-3.5 font-sans text-[13px] transition-colors {% if p.active %}border-brand bg-brand font-bold text-white{% else %}border-slate-200 bg-white font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50{% endif %}">
+                    {{ p.label }}
+                    <span class="{% if p.active %}text-white/70{% else %}text-slate-400{% endif %}">{{ p.count }}</span>
+                    {% if p.active %}{% include "components/icon.html" with name="x" size=12 %}{% endif %}
+                </a>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% comment %}
+        Mobile: липкая панель управления. Раньше кнопка сүзгі и счётчик стояли
+        статично и уезжали после первой же карточки — сменить сортировку значило
+        проскроллить наверх и обратно. Сортировка вынесена в саму панель: это
+        самая частая ось, и прятать её за модалкой стоило двух тапов и загрузки.
+        top-16 — высота липкой шапки, z ниже её z-30.
+    {% endcomment %}
+    <div class="sticky top-16 z-20 -mx-4 mb-4 flex items-center gap-2 border-b border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 xl:hidden">
+        <span class="shrink-0 font-sans text-xs text-slate-500">{{ results|length }} шығарма</span>
+
+        <form method="get" x-data class="ml-auto flex min-w-0 items-center">
+            {% if mode != 'genre' and current_genre_slug %}<input type="hidden" name="genre" value="{{ current_genre_slug }}">{% endif %}
+            {% if mode != 'tag' and current_tag_slug %}<input type="hidden" name="tag" value="{{ current_tag_slug }}">{% endif %}
+            <input type="hidden" name="q" value="{{ query }}">
+            <input type="hidden" name="status" value="{{ status }}">
+            <input type="hidden" name="format" value="{{ format }}">
+            <input type="hidden" name="audience" value="{{ audience }}">
+            <input type="hidden" name="length" value="{{ length }}">
+            <label for="sort-mobile" class="sr-only">Сұрыптау</label>
+            <select id="sort-mobile" name="sort" @change="$el.form.requestSubmit()"
+                    class="h-10 max-w-[150px] truncate rounded-pill border border-slate-300 bg-white px-3 font-sans text-[13px] font-semibold text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30">
+                {% for key, label in sorts %}
+                    <option value="{{ key }}" {% if sort == key %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <noscript><button type="submit" class="ml-1.5 h-10 rounded-pill bg-brand px-3 font-sans text-xs font-bold text-white">OK</button></noscript>
+        </form>
+
+        <button type="button" x-data
                 @click="$dispatch('open-catalog-filters')"
-                class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                class="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-pill border border-slate-300 bg-white px-3.5 font-sans text-[13px] font-semibold text-slate-700 hover:bg-slate-50">
             {% include "components/icon.html" with name="adjustments" size=16 cls="text-slate-500" %}
-            Сүзгілер
-            {% if query or status or audience or length or format or current_genre_slug or current_tag_slug or sort != 'popularity' %}
-                <span aria-hidden="true" class="grid h-2 w-2 place-items-center rounded-pill bg-brand"></span>
+            Сүзгі
+            {% if active_count %}
+                <span class="grid h-5 min-w-5 place-items-center rounded-pill bg-brand px-1 font-sans text-[11px] font-bold text-white">{{ active_count }}</span>
             {% endif %}
         </button>
-        <span class="font-sans text-xs text-slate-500">
-            {{ results|length }} шығарма
-        </span>
     </div>
 
     {# ── Desktop: счётчик результатов + текущая сортировка-метка над списком ── #}
-    <div class="mb-4 hidden items-baseline justify-between border-b border-slate-200 pb-3 lg:flex">
-        <span class="font-sans text-sm text-slate-600">
-            {{ results|length }} шығарма
-        </span>
-        <span class="font-sans text-xs text-slate-500">
-            {% for key, label in sorts %}{% if key == sort %}Сұрыпталу: {{ label }}{% endif %}{% endfor %}
-        </span>
+    <div class="mb-4 hidden items-baseline justify-between border-b border-slate-200 pb-3 xl:flex">
+        <span class="font-sans text-sm text-slate-600">{{ results|length }} шығарма</span>
+        <span class="font-sans text-xs text-slate-500">Сұрыпталу: {{ sort_label }}</span>
     </div>
 
+    {% comment %}
+        Активные сүзгі отдельным рядом: снять одну ось, не открывая панель.
+        Раньше единственным способом был «Тазалау», сносивший всё разом, —
+        а на мобильном ещё и спрятанный за модалкой.
+    {% endcomment %}
+    {% if active_chips %}
+        <div class="mb-4 flex flex-wrap items-center gap-1.5">
+            {% for chip in active_chips %}
+                <a href="{{ chip.href }}"
+                   class="inline-flex min-h-9 items-center gap-1.5 rounded-pill border px-3 font-sans text-[13px] font-semibold{% if not chip.hue %} border-slate-300 bg-white text-slate-700 hover:bg-slate-50{% endif %}"
+                   {% if chip.hue %}style="border-color: oklch(0.86 0.08 {{ chip.hue }}); background: oklch(0.96 0.04 {{ chip.hue }}); color: oklch(0.38 0.14 {{ chip.hue }});"{% endif %}>
+                    <span>{{ chip.label }}</span>
+                    {% include "components/icon.html" with name="x" size=12 %}
+                </a>
+            {% endfor %}
+            {% if active_count > 1 %}
+                <a href="{{ clear_href }}" class="ml-1 inline-flex min-h-9 items-center font-sans text-[13px] font-semibold text-brand hover:text-brand-dark">
+                    Тазалау
+                </a>
+            {% endif %}
+        </div>
+    {% endif %}
+
     {# ── Список + empty state ── #}
-    {% include "partials/catalog/_book_list.html" with results=results empty_title=empty_title empty_text=empty_text %}
+    {% include "partials/catalog/_book_list.html" with results=results empty_title=empty_title empty_text=empty_text empty_collections=rail_collections %}
 
     {# ── Mobile bottom-sheet с тем же filter_panel ── #}
     {% include "partials/catalog/_filter_sheet.html" %}

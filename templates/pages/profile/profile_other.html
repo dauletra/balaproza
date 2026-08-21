@@ -32,7 +32,7 @@
                     Жазылу
                 </a>
             {% elif is_followed %}
-                <form method="post" action="#"
+                <form method="post" action="#" x-data
                       @submit.prevent="$dispatch('toast', { kind:'success', text:'Жазылудан бас тарттың (демо)' })">
                     {% csrf_token %}
                     <button type="submit"
@@ -42,7 +42,7 @@
                     </button>
                 </form>
             {% else %}
-                <form method="post" action="#"
+                <form method="post" action="#" x-data
                       @submit.prevent="$dispatch('toast', { kind:'success', text:'Жазылдың (демо)' })">
                     {% csrf_token %}
                     <button type="submit"

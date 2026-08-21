@@ -388,11 +388,16 @@ class TagPageOpensWithMovement(TestCase):
             reverse('core:tag_detail', kwargs={'slug': 'mektep'}) + '?sort=popularity')
         self.assertEqual(r.context['sort'], 'popularity')
 
-    def test_other_modes_keep_popularity(self):
-        r = self.client.get(reverse('core:catalog'))
-        self.assertEqual(r.context['sort'], 'popularity')
-        r = self.client.get(reverse('core:genre_detail', kwargs={'slug': 'triller'}))
-        self.assertEqual(r.context['sort'], 'popularity')
+    def test_other_modes_open_with_trending(self):
+        """DEC-36 отменяет `popularity` как дефолт: каталог, жанр и поиск
+        открываются окном в 14 дней. Тег при этом остаётся на «Жаңалары» —
+        DEC-31 не отменён, свежесть там ценна сама по себе."""
+        for name, kwargs in (('core:catalog', {}),
+                             ('core:genre_detail', {'slug': 'triller'}),
+                             ('core:search_results', {})):
+            with self.subTest(route=name):
+                r = self.client.get(reverse(name, kwargs=kwargs))
+                self.assertEqual(r.context['sort'], 'trending')
 
 
 class CollectionsAreAdminOnly(TestCase):
@@ -417,3 +422,348 @@ class CollectionsAreAdminOnly(TestCase):
         for c in stub_data.COLLECTIONS:
             with self.subTest(collection=c.slug):
                 self.assertContains(r, f'{c.count} шығарма')
+
+
+# ───────── Каталог: состояние сүзгі не теряется при переходах (DEC-27) ─────────
+
+class CatalogStateIsCarried(TestCase):
+    """Чипы жанра и тега вели на голый путь и молча сбрасывали остальные оси.
+
+    Человек ставил «14+» и «көп бөлімді», тыкал в жанр — и обе оси исчезали
+    без единого следа в интерфейсе.
+    """
+
+    def test_genre_link_keeps_other_axes(self):
+        r = self.client.get(reverse('core:catalog') + '?audience=14%2B&format=serial')
+        href = next(o['href'] for o in r.context['genre_options']
+                    if o['genre'].slug == 'triller')
+        self.assertIn('/genres/triller/', href)
+        self.assertIn('audience=14%2B', href)
+        self.assertIn('format=serial', href)
+
+    def test_tag_link_keeps_other_axes(self):
+        r = self.client.get(reverse('core:catalog') + '?audience=14%2B')
+        href = next(o['href'] for o in r.context['tag_options']
+                    if o['tag'].slug == 'mektep')
+        self.assertIn('/tag/mektep/', href)
+        self.assertIn('audience=14%2B', href)
+
+    def test_tag_link_does_not_drag_popularity_along(self):
+        """DEC-31: тег открывается «жаңалары» вперёд. Неявная сортировка
+        каталога не должна ехать в ссылку и отменять это."""
+        r = self.client.get(reverse('core:catalog'))
+        href = next(o['href'] for o in r.context['tag_options']
+                    if o['tag'].slug == 'mektep')
+        self.assertNotIn('sort=', href)
+
+    def test_explicit_sort_does_travel(self):
+        r = self.client.get(reverse('core:catalog') + '?sort=alphabet')
+        href = next(o['href'] for o in r.context['genre_options']
+                    if o['genre'].slug == 'triller')
+        self.assertIn('sort=alphabet', href)
+
+    def test_active_genre_link_removes_only_genre(self):
+        r = self.client.get(reverse('core:genre_detail',
+                                    kwargs={'slug': 'triller'}) + '?audience=14%2B')
+        href = next(o['href'] for o in r.context['genre_options']
+                    if o['genre'].slug == 'triller')
+        self.assertNotIn('/genres/', href)
+        self.assertIn('audience=14%2B', href)
+
+    def test_clear_stays_inside_the_section(self):
+        """«Тазалау» снимает сүзгі, но не выкидывает из жанра."""
+        r = self.client.get(reverse('core:genre_detail',
+                                    kwargs={'slug': 'triller'}) + '?audience=14%2B')
+        self.assertEqual(r.context['clear_href'],
+                         reverse('core:genre_detail', kwargs={'slug': 'triller'}))
+
+    def test_clear_on_plain_catalog_resets_everything(self):
+        r = self.client.get(reverse('core:catalog') + '?audience=14%2B')
+        self.assertEqual(r.context['clear_href'], reverse('core:catalog'))
+
+
+class CatalogSecondAxisFromQuery(TestCase):
+    """DEC-27 обещал `/genres/triller/?tag=mektep`, но view параметр не читал."""
+
+    def test_tag_query_narrows_a_genre_page(self):
+        base = reverse('core:genre_detail', kwargs={'slug': 'fantezi'})
+        wide = self.client.get(base)
+        narrow = self.client.get(base + '?tag=mektep')
+        self.assertLess(len(narrow.context['results']), len(wide.context['results']))
+        for s in narrow.context['results']:
+            self.assertIn('fantezi', s.genres)
+            self.assertIn('mektep', s.tags)
+
+    def test_genre_query_narrows_the_catalog(self):
+        r = self.client.get(reverse('core:catalog') + '?genre=triller')
+        self.assertGreater(len(r.context['results']), 0)
+        for s in r.context['results']:
+            self.assertIn('triller', s.genres)
+
+    def test_path_wins_over_query(self):
+        r = self.client.get(reverse('core:genre_detail',
+                                    kwargs={'slug': 'triller'}) + '?genre=fantezi')
+        for s in r.context['results']:
+            self.assertIn('triller', s.genres)
+
+    def test_unknown_query_axis_is_ignored(self):
+        plain = self.client.get(reverse('core:catalog'))
+        junk = self.client.get(reverse('core:catalog') + '?genre=no-such&tag=no-such')
+        self.assertEqual(len(junk.context['results']), len(plain.context['results']))
+
+    def test_pending_tag_in_query_is_ignored(self):
+        """BR-TAG-07 действует и для query-оси."""
+        plain = self.client.get(reverse('core:catalog'))
+        r = self.client.get(reverse('core:catalog') + '?tag=basqa-alem')
+        self.assertEqual(len(r.context['results']), len(plain.context['results']))
+
+
+class CatalogActiveChips(TestCase):
+    """Снять одну ось можно, не открывая панель: раньше был только «Тазалау»."""
+
+    def test_each_active_axis_gets_a_chip(self):
+        r = self.client.get(reverse('core:genre_detail', kwargs={'slug': 'triller'})
+                            + '?audience=14%2B&length=short')
+        labels = [c['label'] for c in r.context['active_chips']]
+        self.assertIn('Триллер', labels)
+        self.assertIn('14+', labels)
+        self.assertIn('15 минутқа дейін', labels)
+        self.assertEqual(r.context['active_count'], 3)
+
+    def test_chip_href_drops_only_its_own_axis(self):
+        r = self.client.get(reverse('core:catalog') + '?audience=14%2B&format=serial')
+        href = next(c['href'] for c in r.context['active_chips'] if c['label'] == '14+')
+        self.assertNotIn('audience=', href)
+        self.assertIn('format=serial', href)
+
+    def test_no_chips_on_a_bare_catalog(self):
+        r = self.client.get(reverse('core:catalog'))
+        self.assertEqual(r.context['active_chips'], [])
+        self.assertEqual(r.context['active_count'], 0)
+
+
+class CatalogMobileControls(TestCase):
+    """Мобильная панель управления: сортировка снаружи, сүзгі — черновиком."""
+
+    def setUp(self):
+        self.response = self.client.get(reverse('core:catalog'))
+
+    def test_control_bar_is_sticky(self):
+        """Статичная панель уезжала после первой же карточки."""
+        self.assertContains(self.response, 'sticky top-16')
+
+    def test_sort_is_reachable_without_opening_the_sheet(self):
+        self.assertContains(self.response, 'id="sort-mobile"')
+
+    def test_filter_button_shows_how_many_axes_are_on(self):
+        r = self.client.get(reverse('core:catalog') + '?audience=14%2B&format=serial')
+        self.assertEqual(r.context['active_count'], 2)
+        self.assertContains(r, '>2</span>')
+
+    def test_sheet_batches_instead_of_autosubmitting(self):
+        """Автосабмит остался только в рейле: в модалке каждый тап уносил
+        страницу вместе с самим листом."""
+        body = self.response.content.decode()
+        self.assertEqual(body.count('$el.requestSubmit()'), 1)
+        self.assertIn('Нәтижелерді көрсету', body)
+
+    def test_filter_options_are_tappable(self):
+        """У 14px радиокнопки реальная цель была ~20px."""
+        self.assertContains(self.response, 'min-h-11')
+
+
+class BookCardWideOnMobile(TestCase):
+    """Карточка списка не имела ни одного брейкпоинта: на 375px её колонка
+    контента сжималась до 171px и разворачивалась в ~430px высоты."""
+
+    def setUp(self):
+        self.response = self.client.get(reverse('core:catalog'))
+
+    def test_cover_shrinks_below_sm(self):
+        self.assertContains(self.response, 'h-[132px] w-[88px] sm:h-[180px] sm:w-[120px]')
+
+    def test_annotation_is_two_lines_on_phone(self):
+        self.assertContains(self.response, 'line-clamp-2')
+        self.assertContains(self.response, 'sm:line-clamp-4')
+
+    def test_counters_are_compact(self):
+        """«12 482» в три пилюли подряд не вставало в строку (docs/16 §16.7 п.6)."""
+        self.assertContains(self.response, '12 мың')
+
+    def test_tags_stay_in_html_but_hide_below_sm(self):
+        """Теги не выбрасываем — прячем стилем: жанр в мета-строке уже
+        несёт таксономию, а переход по тегу с карточки нужен на десктопе."""
+        self.assertContains(self.response, 'hidden sm:block')
+        self.assertContains(self.response, 'арман')
+
+
+# ───────── DEC-36: окно в 14 дней как дефолт каталога ─────────
+
+class TrendingIsTheDefaultSort(TestCase):
+    """Дефолтом была накопленная популярность — то есть рейтинг просмотров.
+
+    [13 §13.2](docs) определяет Wattpad-культуру как «популярность важнее
+    качества» и противопоставляет ей свою, а первую страницу каталога
+    навсегда занимали несколько старых хитов. Окно в 14 дней показывает,
+    что читают сейчас, и пускает наверх работы, которые только набирают.
+    """
+
+    def test_catalog_opens_with_trending(self):
+        r = self.client.get(reverse('core:catalog'))
+        self.assertEqual(r.context['sort'], 'trending')
+        self.assertEqual(r.context['sort_label'], 'Қазір танымал')
+
+    def test_trending_orders_by_the_two_week_window(self):
+        r = self.client.get(reverse('core:catalog'))
+        views = [s.recent_views for s in r.context['results']]
+        self.assertEqual(views, sorted(views, reverse=True))
+
+    def test_trending_is_not_the_same_order_as_all_time(self):
+        """Если порядки совпадают, ось ничего не добавляет — и стаб врёт."""
+        trending = self.client.get(reverse('core:catalog'))
+        alltime = self.client.get(reverse('core:catalog') + '?sort=popularity')
+        self.assertNotEqual([s.slug for s in trending.context['results']][:5],
+                            [s.slug for s in alltime.context['results']][:5])
+
+    def test_all_time_popularity_is_still_available(self):
+        r = self.client.get(reverse('core:catalog') + '?sort=popularity')
+        views = [s.views for s in r.context['results']]
+        self.assertEqual(views, sorted(views, reverse=True))
+
+    def test_tag_page_is_untouched_by_dec_34(self):
+        """DEC-31 не отменён: у тега ценна свежесть, а не набранные просмотры."""
+        r = self.client.get(reverse('core:tag_detail', kwargs={'slug': 'mektep'}))
+        self.assertEqual(r.context['sort'], 'recent')
+
+    def test_default_sort_is_absent_from_generated_links(self):
+        r = self.client.get(reverse('core:catalog'))
+        href = next(o['href'] for o in r.context['genre_options']
+                    if o['genre'].slug == 'triller')
+        self.assertNotIn('sort=', href)
+
+
+class QualityBadgeAxis(TestCase):
+    """«Редакция таңдауы» — знак качества платформы ([13 §13.7](docs)), а не
+    просмотры. До этой оси он был неотличимой подписью на карточке: увидеть
+    подборку отмеченных работ было нельзя."""
+
+    def test_editorial_badge_filters(self):
+        r = self.client.get(reverse('core:catalog') + '?badge=editorial')
+        self.assertGreater(len(r.context['results']), 0)
+        for s in r.context['results']:
+            self.assertIn('Редакция таңдауы', s.badges)
+
+    def test_contest_badge_filters(self):
+        r = self.client.get(reverse('core:catalog') + '?badge=contest')
+        self.assertGreater(len(r.context['results']), 0)
+        for s in r.context['results']:
+            self.assertIn('Байқауға қатысады', s.badges)
+
+    def test_unknown_badge_is_ignored_not_fatal(self):
+        plain = self.client.get(reverse('core:catalog'))
+        junk = self.client.get(reverse('core:catalog') + '?badge=no-such')
+        self.assertEqual(junk.status_code, 200)
+        self.assertEqual(len(junk.context['results']), len(plain.context['results']))
+
+    def test_badge_is_an_axis_in_the_filter_panel(self):
+        r = self.client.get(reverse('core:catalog'))
+        names = [g['name'] for g in r.context['filter_groups']]
+        self.assertIn('badge', names)
+
+    def test_badge_combines_with_genre(self):
+        out = stub_data.filter_catalog(genre='fantastika', badge='editorial')
+        for s in out:
+            self.assertIn('fantastika', s.genres)
+            self.assertIn('Редакция таңдауы', s.badges)
+
+
+class CatalogPresets(TestCase):
+    """Пресеты «Не оқимын?» — комбинация осей одним тапом ([13 §13.6](docs)).
+
+    `single + short` §13.11 называет быстрым чтением дословно, но собрать её
+    в панели значило два тапа в двух разных группах.
+    """
+
+    def test_preset_expands_into_its_filter_combination(self):
+        r = self.client.get(reverse('core:catalog'))
+        href = next(p['href'] for p in r.context['presets']
+                    if p['slug'] == 'bir-otyrysta')
+        self.assertIn('format=single', href)
+        self.assertIn('length=short', href)
+
+    def test_counts_are_real(self):
+        r = self.client.get(reverse('core:catalog'))
+        for p in r.context['presets']:
+            with self.subTest(preset=p['slug']):
+                target = self.client.get(p['href'])
+                self.assertEqual(p['count'], len(target.context['results']))
+
+    def test_empty_presets_are_not_offered(self):
+        """Чип, ведущий в пустоту, хуже отсутствующего чипа."""
+        r = self.client.get(reverse('core:catalog'))
+        for p in r.context['presets']:
+            self.assertGreater(p['count'], 0)
+
+    def test_counts_are_scoped_to_the_current_section(self):
+        wide = self.client.get(reverse('core:catalog'))
+        narrow = self.client.get(reverse('core:genre_detail', kwargs={'slug': 'erteg'}))
+        wide_count = next(p['count'] for p in wide.context['presets']
+                          if p['slug'] == 'bir-otyrysta')
+        narrow_count = next(p['count'] for p in narrow.context['presets']
+                            if p['slug'] == 'bir-otyrysta')
+        self.assertLess(narrow_count, wide_count)
+
+    def test_active_preset_is_marked_and_clears_on_second_tap(self):
+        r = self.client.get(reverse('core:catalog') + '?format=single&length=short')
+        active = [p for p in r.context['presets'] if p['active']]
+        self.assertEqual([p['slug'] for p in active], ['bir-otyrysta'])
+        self.assertEqual(active[0]['href'], reverse('core:catalog'))
+
+    def test_active_preset_absorbs_its_axis_chips(self):
+        """Пресет и рядом чипы его же осей — один выбор, показанный трижды."""
+        r = self.client.get(reverse('core:catalog') + '?format=single&length=short')
+        labels = [c['label'] for c in r.context['active_chips']]
+        self.assertNotIn('Бір бөлімді', labels)
+        self.assertNotIn('15 минутқа дейін', labels)
+
+    def test_badge_on_the_button_still_counts_real_axes(self):
+        """Внутри панели обе оси отмечены — число обязано совпадать."""
+        r = self.client.get(reverse('core:catalog') + '?format=single&length=short')
+        self.assertEqual(r.context['active_count'], 2)
+
+
+class DraftsAndModerationStayOutOfTheCatalog(TestCase):
+    """DEC-23: в публичный каталог работа попадает только после модерации.
+
+    `filter_catalog` стартовала с полного списка STORIES, и «Модерацияда»
+    лежала в открытом каталоге наравне с опубликованными.
+    """
+
+    def test_on_moderation_is_not_public(self):
+        r = self.client.get(reverse('core:catalog'))
+        self.assertNotIn('aidana-erteg', [s.slug for s in r.context['results']])
+
+    def test_only_public_statuses_survive_the_pipeline(self):
+        for s in stub_data.filter_catalog():
+            self.assertIn(s.status, stub_data.PUBLIC_STATUSES)
+
+    def test_search_does_not_leak_unmoderated_work(self):
+        hidden = stub_data.STORIES_BY_SLUG['aidana-erteg']
+        r = self.client.get(reverse('core:search_results') + '?q=' + hidden.title[:6])
+        self.assertNotIn('aidana-erteg', [s.slug for s in r.context['results']])
+
+
+class EmptyCatalogOffersAWayOut(TestCase):
+    """Пустой экран был тупиком: «поменяй сүзгі» — и всё. Жинақтар отвечают
+    на «зачем читать сейчас» (DEC-31) — ровно то, чего ждёт человек с
+    несложившимся запросом."""
+
+    def test_empty_result_shows_collections(self):
+        r = self.client.get(reverse('core:search_results') + '?q=zzzzqqq')
+        self.assertEqual(len(r.context['results']), 0)
+        self.assertContains(r, 'Мүмкін, мынау қызық болар')
+        self.assertContains(r, stub_data.COLLECTIONS[0].name)
+
+    def test_rail_offers_collections_too(self):
+        r = self.client.get(reverse('core:catalog'))
+        self.assertContains(r, 'Редакция жинақтары')

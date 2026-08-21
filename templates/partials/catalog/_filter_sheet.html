@@ -3,8 +3,12 @@
     Открывается событием 'open-catalog-filters' (window dispatch).
     Виден до xl — с xl фильтры живут в правом рейле.
 
-    UX: change в radio → form submit → navigate с новыми query → sheet исчезает
-    вместе со старым DOM. Никакого «применить» — изменения применяются мгновенно.
+    UX: внутри листа сүзгі копятся черновиком, применяет их кнопка «Нәтижелерді
+    көрсету» внизу. Автосабмит по change остался только в рейле: в модалке он
+    означал навигацию после каждого тапа, а вместе с навигацией пропадал и сам
+    лист — выбрать две оси стоило двух перезагрузок и двух открытий.
+    Жанр и тег остались ссылками: это разделы с каноническим URL, и теперь они
+    несут остальные сүзгі с собой.
 {% endcomment %}
 <div x-data="{ open: false }"
      @open-catalog-filters.window="open = true"
@@ -44,7 +48,7 @@
         <div aria-hidden="true" class="mx-auto mt-1.5 h-1 w-10 rounded-pill bg-slate-200"></div>
 
         <div class="px-5 pt-3 pb-6">
-            {% include "partials/catalog/_filter_panel.html" %}
+            {% include "partials/catalog/_filter_panel.html" with variant="sheet" %}
         </div>
     </div>
 </div>

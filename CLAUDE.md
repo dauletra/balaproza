@@ -56,12 +56,19 @@ balaproza_v1/
 │   │                             # submission_checklist (BR-22), eligible_for_contest,
 │   │                             # tag_by_slug, tags_of, is_blocked, popular_tags,
 │   │                             # accepted_tags_json, blocked_tag_patterns_list
-│   │                             # + константы: CATALOG_SORTS, CATALOG_STATUS_FILTERS,
+│   │                             # + константы: CATALOG_SORTS, CATALOG_DEFAULT_SORT,
+│   │                             # CATALOG_STATUS_FILTERS, CATALOG_BADGE_FILTERS,
+│   │                             # CATALOG_PRESETS, STORY_BADGES, PUBLIC_STATUSES,
 │   │                             # TAGS, TAGS_BY_SLUG, BLOCKED_TAG_PATTERNS
+│   │                             # Story.recent_views — просмотры за 14 дней (DEC-36),
+│   │                             # ось «Қазір танымал»; инвариант recent_views <= views
 │   ├── views.py                  # все view (тонкие, читают из stub_data)
 │   │                             # + legal_* (5 stub-страниц), profile_me_edit (stub-форма),
 │   │                             # search_index_json (lazy-fetch для popup, включает теги),
 │   │                             # _render_catalog (общий движок DEC-27) + тонкие обёртки
+│   │                             # + _catalog_href / _catalog_links (FR-CAT-08 — URL
+│   │                             #   с сохранением состояния, чипы активных осей)
+│   │                             # + _catalog_presets (FR-CAT-10), _catalog_default_sort
 │   │                             # search_results / catalog / genre_detail / tag_detail
 │   ├── urls.py                   # все маршруты, app_name='core'
 │   │                             # + /catalog/, /tag/<slug>/, /api/search-index.json,
@@ -69,7 +76,7 @@ balaproza_v1/
 │   ├── context_processors.py     # auth_state, nav_state, site_links
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced, page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 492 тестов в 16 файлах (см. ниже)
+│   └── tests/                    # 541 тестов в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -96,7 +103,8 @@ balaproza_v1/
 │   │                             # home/*.html (hero_guest, hero_returning, book_of_week,
 │   │                             # book_row, collections, new_authors, become_author,
 │   │                             # contest_banner, genre_strip, popular_tags),
-│   │                             # catalog/_*.html (DEC-27): _book_list, _filter_panel,
+│   │                             # catalog/_*.html (DEC-27): _book_list, _filter_panel
+│   │                             # (variant='rail'|'sheet' — в листе черновик, не автосабмит),
 │   │                             # _filter_sheet (mobile bottom-sheet), _hero_search,
 │   │                             # _hero_genre, _hero_tag, _hero_catalog.
 │   │                             # NB: sidebar.html удалён — DEC-25; genres_section удалён —
@@ -142,7 +150,12 @@ balaproza_v1/
 - **DEC-25**: Левый sidebar на десктопе исключён. В хедере одна контент-ссылка («Байқаулар» — единственный раздел без альтернативного входа с главной), остальные разделы — секции главной и колонка «Контент» в footer. Личные разделы авторизованного — через avatar-dropdown. Правый рейл рендерится только если view передал `has_right_rail=True`. Контейнер `max-w-[1280px]`, правый рейл 300px (расширен с 234px ради осмысленных виджетов). **Колонка контента зафиксирована на `max-w-[860px]` + `mx-auto`** (= 1184 − 300 − 24): без рейла она центрируется, а не растягивается — иначе на экране `<xl` контент становился шире, чем на большом. Держит `test_desktop_layout.ContentColumnWidth`; свой `max-w-[Npx]` больше 860 в шаблоне страницы запрещён
 - **DEC-26**: Введена **UGC-таксономия тегов** параллельно жанрам. До 10 на произведение, free-form input. Новые попадают в `pending`, модератор переводит в `accepted` (через Django admin, BR-TAG-*). Часть паттернов в блок-листе — `is_blocked()`. Pending-теги скрыты от публики (BR-TAG-07). См. `docs/11`
 - **DEC-31**: Первичный вход в чтение — **жинақтар** (`/collections/`): «зачем читать сейчас». Стоят в первом фолде главной и заменяют каталог во втором слоте mobile nav у гостя. Создаёт их **только редакция** — пользовательских подборок нет (личное хранение — «Кітапхана»). **Жанр понижен до вывески**: полоса чипов под hero, `genres_section` и `?genre=` на главной удалены; цветовая система по `Genre.hue` не меняется. **Теги показывают актуальное**: `weekly_count` → «Осы аптада», `/tag/<slug>/` открывается сортировкой `recent`. Новых таксономий не вводится — связь «настроение → произведения» это `Collection.story_slugs`
-- **DEC-27**: Каталог унифицирован — **один движок** `_render_catalog` обслуживает search/genre/tag/catalog. Canonical URLs сохранены (`/search/?q=`, `/genres/<slug>/`, `/tag/<slug>/`, `/catalog/`), комбинации через query (`/genres/triller/?tag=mektep`). Общий filter_panel в правом рейле / mobile bottom-sheet. **Коллекции (Жинақтар) НЕ объединены** — это editorial curation, отдельный content type
+- **DEC-36**: Каталог отвечает на вопрос читателя, а не описывает атрибуты. **Дефолт сортировки — «Қазір танымал»**: окно в 14 дней по `Story.recent_views`; накопленный `views` остался отдельным пунктом «Ең көп оқылған». Тег по-прежнему открывается `recent` — DEC-31 не отменён. Ось **`badge`** (`editorial` / `contest`) — единственная, где качество заявлено отдельно от просмотров. **Пресеты** `CATALOG_PRESETS` («Бір отырыста» = `single+short` по docs/13 §13.11) стоят в контенте, а не в панели: ниже `xl` панель за модалкой. Счётчик пресета настоящий, пустые не рендерятся, активный поглощает чипы своих осей. Жинақтар — в рейле каталога и в пустом состоянии. Попутно восстановлен DEC-23: `filter_catalog` режет по `PUBLIC_STATUSES`, до этого «Модерацияда» лежала в публичном каталоге
+- **DEC-27**: Каталог унифицирован — **один движок** `_render_catalog` обслуживает search/genre/tag/catalog. Canonical URLs сохранены (`/search/?q=`, `/genres/<slug>/`, `/tag/<slug>/`, `/catalog/`), комбинации через query (`/genres/triller/?tag=mektep`). Общий `_filter_panel` в правом рейле / mobile bottom-sheet, `variant` переключает автосабмит. **Коллекции (Жинақтар) НЕ объединены** — это editorial curation, отдельный content type.
+
+  **Состояние сүзгі живёт в URL** (FR-CAT-08): ссылки строит `_catalog_href`, набор для контекста — `_catalog_links`. Путь занимает главную ось, остальное — query; путь сильнее query; `sort` едет в ссылку только когда выбран явно. Не собирать URL каталога в шаблоне руками — жанровый чип так и терял уже выставленные оси.
+
+  **На mobile**: липкая панель `sticky top-16` с сортировкой снаружи модалки, бейдж числа активных осей на кнопке, ряд чипов для снятия одной оси (docs/07 §7.9)
 
 ## Стаб-авторизация
 
@@ -155,7 +168,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 492 тестов
+uv run python manage.py test core       # все 541 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 
@@ -197,6 +210,12 @@ def _login_as_aidana(client):
 - `open-catalog-filters` — открывает mobile bottom-sheet с фильтр-панелью каталога (DEC-27)
 - `reading-mode` — `{on: bool}`, шлёт страница произведения при входе/выходе текста главы из кадра. `mobile_nav` прячет пилюлю, её место занимает панель чтения (docs/07 §7.6)
 - `open-delete-confirm` — открывает delete_confirm_modal с целью `{name, confirm_url}`
+
+**`@click`/`@submit` требуют `x-data` в предках — иначе директива мёртвая.** Alpine 3 обходит только поддеревья, найденные по `x-data`; элемент вне такого корня он не инициализирует вовсе. Ошибки в консоли нет, вид не меняется — кнопка просто ничего не делает. Так молча не работали кнопка сүзгі каталога, «Іздеу ашу» на 404, обе кнопки удаления произведения и семь форм с `@submit.prevent` (последние вдобавок уходили настоящим POST вместо демо-тоста). Лечение — пустой `x-data` на самом элементе:
+```django
+<button type="button" x-data @click="$dispatch('open-catalog-filters')">
+```
+Закрыто тестом `test_template_lint.AlpineDirectivesAreInScope` — он рендерит все `PUBLIC_URLS` и обходит DOM, потому что предок с `x-data` часто лежит за `{% include %}` в другом файле.
 
 ### Mobile bottom nav (5 слотов)
 - **Гость:** Басты / Оқу (catalog) / **Іздеу (FAB)** / Байқау / Кіру

@@ -1,25 +1,34 @@
 {% comment %}
     DeskBookCardWide (docs/04.3). Горизонтальная карточка для списков:
-    обложка 120×180 слева + расширенные мета справа.
+    обложка слева + расширенные мета справа.
 
     Используется в каталоге, библиотеке, страницах поиска.
 
+    Мобильный вариант — не та же карточка в узком контейнере. При 375px на
+    колонку контента оставалось 171px, и семь блоков подряд разворачивались
+    в 14 строк переносов: карточка вырастала до ~430px при обложке 180px, в
+    экран влезала одна штука. Поэтому до `sm` обложка меньше, мета сжата в одну
+    строку через «·», аннотация в две строки, теги скрыты (жанр в мете уже
+    несёт таксономию), счётчики — через compact_count. С `sm` возвращается
+    полная десктопная раскладка.
+
     Параметры:
       story        — объект Story
-      description  — короткий синопсис (опц., clamp 4)
+      description  — короткий синопсис (опц.)
       status_key   — Published | Completed | OnProcess | ... (опц., рендерит StatusBadge)
 {% endcomment %}
-<article class="flex w-full gap-5 rounded-lg border border-slate-200 bg-white p-4 transition-shadow hover:shadow-card-hover">
+{% load balaproza %}
+<article class="flex w-full gap-3 rounded-lg border border-slate-200 bg-white p-3 transition-shadow hover:shadow-card-hover sm:gap-5 sm:p-4">
     {# Обложка #}
     {% url 'core:story_detail' slug=story.slug as cover_href %}
-    {% include "components/cover_placeholder.html" with story=story href=cover_href cls="h-[180px] w-[120px] rounded-md shadow-[0_1px_3px_rgba(0,0,0,0.08)]" letter_cls="text-6xl" %}
+    {% include "components/cover_placeholder.html" with story=story href=cover_href cls="h-[132px] w-[88px] sm:h-[180px] sm:w-[120px] rounded-md shadow-[0_1px_3px_rgba(0,0,0,0.08)]" letter_cls="text-4xl sm:text-6xl" %}
 
     {# Контент #}
-    <div class="flex min-w-0 flex-1 flex-col gap-2">
+    <div class="flex min-w-0 flex-1 flex-col gap-1.5 sm:gap-2">
         <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
                 <a href="{% url 'core:story_detail' slug=story.slug %}"
-                   class="font-sans text-lg font-bold leading-tight text-slate-900 hover:text-brand">
+                   class="font-sans text-base font-bold leading-tight text-slate-900 hover:text-brand sm:text-lg">
                     {{ story.title }}
                 </a>
                 <a href="{% url 'core:profile_other' username=story.author.username %}"
@@ -32,9 +41,22 @@
             {% endif %}
         </div>
 
-        {# Жанры #}
+        {# Мета до sm — одна строка вместо трёх групп чипов, которые давали 4 ряда переносов #}
+        <p class="flex flex-wrap items-center gap-x-1.5 font-sans text-[12px] text-slate-500 sm:hidden">
+            {% with pg=story.genres_resolved.0 %}{% if pg %}
+                <span style="color: oklch(0.38 0.14 {{ pg.hue }});">{{ pg.name }}</span>
+                <span aria-hidden="true">·</span>
+            {% endif %}{% endwith %}
+            {% if story.audience %}<span>{{ story.audience }}</span><span aria-hidden="true">·</span>{% endif %}
+            <span>{{ story.read_minutes }} мин</span>
+            {% for badge in story.badges %}
+                <span aria-hidden="true">·</span><span class="font-semibold text-brand-dark">{{ badge }}</span>
+            {% endfor %}
+        </p>
+
+        {# Жанры (с sm) #}
         {% if story.genres_resolved %}
-            <div class="flex flex-wrap gap-1.5">
+            <div class="hidden flex-wrap gap-1.5 sm:flex">
                 {% for g in story.genres_resolved %}
                     {% include "components/genre_chip.html" with genre=g size="sm" %}
                 {% endfor %}
@@ -45,10 +67,11 @@
         {% endif %}
 
         {% if description %}
-            <p class="line-clamp-4 font-sans text-[13px] leading-snug text-slate-600">{{ description }}</p>
+            <p class="line-clamp-2 font-sans text-[13px] leading-snug text-slate-600 sm:line-clamp-4">{{ description }}</p>
         {% endif %}
 
-        <div class="flex flex-wrap items-center gap-1.5">
+        {# Чипы «жас» и «оқу уақыты» — только с sm, до этого они в мета-строке выше #}
+        <div class="hidden flex-wrap items-center gap-1.5 sm:flex">
             {% if story.audience %}
                 <span class="inline-flex h-6 items-center rounded-chip bg-slate-100 px-2 font-sans text-[11px] font-bold text-slate-600">{{ story.audience }}</span>
             {% endif %}
@@ -59,14 +82,20 @@
         </div>
 
         {% if story.tags_resolved %}
-            {% include "components/tag_list.html" with tags=story.tags_resolved|slice:":3" viewer_is_author=False size="sm" %}
+            <div class="hidden sm:block">
+                {% include "components/tag_list.html" with tags=story.tags_resolved|slice:":3" viewer_is_author=False size="sm" %}
+            </div>
         {% endif %}
 
-        {# Метрики внизу #}
-        <div class="mt-auto flex flex-wrap items-center gap-4 pt-1">
-            {% include "components/stat_pill.html" with icon="thumbs-up" value=story.likes label=story.likes|stringformat:"d"|add:" ұнату" %}
-            {% include "components/stat_pill.html" with icon="eye" value=story.views label=story.views|stringformat:"d"|add:" оқылды" %}
-            {% include "components/stat_pill.html" with icon="message-caption" value=story.comments label=story.comments|stringformat:"d"|add:" пікір" %}
+        {% comment %}
+            Метрики через compact_count (docs/16 §16.7 п.6): «12 482» в три пилюли
+            подряд не вставало в 171px и уводило счётчики на второй ряд. Полное
+            число остаётся в aria-label.
+        {% endcomment %}
+        <div class="mt-auto flex flex-wrap items-center gap-3 pt-1 sm:gap-4">
+            {% include "components/stat_pill.html" with icon="thumbs-up" value=story.likes|compact_count label=story.likes|spaced|add:" ұнату" %}
+            {% include "components/stat_pill.html" with icon="eye" value=story.views|compact_count label=story.views|spaced|add:" оқылды" %}
+            {% include "components/stat_pill.html" with icon="message-caption" value=story.comments|compact_count label=story.comments|spaced|add:" пікір" %}
         </div>
     </div>
 </article>

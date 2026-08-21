@@ -1,176 +1,149 @@
 {% comment %}
     Каталог-фильтр (DEC-27). Используется в двух местах:
-      • Десктоп — в правом рейле (рендерится из right_rail/catalog.html)
-      • Mobile — в bottom-sheet (рендерится из _filter_sheet.html по кнопке)
+      • Десктоп — в правом рейле (rail): change сразу сабмитит, ничего не
+        перекрыто, результат виден мгновенно.
+      • Mobile — в bottom-sheet (sheet): change НЕ сабмитит. Автосабмит в модалке
+        означал навигацию после каждого тапа, а вместе с навигацией исчезал и сам
+        лист — пять осей стоили пять перезагрузок и пять открытий. Здесь копится
+        черновик, применяет его кнопка внизу.
 
     Параметры:
+      variant     — 'rail' (default) | 'sheet'
+      filter_groups — [{name, legend, options, current}] — все пять осей
       query       — текущий ?q=
-      sort        — текущая сортировка
-      status      — текущий статус-фильтр
-      audience    — текущий возрастной фильтр
-      length      — текущий фильтр длины чтения
-      format      — текущий фильтр формата
-      sorts       — CATALOG_SORTS
-      statuses    — CATALOG_STATUS_FILTERS
-      audiences   — CATALOG_AUDIENCE_FILTERS
-      lengths     — CATALOG_LENGTH_FILTERS
-      formats     — CATALOG_FORMAT_FILTERS
-      genres      — список Genre для chip-cloud
-      current_genre_slug — slug активного жанра (если на /genres/<slug>/)
       mode        — 'search' | 'genre' | 'tag' | 'catalog'
+      genre_options / tag_options — [{genre|tag, href, active}] — ссылки собраны
+                    во view: каждая несёт текущее состояние остальных осей
+      clear_href  — сброс сүзгі без выхода из раздела
+      active_count — сколько осей включено
 {% endcomment %}
+{% with v=variant|default:"rail" %}
 <div class="flex flex-col gap-5">
 
-    {# ── Шапка: «Сүзгілер» + Clear ── #}
-    <div class="flex items-baseline justify-between">
-        <h3 class="font-display text-sm font-bold uppercase tracking-[0.12em] text-slate-600">
-            Сүзгілер
-        </h3>
-        {% if query or status or audience or length or format or current_genre_slug or current_tag_slug or sort != 'popularity' %}
-            <a href="{% url 'core:catalog' %}"
-               class="font-sans text-xs font-semibold text-brand hover:text-brand-dark">
-                Тазалау
-            </a>
-        {% endif %}
-    </div>
+    {# ── Шапка: «Сүзгілер» + Clear. В листе свой заголовок — не дублируем. ── #}
+    {% if v == 'rail' %}
+        <div class="flex items-baseline justify-between">
+            <h3 class="font-display text-sm font-bold uppercase tracking-[0.12em] text-slate-600">
+                Сүзгілер
+            </h3>
+            {% if active_count %}
+                <a href="{{ clear_href }}" class="font-sans text-xs font-semibold text-brand hover:text-brand-dark">Тазалау</a>
+            {% endif %}
+        </div>
+    {% endif %}
 
-    {# ── Форма: q + sort + status. Auto-submit на change. ── #}
-    <form method="get" x-data @change="$el.requestSubmit()" class="flex flex-col gap-5">
+    <form id="catalog-filters-{{ v }}" method="get" x-data {% if v == 'rail' %}@change="$el.requestSubmit()"{% endif %} class="flex flex-col gap-5">
 
-        {# Іздеу — на search-странице input уже в hero, но в рейле — ещё одно поле для refining #}
+        {# Вторая ось живёт в query — без hidden она терялась бы на каждом сабмите #}
+        {% if mode != 'genre' and current_genre_slug %}<input type="hidden" name="genre" value="{{ current_genre_slug }}">{% endif %}
+        {% if mode != 'tag' and current_tag_slug %}<input type="hidden" name="tag" value="{{ current_tag_slug }}">{% endif %}
+
+        {# Іздеу — на search-странице поле уже в hero, там только preserve #}
         {% if mode != 'search' %}
             <div>
-                <label for="filter-q" class="mb-1.5 block font-sans text-xs font-semibold text-slate-700">Іздеу</label>
-                <input id="filter-q" type="search" name="q" value="{{ query }}"
+                <label for="filter-q-{{ v }}" class="mb-1.5 block font-sans text-xs font-semibold text-slate-700">Іздеу</label>
+                <input id="filter-q-{{ v }}" type="search" name="q" value="{{ query }}"
                        placeholder="Атау, автор..."
-                       class="h-9 w-full rounded-md border border-slate-300 bg-slate-50 px-3 font-sans text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30">
+                       class="w-full rounded-md border border-slate-300 bg-slate-50 px-3 font-sans text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30 {% if v == 'sheet' %}h-11{% else %}h-9{% endif %}">
             </div>
         {% else %}
-            {# на search-странице — preserve query при смене sort/status #}
             <input type="hidden" name="q" value="{{ query }}">
         {% endif %}
 
-        {# Сұрыптау — radio group #}
-        <fieldset>
-            <legend class="mb-1.5 font-sans text-xs font-semibold text-slate-700">Сұрыптау</legend>
-            <div class="flex flex-col gap-1">
-                {% for key, label in sorts %}
-                    <label class="inline-flex cursor-pointer items-center gap-2 font-sans text-sm text-slate-700">
-                        <input type="radio" name="sort" value="{{ key }}"
-                               {% if sort == key %}checked{% endif %}
-                               class="h-3.5 w-3.5 accent-brand">
-                        {{ label }}
-                    </label>
-                {% endfor %}
-            </div>
-        </fieldset>
+        {% comment %}
+            Пять осей одним циклом. Чипы вместо вертикальных radio-списков: у
+            14px радиокнопки реальная цель была ~20px, а лист из 19 строк не
+            помещался в экран. Чип держит min-h-11 и укладывается в ряды.
+        {% endcomment %}
+        {% for group in filter_groups %}
+            <fieldset>
+                <legend class="mb-2 font-sans text-xs font-semibold text-slate-700">{{ group.legend }}</legend>
+                <div class="flex flex-wrap gap-1.5">
+                    {% for key, label in group.options %}
+                        <label class="relative cursor-pointer">
+                            <input type="radio" name="{{ group.name }}" value="{{ key }}"
+                                   {% if group.current == key %}checked{% endif %}
+                                   class="peer sr-only">
+                            <span class="inline-flex items-center rounded-pill border border-slate-200 bg-slate-50 font-sans text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100 peer-checked:border-brand peer-checked:bg-brand peer-checked:font-semibold peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40 peer-focus-visible:ring-offset-2 {% if v == 'sheet' %}min-h-11 px-4 text-sm{% else %}min-h-9 px-3 text-[13px]{% endif %}">
+                                {{ label }}
+                            </span>
+                        </label>
+                    {% endfor %}
+                </div>
+            </fieldset>
+        {% endfor %}
 
-        {# Мәртебесі — radio group #}
-        <fieldset>
-            <legend class="mb-1.5 font-sans text-xs font-semibold text-slate-700">Мәртебесі</legend>
-            <div class="flex flex-col gap-1">
-                {% for key, label in statuses %}
-                    <label class="inline-flex cursor-pointer items-center gap-2 font-sans text-sm text-slate-700">
-                        <input type="radio" name="status" value="{{ key }}"
-                               {% if status == key %}checked{% endif %}
-                               class="h-3.5 w-3.5 accent-brand">
-                        {{ label }}
-                    </label>
-                {% endfor %}
-            </div>
-        </fieldset>
-
-        {# Формат — radio group #}
-        <fieldset>
-            <legend class="mb-1.5 font-sans text-xs font-semibold text-slate-700">Формат</legend>
-            <div class="flex flex-col gap-1">
-                {% for key, label in formats %}
-                    <label class="inline-flex cursor-pointer items-center gap-2 font-sans text-sm text-slate-700">
-                        <input type="radio" name="format" value="{{ key }}"
-                               {% if format == key %}checked{% endif %}
-                               class="h-3.5 w-3.5 accent-brand">
-                        {{ label }}
-                    </label>
-                {% endfor %}
-            </div>
-        </fieldset>
-
-        {# Жас — radio group #}
-        <fieldset>
-            <legend class="mb-1.5 font-sans text-xs font-semibold text-slate-700">Жас</legend>
-            <div class="flex flex-col gap-1">
-                {% for key, label in audiences %}
-                    <label class="inline-flex cursor-pointer items-center gap-2 font-sans text-sm text-slate-700">
-                        <input type="radio" name="audience" value="{{ key }}"
-                               {% if audience == key %}checked{% endif %}
-                               class="h-3.5 w-3.5 accent-brand">
-                        {{ label }}
-                    </label>
-                {% endfor %}
-            </div>
-        </fieldset>
-
-        {# Оқу уақыты — radio group #}
-        <fieldset>
-            <legend class="mb-1.5 font-sans text-xs font-semibold text-slate-700">Оқу уақыты</legend>
-            <div class="flex flex-col gap-1">
-                {% for key, label in lengths %}
-                    <label class="inline-flex cursor-pointer items-center gap-2 font-sans text-sm text-slate-700">
-                        <input type="radio" name="length" value="{{ key }}"
-                               {% if length == key %}checked{% endif %}
-                               class="h-3.5 w-3.5 accent-brand">
-                        {{ label }}
-                    </label>
-                {% endfor %}
-            </div>
-        </fieldset>
-
-        {# No-JS fallback #}
-        <noscript>
-            <button type="submit" class="h-8 rounded-md bg-brand px-3 font-sans text-xs font-semibold text-white">
-                Қолдану
-            </button>
-        </noscript>
+        {% if v == 'rail' %}
+            <noscript>
+                <button type="submit" class="h-9 rounded-md bg-brand px-3 font-sans text-xs font-semibold text-white">
+                    Қолдану
+                </button>
+            </noscript>
+        {% endif %}
     </form>
 
-    {# ── Жанр — lightweight text labels (вне формы; каждый label — ссылка) ── #}
+    {% comment %}
+        Жанр — ссылки, а не поля формы: это раздел с каноническим URL
+        /genres/<slug>/. Ссылка теперь несёт текущее состояние остальных осей.
+    {% endcomment %}
     <div>
-        <p class="mb-1.5 font-sans text-xs font-semibold text-slate-700">Жанр</p>
-        <div class="flex flex-wrap gap-x-3 gap-y-2">
-            {% for g in genres %}
-                {% if g.slug == current_genre_slug %}
-                    <a href="{% url 'core:catalog' %}"
-                       class="inline-flex items-center gap-1.5 font-sans text-xs font-bold"
-                       style="color: oklch(0.32 0.14 {{ g.hue }});">
-                        <span aria-hidden="true" class="h-1.5 w-1.5 rounded-pill" style="background: oklch(0.55 0.14 {{ g.hue }});"></span>
-                        {{ g.name }}
+        <p class="mb-2 font-sans text-xs font-semibold text-slate-700">Жанр</p>
+        <div class="flex flex-wrap gap-x-3 gap-y-1">
+            {% for opt in genre_options %}
+                {% if opt.active %}
+                    <a href="{{ opt.href }}"
+                       class="inline-flex min-h-9 items-center gap-1.5 font-sans text-xs font-bold"
+                       style="color: oklch(0.32 0.14 {{ opt.genre.hue }});">
+                        <span aria-hidden="true" class="h-1.5 w-1.5 rounded-pill" style="background: oklch(0.55 0.14 {{ opt.genre.hue }});"></span>
+                        {{ opt.genre.name }}
                         {% include "components/icon.html" with name="x" size=11 %}
                     </a>
                 {% else %}
-                    {% url 'core:genre_detail' slug=g.slug as genre_href %}
-                    {% include "components/genre_chip.html" with genre=g size="sm" href=genre_href %}
+                    {% include "components/genre_chip.html" with genre=opt.genre size="sm" href=opt.href %}
                 {% endif %}
             {% endfor %}
         </div>
     </div>
 
     {# ── Тегтер — lightweight text links (docs/11 Phase 3) ── #}
-    {% if popular_tags %}
+    {% if tag_options %}
         <div>
-            <p class="mb-1.5 font-sans text-xs font-semibold text-slate-700">Тегтер</p>
-            <div class="flex flex-wrap gap-x-3 gap-y-2">
-                {% for t in popular_tags|slice:":8" %}
-                    {% if t.slug == current_tag_slug %}
-                        <a href="{% url 'core:catalog' %}"
-                           class="inline-flex items-center gap-1 font-sans text-xs font-bold text-brand-dark">
-                            <span class="text-brand">#</span>{{ t.name }}
+            <p class="mb-2 font-sans text-xs font-semibold text-slate-700">Тегтер</p>
+            <div class="flex flex-wrap gap-x-3 gap-y-1">
+                {% for opt in tag_options %}
+                    {% if opt.active %}
+                        <a href="{{ opt.href }}"
+                           class="inline-flex min-h-9 items-center gap-1 font-sans text-xs font-bold text-brand-dark">
+                            <span class="text-brand">#</span>{{ opt.tag.name }}
                             {% include "components/icon.html" with name="x" size=11 %}
                         </a>
                     {% else %}
-                        {% include "components/tag_chip.html" with tag=t size="sm" %}
+                        {% include "components/tag_chip.html" with tag=opt.tag size="sm" href=opt.href %}
                     {% endif %}
                 {% endfor %}
             </div>
         </div>
     {% endif %}
+
+    {% comment %}
+        Панель действий листа стоит ПОСЛЕ жанров и тегов и связана с формой
+        через `form=`: внутри формы она переставала быть видимой ровно там, где
+        список ещё продолжается, — а «применить» обязано быть под рукой на любой
+        прокрутке. Один сабмит применяет все пять осей разом.
+    {% endcomment %}
+    {% if v == 'sheet' %}
+        <div class="sticky bottom-0 -mx-5 -mb-6 flex gap-3 border-t border-slate-100 bg-white px-5 pb-6 pt-3">
+            {% if active_count %}
+                <a href="{{ clear_href }}"
+                   class="inline-flex h-12 shrink-0 items-center rounded-pill border border-slate-300 px-5 font-sans text-sm font-semibold text-slate-700">
+                    Тазалау
+                </a>
+            {% endif %}
+            <button type="submit" form="catalog-filters-{{ v }}"
+                    class="inline-flex h-12 flex-1 items-center justify-center rounded-pill bg-brand px-5 font-sans text-sm font-bold text-white hover:bg-brand-dark">
+                Нәтижелерді көрсету
+            </button>
+        </div>
+    {% endif %}
 </div>
+{% endwith %}

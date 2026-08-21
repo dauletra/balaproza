@@ -1,3 +1,5 @@
+from urllib.parse import urlencode
+
 from django.conf import settings
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import redirect, render
@@ -123,134 +125,281 @@ def signup_success(request):
 
 
 # ───────────────────────── CAT — каталог и поиск ─────────────────────────
-def _catalog_controls(request, default_sort='popularity'):
-    """Достаёт sort/status из GET с валидацией по белым спискам.
+def _catalog_default_sort(mode: str) -> str:
+    """Дефолтная сортировка режима.
 
-    `default_sort` задаётся режимом: страница тега открывается «жаңа» вперёд
-    (DEC-31). Тег — единственная ось, которая обновляется без участия редакции,
-    и её ценность в том, что там видно движение; сортировка по популярности
-    превращала бы её в архив.
+    Каталог, жанр и поиск открываются «Қазір танымал» — окном в 14 дней
+    (DEC-36). Тег остаётся на «Жаңалары»: DEC-31 отдал ему роль самой быстрой
+    оси портала, и там ценна свежесть сама по себе, а не набранные просмотры.
     """
+    return 'recent' if mode == 'tag' else stub_data.CATALOG_DEFAULT_SORT
+
+
+def _catalog_controls(request, default_sort=None):
+    """Достаёт оси сүзгі из GET с валидацией по белым спискам."""
+    default_sort = default_sort or stub_data.CATALOG_DEFAULT_SORT
+    axes = {
+        'status':   stub_data.CATALOG_STATUS_FILTERS,
+        'audience': stub_data.CATALOG_AUDIENCE_FILTERS,
+        'length':   stub_data.CATALOG_LENGTH_FILTERS,
+        'format':   stub_data.CATALOG_FORMAT_FILTERS,
+        'badge':    stub_data.CATALOG_BADGE_FILTERS,
+    }
     valid_sorts = {k for k, _ in stub_data.CATALOG_SORTS}
-    valid_status = {k for k, _ in stub_data.CATALOG_STATUS_FILTERS}
-    valid_audience = {k for k, _ in stub_data.CATALOG_AUDIENCE_FILTERS}
-    valid_length = {k for k, _ in stub_data.CATALOG_LENGTH_FILTERS}
-    valid_format = {k for k, _ in stub_data.CATALOG_FORMAT_FILTERS}
     sort = request.GET.get('sort', default_sort)
-    status = request.GET.get('status', '')
-    audience = request.GET.get('audience', '')
-    length = request.GET.get('length', '')
-    format = request.GET.get('format', '')
+    picked = {
+        name: (request.GET.get(name, '')
+               if request.GET.get(name, '') in {k for k, _ in table} else '')
+        for name, table in axes.items()
+    }
     return (
         sort if sort in valid_sorts else default_sort,
-        status if status in valid_status else '',
-        audience if audience in valid_audience else '',
-        length if length in valid_length else '',
-        format if format in valid_format else '',
+        picked['status'], picked['audience'], picked['length'],
+        picked['format'], picked['badge'],
     )
+
+
+def _catalog_href(*, mode='catalog', genre='', tag='', query='', sort='',
+                  status='', audience='', length='', format='', badge=''):
+    """Канонический URL каталога с сохранением остального состояния (DEC-27).
+
+    Путь выбирает «главная» ось: жанр → /genres/<slug>/, иначе тег →
+    /tag/<slug>/, иначе режим страницы. Всё остальное едет в query. До этого
+    чипы жанра и тега вели на голый путь, и выбор жанра молча сбрасывал уже
+    выставленные жас/формат/оқу уақыты.
+
+    `sort` пустой означает «дефолт целевой страницы»: ссылка на тег из каталога
+    не должна тащить туда popularity и ломать DEC-31.
+    """
+    params = {}
+    if genre:
+        path = reverse('core:genre_detail', kwargs={'slug': genre})
+        params['tag'] = tag
+        target_mode = 'genre'
+    elif tag:
+        path = reverse('core:tag_detail', kwargs={'slug': tag})
+        target_mode = 'tag'
+    elif mode == 'search':
+        path = reverse('core:search_results')
+        target_mode = 'search'
+    else:
+        path = reverse('core:catalog')
+        target_mode = 'catalog'
+
+    params.update({'q': query, 'status': status, 'audience': audience,
+                   'length': length, 'format': format, 'badge': badge})
+    if sort and sort != _catalog_default_sort(target_mode):
+        params['sort'] = sort
+
+    qs = urlencode({k: v for k, v in params.items() if v})
+    return f'{path}?{qs}' if qs else path
+
+
+def _catalog_links(state: dict) -> dict:
+    """Ссылки-состояния каталога: активные чипы, жанры, теги, сброс.
+
+    Собираются во view, а не в шаблоне: каждая ссылка — это «текущее состояние
+    минус одна ось», а такой URL шаблонными средствами не построить.
+    """
+    def href(**over):
+        return _catalog_href(**{**state, **over})
+
+    presets = _catalog_presets(state, href)
+
+    # Оси, которые уже показаны активным пресетом, отдельными чипами не
+    # дублируем: «Бір отырыста» и рядом «Бір бөлімді» + «15 минутқа дейін» —
+    # это один и тот же выбор, показанный трижды.
+    covered = set()
+    for preset in presets:
+        if preset['active']:
+            covered = set(preset['axes'])
+
+    chips = []
+    if state['query']:
+        chips.append({'label': f'«{state["query"]}»', 'href': href(query='')})
+    if state['genre']:
+        g = stub_data.GENRES_BY_SLUG[state['genre']]
+        chips.append({'label': g.name, 'hue': g.hue, 'href': href(genre='')})
+    if state['tag']:
+        t = stub_data.tag_by_slug(state['tag'])
+        chips.append({'label': f'#{t.name}', 'href': href(tag='')})
+    for axis, table in (('badge',    stub_data.CATALOG_BADGE_FILTERS),
+                        ('status',   stub_data.CATALOG_STATUS_FILTERS),
+                        ('format',   stub_data.CATALOG_FORMAT_FILTERS),
+                        ('audience', stub_data.CATALOG_AUDIENCE_FILTERS),
+                        ('length',   stub_data.CATALOG_LENGTH_FILTERS)):
+        if state[axis] and axis not in covered:
+            chips.append({'label': dict(table)[state[axis]],
+                          'href': href(**{axis: ''})})
+
+    # «Тазалау» снимает сүзгі, но не выкидывает из раздела: с /genres/triller/
+    # уходить в общий каталог человек не просил. Выход из жанра — крестик на чипе.
+    if state['mode'] == 'genre' and state['genre']:
+        clear_href = _catalog_href(mode='genre', genre=state['genre'])
+    elif state['mode'] == 'tag' and state['tag']:
+        clear_href = _catalog_href(mode='tag', tag=state['tag'])
+    elif state['mode'] == 'search':
+        clear_href = _catalog_href(mode='search', query=state['query'])
+    else:
+        clear_href = _catalog_href(mode='catalog')
+
+    # Бейдж на кнопке считает реально включённые оси, а не показанные чипы:
+    # внутри панели галочки пресета видны как обычные radio, и число обязано
+    # совпадать с тем, что там отмечено.
+    axis_names = ('query', 'genre', 'tag', 'badge', 'status', 'format',
+                  'audience', 'length')
+    return {
+        'active_chips': chips,
+        'active_count': sum(1 for a in axis_names if state[a]),
+        'clear_href':   clear_href,
+        'genre_options': [
+            {'genre': g, 'active': g.slug == state['genre'],
+             'href': href(genre='' if g.slug == state['genre'] else g.slug)}
+            for g in stub_data.GENRES
+        ],
+        'tag_options': [
+            {'tag': t, 'active': t.slug == state['tag'],
+             'href': href(tag='' if t.slug == state['tag'] else t.slug)}
+            for t in stub_data.popular_tags(8)
+        ],
+        'presets': presets,
+    }
+
+
+def _catalog_presets(state: dict, href) -> list:
+    """Пресеты «Не оқимын?» — готовые комбинации осей одним тапом.
+
+    Считаем каждому пресету реальный размер выборки: чип, ведущий в пустоту,
+    хуже отсутствующего чипа. Счёт берётся в текущем разделе (жанр/тег/запрос
+    сохраняются), поэтому «Бір отырыста» внутри жанра честно показывает,
+    сколько коротких историй есть именно там.
+    """
+    out = []
+    for preset in stub_data.CATALOG_PRESETS:
+        axes = {'format': '', 'length': '', 'status': '', 'badge': ''}
+        axes.update(preset['filters'])
+        active = all(state[k] == v for k, v in axes.items())
+        count = len(stub_data.filter_catalog(
+            query=state['query'], genre=state['genre'], tag=state['tag'], **axes))
+        if not count and not active:
+            continue
+        out.append({
+            'slug':   preset['slug'],
+            'label':  preset['label'],
+            'count':  count,
+            'active': active,
+            'axes':   tuple(preset['filters']),
+            # Повторный тап по активному пресету снимает его — иначе выйти из
+            # пресета можно было бы только через чипы отдельных осей.
+            'href':   href(**{k: '' for k in axes}) if active else href(**axes),
+        })
+    return out
 
 
 def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str = ''):
     """Единая точка рендера унифицированного каталога (DEC-27).
 
-    Используется search_results / catalog / genre_detail / (в Phase 3) tag_detail.
+    Используется search_results / catalog / genre_detail / tag_detail.
+    Вторая ось приходит query-параметром (`/genres/triller/?tag=mektep`) —
+    DEC-27 это описывал, но код параметр не читал и молча его терял.
+    Путь всегда сильнее query: канонический URL остаётся источником истины.
     """
     query = request.GET.get('q', '').strip()
-    sort, status, audience, length, format = _catalog_controls(
-        request, default_sort='recent' if mode == 'tag' else 'popularity',
+    sort, status, audience, length, format, badge = _catalog_controls(
+        request, default_sort=_catalog_default_sort(mode),
     )
 
-    empty_title, empty_text = "Шығарма табылмады", "Сүзгілерді өзгертіп көріңіз."
+    genre = stub_data.GENRES_BY_SLUG.get(genre_slug) if genre_slug else None
+    tag = stub_data.tag_by_slug(tag_slug) if tag_slug else None
+    not_found = ((mode == 'genre' and genre is None)
+                 or (mode == 'tag' and (tag is None or tag.status != 'accepted')))
 
-    if mode == 'search' and not query:
+    # Вторая ось из query — только если путь эту ось не занял.
+    eff_genre = genre_slug if genre else ''
+    if not eff_genre:
+        candidate = request.GET.get('genre', '')
+        eff_genre = candidate if candidate in stub_data.GENRES_BY_SLUG else ''
+    eff_tag = tag_slug if (tag and tag.status == 'accepted') else ''
+    if not eff_tag:
+        candidate = stub_data.tag_by_slug(request.GET.get('tag', ''))
+        eff_tag = candidate.slug if candidate and candidate.status == 'accepted' else ''
+
+    empty_title, empty_text = "Шығарма табылмады", "Сүзгіні өзгертіп көр."
+    if not_found:
+        results = []
+        empty_title = empty_text = ''
+    elif mode == 'search' and not query:
         # Idle — без запроса не запускаем фильтр
         results = []
         empty_title = "Не іздейміз?"
         empty_text = (
-            "Шығарманың атауын немесе автордың атын жазыңыз. "
-            "Жанр бойынша ізделсе — жанрлар бетіне өтіңіз."
+            "Шығарманың атауын немесе автордың атын жаз. "
+            "Жанр бойынша іздесең — жанрлар бетіне өт."
         )
-    elif mode == 'genre':
-        genre = stub_data.GENRES_BY_SLUG.get(genre_slug)
-        if genre is None:
-            # Неизвестный жанр — отдаём страницу с error-блоком в hero
-            return render(request, 'pages/catalog/catalog.html', {
-                'has_right_rail': True, 'mode': mode, 'results': [],
-                'genres': stub_data.GENRES, 'current_genre_slug': genre_slug,
-                'current_tag_slug': '', 'current_tag': None,
-                'popular_tags': stub_data.popular_tags(),
-                'genre': None,
-                'query': '', 'sort': sort, 'status': status,
-                'audience': audience, 'length': length, 'format': format,
-                'sorts': stub_data.CATALOG_SORTS, 'statuses': stub_data.CATALOG_STATUS_FILTERS,
-                'audiences': stub_data.CATALOG_AUDIENCE_FILTERS, 'lengths': stub_data.CATALOG_LENGTH_FILTERS,
-                'formats': stub_data.CATALOG_FORMAT_FILTERS,
-                'empty_title': '', 'empty_text': '',
-            })
-        results = stub_data.filter_catalog(query=query, genre=genre_slug,
+    else:
+        results = stub_data.filter_catalog(query=query, genre=eff_genre, tag=eff_tag,
                                            status=status, sort=sort,
                                            audience=audience, length=length,
-                                           format=format)
-        empty_title = "Әзірге шығарма жоқ"
-        empty_text = "Бұл жанрда әлі шығарма жарияланбаған."
-    elif mode == 'tag':
-        tag = stub_data.tag_by_slug(tag_slug)
-        if tag is None or tag.status != 'accepted':
-            # Неизвестный или непринятый тег — error-блок
-            return render(request, 'pages/catalog/catalog.html', {
-                'has_right_rail': True, 'mode': mode, 'results': [],
-                'genres': stub_data.GENRES, 'current_genre_slug': '',
-                'current_tag_slug': tag_slug, 'current_tag': None,
-                'popular_tags': stub_data.popular_tags(),
-                'genre': None,
-                'query': '', 'sort': sort, 'status': status,
-                'audience': audience, 'length': length, 'format': format,
-                'sorts': stub_data.CATALOG_SORTS, 'statuses': stub_data.CATALOG_STATUS_FILTERS,
-                'audiences': stub_data.CATALOG_AUDIENCE_FILTERS, 'lengths': stub_data.CATALOG_LENGTH_FILTERS,
-                'formats': stub_data.CATALOG_FORMAT_FILTERS,
-                'empty_title': '', 'empty_text': '',
-            })
-        results = stub_data.filter_catalog(query=query, tag=tag_slug,
-                                           status=status, sort=sort,
-                                           audience=audience, length=length,
-                                           format=format)
-        empty_title = "Бұл тегпен шығарма жоқ"
-        empty_text = "Басқа тегтерді көріңіз немесе сүзгілерді өзгертіңіз."
-    elif mode == 'search':
-        results = stub_data.filter_catalog(query=query, status=status, sort=sort,
-                                           audience=audience, length=length,
-                                           format=format)
-        empty_title = "Ештеңе табылмады"
-        empty_text = f"«{query}» бойынша шығарма табылмады. Атауды тексеріп көріңіз."
-    else:  # mode == 'catalog'
-        results = stub_data.filter_catalog(query=query, status=status, sort=sort,
-                                           audience=audience, length=length,
-                                           format=format)
+                                           format=format, badge=badge)
+        if mode == 'genre':
+            empty_title = "Әзірге шығарма жоқ"
+            empty_text = "Бұл жанрда әлі шығарма жарияланбаған."
+        elif mode == 'tag':
+            empty_title = "Бұл тегпен шығарма жоқ"
+            empty_text = "Басқа тегті көр немесе сүзгіні өзгерт."
+        elif mode == 'search':
+            empty_title = "Ештеңе табылмады"
+            empty_text = f"«{query}» бойынша шығарма табылмады. Атауын тексеріп көр."
 
-    return render(request, 'pages/catalog/catalog.html', {
+    # sort в ссылках несём только когда он выбран явно: иначе переход на тег из
+    # каталога тащил бы туда «Қазір танымал» и отменял «жаңалары вперёд» (DEC-31).
+    state = {
+        'mode': mode, 'genre': eff_genre, 'tag': eff_tag, 'query': query,
+        'sort': sort if 'sort' in request.GET else '',
+        'status': status, 'audience': audience, 'length': length,
+        'format': format, 'badge': badge,
+    }
+
+    sort_labels = dict(stub_data.CATALOG_SORTS)
+    ctx = {
         'has_right_rail': True,
         'mode':           mode,
         'results':        results,
         'query':          query,
         'sort':           sort,
+        'sort_label':     sort_labels.get(sort, ''),
+        'sorts':          stub_data.CATALOG_SORTS,
         'status':         status,
         'audience':       audience,
         'length':         length,
         'format':         format,
-        'sorts':          stub_data.CATALOG_SORTS,
-        'statuses':       stub_data.CATALOG_STATUS_FILTERS,
-        'audiences':      stub_data.CATALOG_AUDIENCE_FILTERS,
-        'lengths':        stub_data.CATALOG_LENGTH_FILTERS,
-        'formats':        stub_data.CATALOG_FORMAT_FILTERS,
-        'genres':         stub_data.GENRES,
-        'current_genre_slug': genre_slug,
-        'genre':          stub_data.GENRES_BY_SLUG.get(genre_slug) if genre_slug else None,
-        'current_tag_slug':   tag_slug,
-        'current_tag':        stub_data.tag_by_slug(tag_slug) if tag_slug else None,
+        'badge':          badge,
+        # Панель сүзгі рендерится одним циклом по группам — пять почти одинаковых
+        # fieldset'ов в шаблоне расходились при каждой правке.
+        'filter_groups': [
+            {'name': 'sort',     'legend': 'Сұрыптау',   'options': stub_data.CATALOG_SORTS,            'current': sort},
+            {'name': 'badge',    'legend': 'Белгі',      'options': stub_data.CATALOG_BADGE_FILTERS,    'current': badge},
+            {'name': 'status',   'legend': 'Мәртебесі',  'options': stub_data.CATALOG_STATUS_FILTERS,   'current': status},
+            {'name': 'format',   'legend': 'Формат',     'options': stub_data.CATALOG_FORMAT_FILTERS,   'current': format},
+            {'name': 'audience', 'legend': 'Жас',        'options': stub_data.CATALOG_AUDIENCE_FILTERS, 'current': audience},
+            {'name': 'length',   'legend': 'Оқу уақыты', 'options': stub_data.CATALOG_LENGTH_FILTERS,   'current': length},
+        ],
+        'genres':             stub_data.GENRES,
+        'not_found_slug':     (genre_slug or tag_slug) if not_found else '',
+        'current_genre_slug': eff_genre,
+        'genre':              genre,
+        'current_tag_slug':   eff_tag,
+        'current_tag':        tag if (tag and tag.status == 'accepted') else stub_data.tag_by_slug(eff_tag),
         'popular_tags':       stub_data.popular_tags(),
-        'empty_title':    empty_title,
-        'empty_text':     empty_text,
-    })
+        # Жинақтар — первичный вход в чтение (DEC-31). В каталоге они нужны
+        # ровно там, где сүзгі не дали результата: пустой экран не должен быть
+        # тупиком, из которого выход только назад.
+        'rail_collections':   stub_data.COLLECTIONS[:3],
+        'empty_title':        empty_title,
+        'empty_text':         empty_text,
+    }
+    ctx.update(_catalog_links(state))
+    return render(request, 'pages/catalog/catalog.html', ctx)
 
 
 def search_results(request):

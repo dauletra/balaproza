@@ -25,7 +25,7 @@
         </p>
     </header>
 
-    <form method="post" action="{% url 'core:profile_me_edit' %}"
+    <form method="post" action="{% url 'core:profile_me_edit' %}" x-data
           @submit.prevent="$dispatch('toast', { kind:'success', text:'Өзгерістер сақталды (демо)' });
                            setTimeout(()=>window.location='{% url 'core:profile_me' %}', 400)"
           class="flex flex-col gap-6 rounded-hero border border-slate-200 bg-white p-6 sm:p-8">

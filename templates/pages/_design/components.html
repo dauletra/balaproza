@@ -254,15 +254,15 @@
 
         <h3 class="mb-3 font-display text-sm font-bold uppercase tracking-wide text-slate-600">Toast</h3>
         <div class="flex flex-wrap gap-2">
-            <button type="button" @click="$dispatch('toast', { kind:'success', text:'Шығарма сақталды' })"
+            <button type="button" x-data @click="$dispatch('toast', { kind:'success', text:'Шығарма сақталды' })"
                     class="rounded-md border border-status-published-fg/30 bg-status-published-bg px-4 py-2 font-sans text-sm font-semibold text-status-published-fg hover:opacity-90">
                 Success toast
             </button>
-            <button type="button" @click="$dispatch('toast', { kind:'info', text:'Жаңа хабарлама бар' })"
+            <button type="button" x-data @click="$dispatch('toast', { kind:'info', text:'Жаңа хабарлама бар' })"
                     class="rounded-md border border-status-info-fg/30 bg-status-info-bg px-4 py-2 font-sans text-sm font-semibold text-status-info-fg hover:opacity-90">
                 Info toast
             </button>
-            <button type="button" @click="$dispatch('toast', { kind:'error', text:'Файл тым үлкен' })"
+            <button type="button" x-data @click="$dispatch('toast', { kind:'error', text:'Файл тым үлкен' })"
                     class="rounded-md border border-status-error-fg/30 bg-status-error-bg px-4 py-2 font-sans text-sm font-semibold text-status-error-fg hover:opacity-90">
                 Error toast
             </button>
@@ -270,15 +270,15 @@
 
         <h3 class="mt-6 mb-3 font-display text-sm font-bold uppercase tracking-wide text-slate-600">Modals</h3>
         <div class="flex flex-wrap gap-2">
-            <button type="button" @click="$dispatch('open-login')"
+            <button type="button" x-data @click="$dispatch('open-login')"
                     class="rounded-md border border-slate-300 bg-white px-4 py-2 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
                 Открыть LoginModal
             </button>
-            <button type="button" @click="$dispatch('open-report', { target: 'story:sample' })"
+            <button type="button" x-data @click="$dispatch('open-report', { target: 'story:sample' })"
                     class="rounded-md border border-slate-300 bg-white px-4 py-2 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
                 Открыть ReportModal
             </button>
-            <button type="button" @click="$dispatch('open-delete-confirm', { name: 'Алыс жағалауларда' })"
+            <button type="button" x-data @click="$dispatch('open-delete-confirm', { name: 'Алыс жағалауларда' })"
                     class="rounded-md border border-slate-300 bg-white px-4 py-2 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
                 Открыть DeleteConfirm
             </button>

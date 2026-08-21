@@ -6,6 +6,9 @@
       results      — list of Story
       empty_title  — заголовок empty state (default: "Шығарма табылмады")
       empty_text   — подзаголовок empty state (default — общий)
+      empty_collections — жинақтар как выход из пустого экрана (опц., DEC-31).
+                    Передаёт только каталог: внутри самой подборки предлагать
+                    подборки незачем.
 {% endcomment %}
 {% if results %}
     <div class="flex flex-col gap-3">
@@ -14,7 +17,7 @@
         {% endfor %}
     </div>
 {% else %}
-    <section class="rounded-lg border border-slate-200 bg-white p-10 text-center">
+    <section class="rounded-lg border border-slate-200 bg-white p-6 text-center sm:p-10">
         <div class="mx-auto grid h-14 w-14 place-items-center rounded-pill bg-slate-100 text-slate-500">
             {% include "components/icon.html" with name="search" size=28 %}
         </div>
@@ -22,7 +25,29 @@
             {{ empty_title|default:"Шығарма табылмады" }}
         </h2>
         <p class="mx-auto mt-1 max-w-md font-sans text-sm text-slate-600">
-            {{ empty_text|default:"Сүзгілерді өзгертіп көр немесе басқа жанр/тегтен ізде." }}
+            {{ empty_text|default:"Сүзгіні өзгертіп көр немесе басқа жанр/тегтен ізде." }}
         </p>
+
+        {% comment %}
+            Выход из пустого экрана. Раньше здесь был тупик: «поменяй сүзгі» —
+            и всё. Жинақтар отвечают на «зачем читать сейчас» (DEC-31), и это
+            ровно тот вопрос, на который человек с несложившимся запросом ждёт
+            ответа.
+        {% endcomment %}
+        {% if empty_collections %}
+            <p class="mt-6 font-sans text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Мүмкін, мынау қызық болар
+            </p>
+            <div class="mt-3 flex flex-wrap justify-center gap-2">
+                {% for c in empty_collections %}
+                    <a href="{% url 'core:collection_detail' slug=c.slug %}"
+                       class="inline-flex min-h-11 items-center gap-2 rounded-pill border px-4 font-sans text-sm font-semibold"
+                       style="border-color: oklch(0.86 0.08 {{ c.tint_hue }}); background: oklch(0.96 0.04 {{ c.tint_hue }}); color: oklch(0.38 0.14 {{ c.tint_hue }});">
+                        {% include "components/icon.html" with name=c.icon size=14 %}
+                        {{ c.name }}
+                    </a>
+                {% endfor %}
+            </div>
+        {% endif %}
     </section>
 {% endif %}

@@ -24,7 +24,7 @@
         {% include "components/status_badge.html" with key=story.status %}
     </header>
 
-    <form method="post"
+    <form method="post" x-data
           @submit.prevent="$dispatch('toast', { kind:'success', text:'Өзгертулер сақталды (демо)' })"
           class="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
         {% csrf_token %}
@@ -116,7 +116,7 @@
         <p class="mt-1 font-sans text-xs leading-relaxed text-slate-700">
             Шығарманы өшіру — қайтарылмайтын әрекет.
         </p>
-        <button type="button"
+        <button type="button" x-data
                 @click="$dispatch('open-delete-confirm', { name: '{{ story.title|escapejs }}', confirm_url: '#' })"
                 class="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-status-error-fg bg-white px-5 font-sans text-sm font-bold text-status-error-fg hover:bg-status-error-bg">
             {% include "components/icon.html" with name="trash" size=14 %}

@@ -1,6 +1,6 @@
 # 04 · Библиотека компонентов
 
-> `Обновлён: 2026-08-20` · `Сверен с кодом: 5d39adb`
+> `Обновлён: 2026-08-21` · `Сверен с кодом: fdde268`
 
 Спецификация переиспользуемых UI-компонентов: назначение, входные параметры (props), состояния и поведение. Компоненты обязаны использовать токены из модуля 02.
 
@@ -8,7 +8,7 @@
 
 **Параметры каждого компонента документированы в нём самом** — в блоке `{% comment %}` в первых строках файла. Здесь их дублировать нельзя: копия расходится с оригиналом молча, и именно так этот модуль три месяца описывал `PrimaryButton`, `InputValidated` и `DeskBookCardWide`, которых в коде нет.
 
-Все 50 файлов в `templates/components/`. Обязаны использовать токены модуля 02; прямые `rgb()` запрещены (DEC-05).
+Все 51 файл в `templates/components/`. Обязаны использовать токены модуля 02; прямые `rgb()` запрещены (DEC-05).
 
 ### Бренд и типовые элементы
 
@@ -27,7 +27,7 @@
 |------|-----------|
 | `cover_placeholder.html` | **Двухрежимная обложка.** Если `story.cover` задан — `<img src="/media/…">`; иначе типографическая плашка OKLCH по `primary_genre.hue` + буква + «корешок». Обязателен везде, где показывается обложка: `{% static story.cover %}` напрямую запрещён |
 | `book_card_small.html` | Вертикальная карточка для рядов и каруселей. Чип длительности на обложке |
-| `book_card_wide.html` | Горизонтальная карточка для списков каталога |
+| `book_card_wide.html` | Горизонтальная карточка для списков каталога. **Mobile-first**: до `sm` обложка 88×132, мета сжата в одну строку через «·», аннотация в две строки, теги скрыты стилем, счётчики через `compact_count`; с `sm` — полная раскладка 120×180. Брейкпоинтов не было вовсе: на 375px колонке контента оставался 171px, семь блоков подряд разворачивались в ~430px высоты, и в экран влезала одна карточка |
 | `library_row.html` | Строка библиотеки с прогрессом чтения |
 | `my_story_row.html` | Строка авторского кабинета со статусом и метриками |
 | `stat_pill.html` | Иконка + значение (лайки / просмотры / комментарии), `--color-slate-600` |
@@ -92,7 +92,7 @@
 | Файл | Назначение |
 |------|-----------|
 | `skeleton_box.html`, `skeleton_circle.html`, `skeleton_text.html` | Примитивы: прямоугольник, круг, строки текста |
-| `skeleton_book_card_small.html`, `skeleton_book_card_wide.html` | Скелетоны карточек. **Сетка обязана совпадать с сеткой контента** — иначе страница дёргается при подстановке; закрыто тестом |
+| `skeleton_book_card_small.html`, `skeleton_book_card_wide.html` | Скелетоны карточек. **Сетка обязана совпадать с сеткой контента** — иначе страница дёргается при подстановке; закрыто тестом. Включая брейкпоинты: `skeleton_book_card_wide` повторяет и мобильную обложку 88×132, и двухстрочную аннотацию |
 | `skeleton_comment.html`, `skeleton_chapter_text.html`, `skeleton_my_story_row.html`, `skeleton_notification_item.html` | Скелетоны под конкретные строки |
 | `empty_state.html` | Иконка, заголовок, подсказка, опц. CTA |
 | `error_state.html` | Ошибка загрузки + «Қайта көру». Есть `compact`-вариант для inline |
@@ -135,8 +135,8 @@
 | `partials/catalog/_hero_tag.html` | Tag-режим: slate-блок + `#`-префикс, usage_count |
 | `partials/catalog/_hero_catalog.html` | Нейтральный hero для `/catalog/` |
 | `partials/catalog/_book_list.html` | Список `book_card_wide` + empty-state (переиспользуется И коллекциями) |
-| `partials/catalog/_filter_panel.html` | Sort + status + q (refining) + genre chip-cloud + popular tags chip-cloud. В рейле всегда, в форме `@change="$el.requestSubmit()"` |
-| `partials/catalog/_filter_sheet.html` | Mobile bottom-sheet с тем же `_filter_panel`. Триггер: `$dispatch('open-catalog-filters')` |
+| `partials/catalog/_filter_panel.html` | Пять осей чипами (цикл по `filter_groups`) + q (refining) + genre chip-cloud + popular tags chip-cloud. Параметр `variant`: `rail` сабмитит по `@change`, `sheet` копит черновик и применяет кнопкой (FR-CAT-07) |
+| `partials/catalog/_filter_sheet.html` | Mobile bottom-sheet с тем же `_filter_panel` в `variant="sheet"`. Триггер: `$dispatch('open-catalog-filters')`. Кнопка «Нәтижелерді көрсету» стоит после жанров и тегов и связана с формой через `form=` |
 | `partials/right_rail/catalog.html` | Wrapper рейла: оборачивает `_filter_panel` в card |
 
 Комбинация фильтров — через query string: `/genres/triller/?tag=mektep&status=Published`. Тонкая обёртка — `_render_catalog(request, mode='...', genre_slug=..., tag_slug=...)`.

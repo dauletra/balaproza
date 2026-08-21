@@ -1,6 +1,6 @@
 # 14 · Карта реализации: требование → код
 
-> `Обновлён: 2026-08-21` · `Сверен с кодом: f1f896b`
+> `Обновлён: 2026-08-21` · `Сверен с кодом: fdde268`
 
 Этот документ отвечает на два вопроса, на которые остальное ТЗ не отвечает: **где живёт то, что описано требованием**, и **что придётся обновить, если это изменить**.
 
@@ -21,9 +21,9 @@
 | Маршруты | `core/urls.py`, `app_name='core'` | Все URL проекта, кроме `/admin/` |
 | Общий контекст | `core/context_processors.py` | `auth_state`, `nav_state`, `site_links` |
 | Фильтры | `core/templatetags/balaproza.py` | `compact_count`, `spaced`, `page_range`, `belongs_to` |
-| Шаблоны | корневая `templates/` (109 файлов) | 50 компонентов · 28 партиалов · 27 страниц · `base.html` · `404/500` |
+| Шаблоны | корневая `templates/` (113 файлов) | 51 компонент · 31 партиал · 27 страниц · спрайт иконок · `base.html` · `404/500` |
 | Токены | `static_src/input.css`, блок `@theme` | Единственный источник цветов, радиусов, теней ([02](02-design-system.md)) |
-| Тесты | `core/tests/` (16 файлов, 425 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
+| Тесты | `core/tests/` (16 файлов, 541 тест) | Контракт поведения, описан в [15](15-testing-contract.md) |
 
 **Шаблоны — не в `core/templates/`, а в корневой `templates/`.** Это задано `TEMPLATES.DIRS` в `config/settings.py`.
 
@@ -104,8 +104,26 @@
 | FR-CAT-04 | `collections`, `collection_detail` | `test_catalog.CollectionsList`, `CollectionDetail*` |
 | FR-CAT-05 | фильтр `page_range` | `test_filters.PageRange` |
 | FR-CAT-06 | `search_index_json` → `/api/search-index.json` | `test_catalog.SearchIndexHasTags` |
-| FR-CAT-07 | `partials/catalog/_filter_panel.html` + `_filter_sheet.html` | `test_catalog.CatalogFilterHelper`, `TagsInFilterPanel` |
-| Комбинации фильтров | `/genres/triller/?tag=mektep` | `test_catalog.CatalogFilterCombination` |
+| FR-CAT-07 | `partials/catalog/_filter_panel.html` (`variant='rail'\|'sheet'`) + `_filter_sheet.html` | `test_catalog.CatalogFilterHelper`, `TagsInFilterPanel`, `CatalogMobileControls` |
+| FR-CAT-08 | `_catalog_href` / `_catalog_links` в `core/views.py` | `test_catalog.CatalogStateIsCarried`, `CatalogActiveChips` |
+| Комбинации фильтров | `/genres/triller/?tag=mektep` | `test_catalog.CatalogFilterCombination`, `CatalogSecondAxisFromQuery` |
+| FR-CAT-09 (дефолт «Қазір танымал») | `Story.recent_views`, `_catalog_default_sort` | `test_catalog.TrendingIsTheDefaultSort` |
+| FR-CAT-10 (пресеты) | `stub_data.CATALOG_PRESETS`, `_catalog_presets` | `test_catalog.CatalogPresets` |
+| FR-CAT-11 (жинақтар в каталоге) | `rail_collections` → `partials/right_rail/catalog.html`, `partials/catalog/_book_list.html` | `test_catalog.EmptyCatalogOffersAWayOut` |
+| Ось знака качества | `STORY_BADGES`, `badge=` в `filter_catalog` | `test_catalog.QualityBadgeAxis` |
+| DEC-23 в выдаче | `PUBLIC_STATUSES` в `filter_catalog` | `test_catalog.DraftsAndModerationStayOutOfTheCatalog` |
+
+**Состояние сүзгі живёт в URL и собирается во view.** `_catalog_href(mode=, genre=, tag=, query=, sort=, status=, audience=, length=, format=)` строит канонический URL: путь занимает «главная» ось (жанр → `/genres/<slug>/`, иначе тег → `/tag/<slug>/`, иначе режим), всё остальное едет в query. `_catalog_links(state)` поверх него отдаёт в контекст `active_chips` (каждый чип — «состояние минус эта ось»), `active_count`, `clear_href`, `genre_options`, `tag_options`.
+
+Так закрыты две дыры: чипы жанра и тега вели на голый путь и молча сбрасывали остальные оси, а обещанная DEC-27 комбинация `?tag=` на странице жанра во view вообще не читалась. Путь всегда сильнее query — канонический URL остаётся источником истины. `sort` попадает в ссылку только когда выбран явно: иначе неявная `popularity` каталога ехала бы на страницу тега и отменяла DEC-31.
+
+**Панель сүзгі рендерится одним циклом** по `filter_groups` из контекста (`[{name, legend, options, current}]` — пять осей). Пять почти одинаковых `fieldset` в шаблоне расходились при каждой правке.
+
+**Мобильный каталог** (см. также [07 §7.9](07-layout-navigation.md)): липкая панель управления `sticky top-16` с сортировкой снаружи модалки, кнопка сүзгі с числовым бейджем активных осей, ряд чипов для снятия одной оси. В `_filter_sheet.html` панель работает черновиком — автосабмит по `@change` остался только в рейле.
+
+**Каталог отвечает на вопрос читателя, а не описывает атрибуты (DEC-36).** Дефолт сортировки — окно в 14 дней по `Story.recent_views`; накопленный `views` остался пунктом «Ең көп оқылған». Ось `badge` даёт платформе сказать про качество отдельно от просмотров. Пресеты `CATALOG_PRESETS` раскрываются в готовые комбинации осей и живут в контенте, а не в панели: ниже `xl` панель за модалкой. Счётчик у пресета настоящий и считается в текущем разделе, пустые пресеты не рендерятся, активный поглощает чипы своих осей.
+
+Попутно закрыта дыра в DEC-23: `filter_catalog` стартовала с полного `STORIES`, и работа со статусом «Модерацияда» лежала в публичном каталоге. Теперь пайплайн режет по `PUBLIC_STATUSES` на входе.
 
 **Коллекции сознательно не входят в движок** — это editorial curation, отдельный content type. Они переиспользуют только `partials/catalog/_book_list.html` (DEC-27).
 

@@ -24,7 +24,7 @@
             </p>
         </div>
         {% if has_any %}
-            <form method="post" action="#"
+            <form method="post" action="#" x-data
                   @submit.prevent="$dispatch('toast', { kind:'success', text:'Барлығы оқылды деп белгіленді (демо)' })">
                 {% csrf_token %}
                 <button type="submit"

@@ -19,7 +19,7 @@
         Атау мен аннотация — міндетті. Әңгімені бір мәтінмен немесе бөлімдермен жаза аласың.
     </p>
 
-    <form method="post" action="{% url 'core:new_story' %}"
+    <form method="post" action="{% url 'core:new_story' %}" x-data
           @submit.prevent="$dispatch('toast', { kind:'success', text:'Шығарма құрылды (демо)' })"
           class="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
         {% csrf_token %}
