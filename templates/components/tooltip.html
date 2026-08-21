@@ -1,0 +1,20 @@
+{% comment %}
+    Tooltip (docs/04). Подпись, всплывающая над элементом.
+
+    ВАЖНО: сам `x-data` не заводит — живёт внутри предка, у которого есть
+    булево `open`. Предок обязан быть `relative`, иначе абсолютный тултип
+    посчитает containing block от initial containing block и уедет в
+    координаты документа (см. правило про скроллеры в CLAUDE.md).
+
+    Открывать предок обязан не только по `mouseenter`: на телефоне
+    наведения нет, а тултип-только-по-ховеру означает, что смысл элемента
+    недоступен большинству читателей портала.
+
+    Параметры:
+      text — подпись
+{% endcomment %}
+<span x-show="open" x-cloak x-transition.opacity.duration.120ms
+      role="tooltip"
+      class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-sans text-xs font-semibold text-slate-700 shadow-modal">
+    {{ text }}
+</span>

@@ -7,6 +7,7 @@
 {% block content %}
     {# Неизвестный автор до шаблона не доходит: profile_other отдаёт 404. #}
     {% include "partials/profile/_header.html" %}
+    {% include "partials/profile/_achievements.html" %}
     {% include "partials/profile/_stats.html" %}
 
     {# ── Сегменты: чужой профиль ограничен — Шығарма + Туралы (без чужой библиотеки) ── #}

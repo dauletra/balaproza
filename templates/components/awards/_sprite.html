@@ -1,0 +1,219 @@
+{% comment %}
+    Спрайт наград (FR-PROF-06, DEC-43). Подключается ТОЛЬКО там, где награды
+    рендерятся — `partials/profile/_achievements.html`, — а не в base.html:
+    иконочный спрайт весит ~22 КБ инлайном на каждой странице, и добавлять
+    туда иллюстрации ради одного раздела нельзя.
+
+    Система, а не набор картинок:
+      • общий постамент — одинаковая геометрия у всех наград, именно он
+        превращает набор в набор. Инлайнится в каждый символ, а не
+        подключается вложенным `<use>` на группу в `<defs>`: такая
+        вложенность рендерится не во всех движках, и постамент молча
+        пропадал, оставляя эмблему висеть в воздухе;
+      • эмблема сверху — уникальный силуэт, различимый при 56px;
+      • металл — ступень ценности (бронза → серебро → золото), сигнал без слов.
+
+    Свет единый: сверху-слева. Градиент `-dk` — затенённая грань, белые
+    полупрозрачные штрихи — блик. Плоских заливок здесь нет специально:
+    объём и есть разница между наградой и иконкой.
+
+    Палитра металлов — закрытый реестр, docs/03 §3.5. Это не OKLCH-система
+    жанров: у металла нет `Genre.hue`, и подмешивать его в жанровую таблицу
+    было бы враньём про природу цвета.
+{% endcomment %}
+<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
+
+    <defs>
+        {# ── Металлы ── #}
+        <linearGradient id="g-gold" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#FFF3C4"/>
+            <stop offset=".38" stop-color="#F7CE5B"/>
+            <stop offset=".75" stop-color="#E0A424"/>
+            <stop offset="1" stop-color="#B97A12"/>
+        </linearGradient>
+        <linearGradient id="g-gold-dk" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#D9A32B"/>
+            <stop offset="1" stop-color="#8E5B0C"/>
+        </linearGradient>
+
+        <linearGradient id="g-silver" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#FBFDFF"/>
+            <stop offset=".38" stop-color="#DCE4EC"/>
+            <stop offset=".75" stop-color="#B2BECB"/>
+            <stop offset="1" stop-color="#8794A3"/>
+        </linearGradient>
+        <linearGradient id="g-silver-dk" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#B7C2CE"/>
+            <stop offset="1" stop-color="#75828F"/>
+        </linearGradient>
+
+        <linearGradient id="g-bronze" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#FBE0C0"/>
+            <stop offset=".38" stop-color="#E3A76B"/>
+            <stop offset=".75" stop-color="#C07B3C"/>
+            <stop offset="1" stop-color="#8F551F"/>
+        </linearGradient>
+        <linearGradient id="g-bronze-dk" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#C08046"/>
+            <stop offset="1" stop-color="#71411A"/>
+        </linearGradient>
+
+    </defs>
+
+    {# ═══ Байқау жеңімпазы — кубок, золото ═══ #}
+    <symbol id="award-contest-winner" viewBox="0 0 64 64">
+        <ellipse cx="32" cy="59.5" rx="18" ry="3" fill="#0F172A" opacity=".15"/>
+        <rect x="12.5" y="51" width="39" height="7" rx="2" fill="url(#g-gold-dk)"/>
+        <rect x="12.5" y="49" width="39" height="3.6" rx="1.8" fill="url(#g-gold)"/>
+        <rect x="19" y="44" width="26" height="5.6" rx="1.6" fill="url(#g-gold-dk)"/>
+        <rect x="19" y="42.8" width="26" height="2.6" rx="1.3" fill="url(#g-gold)"/>
+        <rect x="15.5" y="53" width="11" height="1.6" rx=".8" fill="#fff" opacity=".38"/>
+        <path d="M21 13h-5a6 6 0 0 0 6.4 9" fill="none" stroke="url(#g-gold-dk)" stroke-width="3.2" stroke-linecap="round"/>
+        <path d="M43 13h5a6 6 0 0 1-6.4 9" fill="none" stroke="url(#g-gold-dk)" stroke-width="3.2" stroke-linecap="round"/>
+        <path d="M20.5 10.5h23v10.5a11.5 11.5 0 0 1-23 0z" fill="url(#g-gold)"/>
+        <rect x="18.6" y="7.6" width="26.8" height="3.6" rx="1.8" fill="url(#g-gold)"/>
+        <rect x="18.6" y="7.6" width="26.8" height="1.5" rx=".75" fill="#fff" opacity=".45"/>
+        <path d="M30 32.2h4v6h-4z" fill="url(#g-gold-dk)"/>
+        <rect x="23.6" y="37.8" width="16.8" height="4.4" rx="1.7" fill="url(#g-gold)"/>
+        <path d="M25.4 14v7a7.4 7.4 0 0 0 2.6 5.6" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2.1" stroke-linecap="round"/>
+    </symbol>
+
+    {# ═══ Редакция таңдауы — звезда, золото ═══ #}
+    <symbol id="award-editorial-choice" viewBox="0 0 64 64">
+        <ellipse cx="32" cy="59.5" rx="18" ry="3" fill="#0F172A" opacity=".15"/>
+        <rect x="12.5" y="51" width="39" height="7" rx="2" fill="url(#g-gold-dk)"/>
+        <rect x="12.5" y="49" width="39" height="3.6" rx="1.8" fill="url(#g-gold)"/>
+        <rect x="19" y="44" width="26" height="5.6" rx="1.6" fill="url(#g-gold-dk)"/>
+        <rect x="19" y="42.8" width="26" height="2.6" rx="1.3" fill="url(#g-gold)"/>
+        <rect x="15.5" y="53" width="11" height="1.6" rx=".8" fill="#fff" opacity=".38"/>
+        <path d="M32 9 36.58 21.19 49.6 21.78 39.42 29.91 42.87 42.47 32 35.3 21.13 42.47 24.58 29.91 14.4 21.78 27.42 21.19Z" fill="url(#g-gold)"/>
+        <path d="M32 9 36.58 21.19 27.42 21.19Z" fill="#fff" opacity=".42"/>
+        <path d="M32 14.4 34.7 21.6 27.9 26.9Z" fill="#fff" opacity=".2"/>
+    </symbol>
+
+    {# ═══ Байқауға қабылданды — медаль на ленте, серебро ═══ #}
+    <symbol id="award-contest-accepted" viewBox="0 0 64 64">
+        <ellipse cx="32" cy="59.5" rx="18" ry="3" fill="#0F172A" opacity=".15"/>
+        <rect x="12.5" y="51" width="39" height="7" rx="2" fill="url(#g-silver-dk)"/>
+        <rect x="12.5" y="49" width="39" height="3.6" rx="1.8" fill="url(#g-silver)"/>
+        <rect x="19" y="44" width="26" height="5.6" rx="1.6" fill="url(#g-silver-dk)"/>
+        <rect x="19" y="42.8" width="26" height="2.6" rx="1.3" fill="url(#g-silver)"/>
+        <rect x="15.5" y="53" width="11" height="1.6" rx=".8" fill="#fff" opacity=".5"/>
+        <path d="M26.6 8.6 30.2 21.8" fill="none" stroke="url(#g-silver-dk)" stroke-width="5.2" stroke-linecap="round"/>
+        <path d="M37.4 8.6 33.8 21.8" fill="none" stroke="url(#g-silver-dk)" stroke-width="5.2" stroke-linecap="round"/>
+        <circle cx="32" cy="31.2" r="11.3" fill="url(#g-silver)"/>
+        <circle cx="32" cy="31.2" r="7.7" fill="url(#g-silver-dk)"/>
+        <path d="M32 25.5 33.9 29.4 38.2 30 35.1 33 35.8 37.2 32 35.2 28.2 37.2 28.9 33 25.8 30 30.1 29.4Z" fill="#fff" fill-opacity=".8"/>
+        <path d="M24.4 25.8a11.3 11.3 0 0 1 4.8-4.4" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+
+    {# ═══ Сериалды аяқтады — стопка томов, серебро ═══ #}
+    <symbol id="award-finished-serial" viewBox="0 0 64 64">
+        <ellipse cx="32" cy="59.5" rx="18" ry="3" fill="#0F172A" opacity=".15"/>
+        <rect x="12.5" y="51" width="39" height="7" rx="2" fill="url(#g-silver-dk)"/>
+        <rect x="12.5" y="49" width="39" height="3.6" rx="1.8" fill="url(#g-silver)"/>
+        <rect x="19" y="44" width="26" height="5.6" rx="1.6" fill="url(#g-silver-dk)"/>
+        <rect x="19" y="42.8" width="26" height="2.6" rx="1.3" fill="url(#g-silver)"/>
+        <rect x="15.5" y="53" width="11" height="1.6" rx=".8" fill="#fff" opacity=".5"/>
+        <rect x="20" y="33.6" width="24" height="8.4" rx="1.8" fill="url(#g-silver-dk)"/>
+        <rect x="20" y="33.6" width="24" height="2.3" rx="1.15" fill="#fff" opacity=".38"/>
+        <rect x="39.2" y="35.5" width="4.8" height="6.5" rx="1.3" fill="#fff" opacity=".3"/>
+        <rect x="21.4" y="24.1" width="21.2" height="8.4" rx="1.8" fill="url(#g-silver)"/>
+        <rect x="21.4" y="24.1" width="21.2" height="2.3" rx="1.15" fill="#fff" opacity=".52"/>
+        <rect x="21.4" y="26" width="4.8" height="6.5" rx="1.3" fill="#fff" opacity=".36"/>
+        <rect x="20.6" y="14.6" width="22.8" height="8.4" rx="1.8" fill="url(#g-silver-dk)"/>
+        <rect x="20.6" y="14.6" width="22.8" height="2.3" rx="1.15" fill="#fff" opacity=".38"/>
+        <rect x="38.6" y="16.5" width="4.8" height="6.5" rx="1.3" fill="#fff" opacity=".3"/>
+        <path d="M29.6 14.6h4.8v12.4l-2.4-2.4-2.4 2.4z" fill="url(#g-gold)"/>
+    </symbol>
+
+    {# ═══ Алғашқы жарияланым — раскрытая книга, бронза ═══ #}
+    <symbol id="award-first-publication" viewBox="0 0 64 64">
+        <ellipse cx="32" cy="59.5" rx="18" ry="3" fill="#0F172A" opacity=".15"/>
+        <rect x="12.5" y="51" width="39" height="7" rx="2" fill="url(#g-bronze-dk)"/>
+        <rect x="12.5" y="49" width="39" height="3.6" rx="1.8" fill="url(#g-bronze)"/>
+        <rect x="19" y="44" width="26" height="5.6" rx="1.6" fill="url(#g-bronze-dk)"/>
+        <rect x="19" y="42.8" width="26" height="2.6" rx="1.3" fill="url(#g-bronze)"/>
+        <rect x="15.5" y="53" width="11" height="1.6" rx=".8" fill="#fff" opacity=".38"/>
+        <path d="M32 16.6c-3.9-3.2-9-4.8-14.5-4.8a1.8 1.8 0 0 0-1.8 1.8v22.4a1.8 1.8 0 0 0 1.8 1.8c5.5 0 10.6 1.6 14.5 4.8z" fill="url(#g-bronze)"/>
+        <path d="M32 16.6c3.9-3.2 9-4.8 14.5-4.8a1.8 1.8 0 0 1 1.8 1.8v22.4a1.8 1.8 0 0 1-1.8 1.8c-5.5 0-10.6 1.6-14.5 4.8z" fill="url(#g-bronze-dk)"/>
+        <path d="M30.5 16.6h3v26h-3z" fill="url(#g-bronze-dk)"/>
+        <path d="M20.6 21.2h7.4M20.6 25.4h7.4M20.6 29.6h5.4M36 21.2h6.4M36 25.4h6.4" stroke="#fff" stroke-opacity=".42" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+
+    {% comment %}
+        ═══ Байқауға қатысты — перо, бронза ═══
+        Бумажный самолётик не читался ни в анфас (выходила пирамида), ни в
+        3/4 (выходила стрелка). Перо — единственный в наборе силуэт, который
+        не прямоугольник и не круг, и метафора для литпортала точнее.
+    {% endcomment %}
+    <symbol id="award-contest-participant" viewBox="0 0 64 64">
+        <ellipse cx="32" cy="59.5" rx="18" ry="3" fill="#0F172A" opacity=".15"/>
+        <rect x="12.5" y="51" width="39" height="7" rx="2" fill="url(#g-bronze-dk)"/>
+        <rect x="12.5" y="49" width="39" height="3.6" rx="1.8" fill="url(#g-bronze)"/>
+        <rect x="19" y="44" width="26" height="5.6" rx="1.6" fill="url(#g-bronze-dk)"/>
+        <rect x="19" y="42.8" width="26" height="2.6" rx="1.3" fill="url(#g-bronze)"/>
+        <rect x="15.5" y="53" width="11" height="1.6" rx=".8" fill="#fff" opacity=".38"/>
+        <path d="M43.5 10.5c2.6 9.6-1.2 19.6-9.4 26.2-3.4 2.8-7.2 4.4-10.6 5 1.2-9.8 5.4-19.4 11-25.2 2.8-2.9 6-5 9-6Z" fill="url(#g-bronze)"/>
+        <path d="M43.5 10.5C37 17 30.4 27.4 27.8 42.2" fill="none" stroke="url(#g-bronze-dk)" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M39 15.6c1.2 6-.6 12.4-5.4 17.6" fill="none" stroke="#fff" stroke-opacity=".4" stroke-width="1.6" stroke-linecap="round"/>
+    </symbol>
+
+    {# ═══ Оқылым — стела с числом. Один рисунок, четыре ступени ═══ #}
+    <symbol id="award-reads-1k" viewBox="0 0 64 64">
+        <ellipse cx="32" cy="59.5" rx="18" ry="3" fill="#0F172A" opacity=".15"/>
+        <rect x="12.5" y="51" width="39" height="7" rx="2" fill="url(#g-bronze-dk)"/>
+        <rect x="12.5" y="49" width="39" height="3.6" rx="1.8" fill="url(#g-bronze)"/>
+        <rect x="19" y="44" width="26" height="5.6" rx="1.6" fill="url(#g-bronze-dk)"/>
+        <rect x="19" y="42.8" width="26" height="2.6" rx="1.3" fill="url(#g-bronze)"/>
+        <rect x="15.5" y="53" width="11" height="1.6" rx=".8" fill="#fff" opacity=".38"/>
+        <rect x="19" y="11" width="26" height="31" rx="3" fill="url(#g-bronze)"/>
+        <rect x="21.5" y="13.5" width="21" height="25.4" rx="2" fill="url(#g-bronze-dk)"/>
+        <rect x="21.5" y="13.5" width="21" height="2" rx="1" fill="#fff" opacity=".22"/>
+        <text x="32" y="29" text-anchor="middle" font-family="Montserrat, sans-serif" font-weight="700" font-size="14.5" fill="#fff" fill-opacity=".94">1</text>
+        <text x="32" y="36.3" text-anchor="middle" font-family="Montserrat, sans-serif" font-weight="700" font-size="6.6" letter-spacing=".5" fill="#fff" fill-opacity=".7">мың</text>
+    </symbol>
+
+    <symbol id="award-reads-10k" viewBox="0 0 64 64">
+        <ellipse cx="32" cy="59.5" rx="18" ry="3" fill="#0F172A" opacity=".15"/>
+        <rect x="12.5" y="51" width="39" height="7" rx="2" fill="url(#g-silver-dk)"/>
+        <rect x="12.5" y="49" width="39" height="3.6" rx="1.8" fill="url(#g-silver)"/>
+        <rect x="19" y="44" width="26" height="5.6" rx="1.6" fill="url(#g-silver-dk)"/>
+        <rect x="19" y="42.8" width="26" height="2.6" rx="1.3" fill="url(#g-silver)"/>
+        <rect x="15.5" y="53" width="11" height="1.6" rx=".8" fill="#fff" opacity=".5"/>
+        <rect x="19" y="11" width="26" height="31" rx="3" fill="url(#g-silver)"/>
+        <rect x="21.5" y="13.5" width="21" height="25.4" rx="2" fill="url(#g-silver-dk)"/>
+        <rect x="21.5" y="13.5" width="21" height="2" rx="1" fill="#fff" opacity=".3"/>
+        <text x="32" y="29" text-anchor="middle" font-family="Montserrat, sans-serif" font-weight="700" font-size="13.5" fill="#fff" fill-opacity=".96">10</text>
+        <text x="32" y="36.3" text-anchor="middle" font-family="Montserrat, sans-serif" font-weight="700" font-size="6.6" letter-spacing=".5" fill="#fff" fill-opacity=".75">мың</text>
+    </symbol>
+
+    <symbol id="award-reads-50k" viewBox="0 0 64 64">
+        <ellipse cx="32" cy="59.5" rx="18" ry="3" fill="#0F172A" opacity=".15"/>
+        <rect x="12.5" y="51" width="39" height="7" rx="2" fill="url(#g-silver-dk)"/>
+        <rect x="12.5" y="49" width="39" height="3.6" rx="1.8" fill="url(#g-silver)"/>
+        <rect x="19" y="44" width="26" height="5.6" rx="1.6" fill="url(#g-silver-dk)"/>
+        <rect x="19" y="42.8" width="26" height="2.6" rx="1.3" fill="url(#g-silver)"/>
+        <rect x="15.5" y="53" width="11" height="1.6" rx=".8" fill="#fff" opacity=".5"/>
+        <rect x="19" y="11" width="26" height="31" rx="3" fill="url(#g-silver)"/>
+        <rect x="21.5" y="13.5" width="21" height="25.4" rx="2" fill="url(#g-silver-dk)"/>
+        <rect x="21.5" y="13.5" width="21" height="2" rx="1" fill="#fff" opacity=".3"/>
+        <text x="32" y="29" text-anchor="middle" font-family="Montserrat, sans-serif" font-weight="700" font-size="13.5" fill="#fff" fill-opacity=".96">50</text>
+        <text x="32" y="36.3" text-anchor="middle" font-family="Montserrat, sans-serif" font-weight="700" font-size="6.6" letter-spacing=".5" fill="#fff" fill-opacity=".75">мың</text>
+    </symbol>
+
+    <symbol id="award-reads-100k" viewBox="0 0 64 64">
+        <ellipse cx="32" cy="59.5" rx="18" ry="3" fill="#0F172A" opacity=".15"/>
+        <rect x="12.5" y="51" width="39" height="7" rx="2" fill="url(#g-gold-dk)"/>
+        <rect x="12.5" y="49" width="39" height="3.6" rx="1.8" fill="url(#g-gold)"/>
+        <rect x="19" y="44" width="26" height="5.6" rx="1.6" fill="url(#g-gold-dk)"/>
+        <rect x="19" y="42.8" width="26" height="2.6" rx="1.3" fill="url(#g-gold)"/>
+        <rect x="15.5" y="53" width="11" height="1.6" rx=".8" fill="#fff" opacity=".38"/>
+        <rect x="19" y="11" width="26" height="31" rx="3" fill="url(#g-gold)"/>
+        <rect x="21.5" y="13.5" width="21" height="25.4" rx="2" fill="url(#g-gold-dk)"/>
+        <rect x="21.5" y="13.5" width="21" height="2" rx="1" fill="#fff" opacity=".26"/>
+        <text x="32" y="29" text-anchor="middle" font-family="Montserrat, sans-serif" font-weight="700" font-size="10.5" fill="#fff" fill-opacity=".96">100</text>
+        <text x="32" y="36.3" text-anchor="middle" font-family="Montserrat, sans-serif" font-weight="700" font-size="6.6" letter-spacing=".5" fill="#fff" fill-opacity=".72">мың</text>
+    </symbol>
+
+</svg>

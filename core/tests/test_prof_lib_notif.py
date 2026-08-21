@@ -360,6 +360,60 @@ class ProfileOtherUnknown(TestCase):
         self.assertEqual(r.status_code, 404)
 
 
+class ProfileAchievementsRender(TestCase):
+    """Ряд знаков и строка фактов (FR-PROF-06)."""
+
+    def test_badges_render_on_other_profile(self):
+        r = self.client.get(reverse('core:profile_other', kwargs={'username': 'dina_books'}))
+        ach = stub_data.achievements_of('dina_books')
+        self.assertTrue(ach)
+        for a in ach:
+            with self.subTest(key=a['key']):
+                self.assertContains(r, a['label'])
+
+    def test_owner_sees_the_same_badges(self):
+        """Достижение публично по определению — набор не зависит от зрителя."""
+        _login_as_aidana(self.client)
+        mine = self.client.get(reverse('core:profile_me'))
+        theirs = self.client.get(reverse('core:profile_other', kwargs={'username': 'aidana'}))
+        for a in stub_data.achievements_of('aidana'):
+            with self.subTest(key=a['key']):
+                self.assertContains(mine, a['label'])
+                self.assertContains(theirs, a['label'])
+
+    def test_row_is_a_labelled_list(self):
+        r = self.client.get(reverse('core:profile_other', kwargs={'username': 'rudazov'}))
+        self.assertContains(r, 'Автордың марапаттары')
+
+    def test_empty_row_renders_nothing(self):
+        """Пустое состояние здесь звучало бы упрёком новичку (docs/13 §13.8.6)."""
+        from django.template.loader import render_to_string
+        html = render_to_string('partials/profile/_achievements.html', {'achievements': []})
+        self.assertNotIn('<ul', html)
+        self.assertEqual(html.strip(), '')
+
+    def test_facts_line_shows_year_and_contests(self):
+        r = self.client.get(reverse('core:profile_other', kwargs={'username': 'aidana'}))
+        self.assertContains(r, '2025 жылдан бері')
+        # Участие без статуса: число совпадает с длиной списка заявок и не
+        # выдаёт вычитанием, что одна из них отклонена.
+        self.assertEqual(len(stub_data.submissions_of('aidana')), 2)
+        self.assertContains(r, '2 байқау')
+
+    def test_facts_line_omits_contests_when_none(self):
+        r = self.client.get(reverse('core:profile_other', kwargs={'username': 'aygerim_k'}))
+        self.assertEqual(stub_data.submissions_of('aygerim_k'), [])
+        self.assertEqual(r.context['contests_n'], 0)
+        self.assertContains(r, '2024 жылдан бері')
+        # Проверяем сам сегмент, а не слово: «Байқаулар» есть в шапке и подвале.
+        self.assertNotContains(r, '0 байқау')
+
+    def test_facts_line_does_not_repeat_the_works_tile(self):
+        """Дубль числа работ уже вычищали из рейла — не возвращаем его в шапку."""
+        body = (TEMPLATES / 'partials' / 'profile' / '_header.html').read_text(encoding='utf-8')
+        self.assertNotIn('шығарма', body)
+
+
 class ProfileTemplatesShareParts(TestCase):
     """Свой и чужой профиль обязаны рендерить одни и те же партиалы.
 
@@ -371,7 +425,7 @@ class ProfileTemplatesShareParts(TestCase):
     """
 
     PAGES = ('pages/profile/profile_me.html', 'pages/profile/profile_other.html')
-    PARTS = ('_header.html', '_stats.html', '_about.html')
+    PARTS = ('_header.html', '_achievements.html', '_stats.html', '_about.html')
 
     def test_both_pages_include_shared_partials(self):
         for page in self.PAGES:

@@ -86,6 +86,12 @@ Author workspace, library, social:
 - `in_library(username: str, story_slug: str) -> bool`
 - `public_stats(username: str) -> dict` — `works` / `reads` / `likes` / `followers` по публичным работам (FR-PROF-01). `works` совпадает с `Author.works` по построению
 - `reader_stats(username: str) -> dict` — `public_stats` плюс приватное: `works_total` (с черновиками), `finished` (дочитано, из библиотеки). Ключ `read` переименован в `finished`, чтобы не путаться с `reads`
+- `achievements_of(username: str) -> list[dict]` — награды автора (FR-PROF-06, BR-ACH-01): `key` / `label` / `art` / `tier`. `art` — слаг иллюстрации в `components/awards/_sprite.html`, `tier` — металл ступени (`AWARD_TIERS`). **Выводятся, не хранятся**; URL-ы слой данных не отдаёт
+- `READ_TIER_ART` — ступень оқылым → (слаг рисунка, металл). Один рисунок-стела на четыре ступени: меняются число на табличке и металл
+- `reads_total(username: str) -> int` — прочтения по публичным работам
+- `tier_for(total: int) -> tuple | None`, `next_tier_for(total: int) -> tuple | None` — чистые функции над `READ_TIERS`, чтобы границы проверялись напрямую
+- `read_tier(username: str)`, `next_read_tier(username: str)` — они же для автора
+- `winning_stories_of(username: str) -> list[Story]` — победы по `Contest.winners`
 - `is_following(me: str, them: str) -> bool`
 - `following_of(username: str) -> list[Author]`
 - `followers_of(username: str) -> list[Author]`

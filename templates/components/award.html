@@ -1,0 +1,40 @@
+{% comment %}
+    Награда автора (FR-PROF-06, DEC-43) — предметная иллюстрация на
+    постаменте, а не пилюля с монохромной иконкой.
+
+    Подписи рядом нет намеренно: ряд из семи подписанных пилюль читается
+    как таблица, а не как награды. Смысл отдаёт тултип.
+
+    Это `<button>`, а не картинка, и открывается он по наведению, фокусу
+    **и тапу**: hover на телефоне не существует, а проект mobile-first.
+    Нативный `title=` (как в tag_chip) на тач-устройствах молчит вовсе.
+    `aria-label` несёт то же название — иллюстрация для скринридера
+    декоративна.
+
+    `x-data` стоит на самом элементе: Alpine 3 обходит только поддеревья,
+    найденные по `x-data`, и директива на элементе вне такого корня —
+    мёртвый атрибут без единой ошибки в консоли.
+
+    Требует подключённого `components/awards/_sprite.html` на странице.
+
+    Параметры:
+      art   — слаг иллюстрации (`award-<art>` в спрайте)
+      label — название награды: тултип + доступное имя
+      size  — px, по умолчанию 56. Ниже 48 иллюстрация перестаёт читаться
+{% endcomment %}
+{% with s=size|default:56 %}
+<button type="button"
+        x-data="{ open: false }"
+        @mouseenter="open = true" @mouseleave="open = false"
+        @focus="open = true" @blur="open = false"
+        @click="open = !open"
+        @keydown.escape.window="open = false"
+        @click.outside="open = false"
+        class="relative inline-flex shrink-0 rounded-md transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        aria-label="{{ label }}">
+    <svg width="{{ s }}" height="{{ s }}" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <use href="#award-{{ art }}"/>
+    </svg>
+    {% include "components/tooltip.html" with text=label only %}
+</button>
+{% endwith %}

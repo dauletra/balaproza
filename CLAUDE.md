@@ -50,14 +50,18 @@ balaproza_v1/
 │   │                             # stories_by_genre, search_stories, search_authors,
 │   │                             # related_stories, apply_catalog_filters, filter_catalog,
 │   │                             # reactions_of, reaction_breakdown, poll_of,
-│   │                             # library_of, in_library, reader_stats, writer_stats, is_following,
+│   │                             # library_of, in_library, public_stories_of, public_stats,
+│   │                             # reader_stats, writer_stats, is_following,
+│   │                             # achievements_of / reads_total / tier_for / read_tier /
+│   │                             # next_read_tier / winning_stories_of (FR-PROF-06, DEC-41 —
+│   │                             # знаки ВЫВОДЯТСЯ, хранить их нельзя; рейтинга нет),
 │   │                             # following_of, followers_of, notifications_for_user,
 │   │                             # unread_count_for_user, collections_of, trending_tags,
 │   │                             # submissions_of, has_submission,
 │   │                             # submission_checklist (BR-22), eligible_for_contest,
 │   │                             # tag_by_slug, tags_of, is_blocked, popular_tags,
 │   │                             # accepted_tags_json, blocked_tag_patterns_list
-│   │                             # + константы: CATALOG_SORTS, CATALOG_DEFAULT_SORT,
+│   │                             # + константы: READ_TIERS, CATALOG_SORTS, CATALOG_DEFAULT_SORT,
 │   │                             # CATALOG_STATUS_FILTERS, CATALOG_BADGE_FILTERS,
 │   │                             # CATALOG_PRESETS, STORY_BADGES, PUBLIC_STATUSES,
 │   │                             # CATALOG_AUTHOR_FILTERS, NEW_AUTHOR_FOLLOWERS,
@@ -81,12 +85,12 @@ balaproza_v1/
 │   ├── context_processors.py     # auth_state, nav_state, site_links
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced, page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 640 тестов в 16 файлах (см. ниже)
+│   └── tests/                    # 667 тестов в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
 │   ├── 404.html / 500.html       # branded error pages (500 — standalone, без base.html)
-│   ├── components/               # 54 атома и composites (см. docs/04)
+│   ├── components/               # 56 атомов и composites (см. docs/04)
 │   │                             # включая cover_placeholder (двухрежимный: <img> если
 │   │                             # story.cover задан, иначе типографическая плашка OKLCH +
 │   │                             # буква по primary genre.hue),
@@ -98,6 +102,10 @@ balaproza_v1/
 │   │                             # reaction_bar (FR-STORY-12, DEC-32 — 5 реакций
 │   │                             # вместо лайка), chapter_poll (FR-STORY-13,
 │   │                             # DEC-33 — необязательный опрос), school_links.
+│   │                             # award (DEC-43 — иллюстрация на постаменте, НЕ пилюля)
+│   │                             # + tooltip (без своего x-data, живёт в предке с `open`)
+│   │                             # awards/_sprite.html — 10 наград, подключается ТОЛЬКО
+│   │                             # в partials/profile/_achievements.html, не в base.html
 │   │                             # NB: catalog_controls.html устарел — заменён
 │   │                             # _filter_panel в каталоге (DEC-27)
 │   ├── partials/                 # header, footer (карта сайта), mobile_nav, page_header,
@@ -112,7 +120,7 @@ balaproza_v1/
 │   │                             # (variant='rail'|'sheet' — в листе черновик, не автосабмит),
 │   │                             # _filter_sheet (mobile bottom-sheet), _hero_search,
 │   │                             # _hero_genre, _hero_tag, _hero_catalog.
-│   │                             # profile/_{header,stats,about}.html — общие для своего и
+│   │                             # profile/_{header,achievements,stats,about}.html — общие для своего и
 │   │                             # чужого профиля. Были скопированы в оба шаблона и уже
 │   │                             # разошлись; в копии «Туралы» лежало настоящее имя автора
 │   │                             # без пометки приватности. Держит
@@ -180,7 +188,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 640 тестов
+uv run python manage.py test core       # все 667 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 
@@ -251,6 +259,7 @@ def _login_as_aidana(client):
 - **Обложки произведений** — `components/cover_placeholder.html` (двухрежимный): если `story.cover` непустой → рендерит `<img src="/media/{cover}">` с object-cover; иначе — типографическая плашка OKLCH + буква + «корешок» по hue primary жанра. Не использовать `{% static story.cover %}` напрямую — путь к файлу инкапсулирован в компоненте
 - **Аватары** — `components/avatar.html` (буквенные инициалы на OKLCH-фоне по длине seed=username+name). Передавать `username` для стабильного цвета
 - **Статусы произведения** — только через `components/status_badge.html` с key из 5: `Published|NotPublished|OnProcess|Completed|OnModeration` (BR-10/11)
+- **Награды автора** — только через `components/award.html` + спрайт `components/awards/_sprite.html` (DEC-43). Это **не иконки**: иконка монохромна и читается при 16px, награда цветная и ниже 48px рассыпается — в иконочный спрайт их не класть, он подключён глобально. Слаги иллюстраций приходят из `stub_data.achievements_of`; новую награду без нового `<symbol>` не добавлять (ловит `test_template_lint.IconNamesExistInSprite`). Палитра металлов закрыта — `docs/03 §3.6`, новых оттенков без внесения в таблицу нет. Подпись рядом с наградой не ставить: её несёт тултип, и открываться он обязан по наведению, фокусу **и тапу** — на телефоне ховера нет (BR-ACH-06)
 - **Реакции на главу** — закрытый словарь из 5 (`stub_data.REACTIONS`, BR-REACT-01), рендер только через `components/reaction_bar.html`. Каждая реакция обязана иметь подпись словом: эмодзи запрещены, а монохромная иконка 20px без подписи неразличима. Новых реакций не добавлять без нового DEC
 - **Жанры** — только через `components/genre_chip.html` (DEC-14: `GenrePill` запрещён). На главной жанр — полоса-вывеска `partials/home/genre_strip.html` (DEC-31), а не навигация: заголовка, «барлығы →» и скроллера у неё нет. `Genre.icon` используется на карточках `/genres/`
 - **Теги (UGC)** — `components/tag_chip.html` (slate-style + `#`-префикс, отличается от цветного `genre_chip`). Pending-теги автоматически с пунктирной рамкой + бейдж «проверкада». Группа тегов на стори — через `components/tag_list.html` (фильтрует pending для не-автора, BR-TAG-07). Ввод тегов в формах — `components/tag_input.html` (Alpine, автокомплит, лимит 10, blocklist-валидация)

@@ -1935,6 +1935,160 @@ def following_of(username: str) -> list:
     return [AUTHORS_BY_USERNAME[u] for u in FOLLOWING.get(username, set()) if u in AUTHORS_BY_USERNAME]
 
 
+# ───────────────────────── PROF — достижения автора ───────────────────────
+#
+# Знаки автора (FR-PROF-06). Все семь **выводятся из данных**, ни один не
+# хранится: `Author.works` уже был хранимым литералом и врал у всех шести
+# авторов сразу в шести местах рендера. Достижений семь, и разъезжаться они
+# начали бы в семь раз быстрее.
+#
+# Рейтинга — числа, по которому авторов можно выстроить в ряд, — здесь нет и
+# не будет (DEC-41, docs/13 §13.10). Знак говорит «ты сделал», рейтинг —
+# «ты хуже вон того»; аудитории 14-18 второе не нужно.
+
+# Ступени прочтений. Считаются **накопительно по всем публичным работам**:
+# это знак автора, а у произведения свои бейджи уже есть (STORY_BADGES).
+READ_TIERS = (
+    (1_000,   "Мың оқылым"),
+    (10_000,  "Он мың оқылым"),
+    (50_000,  "Елу мың оқылым"),
+    (100_000, "Жүз мың оқылым"),
+)
+
+
+def reads_total(username: str) -> int:
+    """Сколько раз прочитали автора — по публичным работам (BR-73)."""
+    return sum(s.views for s in public_stories_of(username))
+
+
+def tier_for(total: int) -> Optional[tuple]:
+    """Высшая ступень, взятая при таком числе прочтений, или None.
+
+    Отдельно от `read_tier`, чтобы границы (999/1 000/9 999/10 000)
+    проверялись напрямую, а не через подгонку фикстур.
+    """
+    taken = [t for t in READ_TIERS if total >= t[0]]
+    return taken[-1] if taken else None
+
+
+def next_tier_for(total: int) -> Optional[tuple]:
+    """Следующая невзятая ступень или None, если взяты все."""
+    ahead = [t for t in READ_TIERS if total < t[0]]
+    return ahead[0] if ahead else None
+
+
+def read_tier(username: str) -> Optional[tuple]:
+    """Высшая взятая ступень автора.
+
+    В публичный ряд идёт только она. «Мың» + «Он мың» + «Елу мың» рядом —
+    три пилюли, говорящие одно и то же; пройденные ступени видно в своей
+    статистике (FR-PROF-08).
+    """
+    return tier_for(reads_total(username))
+
+
+def next_read_tier(username: str) -> Optional[tuple]:
+    """Следующая ступень — для своей статистики, не для публичного ряда."""
+    return next_tier_for(reads_total(username))
+
+
+def winning_stories_of(username: str) -> list:
+    """Работы автора, победившие в завершённых конкурсах."""
+    return [
+        story
+        for contest in CONTESTS
+        for story in contest.winner_stories
+        if story.author_username == username
+    ]
+
+
+# Слаг иллюстрации и металл ступени для каждой награды (DEC-43).
+# Металл — не украшение, а сигнал ценности: бронза — первые шаги, серебро —
+# середина пути, золото — редкое. Он заменил прежнюю подсветку `kind`,
+# потому что читается без легенды и не требует подписи рядом.
+AWARD_TIERS = ("bronze", "silver", "gold")
+
+# Ступени оқылым: слаг иллюстрации + металл. Один рисунок-стела, у которого
+# меняются число на табличке и металл, — как «5 ЛЕТ» у аналогов. Четыре
+# отдельные картинки рисовать незачем.
+READ_TIER_ART = {
+    1_000:   ("reads-1k",   "bronze"),
+    10_000:  ("reads-10k",  "silver"),
+    50_000:  ("reads-50k",  "silver"),
+    100_000: ("reads-100k", "gold"),
+}
+
+
+def achievements_of(username: str) -> list:
+    """Награды автора — порядок стабильный, от первого шага к редкому.
+
+    Отдаёт `key` / `label` / `art` / `tier`; рендерит `components/award.html`.
+    Ссылок здесь нет: URL-ы в слой данных не спускаем — как в каталоге
+    (`_catalog_href`) и в полосе внимания кабинета (`_attention_links`).
+
+    `art` — слаг иллюстрации в `components/awards/_sprite.html`, `tier` —
+    металл постамента. Прежние `icon` / `kind` описывали пилюлю с
+    монохромной иконкой; награда — предметная иллюстрация, и ступень
+    ценности несёт металл, а не цвет фона (DEC-43, BR-ACH-02).
+    """
+    if username not in AUTHORS_BY_USERNAME:
+        return []
+
+    mine = my_stories_of(username)
+    subs = submissions_of(username)
+    out = []
+
+    if any(s.is_public for s in mine):
+        out.append({
+            "key": "first_publication", "label": "Алғашқы жарияланым",
+            "art": "first-publication", "tier": "bronze",
+        })
+
+    if subs:
+        out.append({
+            "key": "contest_participant", "label": "Байқауға қатысты",
+            "art": "contest-participant", "tier": "bronze",
+        })
+
+    # Дописанный сериал. Самый ценный знак набора: дописать начатое
+    # подростку тяжелее всего, и это ровно то поведение, которое платформе
+    # нужно поощрять. Одиночный рассказ сюда не считается — он «дописан»
+    # в момент публикации (BR-10a).
+    if any(s.status == "Completed" and not s.is_single for s in mine):
+        out.append({
+            "key": "finished_serial", "label": "Сериалды аяқтады",
+            "art": "finished-serial", "tier": "silver",
+        })
+
+    if any(s.status == "accepted" for s in subs):
+        out.append({
+            "key": "contest_accepted", "label": "Байқауға қабылданды",
+            "art": "contest-accepted", "tier": "silver",
+        })
+
+    if winning_stories_of(username):
+        out.append({
+            "key": "contest_winner", "label": "Байқау жеңімпазы",
+            "art": "contest-winner", "tier": "gold",
+        })
+
+    if any(BADGE_LABELS["editorial"] in s.badges for s in mine if s.is_public):
+        out.append({
+            "key": "editorial_choice", "label": BADGE_LABELS["editorial"],
+            "art": "editorial-choice", "tier": "gold",
+        })
+
+    tier = read_tier(username)
+    if tier:
+        art, metal = READ_TIER_ART[tier[0]]
+        out.append({
+            "key": "reads", "label": tier[1],
+            "art": art, "tier": metal,
+        })
+
+    return out
+
+
 # ───────────────────────── NOTIF — уведомления ────────────────────────────
 
 # Типы (FR-NOTIF-03):

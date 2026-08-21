@@ -202,6 +202,10 @@
 | FR-PROF-01…04 (разметка) | `partials/profile/_header.html`, `_stats.html`, `_about.html` — общие для обоих профилей | `ProfileTemplatesShareParts` |
 | BR-73 (приватные поля) | `_about.html`, блок «Тек саған көрінеді» | `ProfileOtherKnown.test_about_hides_private_fields`, `ProfileMeAuthed.test_about_tab_shows_private_block_to_owner` |
 | FR-PROF-05 | `profile_me_edit` → `/me/edit/` | `ProfileMeAuthed` |
+| FR-PROF-06 / BR-ACH-01…05 | `stub_data.achievements_of` (+ `READ_TIERS`, `tier_for`, `winning_stories_of`) | `test_stub_data.Achievements`, `ReadTiers` |
+| FR-PROF-06 (рендер) | `partials/profile/_achievements.html` + строка фактов в `_header.html` | `ProfileAchievementsRender` |
+| DEC-43 (иллюстрации) | `components/award.html`, `components/tooltip.html`, `components/awards/_sprite.html` | `test_template_lint.IconNamesExistInSprite.test_award_art_exists_in_sprite`, `test_award_sprite_has_no_orphan_symbols` |
+| Имена иконок из данных | `components/icons/_sprite.html` | `test_template_lint.IconNamesExistInSprite` |
 | Инварианты конкурсных данных | `Contest.winners`, `SUBMISSIONS_BY_USER` | `test_contests.ContestWinners`, `SubmissionsMatchContestBadges`, `SubmissionIntegrity` |
 | FR-LIB-01…03 / BR-60, BR-61 | `library` + `segmented_control` | `LibraryAuthed`, `LibraryEmpty`, `LibraryHelpers` |
 | FR-NOTIF-01…04 / BR-70…72 | `notifications` | `NotificationsAuthed`, `NotificationsEmpty` |

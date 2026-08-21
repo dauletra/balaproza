@@ -686,6 +686,8 @@ def profile_me(request):
         'lib_reading':     stub_data.library_of(username, 'reading') if username else [],
         'lib_saved':       stub_data.library_of(username, 'saved') if username else [],
         'stats':           stub_data.reader_stats(username) if username else None,
+        'achievements':    stub_data.achievements_of(username) if username else [],
+        'contests_n':      len(stub_data.submissions_of(username)) if username else 0,
         'following':       following,
         'new_story_href':  reverse('core:new_story'),
         'catalog_href':    reverse('core:catalog'),
@@ -726,6 +728,12 @@ def profile_other(request, username):
         'prof_items':    _prof_items(username, _PROF_TABS_OTHER, False),
         'works':         stub_data.public_stories_of(username),
         'stats':         stub_data.public_stats(username),
+        # Знаки одинаковы для владельца и для постороннего: достижение
+        # публично по определению (FR-PROF-06). Число конкурсов — участие
+        # без статуса, поэтому совпадает с длиной публичного списка и не
+        # выдаёт вычитанием, что какая-то заявка отклонена (BR-74a).
+        'achievements':  stub_data.achievements_of(username),
+        'contests_n':    len(stub_data.submissions_of(username)),
         'following':     following,
         'is_followed':   stub_data.is_following(me, username) if me else False,
     })

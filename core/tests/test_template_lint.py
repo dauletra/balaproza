@@ -243,3 +243,60 @@ class IconLabelsDoNotDuplicateText(TestCase):
             "прозвучит дважды. Убери label у иконки (обычно это утечка "
             "контекста, лечится `only`):\n  " + "\n  ".join(sorted(set(offenders))),
         )
+
+
+class IconNamesExistInSprite(unittest.TestCase):
+    """Имя иконки, которого нет в спрайте, рендерит пустой `<use>`.
+
+    Пустой квадрат в консоль не пишет и в вёрстке почти не виден. Раньше
+    все имена были литералами в шаблонах и проверялись глазами при ревью;
+    с достижениями (FR-PROF-06) они приходят из `stub_data`, где опечатку
+    заметить уже негде.
+    """
+
+    def _sprite_ids(self):
+        body = (TEMPLATES_DIR / "components" / "icons" / "_sprite.html").read_text(
+            encoding="utf-8")
+        import re
+        return {m.removeprefix("icon-")
+                for m in re.findall(r'<symbol id="([a-z0-9-]+)"', body)}
+
+    def _award_ids(self):
+        body = (TEMPLATES_DIR / "components" / "awards" / "_sprite.html").read_text(
+            encoding="utf-8")
+        import re
+        return {m.removeprefix("award-")
+                for m in re.findall(r'<symbol id="(award-[a-z0-9-]+)"', body)}
+
+    def test_award_art_exists_in_sprite(self):
+        """Слаг иллюстрации приходит из данных — опечатку заметить негде."""
+        from core import stub_data
+        ids = self._award_ids()
+        for a in stub_data.AUTHORS:
+            for ach in stub_data.achievements_of(a.username):
+                with self.subTest(author=a.username, art=ach["art"]):
+                    self.assertIn(ach["art"], ids)
+
+    def test_every_read_tier_has_art(self):
+        from core import stub_data
+        ids = self._award_ids()
+        for art, _ in stub_data.READ_TIER_ART.values():
+            with self.subTest(art=art):
+                self.assertIn(art, ids)
+
+    def test_award_sprite_has_no_orphan_symbols(self):
+        """Символ, на который никто не ссылается, — мёртвый вес на странице."""
+        from core import stub_data
+        used = {a[0] for a in stub_data.READ_TIER_ART.values()}
+        for author in stub_data.AUTHORS:
+            used |= {x["art"] for x in stub_data.achievements_of(author.username)}
+        self.assertEqual(self._award_ids() - used, set())
+
+    def test_template_icon_literals_exist(self):
+        import re
+        ids = self._sprite_ids()
+        for path in _templates():
+            body = path.read_text(encoding="utf-8")
+            for name in re.findall(r'icon\.html" with name="([a-z0-9-]+)"', body):
+                with self.subTest(template=path.name, icon=name):
+                    self.assertIn(name, ids)

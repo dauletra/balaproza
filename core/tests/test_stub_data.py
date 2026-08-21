@@ -346,3 +346,146 @@ class WriterAttentionOnlySpeaksWhenThereIsSomething(unittest.TestCase):
                     self.assertEqual(item["slug"], "")
                 else:
                     self.assertIn(item["slug"], stub_data.STORIES_BY_SLUG)
+
+
+# ───────────────────────── PROF · достижения (FR-PROF-06) ─────────────────
+
+class ReadTiers(unittest.TestCase):
+    """Ступени прочтений: границы и «только высшая»."""
+
+    def test_boundaries(self):
+        cases = [
+            (0,       None),
+            (999,     None),
+            (1_000,   "Мың оқылым"),
+            (9_999,   "Мың оқылым"),
+            (10_000,  "Он мың оқылым"),
+            (49_999,  "Он мың оқылым"),
+            (50_000,  "Елу мың оқылым"),
+            (99_999,  "Елу мың оқылым"),
+            (100_000, "Жүз мың оқылым"),
+            (999_999, "Жүз мың оқылым"),
+        ]
+        for total, expected in cases:
+            with self.subTest(total=total):
+                tier = stub_data.tier_for(total)
+                self.assertEqual(tier[1] if tier else None, expected)
+
+    def test_next_tier(self):
+        self.assertEqual(stub_data.next_tier_for(0)[0], 1_000)
+        self.assertEqual(stub_data.next_tier_for(2_117)[0], 10_000)
+        self.assertEqual(stub_data.next_tier_for(60_342)[0], 100_000)
+        self.assertIsNone(stub_data.next_tier_for(100_000))
+
+    def test_tiers_are_ascending(self):
+        thresholds = [t[0] for t in stub_data.READ_TIERS]
+        self.assertEqual(thresholds, sorted(thresholds))
+        self.assertEqual(len(thresholds), len(set(thresholds)))
+
+    def test_reads_total_counts_public_only(self):
+        # BR-73: прочтения приходят от читателей, читатель видит публичное.
+        for a in stub_data.AUTHORS:
+            with self.subTest(author=a.username):
+                self.assertEqual(
+                    stub_data.reads_total(a.username),
+                    sum(s.views for s in stub_data.public_stories_of(a.username)),
+                )
+
+    def test_unknown_user_has_no_tier(self):
+        self.assertEqual(stub_data.reads_total("ghost"), 0)
+        self.assertIsNone(stub_data.read_tier("ghost"))
+
+
+class Achievements(unittest.TestCase):
+    """Знаки выводятся из данных, не хранятся (DEC-41)."""
+
+
+    def _all(self):
+        return [(a.username, ach)
+                for a in stub_data.AUTHORS
+                for ach in stub_data.achievements_of(a.username)]
+
+    def test_unknown_user_gets_nothing(self):
+        self.assertEqual(stub_data.achievements_of("ghost"), [])
+
+    def test_keys_unique_per_author(self):
+        for a in stub_data.AUTHORS:
+            keys = [x["key"] for x in stub_data.achievements_of(a.username)]
+            with self.subTest(author=a.username):
+                self.assertEqual(len(keys), len(set(keys)))
+
+    def test_only_highest_read_tier_is_shown(self):
+        for a in stub_data.AUTHORS:
+            reads = [x for x in stub_data.achievements_of(a.username)
+                     if x["key"] == "reads"]
+            with self.subTest(author=a.username):
+                self.assertLessEqual(len(reads), 1)
+                if reads:
+                    self.assertEqual(reads[0]["label"],
+                                     stub_data.read_tier(a.username)[1])
+
+    def test_shape_is_complete(self):
+        for username, ach in self._all():
+            with self.subTest(author=username, key=ach.get("key")):
+                self.assertEqual(set(ach), {"key", "label", "art", "tier"})
+                self.assertTrue(ach["label"])
+                self.assertTrue(ach["art"])
+                self.assertIn(ach["tier"], stub_data.AWARD_TIERS)
+
+    def test_gold_stays_rare(self):
+        """Металл — сигнал ценности. Позолотить всё значит обесценить золото."""
+        gold = {ach["key"] for _, ach in self._all() if ach["tier"] == "gold"}
+        # Верхнюю ступень оқылым в стабе пока не взял никто, поэтому
+        # включение, а не равенство: тест про «золота не больше», а не про
+        # конкретный состав фикстуры.
+        self.assertTrue(gold <= {"contest_winner", "editorial_choice", "reads"}, gold)
+        self.assertIn("contest_winner", gold)
+        # У «reads» золото положено только верхней ступени.
+        golden_reads = {ach["label"] for _, ach in self._all()
+                        if ach["key"] == "reads" and ach["tier"] == "gold"}
+        self.assertTrue(golden_reads <= {"Жүз мың оқылым"})
+        self.assertEqual(stub_data.READ_TIER_ART[100_000][1], "gold")
+        self.assertEqual(stub_data.READ_TIER_ART[1_000][1], "bronze")
+
+    def test_read_tier_art_covers_every_tier(self):
+        thresholds = {t[0] for t in stub_data.READ_TIERS}
+        self.assertEqual(set(stub_data.READ_TIER_ART), thresholds)
+        for art, metal in stub_data.READ_TIER_ART.values():
+            with self.subTest(art=art):
+                self.assertIn(metal, stub_data.AWARD_TIERS)
+
+    def test_art_slugs_are_unique_per_author(self):
+        for a in stub_data.AUTHORS:
+            arts = [x["art"] for x in stub_data.achievements_of(a.username)]
+            with self.subTest(author=a.username):
+                self.assertEqual(len(arts), len(set(arts)))
+
+    def test_finished_serial_needs_a_serial(self):
+        # У aygerim_k три опубликованных одиночных рассказа и ни одного
+        # дописанного сериала: одиночный «дописан» в момент публикации.
+        keys = {x["key"] for x in stub_data.achievements_of("aygerim_k")}
+        self.assertNotIn("finished_serial", keys)
+        self.assertTrue(any(s.is_single for s in stub_data.my_stories_of("aygerim_k")))
+
+    def test_winner_implies_participant_and_accepted(self):
+        for a in stub_data.AUTHORS:
+            keys = {x["key"] for x in stub_data.achievements_of(a.username)}
+            with self.subTest(author=a.username):
+                if "contest_winner" in keys:
+                    self.assertIn("contest_participant", keys)
+                    self.assertIn("contest_accepted", keys)
+
+    def test_editorial_badge_comes_from_public_work(self):
+        label = stub_data.BADGE_LABELS["editorial"]
+        for a in stub_data.AUTHORS:
+            keys = {x["key"] for x in stub_data.achievements_of(a.username)}
+            has_public = any(label in s.badges
+                             for s in stub_data.public_stories_of(a.username))
+            with self.subTest(author=a.username):
+                self.assertEqual("editorial_choice" in keys, has_public)
+
+    def test_winning_stories_belong_to_author(self):
+        for a in stub_data.AUTHORS:
+            for s in stub_data.winning_stories_of(a.username):
+                with self.subTest(author=a.username, story=s.slug):
+                    self.assertEqual(s.author_username, a.username)

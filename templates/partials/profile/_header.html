@@ -17,7 +17,19 @@
 
     <div class="flex min-w-0 flex-1 flex-col gap-1.5">
         <h1 class="font-display text-3xl font-bold text-slate-900">{{ profile_user.public_name }}</h1>
-        <p class="font-sans text-sm text-slate-500">@{{ profile_user.username }}</p>
+        {% comment %}
+            Строка фактов (FR-PROF-06). Числа работ здесь сознательно нет:
+            плитка «Шығарма» стоит на десять пикселей ниже, и это ровно тот
+            дубль, который уже вычищали из правого рейла
+            (test_desktop_layout.ProfileStatsNotDuplicated). Остаётся то,
+            чего нет в плитках: с какого года автор здесь и сколько раз
+            выходил на конкурс.
+        {% endcomment %}
+        <p class="font-sans text-sm text-slate-500">
+            @{{ profile_user.username }}
+            {% if profile_user.joined_year %} · {{ profile_user.joined_year }} жылдан бері{% endif %}
+            {% if contests_n %} · {{ contests_n }} байқау{% endif %}
+        </p>
         {% if profile_user.bio %}
             <p class="mt-1 font-sans text-sm leading-snug text-slate-700">{{ profile_user.bio }}</p>
         {% endif %}
