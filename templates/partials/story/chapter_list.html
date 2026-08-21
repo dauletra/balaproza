@@ -1,0 +1,38 @@
+{% comment %}
+    Список глав произведения. Один партиал на три места:
+      - правый рейл (xl+);
+      - <details> «Бөлімдер» в контенте (no-JS fallback на мобильном);
+      - bottom-sheet, который открывает панель чтения.
+
+    Каждая глава показывает свой счётчик лайков — read-only (FR-STORY-12):
+    чтобы лайкнуть, надо открыть главу. Это поощряет реальное прочтение.
+
+    Контекст: story, chapters, current_chapter_number
+    Параметры:
+      size — "sm" (рейл) | "md" (контент, тач-цели 44px). По умолчанию "md".
+{% endcomment %}
+{% with compact=size|default:"md" %}
+<ol class="flex flex-col {% if compact == 'sm' %}gap-px{% else %}gap-0.5{% endif %}">
+    {% for c in chapters %}
+        <li>
+            <a href="{% url 'core:story_detail' slug=story.slug %}?chapter={{ c.number }}#chapter-{{ c.number }}"
+               {% if c.number == current_chapter_number %}aria-current="true"{% endif %}
+               class="flex items-center gap-2 rounded-sm hover:bg-slate-50
+                      {% if compact == 'sm' %}px-2 py-1.5 font-sans text-xs{% else %}min-h-11 px-2 py-2 font-sans text-sm{% endif %}
+                      {% if c.number == current_chapter_number %}bg-brand-light/30 text-brand{% else %}text-slate-700{% endif %}">
+                <span class="{% if compact == 'sm' %}w-5 text-[10px]{% else %}w-6 text-xs{% endif %} shrink-0 text-right font-mono text-slate-400">{{ c.number }}</span>
+                <span class="min-w-0 flex-1 truncate">{{ c.title }}</span>
+                {% if c.likes %}
+                    <span class="inline-flex shrink-0 items-center gap-1 font-sans text-[11px] text-slate-400" aria-label="{{ c.likes }} ұнату">
+                        {% include "components/icon.html" with name="heart" size=11 %}
+                        <span aria-hidden="true">{{ c.likes }}</span>
+                    </span>
+                {% endif %}
+                {% if c.number == current_chapter_number %}
+                    {% include "components/icon.html" with name="bookmark-filled" size=12 cls="shrink-0 text-brand" %}
+                {% endif %}
+            </a>
+        </li>
+    {% endfor %}
+</ol>
+{% endwith %}

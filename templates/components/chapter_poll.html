@@ -1,0 +1,117 @@
+{% comment %}
+    ChapterPoll — необязательный вопрос автора под главой (FR-STORY-13).
+
+    Заменяет декоративный блок «Бұл бөлімнен кейін», который стоял на этом
+    месте с тремя захардкоженными вариантами и никуда не вёл (DEC-33). Смысл
+    настоящего опроса — повод вернуться: у сериальной прозы «кого он выберет?»
+    работает сильнее любого напоминания, а у автора появляется обязательство
+    дописать.
+
+    Это не квиз: правильного ответа нет, очков нет (BR-POLL-06).
+
+    Три ветки — по состоянию опроса, а не по роли:
+
+      closed  → результаты видны всем, включая гостя, плюс ссылка на главу,
+                где ответ уже пришёл. Голос не принимается (BR-POLL-05).
+                Приглашать гостя «войти и проголосовать» здесь нельзя —
+                голосовать уже негде.
+      гость   → вопрос и варианты видны целиком (вопрос и есть приманка),
+                клик ведёт на login с ?next= (BR-POLL-03).
+      автор.  → бюллетень; проценты скрыты до голоса (BR-POLL-04), иначе
+                первый же перевес определяет остальные ответы.
+
+    Параметры:
+      poll       — ChapterPoll (обязательно)
+      signed_in  — boolean
+      login_href — URL для гостя (default /auth/login/)
+{% endcomment %}
+{% with login_href=login_href|default:'/auth/login/' %}
+<section class="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4"
+         {% if not poll.closed and signed_in %}x-data="{
+            voted: '{{ poll.my_vote }}',
+            counts: { {% for r in poll.results %}'{{ r.slug }}': {{ r.count }}{% if not forloop.last %}, {% endif %}{% endfor %} },
+            get total() {
+                return Object.values(this.counts).reduce((a, b) => a + b, 0) || 1;
+            },
+            percent(slug) {
+                return Math.round(this.counts[slug] * 100 / this.total);
+            },
+            vote(slug) {
+                if (this.voted) return;
+                this.counts[slug] += 1;
+                this.voted = slug;
+                this.$dispatch('toast', { kind: 'success', text: 'Жауабың есептелді' });
+            }
+         }"{% endif %}>
+
+    <div class="mb-1 flex items-center gap-2">
+        {% include "components/icon.html" with name="message-caption" size=14 cls="text-slate-500" %}
+        <h3 class="font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+            Автордың сұрағы
+        </h3>
+    </div>
+    <p class="font-sans text-[15px] font-semibold leading-snug text-slate-900">{{ poll.question }}</p>
+
+    {% if poll.closed %}
+        {# Результаты статикой: голосовать негде, Alpine здесь не нужен #}
+        <ul class="mt-3 flex flex-col gap-2">
+            {% for r in poll.results %}
+                <li class="relative min-h-11 overflow-hidden rounded-md border bg-white px-3 py-2.5 font-sans text-sm text-slate-800 {% if r.mine %}border-brand{% else %}border-slate-300{% endif %}">
+                    <span aria-hidden="true" class="absolute inset-y-0 left-0 bg-brand/10" style="width: {{ r.percent }}%"></span>
+                    <span class="relative flex items-center justify-between gap-3">
+                        <span class="min-w-0">{{ r.text }}{% if r.mine %} <span class="font-semibold text-brand">· сенің жауабың</span>{% endif %}</span>
+                        <span class="shrink-0 font-sans text-xs font-bold text-slate-500">{{ r.percent }}%</span>
+                    </span>
+                </li>
+            {% endfor %}
+        </ul>
+        <p class="mt-3 font-sans text-xs text-slate-500">
+            Сұрақ жабылды — жауабы
+            <a href="?chapter={{ poll.answer_chapter }}#chapter-{{ poll.answer_chapter }}"
+               class="font-semibold text-brand hover:underline">{{ poll.answer_chapter }}-бөлімде</a>.
+            {{ poll.total_votes }} оқырман жауап берген.
+        </p>
+
+    {% elif not signed_in %}
+        <div class="mt-3 flex flex-col gap-2">
+            {% for r in poll.results %}
+                <a href="{{ login_href }}?next={{ request.get_full_path|urlencode }}"
+                   class="flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-3 py-2.5 font-sans text-sm text-slate-800 hover:border-brand">
+                    {{ r.text }}
+                </a>
+            {% endfor %}
+        </div>
+        <p class="mt-3 font-sans text-xs text-slate-500">
+            Жауап беру үшін <a href="{{ login_href }}?next={{ request.get_full_path|urlencode }}" class="font-semibold text-brand hover:underline">кір</a>.
+            Дұрыс жауабы жоқ — тек сенің болжамың.
+        </p>
+
+    {% else %}
+        <div class="mt-3 flex flex-col gap-2">
+            {% for r in poll.results %}
+                <button type="button" @click="vote('{{ r.slug }}')"
+                        :disabled="!!voted"
+                        :aria-pressed="voted === '{{ r.slug }}'"
+                        :class="voted === '{{ r.slug }}' ? 'border-brand' : 'border-slate-300'"
+                        class="relative min-h-11 overflow-hidden rounded-md border bg-white px-3 py-2.5 text-left font-sans text-sm text-slate-800 enabled:hover:border-brand">
+                    <span x-show="!!voted" x-cloak aria-hidden="true"
+                          class="absolute inset-y-0 left-0 bg-brand/10 transition-[width] duration-300"
+                          :style="'width: ' + percent('{{ r.slug }}') + '%'"></span>
+                    <span class="relative flex items-center justify-between gap-3">
+                        <span class="min-w-0">{{ r.text }}</span>
+                        <span x-show="!!voted" x-cloak
+                              class="shrink-0 font-sans text-xs font-bold text-slate-500"
+                              x-text="percent('{{ r.slug }}') + '%'"></span>
+                    </span>
+                </button>
+            {% endfor %}
+        </div>
+        <p class="mt-3 font-sans text-xs text-slate-500">
+            <span x-show="!voted">Дұрыс жауабы жоқ — тек сенің болжамың.</span>
+            <span x-show="!!voted" x-cloak>
+                <span x-text="total"></span> оқырман жауап берді. Жалғасын күт.
+            </span>
+        </p>
+    {% endif %}
+</section>
+{% endwith %}

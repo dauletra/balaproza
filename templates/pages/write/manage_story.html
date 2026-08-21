@@ -114,7 +114,23 @@
 
                         <div class="min-w-0 flex-1">
                             <div class="truncate font-sans text-sm font-semibold text-slate-900">{% if story.is_single %}Толық мәтін{% else %}{{ c.title }}{% endif %}</div>
-                            <div class="font-sans text-xs text-slate-500">{{ c.char_count_formatted }} таңба</div>
+                            <div class="flex flex-wrap items-center gap-x-2 font-sans text-xs text-slate-500">
+                                <span>{{ c.char_count_formatted }} таңба</span>
+                                {% comment %}
+                                    Карта качества по главам (DEC-32). Одна цифра
+                                    говорит «зацепило», ведущая реакция — «чем
+                                    зацепило»: ради этого реакции и вводились,
+                                    и автор должен видеть их первым.
+                                {% endcomment %}
+                                {% if c.top_reaction %}
+                                    <span aria-hidden="true">·</span>
+                                    <span class="inline-flex items-center gap-1 text-slate-600">
+                                        {% include "components/icon.html" with name=c.top_reaction.icon size=12 %}
+                                        {{ c.top_reaction.label }} · {{ c.likes }}
+                                    </span>
+                                    <span class="text-slate-400">({{ c.top_reaction.hint }})</span>
+                                {% endif %}
+                            </div>
                         </div>
 
                         <div class="flex shrink-0 items-center gap-1.5">

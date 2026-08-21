@@ -3,7 +3,7 @@
     переключается через md:-классы. Высота 64.
 
     Гость:        логотип · поиск · CTA «Шығарма жазу» · «Кіру»
-    Авторизован:  логотип · поиск · CTA · 🔔(badge) · аватар + ▾
+    Авторизован:  логотип · поиск · CTA · қоңырау(badge) · аватар + ▾
 {% endcomment %}
 {% comment %}
     x-data обязателен: без Alpine-скоупа директивы @click/@focus ниже не
@@ -60,7 +60,7 @@
             </a>
 
             {% if signed_in %}
-                {# 🔔 + красный счётчик #}
+                {# Колокольчик + красный счётчик #}
                 <a href="{% url 'core:notifications' %}"
                    aria-label="Хабарламалар{% if unread_notifications %} ({{ unread_notifications }} оқылмаған){% endif %}"
                    class="relative -m-2 rounded-pill p-2 hover:bg-slate-100">

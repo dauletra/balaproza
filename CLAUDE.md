@@ -48,7 +48,8 @@ balaproza_v1/
 │   │                             # + helpers: my_stories_of, chapters_of, comments_of,
 │   │                             # stories_by_genre, search_stories, search_authors,
 │   │                             # related_stories, apply_catalog_filters, filter_catalog,
-│   │                             # library_of, reader_stats, writer_stats, is_following,
+│   │                             # reactions_of, reaction_breakdown, poll_of,
+│   │                             # library_of, in_library, reader_stats, writer_stats, is_following,
 │   │                             # following_of, followers_of, notifications_for_user,
 │   │                             # unread_count_for_user, collections_of, trending_tags,
 │   │                             # submissions_of, has_submission,
@@ -67,12 +68,12 @@ balaproza_v1/
 │   │                             # /me/edit/, 5 legal routes
 │   ├── context_processors.py     # auth_state, nav_state, site_links
 │   ├── templatetags/balaproza.py # filter page_range (для pagination)
-│   └── tests/                    # 429 тестов в 16 файлах (см. ниже)
+│   └── tests/                    # 470 тестов в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
 │   ├── 404.html / 500.html       # branded error pages (500 — standalone, без base.html)
-│   ├── components/               # 50 атомов и composites (см. docs/04)
+│   ├── components/               # 51 атом и composites (см. docs/04)
 │   │                             # включая cover_placeholder (двухрежимный: <img> если
 │   │                             # story.cover задан, иначе типографическая плашка OKLCH +
 │   │                             # буква по primary genre.hue),
@@ -81,11 +82,16 @@ balaproza_v1/
 │   │                             # extras §4.10: skeleton_*, error_state, empty_state,
 │   │                             # segmented_control, delete_confirm_modal, toast_host,
 │   │                             # share_button, search_popup (Cmd+K — теги тоже в group),
-│   │                             # chapter_like (FR-STORY-12), school_links.
+│   │                             # reaction_bar (FR-STORY-12, DEC-32 — 5 реакций
+│   │                             # вместо лайка), chapter_poll (FR-STORY-13,
+│   │                             # DEC-33 — необязательный опрос), school_links.
 │   │                             # NB: catalog_controls.html устарел — заменён
 │   │                             # _filter_panel в каталоге (DEC-27)
 │   ├── partials/                 # header, footer (карта сайта), mobile_nav, page_header,
 │   │                             # right_rail/{home,story,writer,profile,contest,catalog}.html
+│   │                             # story/{author_card,chapter_list,whats_next}.html — общие
+│   │                             # для рейла и мобильных вставок; whats_next меняет позицию
+│   │                             # в зависимости от has_next (FR-STORY-02)
 │   │                             # home/*.html (hero_guest, hero_returning, book_of_week,
 │   │                             # book_row, collections, new_authors, become_author,
 │   │                             # contest_banner, genre_strip, popular_tags),
@@ -148,7 +154,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 429 тестов
+uv run python manage.py test core       # все 470 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 
@@ -188,6 +194,7 @@ def _login_as_aidana(client):
 - `open-search` — открывает search_popup (Cmd+K). Используется в кнопках поиска header
 - `open-report` — открывает report_modal с целью `{target: 'story:slug'}`
 - `open-catalog-filters` — открывает mobile bottom-sheet с фильтр-панелью каталога (DEC-27)
+- `reading-mode` — `{on: bool}`, шлёт страница произведения при входе/выходе текста главы из кадра. `mobile_nav` прячет пилюлю, её место занимает панель чтения (docs/07 §7.6)
 - `open-delete-confirm` — открывает delete_confirm_modal с целью `{name, confirm_url}`
 
 ### Mobile bottom nav (5 слотов)
@@ -207,6 +214,7 @@ def _login_as_aidana(client):
 - **Обложки произведений** — `components/cover_placeholder.html` (двухрежимный): если `story.cover` непустой → рендерит `<img src="/media/{cover}">` с object-cover; иначе — типографическая плашка OKLCH + буква + «корешок» по hue primary жанра. Не использовать `{% static story.cover %}` напрямую — путь к файлу инкапсулирован в компоненте
 - **Аватары** — `components/avatar.html` (буквенные инициалы на OKLCH-фоне по длине seed=username+name). Передавать `username` для стабильного цвета
 - **Статусы произведения** — только через `components/status_badge.html` с key из 5: `Published|NotPublished|OnProcess|Completed|OnModeration` (BR-10/11)
+- **Реакции на главу** — закрытый словарь из 5 (`stub_data.REACTIONS`, BR-REACT-01), рендер только через `components/reaction_bar.html`. Каждая реакция обязана иметь подпись словом: эмодзи запрещены, а монохромная иконка 20px без подписи неразличима. Новых реакций не добавлять без нового DEC
 - **Жанры** — только через `components/genre_chip.html` (DEC-14: `GenrePill` запрещён). На главной жанр — полоса-вывеска `partials/home/genre_strip.html` (DEC-31), а не навигация: заголовка, «барлығы →» и скроллера у неё нет. `Genre.icon` используется на карточках `/genres/`
 - **Теги (UGC)** — `components/tag_chip.html` (slate-style + `#`-префикс, отличается от цветного `genre_chip`). Pending-теги автоматически с пунктирной рамкой + бейдж «проверкада». Группа тегов на стори — через `components/tag_list.html` (фильтрует pending для не-автора, BR-TAG-07). Ввод тегов в формах — `components/tag_input.html` (Alpine, автокомплит, лимит 10, blocklist-валидация)
 - **Внешние ссылки** — `target="_blank" rel="noopener noreferrer"` (FR-LINKS-03)

@@ -15,105 +15,137 @@
 {% else %}
 
 {# Ширину колонки держит <main> в base.html (860px) — своего max-w здесь не нужно. #}
-<div class="flex flex-col gap-8"
-     x-data="{ readerSize: 'reader-size-base', readerWidth: 'reader-width-comfort', readerTheme: 'reader-theme-paper' }">
+<div class="flex flex-col gap-8" x-data="storyReader()">
 
-    {# ─────────────────────── Шапка произведения ─────────────────────── #}
-    <header class="grid grid-cols-[96px_minmax(0,1fr)] gap-4 sm:grid-cols-[136px_minmax(0,1fr)] sm:gap-5 md:grid-cols-[156px_minmax(0,1fr)] md:gap-6">
-        {% include "components/cover_placeholder.html" with story=story cls="aspect-[2/3] w-[96px] rounded-lg shadow-sm sm:w-[136px] md:w-[156px]" letter_cls="text-5xl sm:text-6xl" %}
+    {% comment %}
+        Шапка произведения (FR-STORY-01), собрана mobile-first.
 
-        <div class="min-w-0 flex flex-col gap-2.5">
-            <div class="flex flex-wrap gap-x-3 gap-y-1">
-                {% for g in story.genres_resolved %}
-                    {% include "components/genre_chip.html" with genre=g size="sm" %}
-                {% endfor %}
+        Раньше вся мета и все действия жили во второй колонке рядом с обложкой.
+        На 375px под неё оставалось ~245px, в которые упирались чипы жанров,
+        заголовок, теги, аудитория, автор, пять метрик и ряд из четырёх кнопок:
+        строки рвались по одному слову, а главная кнопка чтения стояла в одном
+        ряду с «Шағым» и терялась.
+
+        Теперь рядом с обложкой — только то, что отвечает на «что это»:
+        жанр, название, автор, аудитория и длительность. Всё остальное —
+        полноширинными рядами под сеткой, где есть место.
+    {% endcomment %}
+    <header class="flex flex-col gap-4">
+        <div class="grid grid-cols-[104px_minmax(0,1fr)] gap-4 sm:grid-cols-[136px_minmax(0,1fr)] sm:gap-5 md:grid-cols-[156px_minmax(0,1fr)] md:gap-6">
+            {% include "components/cover_placeholder.html" with story=story cls="aspect-[2/3] w-[104px] rounded-lg shadow-sm sm:w-[136px] md:w-[156px]" letter_cls="text-5xl sm:text-6xl" %}
+
+            <div class="min-w-0 flex flex-col gap-2">
+                <div class="flex flex-wrap gap-x-2 gap-y-1">
+                    {% comment %}
+                        На странице произведения жанр и теги — основная
+                        навигация «ещё такого же», поэтому здесь берём крупный
+                        размер обоих чипов, а не плотный из карточек списка.
+                    {% endcomment %}
+                    {% for g in story.genres_resolved %}
+                        {% include "components/genre_chip.html" with genre=g size="md" %}
+                    {% endfor %}
+                </div>
+
+                <h1 class="font-sans text-[22px] font-bold leading-tight text-slate-900 sm:text-3xl md:text-4xl">
+                    {{ story.title }}
+                </h1>
+
+                <a href="{% url 'core:profile_other' username=story.author.username %}"
+                   class="inline-flex items-center gap-2 self-start font-sans text-sm font-semibold text-slate-700 hover:text-brand">
+                    {% include "components/avatar.html" with size=24 name=story.author.public_name username=story.author.username %}
+                    <span class="truncate">{{ story.author.public_name }}</span>
+                </a>
+
+                {# Аудитория, формат и длительность — то, по чему выбирают читать или нет #}
+                <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-sans text-xs text-slate-500">
+                    {% if story.audience %}<span class="inline-flex h-6 items-center rounded-chip bg-slate-100 px-2 font-bold text-slate-600">{{ story.audience }}</span>{% endif %}
+                    <span>{{ story.format_badge_label }}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{{ story.reading_meta_label }}</span>
+                </p>
             </div>
+        </div>
 
-            <h1 class="font-sans text-2xl font-bold leading-tight text-slate-900 sm:text-3xl md:text-4xl">
-                {{ story.title }}
-            </h1>
-
-            {# docs/11: UGC-теги. Pending видны только автору (BR-TAG-07). #}
-            {% include "components/tag_list.html" with tags=tags viewer_is_author=is_author %}
-
+        {% if story.badges %}
             <div class="flex flex-wrap items-center gap-1.5">
-                {% if story.audience %}
-                    <span class="inline-flex h-7 items-center rounded-chip bg-slate-100 px-2.5 font-sans text-xs font-bold text-slate-600">{{ story.audience }}</span>
-                {% endif %}
                 {% for badge in story.badges %}
                     <span class="inline-flex h-7 items-center rounded-chip bg-brand/5 px-2.5 font-sans text-xs font-bold text-brand-dark">{{ badge }}</span>
                 {% endfor %}
             </div>
+        {% endif %}
 
-            <a href="{% url 'core:profile_other' username=story.author.username %}"
-               class="inline-flex items-center gap-2 self-start font-sans text-sm text-slate-600 hover:text-brand">
-                {% include "components/avatar.html" with size=24 name=story.author.public_name username=story.author.username %}
-                <span>{{ story.author.public_name }}</span>
+        {# docs/11: UGC-теги. Pending видны только автору (BR-TAG-07). #}
+        {% include "components/tag_list.html" with tags=tags viewer_is_author=is_author size="md" %}
+
+        <div class="flex flex-wrap items-center gap-4">
+            {# FR-STORY-12: общий счётчик = сумма лайков глав; ставится в режиме чтения #}
+            {% include "components/stat_pill.html" with icon="heart" value=story.likes label=story.likes|stringformat:"s"|add:" ұнату" %}
+            {% include "components/stat_pill.html" with icon="eye" value=story.views label=story.views|stringformat:"s"|add:" оқылым" %}
+            {% include "components/stat_pill.html" with icon="message-caption" value=story.comments label=story.comments|stringformat:"s"|add:" пікір" %}
+        </div>
+
+        {% comment %}
+            Действия. На мобильном главная кнопка занимает всю ширину, а «Сақтау»
+            и «Бөлісу» делят вторую строку — так primary-действие ни с чем не
+            конкурирует. «Шағым» из этого ряда убран вниз страницы (FR-STORY-09):
+            жалоба — не то, что предлагают человеку до чтения.
+        {% endcomment %}
+        <div class="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+            <a href="#chapter-{{ chapter_number }}"
+               class="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-brand px-5 font-sans text-[15px] font-semibold text-white hover:bg-brand-dark sm:h-11 sm:w-auto sm:text-sm">
+                {% include "components/icon.html" with name="book" size=17 %}
+                <span>{% if story.is_single %}Оқу{% elif has_progress %}Жалғастыру · {{ chapter_number }}-бөлім{% else %}Оқуды бастау{% endif %}</span>
             </a>
 
-            <div class="mt-0.5 flex flex-wrap items-center gap-3">
-                {# FR-STORY-12: общий счётчик = сумма лайков глав; ставится в режиме чтения #}
-                {% include "components/stat_pill.html" with icon="heart" value=story.likes %}
-                {% include "components/stat_pill.html" with icon="eye" value=story.views %}
-                {% include "components/stat_pill.html" with icon="message-caption" value=story.comments %}
-                <span class="font-sans text-xs text-slate-500">· {{ story.format_badge_label }}</span>
-                <span class="font-sans text-xs text-slate-500">· {{ story.reading_meta_label }}</span>
-            </div>
-
-            <div class="mt-2 flex flex-wrap items-center gap-2.5">
-                <a href="#chapter-{{ chapter_number }}"
-                   class="inline-flex h-11 items-center gap-2 rounded-md bg-brand px-4 font-sans text-sm font-semibold text-white hover:bg-brand-dark">
-                    {% include "components/icon.html" with name="book" size=17 %}
-                    <span>Оқу</span>
-                </a>
-
-                <button type="button" aria-label="Сақтау"
-                        class="grid h-11 w-11 place-items-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50">
-                    {% include "components/icon.html" with name="bookmark" size=18 %}
+            <div class="flex items-center gap-2.5">
+                {% comment %}
+                    «Сақтау» была мёртвой иконкой без подписи: ни состояния, ни
+                    отклика, ни гейта для гостя. Это главный вход в «Кітапхана»,
+                    поэтому теперь она с текстом и ведёт себя как chapter_like —
+                    гостя отправляет на логин с ?next=.
+                {% endcomment %}
+                <button type="button" x-data="{ saved: {{ in_library|yesno:'true,false' }} }"
+                        @click="{% if signed_in %}saved = !saved; $dispatch('toast', { kind: saved ? 'success' : 'info', text: saved ? 'Кітапханаға сақталды' : 'Кітапханадан алынды' }){% else %}window.location = '{% url 'core:login' %}?next=' + encodeURIComponent(window.location.pathname){% endif %}"
+                        :aria-pressed="saved"
+                        :class="saved ? 'border-brand bg-brand/5 text-brand-dark' : 'border-slate-300 bg-white text-slate-700 hover:border-brand hover:text-brand'"
+                        class="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md border px-4 font-sans text-sm font-semibold sm:flex-none">
+                    <template x-if="saved">{% include "components/icon.html" with name="bookmark-filled" size=18 %}</template>
+                    <template x-if="!saved">{% include "components/icon.html" with name="bookmark" size=18 %}</template>
+                    <span x-text="saved ? 'Сақталды' : 'Сақтау'">Сақтау</span>
                 </button>
 
-                {% include "components/share_button.html" with url=request.build_absolute_uri title=story.title %}
-
-                {% if signed_in %}
-                    <button type="button" @click="$dispatch('open-report', { target: 'story:{{ story.slug }}' })"
-                            class="ml-auto inline-flex h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-600 hover:bg-slate-50"
-                            aria-label="Шағым жіберу">
-                        {% include "components/icon.html" with name="dots-vertical" size=16 %}
-                        <span>Шағым</span>
-                    </button>
-                {% endif %}
+                {% include "components/share_button.html" with url=request.build_absolute_uri title=story.title wrap_cls="flex-1 sm:flex-none" btn_cls="w-full justify-center sm:w-auto" %}
             </div>
         </div>
     </header>
 
     {# ─────────────────────── Аннотация ─────────────────────── #}
-    <section class="border-y border-slate-200 py-6">
-        <h2 class="font-display text-xl font-bold text-slate-900">Аннотация</h2>
-        <p class="mt-3 font-sans text-[15px] leading-[1.65] text-slate-700">
-            Үш достың таңғажайып саяхаты. Олар әрқайсысы жоғалғанын іздеп жолға шығады, бірақ
-            табатыны мүлдем басқа нәрсе — өзін, бір-бірін және ішкі дауысты. Әр бөлім — жаңа
-            күмән, жаңа сын, жаңа таңдау. Авторлар әлемі — бұл біздің әлемнен бір қадам әріге
-            ғана кеткен әлем, бірақ ондағы әр сурет — таныс.
-        </p>
-    </section>
+    {% if story.annotation %}
+        <section class="border-y border-slate-200 py-6">
+            <h2 class="font-display text-xl font-bold text-slate-900">Аннотация</h2>
+            <p class="mt-3 font-sans text-[15px] leading-[1.65] text-slate-700">
+                {{ story.annotation }}
+            </p>
+        </section>
+    {% endif %}
 
     {% if chapters and story.is_serial %}
-        <details class="xl:hidden rounded-lg border border-slate-200 bg-white p-4" aria-label="Мобильді бөлімдер">
-            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 font-sans text-sm font-bold text-slate-900">
-                <span>Бөлімдер</span>
-                <span class="font-sans text-xs font-semibold text-slate-500">{{ chapter_number }} / {{ chapters|length }}</span>
+        <details class="group xl:hidden rounded-lg border border-slate-200 bg-white p-4" aria-label="Мобильді бөлімдер">
+            <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 font-sans text-sm font-bold text-slate-900">
+                <span class="flex items-center gap-2">
+                    {% include "components/icon.html" with name="list" size=16 cls="text-slate-500" %}
+                    Бөлімдер
+                </span>
+                <span class="flex items-center gap-1.5 font-sans text-xs font-semibold text-slate-500">
+                    {{ chapter_number }} / {{ chapters|length }}
+                    {# Индикатор раскрытия: list-none убирает системный маркер, без замены #}
+                    {# <summary> не читается как раскрываемый. #}
+                    <span class="transition-transform group-open:rotate-180">{% include "components/icon.html" with name="chevron-down" size=14 %}</span>
+                </span>
             </summary>
-            <ol class="mt-3 flex flex-col gap-1 border-t border-slate-100 pt-3">
-                {% for c in chapters %}
-                    <li>
-                        <a href="{% url 'core:story_detail' slug=story.slug %}?chapter={{ c.number }}#chapter-{{ c.number }}"
-                           class="flex items-center gap-2 rounded-sm px-2 py-2 font-sans text-sm hover:bg-slate-50 {% if c.number == current_chapter_number %}text-brand{% else %}text-slate-700{% endif %}">
-                            <span class="w-6 shrink-0 text-right font-mono text-xs text-slate-400">{{ c.number }}</span>
-                            <span class="min-w-0 flex-1 truncate">{{ c.title }}</span>
-                        </a>
-                    </li>
-                {% endfor %}
-            </ol>
+            <div class="mt-3 border-t border-slate-100 pt-3">
+                {% include "partials/story/chapter_list.html" %}
+            </div>
         </details>
     {% endif %}
 
@@ -121,14 +153,106 @@
     {% if current %}
         <section id="chapter-{{ chapter_number }}" class="scroll-mt-24 rounded-lg bg-white p-6 shadow-sm sm:p-8">
             <header class="mb-5">
-                <p class="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    {% if story.is_single %}Толық мәтін{% else %}{{ chapter_number }}-бөлім · {{ chapters|length }} бөлімнен{% endif %}
-                </p>
-                {% if story.is_serial %}
-                    <h2 class="mt-1 font-display text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">
-                        {{ current.title }}
-                    </h2>
-                {% endif %}
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            {% if story.is_single %}Толық мәтін{% else %}{{ chapter_number }}-бөлім · {{ chapters|length }} бөлімнен{% endif %}
+                        </p>
+                        {% if story.is_serial %}
+                            <h2 class="mt-1 font-display text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">
+                                {{ current.title }}
+                            </h2>
+                        {% endif %}
+                    </div>
+
+                    {% comment %}
+                        Триггер настроек чтения (FR-STORY-07). Раньше три оси
+                        стояли развёрнутым рядом перед текстом: на 375px он
+                        переносился в две строки 32px-кнопок и требовал принять
+                        три решения до первой прочитанной строки.
+                    {% endcomment %}
+                    <div class="relative shrink-0" @click.outside="settingsOpen = false">
+                        <button type="button" @click="settingsOpen = !settingsOpen" aria-label="Оқу параметрлері"
+                                :aria-expanded="settingsOpen"
+                                :class="settingsOpen ? 'border-brand text-brand' : 'border-slate-300 text-slate-600'"
+                                class="grid h-11 w-11 place-items-center rounded-md border bg-white font-sans text-sm font-bold hover:border-brand hover:text-brand">
+                            Aa
+                        </button>
+
+                        {# Затемнение — только под мобильным bottom-sheet #}
+                        <div x-show="settingsOpen" x-cloak x-transition.opacity @click="settingsOpen = false"
+                             class="fixed inset-0 z-40 bg-slate-900/40 sm:hidden"></div>
+
+                        {% comment %}
+                            Одна панель в двух подачах: bottom-sheet на телефоне
+                            (палец достаёт до низа экрана) и поповер под кнопкой
+                            на десктопе. Тач-цели 44px — прежние 32px были ниже
+                            минимума и стояли в две строки.
+                        {% endcomment %}
+                        <div x-show="settingsOpen" x-cloak x-transition
+                             @keydown.escape.window="settingsOpen = false"
+                             role="dialog" aria-label="Оқу параметрлері"
+                             class="fixed inset-x-0 bottom-0 z-50 rounded-t-hero border-t border-slate-200 bg-white p-5 pb-8 shadow-modal sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-[52px] sm:w-[300px] sm:rounded-md sm:border sm:p-4 sm:pb-4">
+                            <div class="mb-4 flex items-center justify-between sm:hidden">
+                                <h3 class="font-display text-sm font-bold text-slate-900">Оқу параметрлері</h3>
+                                <button type="button" @click="settingsOpen = false" aria-label="Жабу"
+                                        class="grid h-9 w-9 place-items-center rounded-pill text-slate-500 hover:bg-slate-100">
+                                    {% include "components/icon.html" with name="x" size=18 %}
+                                </button>
+                            </div>
+
+                            <div class="flex flex-col gap-4">
+                                <div>
+                                    <p class="mb-2 font-sans text-xs font-semibold text-slate-500">Қаріп</p>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" aria-label="Кіші қаріп" @click="readerSize = 'reader-size-base'"
+                                                :aria-pressed="readerSize == 'reader-size-base'"
+                                                :class="readerSize == 'reader-size-base' ? 'border-brand text-brand' : 'border-slate-300 text-slate-600'"
+                                                class="grid h-11 flex-1 place-items-center rounded-md border bg-white font-sans text-sm font-bold hover:border-brand">A</button>
+                                        <button type="button" aria-label="Үлкен қаріп" @click="readerSize = 'reader-size-large'"
+                                                :aria-pressed="readerSize == 'reader-size-large'"
+                                                :class="readerSize == 'reader-size-large' ? 'border-brand text-brand' : 'border-slate-300 text-slate-600'"
+                                                class="grid h-11 flex-1 place-items-center rounded-md border bg-white font-sans text-lg font-bold hover:border-brand">A</button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p class="mb-2 font-sans text-xs font-semibold text-slate-500">Жол ені</p>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" aria-label="Тар жол" @click="readerWidth = 'reader-width-narrow'"
+                                                :aria-pressed="readerWidth == 'reader-width-narrow'"
+                                                :class="readerWidth == 'reader-width-narrow' ? 'border-brand text-brand' : 'border-slate-300 text-slate-600'"
+                                                class="grid h-11 flex-1 place-items-center rounded-md border bg-white hover:border-brand">{% include "components/icon.html" with name="list" size=16 %}</button>
+                                        <button type="button" aria-label="Кең жол" @click="readerWidth = 'reader-width-comfort'"
+                                                :aria-pressed="readerWidth == 'reader-width-comfort'"
+                                                :class="readerWidth == 'reader-width-comfort' ? 'border-brand text-brand' : 'border-slate-300 text-slate-600'"
+                                                class="grid h-11 flex-1 place-items-center rounded-md border bg-white hover:border-brand">{% include "components/icon.html" with name="adjustments" size=16 %}</button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p class="mb-2 font-sans text-xs font-semibold text-slate-500">Фон</p>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" aria-label="Ақ фон" @click="readerTheme = 'reader-theme-paper'"
+                                                :aria-pressed="readerTheme == 'reader-theme-paper'"
+                                                :class="readerTheme == 'reader-theme-paper' ? 'border-brand ring-2 ring-brand/30' : 'border-slate-300'"
+                                                class="h-11 flex-1 rounded-md border bg-white hover:border-brand"></button>
+                                        <button type="button" aria-label="Жылы фон" @click="readerTheme = 'reader-theme-warm'"
+                                                :aria-pressed="readerTheme == 'reader-theme-warm'"
+                                                :class="readerTheme == 'reader-theme-warm' ? 'border-brand ring-2 ring-brand/30' : 'border-slate-300'"
+                                                class="h-11 flex-1 rounded-md border bg-[#fff7ed] hover:border-brand"></button>
+                                        <button type="button" aria-label="Түнгі фон" @click="readerTheme = 'reader-theme-night'"
+                                                :aria-pressed="readerTheme == 'reader-theme-night'"
+                                                :class="readerTheme == 'reader-theme-night' ? 'border-brand ring-2 ring-brand/30' : 'border-slate-300'"
+                                                class="h-11 flex-1 rounded-md border bg-slate-900 hover:border-brand"></button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p class="mt-4 font-sans text-[11px] text-slate-400">Таңдауың есте сақталады — келесі бөлімде де сол күйінде ашылады.</p>
+                        </div>
+                    </div>
+                </div>
 
                 {% if current_chapter_number and not is_teaser and story.is_serial %}
                     {% widthratio current_chapter_number chapters|length 100 as pct %}
@@ -141,40 +265,11 @@
                 {% endif %}
             </header>
 
-            <div class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                <div class="flex items-center gap-1">
-                    <button type="button" aria-label="Кіші қаріп" @click="readerSize = 'reader-size-base'"
-                            :class="readerSize == 'reader-size-base' ? 'border-brand text-brand' : 'border-slate-300 text-slate-600'"
-                            class="grid h-8 w-8 place-items-center rounded-md border bg-white font-sans text-xs font-bold hover:border-brand hover:text-brand">A</button>
-                    <button type="button" aria-label="Үлкен қаріп" @click="readerSize = 'reader-size-large'"
-                            :class="readerSize == 'reader-size-large' ? 'border-brand text-brand' : 'border-slate-300 text-slate-600'"
-                            class="grid h-8 w-8 place-items-center rounded-md border bg-white font-sans text-sm font-bold hover:border-brand hover:text-brand">A</button>
-                </div>
-                <div class="flex items-center gap-1">
-                    <button type="button" aria-label="Тар жол" @click="readerWidth = 'reader-width-narrow'"
-                            :class="readerWidth == 'reader-width-narrow' ? 'border-brand text-brand' : 'border-slate-300 text-slate-600'"
-                            class="grid h-8 w-8 place-items-center rounded-md border bg-white text-slate-600 hover:border-brand hover:text-brand">{% include "components/icon.html" with name="list" size=14 %}</button>
-                    <button type="button" aria-label="Кең жол" @click="readerWidth = 'reader-width-comfort'"
-                            :class="readerWidth == 'reader-width-comfort' ? 'border-brand text-brand' : 'border-slate-300 text-slate-600'"
-                            class="grid h-8 w-8 place-items-center rounded-md border bg-white text-slate-600 hover:border-brand hover:text-brand">{% include "components/icon.html" with name="adjustments" size=14 %}</button>
-                </div>
-                <div class="flex items-center gap-1">
-                    <button type="button" aria-label="Ақ фон" @click="readerTheme = 'reader-theme-paper'"
-                            :class="readerTheme == 'reader-theme-paper' ? 'border-brand' : 'border-slate-300'"
-                            class="h-8 w-8 rounded-md border bg-white hover:border-brand"></button>
-                    <button type="button" aria-label="Жылы фон" @click="readerTheme = 'reader-theme-warm'"
-                            :class="readerTheme == 'reader-theme-warm' ? 'border-brand' : 'border-slate-300'"
-                            class="h-8 w-8 rounded-md border bg-[#fff7ed] hover:border-brand"></button>
-                    <button type="button" aria-label="Түнгі фон" @click="readerTheme = 'reader-theme-night'"
-                            :class="readerTheme == 'reader-theme-night' ? 'border-brand' : 'border-slate-300'"
-                            class="h-8 w-8 rounded-md border bg-slate-900 hover:border-brand"></button>
-                </div>
-            </div>
-
             {% if is_teaser %}
                 {# Тизер первой главы: max-h + fade-gradient, разворот по клику. #}
                 <div x-data="{ expanded: false }" class="relative">
-                    <article :class="[!expanded ? 'max-h-72 overflow-hidden' : '', readerSize, readerWidth, readerTheme]"
+                    <article data-chapter-body
+                             :class="[!expanded ? 'max-h-[60vh] overflow-hidden' : '', readerSize, readerWidth, readerTheme]"
                              class="prose-reader font-sans text-[17px] leading-[1.75] text-slate-800">
                         {{ current.body|linebreaks }}
                     </article>
@@ -190,34 +285,19 @@
                     </div>
                 </div>
             {% else %}
-                <article :class="[readerSize, readerWidth, readerTheme]"
+                <article data-chapter-body :class="[readerSize, readerWidth, readerTheme]"
                          class="prose-reader font-sans text-[17px] leading-[1.75] text-slate-800">
                     {{ current.body|linebreaks }}
                 </article>
             {% endif %}
 
-            {# FR-STORY-12: лайк главы #}
-            {% include "components/chapter_like.html" with likes=current.likes liked=current.liked %}
+            {# FR-STORY-12 / DEC-32: реакции на главу вместо одиночного лайка #}
+            {% include "components/reaction_bar.html" with items=reactions picked=current.my_reaction %}
 
-            <section class="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4"
-                     x-data="{ picked: '' }">
-                <h3 class="font-display text-sm font-bold text-slate-900">{% if story.is_single %}Оқығаннан кейін{% else %}Бұл бөлімнен кейін{% endif %}</h3>
-                <p class="mt-1 font-sans text-sm text-slate-600">Кейіпкердің келесі таңдауы қандай болуы мүмкін?</p>
-                <div class="mt-3 flex flex-wrap gap-2">
-                    <button type="button" @click="picked = 'courage'"
-                            :class="picked == 'courage' ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white text-slate-700'"
-                            class="rounded-pill border px-3 py-1.5 font-sans text-xs font-semibold hover:border-brand">Батыл қадам</button>
-                    <button type="button" @click="picked = 'friend'"
-                            :class="picked == 'friend' ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white text-slate-700'"
-                            class="rounded-pill border px-3 py-1.5 font-sans text-xs font-semibold hover:border-brand">Досымен сөйлесу</button>
-                    <button type="button" @click="picked = 'secret'"
-                            :class="picked == 'secret' ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white text-slate-700'"
-                            class="rounded-pill border px-3 py-1.5 font-sans text-xs font-semibold hover:border-brand">Құпияны іздеу</button>
-                </div>
-                <p x-show="picked" x-cloak class="mt-3 font-sans text-xs font-semibold text-brand-dark">
-                    Таңдауың белгіленді. {% if story.is_single %}Шығарма туралы{% else %}Бұл бөлім туралы{% endif %} пікірде ойыңды кеңейте аласың.
-                </p>
-            </section>
+            {# FR-STORY-13: опрос автора — необязательный, рендерится если создан #}
+            {% if poll %}
+                {% include "components/chapter_poll.html" with poll=poll story=story %}
+            {% endif %}
 
             {# Навигация между главами — full reload на ?chapter=N±1 с якорем на тексте #}
             {% if story.is_serial %}
@@ -243,6 +323,28 @@
                 {% endif %}
             </nav>
             {% endif %}
+        </section>
+
+        {% comment %}
+            Дочитал произведение — «что дальше» встаёт сразу здесь, а не за
+            лентой комментариев внизу. На телефоне лента длинная, и до
+            подборок дочитавший практически не добирался; при этом по DEC-31
+            именно подборка — правильный следующий шаг после последней главы.
+            Пока следующая глава есть, блок остаётся внизу (см. ниже).
+        {% endcomment %}
+        {% if not has_next %}
+            {% include "partials/story/whats_next.html" %}
+        {% endif %}
+
+        {% comment %}
+            Автор — на мобильном, сразу после текста. Карточка автора живёт в
+            правом рейле, а рейл начинается с xl: на телефоне от автора
+            оставалась строка с 24px-аватаром в шапке. Место выбрано по
+            намерению: человек только что дочитал главу — это точка, где
+            «кто это написал» и «подписаться» осмысленны.
+        {% endcomment %}
+        <section class="xl:hidden">
+            {% include "partials/story/author_card.html" %}
         </section>
 
         {# ─────────────────────── Комментарии этой главы ─────────────────────── #}
@@ -303,52 +405,95 @@
     {% endif %}
 
     {% comment %}
-        Обратный вход в настроение (DEC-31). Дочитавший ищет «ещё такого же»,
-        и жанр отвечает на это хуже всего: две фэнтези бывают совсем разными.
-        Подборка же собрана по состоянию, поэтому именно она — правильный
-        следующий шаг. Стоит выше «Басқа шығармалар»: рекомендация редакции
-        сильнее автоматической выдачи по жанру.
+        Если следующая глава есть, «что дальше» остаётся внизу: в середине
+        сериала следующий шаг — следующая глава, и подборки с ней конкурируют.
+        Для дочитавшего блок уезжает наверх, сразу после текста (см. выше).
     {% endcomment %}
-    {% if in_collections %}
-        <section aria-labelledby="in-collections-heading" class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-5">
-            <h2 id="in-collections-heading" class="mb-3 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                Мына жинақтарда бар
-            </h2>
-            <div class="flex flex-wrap gap-2">
-                {% for c in in_collections %}
-                    <a href="{% url 'core:collection_detail' slug=c.slug %}"
-                       class="inline-flex items-center gap-2 rounded-pill px-3 py-1.5 font-sans text-[13px] font-semibold transition-transform hover:-translate-y-0.5"
-                       style="background: oklch(0.95 0.05 {{ c.tint_hue }}); color: oklch(0.32 0.13 {{ c.tint_hue }}); box-shadow: inset 0 0 0 1px oklch(0.86 0.08 {{ c.tint_hue }});">
-                        {% include "components/icon.html" with name=c.icon size=14 %}
-                        {{ c.name }}
-                    </a>
-                {% endfor %}
-            </div>
-        </section>
+    {% if has_next or not current %}
+        {% include "partials/story/whats_next.html" %}
     {% endif %}
 
-    {# ── Басқа шығармалар (FR-STORY-02) ── #}
-    {% if related %}
-        <section aria-labelledby="related-heading" class="mt-4">
-            <header class="mb-4 flex items-baseline justify-between">
-                <h2 id="related-heading" class="font-display text-xl font-bold text-slate-900">
-                    Басқа шығармалар
-                </h2>
-                {% if story.genres_resolved %}
-                    {% with primary_genre=story.genres_resolved.0 %}
-                        <a href="{% url 'core:genre_detail' slug=primary_genre.slug %}"
-                           class="font-sans text-sm font-semibold text-brand hover:underline">
-                            {{ primary_genre.name }} жанры →
-                        </a>
-                    {% endwith %}
-                {% endif %}
-            </header>
-            <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-                {% for s in related %}
-                    {% include "components/book_card_small.html" with story=s %}
-                {% endfor %}
+    {% comment %}
+        Жалоба (FR-STORY-09) — в подвале страницы, а не в шапке. В ряду
+        действий она стояла рядом с кнопкой чтения и на мобильном забирала
+        строку у primary-действия; при этом повод пожаловаться появляется
+        после чтения, а не до него.
+    {% endcomment %}
+    {% if signed_in %}
+        <div class="mt-2 border-t border-slate-200 pt-5">
+            <button type="button" @click="$dispatch('open-report', { target: 'story:{{ story.slug }}' })"
+                    class="inline-flex items-center gap-2 font-sans text-sm font-semibold text-slate-500 hover:text-slate-800"
+                    aria-label="Шағым жіберу">
+                {% include "components/icon.html" with name="dots-vertical" size=16 %}
+                <span>Шағым жіберу</span>
+            </button>
+        </div>
+    {% endif %}
+
+    {% if current %}
+        {% comment %}
+            Панель чтения — только на мобильном и только пока текст главы в
+            кадре. Внутри длинной главы под рукой не было ничего: ни прогресса,
+            ни оглавления, ни перехода к следующей главе — только прокрутка до
+            самого низа. Геометрия повторяет нижнее меню (пилюля 360×64,
+            bottom-4), потому что панель встаёт на его место: две плавающие
+            пилюли на 375px наехали бы друг на друга. Меню прячется по
+            событию `reading-mode` (docs/07 §7.6).
+        {% endcomment %}
+        <div x-show="reading" x-cloak x-transition.opacity
+             role="toolbar" aria-label="Оқу панелі"
+             class="fixed inset-x-0 bottom-4 z-30 mx-auto flex h-16 w-[360px] max-w-[calc(100%-2rem)] items-center gap-1 overflow-hidden rounded-pill border border-slate-200 bg-white px-2 shadow-bottom-nav md:hidden">
+
+            {# Прогресс по тексту главы — тонкая линия по верхнему краю пилюли #}
+            <div class="absolute inset-x-0 top-0 h-1 bg-slate-100">
+                <div class="h-full bg-brand transition-[width] duration-150" :style="'width: ' + progress + '%'"></div>
             </div>
-        </section>
+
+            <button type="button" @click.stop="settingsOpen = true" aria-label="Оқу параметрлері"
+                    class="flex h-12 w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-pill text-slate-800 hover:bg-slate-100">
+                <span class="font-sans text-sm font-bold leading-none">Aa</span>
+                <span class="font-sans text-[10px] font-semibold leading-none">Қаріп</span>
+            </button>
+
+            {% if story.is_serial %}
+                <button type="button" @click.stop="chaptersOpen = true" aria-label="Бөлімдер тізімі"
+                        class="flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-pill text-slate-800 hover:bg-slate-100">
+                    {% include "components/icon.html" with name="list" size=20 %}
+                    <span class="font-sans text-[10px] font-semibold leading-none">{{ chapter_number }} / {{ chapters|length }}</span>
+                </button>
+
+                {% if has_next %}
+                    <a href="?chapter={{ chapter_number|add:'1' }}#chapter-{{ chapter_number|add:'1' }}"
+                       class="inline-flex h-12 shrink-0 items-center gap-1.5 rounded-pill bg-brand px-4 font-sans text-sm font-semibold text-white hover:bg-brand-dark">
+                        Келесі
+                        {% include "components/icon.html" with name="chevron-right" size=16 %}
+                    </a>
+                {% else %}
+                    <span class="px-3 font-sans text-[11px] font-semibold text-slate-500">Соңғы бөлім</span>
+                {% endif %}
+            {% else %}
+                <span class="flex-1 px-2 font-sans text-[11px] text-slate-500" x-text="progress + '% оқылды'"></span>
+            {% endif %}
+        </div>
+
+        {% if chapters and story.is_serial %}
+            {# Оглавление из панели чтения — не уводя со страницы к <details> вверху #}
+            <div x-show="chaptersOpen" x-cloak x-transition.opacity @click="chaptersOpen = false"
+                 class="fixed inset-0 z-40 bg-slate-900/40 md:hidden"></div>
+            <div x-show="chaptersOpen" x-cloak x-transition
+                 @keydown.escape.window="chaptersOpen = false"
+                 role="dialog" aria-label="Бөлімдер"
+                 class="fixed inset-x-0 bottom-0 z-50 max-h-[70vh] overflow-y-auto rounded-t-hero border-t border-slate-200 bg-white p-5 pb-8 shadow-modal md:hidden">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="font-display text-sm font-bold text-slate-900">Бөлімдер</h3>
+                    <button type="button" @click="chaptersOpen = false" aria-label="Жабу"
+                            class="grid h-9 w-9 place-items-center rounded-pill text-slate-500 hover:bg-slate-100">
+                        {% include "components/icon.html" with name="x" size=18 %}
+                    </button>
+                </div>
+                {% include "partials/story/chapter_list.html" %}
+            </div>
+        {% endif %}
     {% endif %}
 </div>
 
@@ -377,4 +522,100 @@
     .reader-theme-warm { background: #fff7ed; color: rgb(51 65 85); padding: 1rem; border-radius: var(--radius-md); }
     .reader-theme-night { background: rgb(15 23 42); color: rgb(226 232 240); padding: 1rem; border-radius: var(--radius-md); }
 </style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+/* storyReader — Alpine-компонент страницы произведения (FR-STORY-07).
+ *
+ * Держит три оси настроек чтения, состояние двух bottom-sheet'ов и режим
+ * чтения. Вынесен из inline-x-data по двум причинам:
+ *
+ *  1. Настройки переживают переход к следующей главе. Навигация по главам —
+ *     это full reload на ?chapter=N, и состояние на уровне страницы умирало
+ *     вместе с ним: выбрал ночную тему — через главу снова белый экран.
+ *     Значения читаются из localStorage и валидируются по белому списку:
+ *     чужое или устаревшее значение молча падает в fallback, а не уезжает
+ *     классом в разметку.
+ *  2. Панели чтения нужен IntersectionObserver и обработчик скролла, а это
+ *     уже не выражается атрибутом.
+ *
+ * Регистрация до alpine:init обязательна: alpine.min.js подключён с defer,
+ * поэтому этот скрипт исполняется раньше и слушатель успевает встать.
+ */
+(function () {
+    var AXES = {
+        size:  { key: 'bp-reader-size',  values: ['reader-size-base', 'reader-size-large'],                          fallback: 'reader-size-base' },
+        width: { key: 'bp-reader-width', values: ['reader-width-narrow', 'reader-width-comfort'],                    fallback: 'reader-width-comfort' },
+        theme: { key: 'bp-reader-theme', values: ['reader-theme-paper', 'reader-theme-warm', 'reader-theme-night'],  fallback: 'reader-theme-paper' }
+    };
+
+    function load(axis) {
+        try {
+            var stored = window.localStorage.getItem(AXES[axis].key);
+            return AXES[axis].values.indexOf(stored) > -1 ? stored : AXES[axis].fallback;
+        } catch (e) {
+            return AXES[axis].fallback;   /* приватный режим — просто не запоминаем */
+        }
+    }
+
+    function save(axis, value) {
+        try { window.localStorage.setItem(AXES[axis].key, value); } catch (e) {}
+    }
+
+    document.addEventListener('alpine:init', function () {
+        Alpine.data('storyReader', function () {
+            return {
+                readerSize:   load('size'),
+                readerWidth:  load('width'),
+                readerTheme:  load('theme'),
+                settingsOpen: false,
+                chaptersOpen: false,
+                reading:      false,
+                progress:     0,
+
+                init: function () {
+                    var self = this;
+                    this.$watch('readerSize',  function (v) { save('size',  v); });
+                    this.$watch('readerWidth', function (v) { save('width', v); });
+                    this.$watch('readerTheme', function (v) { save('theme', v); });
+
+                    var body = this.$el.querySelector('[data-chapter-body]');
+                    if (!body) return;
+
+                    if ('IntersectionObserver' in window) {
+                        new IntersectionObserver(function (entries) {
+                            self.setReading(entries[0].isIntersecting);
+                        }, { rootMargin: '-72px 0px -96px 0px' }).observe(body);
+                    }
+
+                    var track = function () { self.track(body); };
+                    window.addEventListener('scroll', track, { passive: true });
+                    window.addEventListener('resize', track, { passive: true });
+                    track();
+                },
+
+                /* Панель чтения занимает место нижнего меню, поэтому о входе
+                 * в режим чтения нужно сообщить наружу — mobile_nav слушает
+                 * это событие и убирает свою пилюлю (docs/07 §7.6). */
+                setReading: function (on) {
+                    if (this.reading === on) return;
+                    this.reading = on;
+                    window.dispatchEvent(new CustomEvent('reading-mode', { detail: { on: on } }));
+                },
+
+                track: function (body) {
+                    var rect = body.getBoundingClientRect();
+                    var viewport = window.innerHeight || document.documentElement.clientHeight;
+                    var scrollable = rect.height - viewport;
+                    var done = scrollable > 0
+                        ? -rect.top / scrollable
+                        : (rect.bottom <= viewport ? 1 : 0);
+                    this.progress = Math.max(0, Math.min(100, Math.round(done * 100)));
+                }
+            };
+        });
+    });
+})();
+</script>
 {% endblock %}

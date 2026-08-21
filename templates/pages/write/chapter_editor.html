@@ -63,6 +63,50 @@
             </span>
         </label>
 
+        {% comment %}
+            Опрос под главой (FR-STORY-13) — необязательный, поэтому свёрнут:
+            развёрнутая форма читалась бы как обязательный шаг публикации.
+            Лимиты — BR-POLL-02: до 4 вариантов, вопрос 120 знаков, вариант 80.
+            Стаб-разметка; реальная отправка появится в Ф14.
+        {% endcomment %}
+        <details class="group rounded-lg border border-slate-200 bg-slate-50 p-4" {% if poll %}open{% endif %}>
+            <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3">
+                <span class="flex items-center gap-2 font-sans text-sm font-bold text-slate-900">
+                    {% include "components/icon.html" with name="message-caption" size=16 cls="text-slate-500" %}
+                    Оқырманға сұрақ
+                    <span class="font-sans text-xs font-semibold text-slate-500">(міндетті емес)</span>
+                </span>
+                <span class="transition-transform group-open:rotate-180">{% include "components/icon.html" with name="chevron-down" size=14 %}</span>
+            </summary>
+
+            <p class="mt-3 font-sans text-xs leading-relaxed text-slate-600">
+                Сұрақ бөлім мәтінінен кейін тұрады. Дұрыс жауабы жоқ — бұл викторина емес, оқырманның болжамы.
+                Келесі бөлімді жариялағанда сұрақ автоматты түрде жабылады: жауап сол жерде сюжетпен келеді.
+            </p>
+
+            <label class="mt-4 flex flex-col gap-1.5">
+                <span class="font-sans text-sm font-semibold text-slate-800">Сұрақ</span>
+                <input type="text" name="poll_question" maxlength="120"
+                       value="{{ poll.question|default:'' }}"
+                       placeholder="Сенше, кейіпкер кімді таңдайды?"
+                       class="h-11 w-full rounded-md border border-slate-300 bg-white px-3 font-sans text-sm text-slate-900 placeholder:text-slate-500 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30">
+            </label>
+
+            <div class="mt-3 flex flex-col gap-2">
+                {% for r in poll.results %}
+                    <input type="text" name="poll_option" maxlength="80" value="{{ r.text }}"
+                           class="h-11 w-full rounded-md border border-slate-300 bg-white px-3 font-sans text-sm text-slate-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30">
+                {% empty %}
+                    <input type="text" name="poll_option" maxlength="80" placeholder="1-нұсқа"
+                           class="h-11 w-full rounded-md border border-slate-300 bg-white px-3 font-sans text-sm text-slate-900 placeholder:text-slate-500 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30">
+                    <input type="text" name="poll_option" maxlength="80" placeholder="2-нұсқа"
+                           class="h-11 w-full rounded-md border border-slate-300 bg-white px-3 font-sans text-sm text-slate-900 placeholder:text-slate-500 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30">
+                {% endfor %}
+            </div>
+
+            <p class="mt-2 font-sans text-xs text-slate-500">Кемінде 2, ең көбі 4 нұсқа.</p>
+        </details>
+
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
             <a href="{% url 'core:manage_story' slug=story.slug %}"
                class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">

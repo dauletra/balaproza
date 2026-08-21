@@ -118,19 +118,26 @@
 | Требование | Реализация | Тест |
 |-----------|-----------|------|
 | FR-STORY-01, 02 | шапка + секции страницы | `test_story.StoryDetailValidSlug` |
-| FR-STORY-03 | sticky scrollspy (IntersectionObserver) | `test_story.StoryDetailValidSlug` |
-| FR-STORY-04 | оглавление глав + прогресс | `test_story.StoryDetailReadingProgress` |
+| FR-STORY-01 (аннотация) | `Story.annotation` в шаблоне | `test_story.StoryDetailAnnotation` |
+| FR-STORY-01 (кнопка чтения) | подписи «Оқу» / «Жалғастыру · N-бөлім» / «Оқуды бастау» | `test_story.StoryDetailReadCta` |
+| FR-STORY-01 («Сақтау») | `in_library(username, slug)` + Alpine-toggle, гейт для гостя | `test_story.StoryDetailSaveButton` |
+| FR-STORY-01 (автор) | `partials/story/author_card.html` — рейл + `xl:hidden` в контенте | `test_story.StoryDetailAuthorOnMobile` |
+| ~~FR-STORY-03~~ | Аннулировано **DEC-34** — scrollspy на странице нет | `test_story.StoryDetailValidSlug.test_no_old_scrollspy_anchors` держит его отсутствие |
+| «Что дальше» (FR-STORY-02, DEC-31) | `partials/story/whats_next.html`; позиция зависит от `has_next` | `test_story.WhatsNextPlacement` |
+| FR-STORY-04 | `partials/story/chapter_list.html` (рейл / `<details>` / sheet) + прогресс | `test_story.StoryDetailReadingProgress`, `test_story.ChapterListShowsLikes` |
+| Панель чтения на mobile | событие `reading-mode`, `mobile_nav` уступает место (docs/07 §7.6) | `test_story.StoryReadingPanel` |
 | FR-STORY-05 | `components/comment.html`, `CommentLoginGate` | `test_story.StoryDetailGuestVsAuth`, `test_home.StoryDetailHasGate` |
 | FR-STORY-06 | `?chapter=N`, prev/next через `?chapter=N±1` | `test_story.StoryDetailChapterParam` |
-| FR-STORY-07, 08 | Alpine: `readerSize` / `readerWidth` / `readerTheme` | — |
-| FR-STORY-09 | `components/report_modal.html`, событие `open-report` | `test_story.StoryDetailGuestVsAuth` |
+| FR-STORY-07, 08 | Alpine-компонент `storyReader` + `localStorage` (`bp-reader-*`) | `test_story.StoryReaderSettings` |
+| FR-STORY-09 | `components/report_modal.html`, событие `open-report` (в подвале страницы) | `test_story.StoryDetailGuestVsAuth`, `test_story.StoryDetailReportPlacement` |
 | FR-STORY-10 | `components/share_button.html` | — |
 | FR-STORY-11 | `related_stories(slug, limit=6)` | `test_stub_data.StoryRelations` |
-| FR-STORY-12 | `components/chapter_like.html` | — |
+| FR-STORY-12 (DEC-32) | `components/reaction_bar.html`, `REACTIONS`, `reactions_of()` | `test_story.ChapterReactions` |
+| FR-STORY-13 (DEC-33) | `components/chapter_poll.html`, `ChapterPoll`, `poll_of()` | `test_story.ChapterPollStates` |
 | DEC-28 (`single` vs `serial`) | `story.is_single` / `is_serial` | `test_story.StoryDetailSingleWork` |
 | Комментарии к главе | `comments_of_chapter(slug, n)` | `test_story.StoryDetailPerChapterComments` |
 
-> **Пробел в покрытии.** FR-STORY-07/08 (настройки чтения), FR-STORY-10 (share) и FR-STORY-12 (лайк главы) тестами не закрыты — это чистый Alpine-клиент, серверный рендер про него ничего не знает. Изменение классов `reader-*` или разметки лайка сейчас не поймается. Кандидат на добавление проверок разметки.
+> **Пробел в покрытии.** FR-STORY-10 (share) и поведение лайка главы (FR-STORY-12) тестами не закрыты — это чистый Alpine-клиент, серверный рендер про него ничего не знает. У FR-STORY-07/08 проверяется только разметка: что оси на месте, что панель за триггером и что ключи `localStorage` в странице есть; сам факт сохранения между главами тест не наблюдает — для этого нужен браузерный прогон.
 
 ## 14.6 WRITE · Авторский кабинет
 
@@ -205,12 +212,14 @@ Showcase-маршруты `/_design/tokens/`, `/_design/components/`, `/_design/
 | `partials/header.html`, `footer.html` | [07 §7.2 / §7.5](07-layout-navigation.md) |
 | Ширина контейнера, колонки контента или рейла в `base.html` | [07 §7.1](07-layout-navigation.md), [02 «Размеры каркаса»](02-design-system.md), константы в `test_desktop_layout.py` |
 | Состав/порядок секций `pages/home.html` | [05 §5.2](05-functional-spec.md) FR-HOME-*, эта карта §14.3 |
+| Состав/порядок секций `pages/story/story_detail.html` | [05 §5.4](05-functional-spec.md) FR-STORY-*, эта карта §14.5 |
 | `_render_catalog`, `filter_catalog` | [05](05-functional-spec.md) FR-CAT-07 (таблица параметров), [12 §12.3](12-domain-model-contract.md) |
 | Сигнатура хелпера в `stub_data.py` | [12 §12.3](12-domain-model-contract.md) |
 | Поле/property на `Story` | [12 §12.4](12-domain-model-contract.md) |
 | Новый маршрут в `core/urls.py` | [05 §5.13](05-functional-spec.md) (карта переходов), эта карта, `PUBLIC_URLS` в `test_urls_smoke.py` |
 | Новый компонент в `templates/components/` | [04](04-component-library.md), счётчик в `CLAUDE.md` |
 | Новый тест-файл | [15](15-testing-contract.md), счётчики в `README.md` и `CLAUDE.md` |
+| Новые тесты в существующем файле | счётчики в `README.md` и `CLAUDE.md` (их держит `test_docs_sync.TestCounters`) |
 | Строка интерфейса | [16](16-content-voice.md) — тон, обращение на «сен» |
 | `config/settings.py` | [17](17-deployment.md), [09 §9.7](09-nonfunctional.md) |
 | Отмена/пересмотр решения | [10](10-resolved-decisions.md) — **новым DEC**, не правкой старого |
@@ -223,7 +232,8 @@ Showcase-маршруты `/_design/tokens/`, `/_design/components/`, `/_design/
 
 | Что | Статус |
 |-----|--------|
-| Настройки чтения, share-кнопка, лайк главы | Реализованы, тестами не закрыты (§14.5) |
+| Share-кнопка, поведение лайка главы | Реализованы, тестами не закрыты (§14.5) |
+| Сохранение настроек чтения между главами | Разметка проверена, само поведение `localStorage` — только вручную в браузере (§14.5) |
 | sRGB-fallback для OKLCH (DEC-12, NFR-41) | Не реализован; варианты решения в [03 §3.5](03-genre-color-system.md) |
 | Вынос строк в локализацию (NFR-30) | Не реализовано, отложено осознанно |
 | Гарнитура Serif в чтении (`--font-serif`) | Токен есть, применения нет — [02 §2.2](02-design-system.md) |

@@ -4,9 +4,11 @@
       - Десктоп (или fallback): dropdown с Telegram / WhatsApp / Copy link
 
     Параметры:
-      url    — абсолютный/относительный URL (обязательно)
-      title  — заголовок шеринга (string)
-      label  — текст кнопки (default: "Бөлісу")
+      url      — абсолютный/относительный URL (обязательно)
+      title    — заголовок шеринга (string)
+      label    — текст кнопки (default: "Бөлісу")
+      wrap_cls — доп. классы обёртки (опц., напр. "flex-1" в ряду действий)
+      btn_cls  — доп. классы кнопки (опц., напр. "w-full justify-center")
 
     Использование:
       {% include "components/share_button.html" with url=request.build_absolute_uri title=story.title %}
@@ -42,10 +44,10 @@
             return 'https://api.whatsapp.com/send?text=' + encodeURIComponent(this.title + ' ' + this.url);
         }
      }"
-     class="relative">
+     class="relative {{ wrap_cls|default:'' }}">
     <button type="button" @click="share()" @click.outside="open = false"
             aria-label="{{ btn_label }}"
-            class="inline-flex h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            class="inline-flex h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-50 {{ btn_cls|default:'' }}">
         {% include "components/icon.html" with name="paper-plane" size=16 %}
         <span>{{ btn_label }}</span>
     </button>

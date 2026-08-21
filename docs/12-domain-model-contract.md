@@ -59,11 +59,15 @@ Story and chapters:
 - `chapter_of(story_slug: str, number: int) -> Chapter | None`
 - `comments_of(story_slug: str) -> list[StoryComment]`
 - `comments_of_chapter(story_slug: str, chapter_number: int) -> list[StoryComment]`
+- `reactions_of(chapter: Chapter) -> list[dict]` — полный ряд из пяти реакций, включая нулевые (BR-REACT-01)
+- `reaction_breakdown(story_slug: str) -> list[dict]` — «чем зацепила каждая глава», для авторского кабинета
+- `poll_of(story_slug: str, chapter_number: int) -> ChapterPoll | None` — опрос необязателен (BR-POLL-01)
 
 Author workspace, library, social:
 - `my_stories_of(username: str) -> list[Story]`
 - `writer_stats(username: str) -> dict`
 - `library_of(username: str, kind: str = "") -> list[LibraryEntry]`
+- `in_library(username: str, story_slug: str) -> bool`
 - `reader_stats(username: str) -> dict`
 - `is_following(me: str, them: str) -> bool`
 - `following_of(username: str) -> list[Author]`

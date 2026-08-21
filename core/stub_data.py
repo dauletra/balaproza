@@ -417,6 +417,34 @@ STORIES = [
 STORIES_BY_SLUG = {s.slug: s for s in STORIES}
 
 
+# ───────────────────────── Реакции на главу ───────────────────────────────
+
+@dataclass(frozen=True)
+class Reaction:
+    """Одна реакция читателя на главу (FR-STORY-12, DEC-32).
+
+    Словарь закрытый: пять штук, пользовательских реакций нет. Открытый
+    список означал бы бесконечную модерацию и длинный хвост мёртвых кнопок.
+    """
+    slug: str
+    label: str    # первое лицо — читатель говорит о себе, как в docs/16 («сен»)
+    icon: str     # symbol в спрайте; эмодзи запрещены, поэтому только SVG
+    hint: str     # как это читать автору в разбивке по главам
+
+
+# Порядок фиксирован и в данных, и в интерфейсе: кнопки не должны прыгать
+# местами по мере голосования.
+REACTIONS = (
+    Reaction("kuldim",    "Күлдім",    "smile",        "күлкілі болды"),
+    Reaction("jyladym",   "Жыладым",   "drop",         "қатты әсер етті"),
+    Reaction("juregim",   "Жүрегім",   "heart-filled", "романтикалық"),
+    Reaction("shabyt",    "Шабыт",     "feather",      "жазуға шабыттандырды"),
+    Reaction("tangaldym", "Таңғалдым", "sparkle",      "күтпеген бұрылыс"),
+)
+
+REACTIONS_BY_SLUG = {r.slug: r for r in REACTIONS}
+
+
 # ───────────────────────── Главы (для STORY/READ) ─────────────────────────
 
 @dataclass(frozen=True)
@@ -425,8 +453,10 @@ class Chapter:
     title: str
     char_count: int        # для «X / N» прогресса
     body: str = ""         # длинный текст для режима чтения
-    likes: int = 0         # лайки именно этой главы (FR-STORY-12)
-    liked: bool = False    # текущий пользователь лайкнул эту главу
+    # Реакции главы: пары (reaction_slug, count). Кортеж, а не dict, —
+    # Chapter заморожен и должен оставаться хешируемым.
+    reactions: tuple = ()
+    my_reaction: str = ""  # что поставил текущий пользователь; "" — ничего
 
     @property
     def char_count_formatted(self) -> str:
@@ -434,6 +464,27 @@ class Chapter:
         if n >= 1000:
             return f"{n // 1000},{(n % 1000) // 100} мың"
         return str(n)
+
+    @property
+    def reaction_counts(self) -> dict:
+        return dict(self.reactions)
+
+    @property
+    def likes(self) -> int:
+        """Совокупная реакция главы — число для карточек и шапки.
+
+        Раскладка «чем зацепило» нужна автору и читателю внутри главы,
+        но в каталоге пять цифр на карточке превратили бы сетку в дашборд.
+        """
+        return sum(count for _, count in self.reactions)
+
+    @property
+    def top_reaction(self) -> Reaction | None:
+        """Самая частая реакция — «чем зацепило» одним словом."""
+        if not self.reactions:
+            return None
+        slug = max(self.reactions, key=lambda pair: pair[1])[0]
+        return REACTIONS_BY_SLUG.get(slug)
 
 
 STORY_TEXTS_DIR = Path(__file__).resolve().parent / "story_texts"
@@ -446,9 +497,10 @@ def _story_text(story_slug: str, chapter_number: int) -> str:
     return path.read_text(encoding="utf-8").strip()
 
 
-def _chapter(story_slug: str, number: int, title: str, *, likes: int = 0, liked: bool = False) -> Chapter:
+def _chapter(story_slug: str, number: int, title: str, *,
+             reactions: tuple = (), mine: str = "") -> Chapter:
     body = _story_text(story_slug, number)
-    return Chapter(number, title, len(body), body, likes=likes, liked=liked)
+    return Chapter(number, title, len(body), body, reactions=reactions, my_reaction=mine)
 
 
 
@@ -515,26 +567,157 @@ CHAPTERS_BY_STORY: dict = {
         _chapter("arhimag", 3, "Үйге қайту шарты"),
     ],
     "dalney-berega": [
-        # FR-STORY-12: лайки — на главу, не на произведение целиком.
-        # Прогрессия лайков иллюстрирует «крючок»: первые главы заходят, к середине пик,
-        # глава 4 — текущая для возвращающегося читателя (liked=True), последние ещё впереди.
-        _chapter("dalney-berega", 1, "Жолға шығу", likes=842),
-        _chapter("dalney-berega", 2, "Тауға көтерілу", likes=719),
-        _chapter("dalney-berega", 3, "Алғашқы кездесу", likes=1024),
-        _chapter("dalney-berega", 4, "Депрессия", likes=687, liked=True),
-        _chapter("dalney-berega", 5, "Жаңа карта", likes=512),
-        _chapter("dalney-berega", 6, "Жаңбыр түн", likes=438),
-        _chapter("dalney-berega", 7, "Тас үй", likes=391),
-        _chapter("dalney-berega", 8, "Кездесу", likes=287),
-        _chapter("dalney-berega", 9, "Жасырын есік", likes=176),
-        _chapter("dalney-berega", 10, "Қайту", likes=94),
-        _chapter("dalney-berega", 11, "Соңғы кеш", likes=42),
-        _chapter("dalney-berega", 12, "Шеп", likes=18),
+        # FR-STORY-12 + DEC-32: реакции — на главу, не на произведение целиком.
+        # Раскладка подобрана так, чтобы читалась не только высота столбика,
+        # но и характер главы: «Алғашқы кездесу» собирает Жүрегім,
+        # «Депрессия» — Жыладым, «Жасырын есік» — Таңғалдым. Именно это
+        # и есть карта качества, которую автор не получит от одного лайка.
+        # Глава 4 — текущая для возвращающегося читателя (mine="jyladym").
+        _chapter("dalney-berega", 1, "Жолға шығу",
+                 reactions=(("tangaldym", 310), ("shabyt", 240), ("kuldim", 160), ("juregim", 82), ("jyladym", 50))),
+        _chapter("dalney-berega", 2, "Тауға көтерілу",
+                 reactions=(("shabyt", 300), ("tangaldym", 190), ("kuldim", 120), ("jyladym", 69), ("juregim", 40))),
+        _chapter("dalney-berega", 3, "Алғашқы кездесу",
+                 reactions=(("juregim", 520), ("tangaldym", 210), ("kuldim", 160), ("shabyt", 84), ("jyladym", 50))),
+        _chapter("dalney-berega", 4, "Депрессия", mine="jyladym",
+                 reactions=(("jyladym", 420), ("shabyt", 130), ("juregim", 70), ("tangaldym", 47), ("kuldim", 20))),
+        _chapter("dalney-berega", 5, "Жаңа карта",
+                 reactions=(("tangaldym", 220), ("shabyt", 150), ("kuldim", 90), ("juregim", 32), ("jyladym", 20))),
+        _chapter("dalney-berega", 6, "Жаңбыр түн",
+                 reactions=(("jyladym", 180), ("juregim", 120), ("tangaldym", 80), ("shabyt", 40), ("kuldim", 18))),
+        _chapter("dalney-berega", 7, "Тас үй",
+                 reactions=(("tangaldym", 170), ("shabyt", 110), ("jyladym", 60), ("kuldim", 31), ("juregim", 20))),
+        _chapter("dalney-berega", 8, "Кездесу",
+                 reactions=(("juregim", 140), ("tangaldym", 70), ("jyladym", 40), ("kuldim", 22), ("shabyt", 15))),
+        _chapter("dalney-berega", 9, "Жасырын есік",
+                 reactions=(("tangaldym", 90), ("shabyt", 40), ("kuldim", 26), ("jyladym", 12), ("juregim", 8))),
+        _chapter("dalney-berega", 10, "Қайту",
+                 reactions=(("jyladym", 40), ("shabyt", 24), ("juregim", 15), ("tangaldym", 10), ("kuldim", 5))),
+        _chapter("dalney-berega", 11, "Соңғы кеш",
+                 reactions=(("jyladym", 18), ("juregim", 12), ("shabyt", 7), ("tangaldym", 3), ("kuldim", 2))),
+        _chapter("dalney-berega", 12, "Шеп",
+                 reactions=(("shabyt", 8), ("jyladym", 5), ("tangaldym", 3), ("juregim", 1), ("kuldim", 1))),
     ],
     "sila-imperii": [
-        _chapter("sila-imperii", 1, "Толық мәтін", likes=245),
+        _chapter("sila-imperii", 1, "Толық мәтін",
+                 reactions=(("tangaldym", 100), ("shabyt", 70), ("kuldim", 40), ("juregim", 20), ("jyladym", 15))),
     ],
 }
+
+
+def reactions_of(chapter) -> list:
+    """Полный ряд реакций главы в каноническом порядке — включая нулевые.
+
+    Нулевые не выбрасываются намеренно: набор из пяти кнопок должен
+    выглядеть одинаково у первой главы и у сотой, иначе читатель каждый
+    раз заново ищет нужную.
+    """
+    counts = chapter.reaction_counts if chapter else {}
+    mine = chapter.my_reaction if chapter else ""
+    return [
+        {"reaction": r, "count": counts.get(r.slug, 0), "mine": r.slug == mine}
+        for r in REACTIONS
+    ]
+
+
+def reaction_breakdown(story_slug: str) -> list:
+    """Разбивка по главам для авторского кабинета: чем зацепила каждая глава."""
+    return [
+        {"chapter": c, "top": c.top_reaction, "total": c.likes}
+        for c in chapters_of(story_slug)
+    ]
+
+
+# ───────────────────────── Опрос под главой (FR-STORY-13) ─────────────────
+
+@dataclass(frozen=True)
+class ChapterPoll:
+    """Необязательный вопрос автора под главой.
+
+    Это не квиз: правильного ответа нет и очков не бывает. Смысл в другом —
+    у сериальной прозы появляется повод вернуться («кого он выберет?»),
+    а у автора — обязательство дописать.
+
+    Опрос закрывается публикацией следующей главы (BR-POLL-05): именно там
+    ответ и приходит, сюжетом. Поэтому `closed` вычисляется, а не хранится.
+    """
+    story_slug: str
+    chapter_number: int
+    question: str
+    options: tuple          # ((slug, text), …) — до 4 (BR-POLL-02)
+    votes: tuple = ()       # ((slug, count), …)
+    my_vote: str = ""       # что выбрал текущий пользователь
+
+    @property
+    def closed(self) -> bool:
+        return len(CHAPTERS_BY_STORY.get(self.story_slug, [])) > self.chapter_number
+
+    @property
+    def answer_chapter(self) -> int | None:
+        """Глава, в которой ответ уже есть — куда вести дочитавшего."""
+        return self.chapter_number + 1 if self.closed else None
+
+    @property
+    def total_votes(self) -> int:
+        return sum(count for _, count in self.votes)
+
+    @property
+    def results(self) -> list:
+        counts = dict(self.votes)
+        total = self.total_votes or 1
+        return [
+            {
+                "slug":    slug,
+                "text":    text,
+                "count":   counts.get(slug, 0),
+                "percent": round(counts.get(slug, 0) * 100 / total),
+                "mine":    slug == self.my_vote,
+            }
+            for slug, text in self.options
+        ]
+
+
+POLLS_BY_CHAPTER: dict = {
+    # Открытый опрос: последняя вышедшая глава, ответа ещё нет.
+    ("dalney-berega", 12): ChapterPoll(
+        story_slug="dalney-berega", chapter_number=12,
+        question="Сенше, Дана кімге сенеді?",
+        options=(
+            ("almas",   "Алмасқа — ол ешқашан өтірік айтпаған"),
+            ("qarttyq", "Қартқа — оның сөзінде салмақ бар"),
+            ("ozine",   "Тек өзіне"),
+        ),
+        votes=(("almas", 184), ("qarttyq", 97), ("ozine", 233)),
+    ),
+    # Закрытый опрос: следующая глава вышла, ответ уже в ней.
+    ("dalney-berega", 3): ChapterPoll(
+        story_slug="dalney-berega", chapter_number=3,
+        question="Үшеуі таңертең не істейді деп ойлайсың?",
+        options=(
+            ("tauga",  "Тауға көтеріледі"),
+            ("qaitad", "Қайтады"),
+            ("bolinu", "Бөлініп кетеді"),
+        ),
+        votes=(("tauga", 612), ("qaitad", 88), ("bolinu", 341)),
+        my_vote="bolinu",
+    ),
+    # Однобөлімное произведение: опрос тоже уместен и остаётся открытым.
+    ("tunge-deiin", 1): ChapterPoll(
+        story_slug="tunge-deiin", chapter_number=1,
+        question="Лифтіде екеудің қайсысы шындықты айтпай тұр?",
+        options=(
+            ("qyz",  "Қыз"),
+            ("jigit", "Жігіт"),
+            ("ekeui", "Екеуі де"),
+        ),
+        votes=(("qyz", 421), ("jigit", 96), ("ekeui", 188)),
+    ),
+}
+
+
+def poll_of(story_slug: str, chapter_number: int):
+    """Опрос главы или None — опрос необязателен (BR-POLL-01)."""
+    return POLLS_BY_CHAPTER.get((story_slug, chapter_number))
 
 
 def chapters_of(story_slug: str) -> list:
@@ -1311,6 +1494,11 @@ def library_of(username: str, kind: str = "") -> list:
     if kind:
         return [e for e in entries if e.kind == kind]
     return entries
+
+
+def in_library(username: str, story_slug: str) -> bool:
+    """Лежит ли произведение в библиотеке — для кнопки «Сақтау» на STORY."""
+    return any(e.story_slug == story_slug for e in library_of(username))
 
 
 def reader_stats(username: str) -> dict:

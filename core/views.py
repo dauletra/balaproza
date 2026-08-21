@@ -347,6 +347,10 @@ def story_detail(request, slug):
         'has_next': bool(current) and chapter_number < len(chapters),
         'is_teaser': is_teaser,
         'comments': stub_data.comments_of_chapter(slug, chapter_number) if chapter_number else [],
+        # FR-STORY-12 / DEC-32: пять реакций на главу вместо одиночного лайка
+        'reactions': stub_data.reactions_of(current) if current else [],
+        # FR-STORY-13: опрос автора — необязателен, чаще всего его нет
+        'poll': stub_data.poll_of(slug, chapter_number) if chapter_number else None,
         # Подсветка в правом рейле — текущая отображаемая глава.
         'current_chapter_number': chapter_number,
         # FR-STORY-02: блок «Басқа шығармалар» внизу страницы
@@ -356,6 +360,14 @@ def story_detail(request, slug):
         # DEC-31: обратный вход в настроение — подборки, где лежит произведение
         'in_collections': stub_data.collections_of(story) if story else [],
         'is_author': is_author,
+        # Шапка (FR-STORY-01): подпись главной кнопки — «начать» или «продолжить».
+        'has_progress': bool(has_progress_here),
+        # Кнопка «Сақтау» и подписка на автора в карточке автора.
+        'in_library':  stub_data.in_library(viewer, slug) if viewer else False,
+        'is_followed': (
+            stub_data.is_following(viewer, story.author.username)
+            if viewer and story else False
+        ),
     })
 
 
@@ -422,6 +434,8 @@ def chapter_editor(request, slug, chapter=None):
         'chapter': chapter,
         'current': current,
         'is_new':  chapter is None,
+        # FR-STORY-13: опрос главы, если автор его уже создал
+        'poll':    stub_data.poll_of(slug, chapter) if chapter else None,
     })
 
 
