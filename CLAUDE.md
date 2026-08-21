@@ -59,6 +59,7 @@ balaproza_v1/
 │   │                             # + константы: CATALOG_SORTS, CATALOG_DEFAULT_SORT,
 │   │                             # CATALOG_STATUS_FILTERS, CATALOG_BADGE_FILTERS,
 │   │                             # CATALOG_PRESETS, STORY_BADGES, PUBLIC_STATUSES,
+│   │                             # CATALOG_AUTHOR_FILTERS, NEW_AUTHOR_FOLLOWERS,
 │   │                             # TAGS, TAGS_BY_SLUG, BLOCKED_TAG_PATTERNS
 │   │                             # Story.recent_views — просмотры за 14 дней (DEC-36),
 │   │                             # ось «Қазір танымал»; инвариант recent_views <= views
@@ -76,7 +77,7 @@ balaproza_v1/
 │   ├── context_processors.py     # auth_state, nav_state, site_links
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced, page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 541 тестов в 16 файлах (см. ниже)
+│   └── tests/                    # 551 тестов в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -168,7 +169,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 541 тестов
+uv run python manage.py test core       # все 551 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 

@@ -270,9 +270,22 @@ class Story:
 
     @property
     def length_bucket(self) -> str:
-        if self.read_minutes <= 15:
+        """Бакет времени чтения.
+
+        Границы взяты из намерения читателя, а не из нынешнего корпуса: до
+        десяти минут читают между делом — на перемене, в дороге; десять-тридцать
+        это целый рассказ за один заход; дальше начинается чтение, которое не
+        помещается в один присест и требует закладки. Прежние 15/35 были
+        подобраны под романы: 95% стаба лежало в первом бакете, а третий не
+        набирался никогда.
+
+        Подгонять их под распределение нельзя — какие произведения реально
+        опубликуют, мы не знаем, а намерение «хочу быстрое» / «хочу надолго»
+        от состава каталога не зависит.
+        """
+        if self.read_minutes <= 10:
             return "short"
-        if self.read_minutes <= 35:
+        if self.read_minutes <= 30:
             return "medium"
         return "long"
 
@@ -357,7 +370,7 @@ STORIES = [
     Story(
         slug="zhuldyz-kartasy", title="Жұлдыз картасы", author_username="rudazov",
         cover="", genres=("fantastika", "shyttyrman"),
-        chapters=9, views=15320, likes=3940, comments=387,
+        chapters=17, views=15320, likes=3940, comments=387,
         status="Published", secondary_genre="shyttyrman",
         recent_views=1240, annotation="Ғарыш кемесінің картасында болмауға тиіс бір нүкте бар. Экипаж соған қарай бет алады.",
         tags=("aua-ralighi", "sayahat", "arman"), audience="10+",
@@ -366,7 +379,7 @@ STORIES = [
     Story(
         slug="kokjal-anyzy", title="Көкжал аңызы", author_username="dina_books",
         cover="", genres=("tarih", "erteg"),
-        chapters=6, views=6720, likes=1180, comments=94,
+        chapters=19, views=6720, likes=1180, comments=94,
         status="Published", secondary_genre="erteg",
         recent_views=430, annotation="Далада бір қасқыр туралы аңыз жүреді. Оны естіген әр ұрпақ басқаша айтады.",
         tags=("sayahat", "dostyk"), audience="10+",
@@ -955,11 +968,12 @@ CATALOG_AUDIENCE_FILTERS = (
     ("14+", "14+"),
 )
 
+# Границы — в Story.length_bucket, там же и обоснование.
 CATALOG_LENGTH_FILTERS = (
     ("",       "Барлығы"),
-    ("short",  "15 минутқа дейін"),
-    ("medium", "15-35 минут"),
-    ("long",   "35 минуттан ұзақ"),
+    ("short",  "10 минутқа дейін"),
+    ("medium", "10-30 минут"),
+    ("long",   "30 минуттан ұзақ"),
 )
 
 CATALOG_FORMAT_FILTERS = (
@@ -967,6 +981,25 @@ CATALOG_FORMAT_FILTERS = (
     ("single", "Бір бөлімді"),
     ("serial", "Көп бөлімді"),
 )
+
+# Порог «нового имени». Значение стаб-условное: авторов здесь шесть, и любая
+# граница между ними произвольна. После Ф14 это должен быть перцентиль по
+# подписчикам или возраст аккаунта — не унаследовать это число как правило.
+NEW_AUTHOR_FOLLOWERS = 150
+
+# Ось «Автор». Ни одна другая ось не помогает найти того, кого ещё не читают,
+# при том что вся культура портала построена вокруг растущего автора
+# (docs/13 §13.2), а «новые авторы» стоят отдельным блоком на главной.
+CATALOG_AUTHOR_FILTERS = (
+    ("",    "Барлығы"),
+    ("new", "Жаңа есімдер"),
+)
+
+
+def is_new_author(username: str) -> bool:
+    """Автор, которого ещё не читают: подписчиков меньше порога."""
+    a = AUTHORS_BY_USERNAME.get(username)
+    return bool(a and a.followers < NEW_AUTHOR_FOLLOWERS)
 
 # Статусы, которые вообще показываются публике (BR-10/11, DEC-23).
 # «Жоба» и «Модерацияда» — этапы авторского пути, а не публикация: до явного
@@ -976,7 +1009,8 @@ PUBLIC_STATUSES = frozenset({"Published", "Completed", "OnProcess"})
 
 def apply_catalog_filters(stories: list, sort: str = CATALOG_DEFAULT_SORT,
                           status: str = "", audience: str = "", length: str = "",
-                          format: str = "", badge: str = "") -> list:
+                          format: str = "", badge: str = "",
+                          author_tier: str = "") -> list:
     """Применяет сорт + фильтры к списку Story.
 
     Sort:
@@ -986,6 +1020,7 @@ def apply_catalog_filters(stories: list, sort: str = CATALOG_DEFAULT_SORT,
       - alphabet: по title
     Status: пустой → все публичные; иначе точный match Story.status.
     Badge: ключ из STORY_BADGES; пустой → без фильтра.
+    Author_tier: 'new' — авторы, которых ещё не читают (see is_new_author).
     """
     out = list(stories)
     if status:
@@ -999,6 +1034,8 @@ def apply_catalog_filters(stories: list, sort: str = CATALOG_DEFAULT_SORT,
     if badge:
         label = BADGE_LABELS.get(badge)
         out = [s for s in out if label and label in s.badges] if label else []
+    if author_tier == "new":
+        out = [s for s in out if is_new_author(s.author_username)]
 
     if sort == "alphabet":
         out.sort(key=lambda s: s.title.lower())
@@ -1014,7 +1051,8 @@ def apply_catalog_filters(stories: list, sort: str = CATALOG_DEFAULT_SORT,
 def filter_catalog(*, query: str = "", genre: str = "", tag: str = "",
                    status: str = "", sort: str = CATALOG_DEFAULT_SORT,
                    audience: str = "", length: str = "",
-                   format: str = "", badge: str = "") -> list:
+                   format: str = "", badge: str = "",
+                   author_tier: str = "") -> list:
     """Единый фильтр-пайплайн для унифицированного каталога (DEC-27).
 
     Применяет все источники AND-комбинацией. Для пустых параметров — no-op.
@@ -1039,7 +1077,8 @@ def filter_catalog(*, query: str = "", genre: str = "", tag: str = "",
 
     return apply_catalog_filters(out, sort=sort, status=status,
                                  audience=audience, length=length,
-                                 format=format, badge=badge)
+                                 format=format, badge=badge,
+                                 author_tier=author_tier)
 
 
 # Пресеты «Не оқимын?» (docs/13 §13.6). Готовые ответы на вопрос состояния,
@@ -1056,6 +1095,8 @@ CATALOG_PRESETS = (
      "filters": {"badge": "editorial"}},
     {"slug": "baiqau",       "label": "Байқау жұмыстары",
      "filters": {"badge": "contest"}},
+    {"slug": "jana-esimder", "label": "Жаңа есімдер",
+     "filters": {"author_tier": "new"}},
 )
 
 

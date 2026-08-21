@@ -527,7 +527,7 @@ class CatalogActiveChips(TestCase):
         labels = [c['label'] for c in r.context['active_chips']]
         self.assertIn('Триллер', labels)
         self.assertIn('14+', labels)
-        self.assertIn('15 минутқа дейін', labels)
+        self.assertIn('10 минутқа дейін', labels)
         self.assertEqual(r.context['active_count'], 3)
 
     def test_chip_href_drops_only_its_own_axis(self):
@@ -767,3 +767,93 @@ class EmptyCatalogOffersAWayOut(TestCase):
     def test_rail_offers_collections_too(self):
         r = self.client.get(reverse('core:catalog'))
         self.assertContains(r, 'Редакция жинақтары')
+
+
+class ReadingTimeBuckets(TestCase):
+    """Границы «Оқу уақыты» заданы намерением читателя, а не корпусом.
+
+    Прежние 15/35 были подобраны под романы: 95% каталога лежало в первом
+    бакете, а «35 минуттан ұзақ» не набирался никогда. Новые — до десяти
+    минут читают между делом, десять-тридцать это рассказ за один заход,
+    дальше нужна закладка.
+
+    Тест проверяет **функцию границ**, а не наполнение бакетов. Проверка вида
+    «во всех трёх что-то есть» снова привязала бы пороги к текущему стабу:
+    длинные работы уйдут в архив — и сборка упадёт, хотя дизайн исправен.
+    """
+
+    class _Fake:
+        """Story без данных: важен только read_minutes."""
+        def __init__(self, minutes):
+            self._m = minutes
+        read_minutes = property(lambda self: self._m)
+        length_bucket = stub_data.Story.length_bucket
+
+    def _bucket(self, minutes):
+        return self._Fake(minutes).length_bucket
+
+    def test_boundaries_are_ten_and_thirty(self):
+        for minutes, expected in ((1, 'short'), (10, 'short'), (11, 'medium'),
+                                  (30, 'medium'), (31, 'long'), (600, 'long')):
+            with self.subTest(minutes=minutes):
+                self.assertEqual(self._bucket(minutes), expected)
+
+    def test_every_story_lands_in_exactly_one_bucket(self):
+        keys = {k for k, _ in stub_data.CATALOG_LENGTH_FILTERS if k}
+        for s in stub_data.STORIES:
+            with self.subTest(story=s.slug):
+                self.assertIn(s.length_bucket, keys)
+
+    def test_filter_agrees_with_the_bucket(self):
+        for key in ('short', 'medium', 'long'):
+            with self.subTest(bucket=key):
+                for s in stub_data.filter_catalog(length=key):
+                    self.assertEqual(s.length_bucket, key)
+
+    def test_labels_name_the_actual_boundaries(self):
+        """Подпись, разошедшаяся с порогом, врёт молча."""
+        labels = dict(stub_data.CATALOG_LENGTH_FILTERS)
+        self.assertIn('10', labels['short'])
+        self.assertIn('30', labels['long'])
+
+
+class NewAuthorsAxis(TestCase):
+    """Ни одна ось не помогала найти автора, которого ещё не читают, при том
+    что «новые авторы» стоят отдельным блоком на главной, а культура портала
+    построена вокруг растущего автора (docs/13 §13.2)."""
+
+    def test_axis_filters_by_follower_count(self):
+        out = stub_data.filter_catalog(author_tier='new')
+        self.assertGreater(len(out), 0)
+        for s in out:
+            self.assertLess(s.author.followers, stub_data.NEW_AUTHOR_FOLLOWERS)
+
+    def test_axis_excludes_the_established(self):
+        slugs = {s.slug for s in stub_data.filter_catalog(author_tier='new')}
+        loud = [a.username for a in stub_data.AUTHORS
+                if a.followers >= stub_data.NEW_AUTHOR_FOLLOWERS]
+        for s in stub_data.STORIES:
+            if s.author_username in loud:
+                self.assertNotIn(s.slug, slugs)
+
+    def test_unknown_value_is_ignored(self):
+        plain = self.client.get(reverse('core:catalog'))
+        junk = self.client.get(reverse('core:catalog') + '?author_tier=no-such')
+        self.assertEqual(junk.status_code, 200)
+        self.assertEqual(len(junk.context['results']), len(plain.context['results']))
+
+    def test_it_is_offered_as_a_preset(self):
+        r = self.client.get(reverse('core:catalog'))
+        preset = next((p for p in r.context['presets'] if p['slug'] == 'jana-esimder'), None)
+        self.assertIsNotNone(preset)
+        self.assertIn('author_tier=new', preset['href'])
+
+    def test_it_is_an_axis_in_the_panel(self):
+        r = self.client.get(reverse('core:catalog'))
+        self.assertIn('author_tier', [g['name'] for g in r.context['filter_groups']])
+
+    def test_it_combines_with_genre(self):
+        out = stub_data.filter_catalog(genre='balalar', author_tier='new')
+        for s in out:
+            self.assertIn('balalar', s.genres)
+            self.assertLess(s.author.followers, stub_data.NEW_AUTHOR_FOLLOWERS)

@@ -1,6 +1,6 @@
 # 12. Domain model contract for F14
 
-> `Обновлён: 2026-08-21` · `Сверен с кодом: fdde268`
+> `Обновлён: 2026-08-21` · `Сверен с кодом: 855d37c`
 
 This document is the implementation contract for replacing `core/stub_data.py` with real Django models. It does not introduce models yet; it fixes the fields, relationships, computed values, and query helpers that the current templates already depend on.
 
@@ -26,6 +26,8 @@ Fields are **not listed here.** Every stub dataclass is in `core/stub_data.py`, 
 
 **`Story.recent_views` — единственное поле, которое в Ф14 не переносится как есть.** Это просмотры за 14 дней (DEC-36), в стабе — литерал, в бою — агрегат по логу просмотров с окном. Считать его от `views` нельзя: смысл оси в том, что она расходится с накопленным счётчиком. Инвариант `recent_views <= views` закрыт тестом `test_stub_data.RecentViewsAreConsistent`.
 
+**`NEW_AUTHOR_FOLLOWERS = 150` — стаб-условная константа, не правило.** Авторов в стабе шесть, и любая граница между ними произвольна. В Ф14 «новое имя» должно определяться перцентилем по подписчикам или возрастом аккаунта, а не абсолютным числом: 150 подписчиков на портале из двухсот авторов и из двадцати тысяч означают разное. Число не наследовать.
+
 What the table carries instead is the part `stub_data.py` cannot state: what must survive the migration and why.
 
 | Model | Stub source | Must survive F14 |
@@ -49,10 +51,11 @@ Current views rely on these helpers from `stub_data.py`. In F14 they should move
 **Signatures below are the actual ones in the code.** Note that every helper takes a **string key** (`username`, `story_slug`, `genre_slug`, `contest_slug`), not a model object — stub dataclasses are frozen and unlinked. F14 may switch these to objects, but that is a deliberate signature change touching every call site, not a free refactor.
 
 Catalog and search:
-- `filter_catalog(*, query="", genre="", tag="", status="", sort="trending", audience="", length="", format="", badge="") -> list[Story]`
-- `apply_catalog_filters(stories, sort="trending", status="", ..., badge="") -> list[Story]`
+- `filter_catalog(*, query="", genre="", tag="", status="", sort="trending", audience="", length="", format="", badge="", author_tier="") -> list[Story]`
+- `apply_catalog_filters(stories, sort="trending", status="", ..., badge="", author_tier="") -> list[Story]`
 - `stories_by_genre(genre_slug: str) -> list[Story]`
 - `PUBLIC_STATUSES` — статусы, видимые публике (DEC-23). `filter_catalog` режет по ним на входе
+- `is_new_author(username) -> bool`, `NEW_AUTHOR_FOLLOWERS`, `CATALOG_AUTHOR_FILTERS` — ось «Автор» (FR-CAT-13)
 - `CATALOG_PRESETS`, `STORY_BADGES` / `BADGE_LABELS`, `CATALOG_BADGE_FILTERS`, `CATALOG_DEFAULT_SORT` — справочники осей каталога
 - `search_stories(query: str) -> list[Story]`
 - `search_authors(query: str, limit=5) -> list[Author]`
