@@ -51,12 +51,13 @@ Current views rely on these helpers from `stub_data.py`. In F14 they should move
 **Signatures below are the actual ones in the code.** Note that every helper takes a **string key** (`username`, `story_slug`, `genre_slug`, `contest_slug`), not a model object — stub dataclasses are frozen and unlinked. F14 may switch these to objects, but that is a deliberate signature change touching every call site, not a free refactor.
 
 Catalog and search:
-- `filter_catalog(*, query="", genre="", tag="", status="", sort="trending", audience="", length="", format="", badge="", author_tier="") -> list[Story]`
-- `apply_catalog_filters(stories, sort="trending", status="", ..., badge="", author_tier="") -> list[Story]`
+- `filter_catalog(*, query="", genre="", tag="", status="", sort="trending", audience="", length="", format="", badge="", author_tier="", kind="") -> list[Story]`
+- `apply_catalog_filters(stories, sort="trending", status="", ..., badge="", author_tier="", kind="") -> list[Story]`
 - `stories_by_genre(genre_slug: str) -> list[Story]`
 - `PUBLIC_STATUSES` — статусы, видимые публике (DEC-23). `filter_catalog` режет по ним на входе
 - `is_new_author(username) -> bool`, `NEW_AUTHOR_FOLLOWERS`, `CATALOG_AUTHOR_FILTERS` — ось «Автор» (FR-CAT-13)
 - `AUDIENCE_ORDER` — отметки от младшей к старшей; ось «Жасың» сравнивает по индексу, не по равенству (DEC-38)
+- `CATALOG_KIND_FILTERS`, `KIND_PREDICATES` — ось «Түрі» (DEC-37). Правило «у публичного сериала не бывает `Published`» — BR-10a; `writer_stats` считает `published` как `Published` + `Completed`, ключ `ongoing` (бывший `drafts`) считает `OnProcess`
 - `CATALOG_PRESETS`, `STORY_BADGES` / `BADGE_LABELS`, `CATALOG_BADGE_FILTERS`, `CATALOG_DEFAULT_SORT` — справочники осей каталога
 - `search_stories(query: str) -> list[Story]`
 - `search_authors(query: str, limit=5) -> list[Author]`

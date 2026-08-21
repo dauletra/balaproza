@@ -191,7 +191,7 @@ class CollectionsAreEditorialAndSelfConsistent(unittest.TestCase):
         for c in stub_data.COLLECTIONS:
             for story in c.stories:
                 with self.subTest(collection=c.slug, story=story.slug):
-                    self.assertIn(story.status, ('Published', 'Completed'))
+                    self.assertIn(story.status, stub_data.PUBLIC_STATUSES)
 
 
 class TrendingTagsShowMovementNotArchive(unittest.TestCase):

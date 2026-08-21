@@ -232,12 +232,11 @@ class CatalogPage(TestCase):
 class CatalogFilterCombination(TestCase):
     """DEC-27: комбинации фильтров через query string."""
 
-    def test_genre_plus_status_filter(self):
-        # У жанра fantezi есть стори со status='Published'. Применяем оба.
+    def test_genre_plus_kind_filter(self):
+        # «Күңгірт мырза» — fantezi и сериал, который ещё пишется (DEC-37).
         r = self.client.get(reverse('core:genre_detail',
-                                    kwargs={'slug': 'fantezi'}) + '?status=Published')
+                                    kwargs={'slug': 'fantezi'}) + '?kind=ongoing')
         self.assertEqual(r.status_code, 200)
-        # Хотя бы одна fantezi-published стори должна быть видна
         self.assertContains(r, 'Күңгірт мырза')
 
     def test_genre_plus_query_filter(self):
@@ -688,7 +687,7 @@ class CatalogPresets(TestCase):
         r = self.client.get(reverse('core:catalog'))
         href = next(p['href'] for p in r.context['presets']
                     if p['slug'] == 'bir-otyrysta')
-        self.assertIn('format=single', href)
+        self.assertIn('kind=single', href)
         self.assertIn('length=short', href)
 
     def test_counts_are_real(self):
@@ -714,21 +713,21 @@ class CatalogPresets(TestCase):
         self.assertLess(narrow_count, wide_count)
 
     def test_active_preset_is_marked_and_clears_on_second_tap(self):
-        r = self.client.get(reverse('core:catalog') + '?format=single&length=short')
+        r = self.client.get(reverse('core:catalog') + '?kind=single&length=short')
         active = [p for p in r.context['presets'] if p['active']]
         self.assertEqual([p['slug'] for p in active], ['bir-otyrysta'])
         self.assertEqual(active[0]['href'], reverse('core:catalog'))
 
     def test_active_preset_absorbs_its_axis_chips(self):
         """Пресет и рядом чипы его же осей — один выбор, показанный трижды."""
-        r = self.client.get(reverse('core:catalog') + '?format=single&length=short')
+        r = self.client.get(reverse('core:catalog') + '?kind=single&length=short')
         labels = [c['label'] for c in r.context['active_chips']]
         self.assertNotIn('Бір бөлімді', labels)
-        self.assertNotIn('15 минутқа дейін', labels)
+        self.assertNotIn('10 минутқа дейін', labels)
 
     def test_badge_on_the_button_still_counts_real_axes(self):
         """Внутри панели обе оси отмечены — число обязано совпадать."""
-        r = self.client.get(reverse('core:catalog') + '?format=single&length=short')
+        r = self.client.get(reverse('core:catalog') + '?kind=single&length=short')
         self.assertEqual(r.context['active_count'], 2)
 
 
@@ -905,3 +904,108 @@ class AudienceIsCumulative(TestCase):
         for s in out:
             self.assertEqual(s.audience, '10+')
             self.assertTrue(s.is_single)
+
+
+class KindReplacesFormatAndStatus(TestCase):
+    """DEC-37: одна ось «Түрі» вместо «Формат» + «Мәртебесі».
+
+    `status` держал две несовместимые вещи: путь модерации и завершённость
+    сериала. Первая читателю не нужна — в каталоге всё уже прошло модерацию,
+    и «Жарияланған» стоял у 90% выдачи, ничего не отбирая. Вторая нужна, но
+    осмысленна только для сериала.
+    """
+
+    def test_three_values_split_the_catalogue(self):
+        counts = {k: len(stub_data.filter_catalog(kind=k))
+                  for k, _ in stub_data.CATALOG_KIND_FILTERS if k}
+        self.assertEqual(sum(counts.values()), len(stub_data.filter_catalog()))
+        for key, n in counts.items():
+            with self.subTest(kind=key):
+                self.assertGreater(n, 0)
+
+    def test_single_means_one_whole_text(self):
+        for s in stub_data.filter_catalog(kind='single'):
+            self.assertTrue(s.is_single)
+
+    def test_done_is_a_finished_serial(self):
+        for s in stub_data.filter_catalog(kind='done'):
+            self.assertTrue(s.is_serial)
+            self.assertEqual(s.status, 'Completed')
+
+    def test_ongoing_is_a_serial_still_being_written(self):
+        for s in stub_data.filter_catalog(kind='ongoing'):
+            self.assertTrue(s.is_serial)
+            self.assertEqual(s.status, 'OnProcess')
+
+    def test_panel_offers_kind_and_no_longer_format_or_status(self):
+        r = self.client.get(reverse('core:catalog'))
+        names = [g['name'] for g in r.context['filter_groups']]
+        self.assertIn('kind', names)
+        self.assertNotIn('format', names)
+        self.assertNotIn('status', names)
+
+    def test_legacy_params_still_filter(self):
+        """На `?format=` ведут ссылки, которые уже могли уйти наружу."""
+        out = stub_data.filter_catalog(format='single')
+        self.assertGreater(len(out), 0)
+        for s in out:
+            self.assertTrue(s.is_single)
+
+    def test_unknown_kind_is_ignored(self):
+        plain = self.client.get(reverse('core:catalog'))
+        junk = self.client.get(reverse('core:catalog') + '?kind=no-such')
+        self.assertEqual(junk.status_code, 200)
+        self.assertEqual(len(junk.context['results']), len(plain.context['results']))
+
+
+class SerialCompletionIsAlwaysKnown(TestCase):
+    """Правило данных, ради которого DEC-37 и принят.
+
+    Раньше обе читательские метки стояли на одночастевых произведениях, где
+    завершённость бессмысленна, а все десять сериалов были помечены просто
+    «Жарияланған» — узнать, дописан ли сериал, было нельзя ни по одному.
+    """
+
+    def test_no_published_serial_is_left_unmarked(self):
+        for s in stub_data.STORIES:
+            if s.is_serial and s.status in stub_data.PUBLIC_STATUSES:
+                with self.subTest(story=s.slug):
+                    self.assertIn(s.status, ('Completed', 'OnProcess'))
+
+    def test_one_shots_are_not_marked_for_completion(self):
+        """У цельного текста «дописан» и «пишется» не значат ничего."""
+        for s in stub_data.STORIES:
+            if s.is_single and s.status in stub_data.PUBLIC_STATUSES:
+                with self.subTest(story=s.slug):
+                    self.assertEqual(s.status, 'Published')
+
+
+class PublicStatusesAreNotSpelledOut(TestCase):
+    """Литерал 'Published' вместо набора публичных статусов — тихая пропажа.
+
+    После DEC-37 опубликованный сериал носит OnProcess или Completed, и любое
+    место, сравнивающее с одним литералом, теряет их все разом, ничего не
+    ломая: страница отдаёт 200, просто без десяти произведений.
+    """
+
+    def test_home_rows_still_contain_serials(self):
+        r = self.client.get(reverse('core:home'))
+        self.assertTrue(any(s.is_serial for s in r.context['top_stories']))
+        self.assertTrue(r.context['serial_stories'])
+
+    def test_home_serial_row_shows_only_ongoing(self):
+        """Ряд называется «Жалғасып жатқан шығармалар»."""
+        r = self.client.get(reverse('core:home'))
+        for s in r.context['serial_stories']:
+            self.assertEqual(s.status, 'OnProcess')
+
+    def test_search_index_still_contains_serials(self):
+        data = self.client.get(reverse('core:api_search_index')).json()
+        slugs = {s['slug'] for s in data['stories']}
+        serials = {s.slug for s in stub_data.STORIES
+                   if s.is_serial and s.status in stub_data.PUBLIC_STATUSES}
+        self.assertTrue(serials <= slugs)
+
+    def test_moderation_is_still_out_of_the_index(self):
+        data = self.client.get(reverse('core:api_search_index')).json()
+        self.assertNotIn('aidana-erteg', {s['slug'] for s in data['stories']})

@@ -93,7 +93,7 @@
 
             {% include "partials/home/book_row.html" with title="Көп оқылған шығармалар" books=top_stories link_href="/catalog/?sort=popularity" %}
 
-            {% include "partials/home/book_row.html" with title="Жалғасып жатқан шығармалар" eyebrow="көп бөлімді" books=serial_stories link="сериялар →" link_href="/catalog/?format=serial" %}
+            {% include "partials/home/book_row.html" with title="Жалғасып жатқан шығармалар" eyebrow="көп бөлімді" books=serial_stories link="сериялар →" link_href="/catalog/?kind=ongoing" %}
 
             {% comment %}
                 ФОЛД 3. Теги — вторая ось навигации: жинақтар отвечают «зачем

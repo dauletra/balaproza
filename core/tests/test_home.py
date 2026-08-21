@@ -187,8 +187,10 @@ class HomeMobileSecondFold(TestCase):
         from core import stub_data
         for genre in stub_data.GENRES:
             with self.subTest(genre=genre.slug):
+                # Не литерал 'Published': после DEC-37 опубликованный сериал
+                # носит OnProcess или Completed, и проверка ловила бы не то.
                 published = [s for s in stub_data.stories_by_genre(genre.slug)
-                             if s.status == 'Published']
+                             if s.status in stub_data.PUBLIC_STATUSES]
                 self.assertTrue(published)
 
 
@@ -375,11 +377,13 @@ class HomeAuthedMode(TestCase):
         self.assertContains(self.response, 'Мәтінің күтіп тұр')
 
     def test_context_has_active_work_for_writer_resume(self):
-        self.assertEqual(self.response.context['active_work'].slug, 'aidana-koshe')
+        # DEC-37: одночастевая «aidana-koshe» больше не «жазылып жатыр» —
+        # незакончен теперь сериал «aidana-tan», он и есть активная работа.
+        self.assertEqual(self.response.context['active_work'].slug, 'aidana-tan')
 
     def test_shows_writer_resume_as_primary_action(self):
         self.assertContains(self.response, 'Жазуды жалғастыру')
-        self.assertContains(self.response, reverse('core:manage_story', kwargs={'slug': 'aidana-koshe'}))
+        self.assertContains(self.response, reverse('core:manage_story', kwargs={'slug': 'aidana-tan'}))
 
     def test_reading_resume_moves_to_right_rail_when_writing_is_primary(self):
         self.assertContains(self.response, 'Оқу үстінде')

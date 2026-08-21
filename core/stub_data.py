@@ -291,11 +291,11 @@ class Story:
 
 
 STORIES = [
-    Story("dalney-berega",  "Алыс жағалауларда",     "sayyn",      "ipad_19b0bc4bcd9c1a1dc4c3cc12cf20dce5.webp", ("fantastika",  None),         12, 12482, 4821, 312, status="Published", recent_views=2980, annotation="Үш дос жоғалған жолды іздеп шығады. Таудағы сапар оларды өз қорқынышымен, достықпен және белгісіз ауылдың құпиясымен беттестіреді.", tags=("arman", "sayahat", "jasospirim"), audience="10+", badges=("Редакция таңдауы",)),
-    Story("temniy-lord",    "Күңгірт мырза",         "bekzhan_t",  "ipad_42f033cf1b9a2bcad744d05b9d429609.webp", ("fantezi",     "horror"),      3,  8920, 2440, 156, status="Published", recent_views=1810, annotation="Қараңғы патшалыққа түскен жас кейіпкер биліктің бағасын түсіне бастайды. Сиқыр, қорқыныш және таңдау туралы фэнтези.", tags=("mistika", "arman", "basqa-alem"), audience="14+"),
-    Story("igra-kuklovoda", "Қуыршақшының ойыны",    "dina_books", "ipad_499539963221e0fe36b0888bf8601067.webp", ("triller",     "drama"),       3, 18102, 6230, 421, status="Published", recent_views=4120, annotation="Мектептегі тыныш күндер бір жұмбақ ойыннан кейін өзгереді. Әр белгі жаңа күдікке апарады, ал шындық жақын жерде жасырынып тұр.", tags=("mistika", "jasospirim", "detektiv-jas"), audience="14+", badges=("Байқауға қатысады",)),
-    Story("kronchessii",    "Тас уәделер",           "rudazov",    "ipad_5916b4e19c616e74d008125ba9a1be8e.webp", ("shyttyrman",  "fantezi"),     3, 32540, 11200, 890, status="Published", recent_views=890, annotation="Ескі қала қабырғаларындағы тасқа қашалған уәделер оянады. Кейіпкерлер өткеннің шартын бұзбай, болашақты сақтауға тырысады.", tags=("sayahat", "arman", "syikyr-akademiya")),
-    Story("arhimag",        "Сиқыршы: бөтен әлемдер","rudazov",    "ipad_940e074d12d6c3657199601ca568f1b3.jpg",  ("fantezi",     "shyttyrman"),  3, 12482, 4821, 312, status="Published", recent_views=740, annotation="Жас сиқыршы бөтен әлемдердің есігін ашқанда, әр әлем өз ережесін ұсынады. Үйге қайту үшін ол күштен бұрын жауапкершілікті үйренеді.", tags=("syikyr-akademiya", "arman", "dostyk", "jasospirim", "mektep")),
+    Story("dalney-berega",  "Алыс жағалауларда",     "sayyn",      "ipad_19b0bc4bcd9c1a1dc4c3cc12cf20dce5.webp", ("fantastika",  None),         12, 12482, 4821, 312, status="Completed", recent_views=2980, annotation="Үш дос жоғалған жолды іздеп шығады. Таудағы сапар оларды өз қорқынышымен, достықпен және белгісіз ауылдың құпиясымен беттестіреді.", tags=("arman", "sayahat", "jasospirim"), audience="10+", badges=("Редакция таңдауы",)),
+    Story("temniy-lord",    "Күңгірт мырза",         "bekzhan_t",  "ipad_42f033cf1b9a2bcad744d05b9d429609.webp", ("fantezi",     "horror"),      3,  8920, 2440, 156, status="OnProcess", recent_views=1810, annotation="Қараңғы патшалыққа түскен жас кейіпкер биліктің бағасын түсіне бастайды. Сиқыр, қорқыныш және таңдау туралы фэнтези.", tags=("mistika", "arman", "basqa-alem"), audience="14+"),
+    Story("igra-kuklovoda", "Қуыршақшының ойыны",    "dina_books", "ipad_499539963221e0fe36b0888bf8601067.webp", ("triller",     "drama"),       3, 18102, 6230, 421, status="OnProcess", recent_views=4120, annotation="Мектептегі тыныш күндер бір жұмбақ ойыннан кейін өзгереді. Әр белгі жаңа күдікке апарады, ал шындық жақын жерде жасырынып тұр.", tags=("mistika", "jasospirim", "detektiv-jas"), audience="14+", badges=("Байқауға қатысады",)),
+    Story("kronchessii",    "Тас уәделер",           "rudazov",    "ipad_5916b4e19c616e74d008125ba9a1be8e.webp", ("shyttyrman",  "fantezi"),     3, 32540, 11200, 890, status="Completed", recent_views=890, annotation="Ескі қала қабырғаларындағы тасқа қашалған уәделер оянады. Кейіпкерлер өткеннің шартын бұзбай, болашақты сақтауға тырысады.", tags=("sayahat", "arman", "syikyr-akademiya")),
+    Story("arhimag",        "Сиқыршы: бөтен әлемдер","rudazov",    "ipad_940e074d12d6c3657199601ca568f1b3.jpg",  ("fantezi",     "shyttyrman"),  3, 12482, 4821, 312, status="OnProcess", recent_views=740, annotation="Жас сиқыршы бөтен әлемдердің есігін ашқанда, әр әлем өз ережесін ұсынады. Үйге қайту үшін ол күштен бұрын жауапкершілікті үйренеді.", tags=("syikyr-akademiya", "arman", "dostyk", "jasospirim", "mektep")),
     Story("sila-imperii",   "Империя құдіреті",      "aygerim_k",  "ipad_992f1631a421d74ed5e1aa72717df374.webp", ("tarih",       "drama"),       1, 14200, 3890, 245, status="Published", recent_views=610, annotation="Көне империяның шетінде өскен жас батыр тарихтың үлкен толқынына түседі. Бұл шығарма билік, адалдық және ел алдындағы таңдау туралы.", tags=("arman", "jasospirim"), format="single"),
 
     # ─ Витринный слой: заполняет ряды главной и покрывает пустые жанры ─
@@ -371,7 +371,7 @@ STORIES = [
         slug="zhuldyz-kartasy", title="Жұлдыз картасы", author_username="rudazov",
         cover="", genres=("fantastika", "shyttyrman"),
         chapters=17, views=15320, likes=3940, comments=387,
-        status="Published", secondary_genre="shyttyrman",
+        status="Completed", secondary_genre="shyttyrman",
         recent_views=1240, annotation="Ғарыш кемесінің картасында болмауға тиіс бір нүкте бар. Экипаж соған қарай бет алады.",
         tags=("aua-ralighi", "sayahat", "arman"), audience="10+",
         badges=("Редакция таңдауы",),
@@ -380,7 +380,7 @@ STORIES = [
         slug="kokjal-anyzy", title="Көкжал аңызы", author_username="dina_books",
         cover="", genres=("tarih", "erteg"),
         chapters=19, views=6720, likes=1180, comments=94,
-        status="Published", secondary_genre="erteg",
+        status="Completed", secondary_genre="erteg",
         recent_views=430, annotation="Далада бір қасқыр туралы аңыз жүреді. Оны естіген әр ұрпақ басқаша айтады.",
         tags=("sayahat", "dostyk"), audience="10+",
     ),
@@ -388,7 +388,7 @@ STORIES = [
         slug="keiipkerge-hat", title="Кейіпкерге жазылған хат", author_username="aygerim_k",
         cover="", genres=("fanfik", "romantika"),
         chapters=5, views=10940, likes=3210, comments=452,
-        status="Published", secondary_genre="romantika",
+        status="OnProcess", secondary_genre="romantika",
         recent_views=3120, annotation="Сүйікті кітабының кейіпкеріне хат жазған қыз кенет жауап алады.",
         tags=("gashyqtyq", "syikyr-akademiya", "jasospirim"), audience="14+",
     ),
@@ -396,7 +396,7 @@ STORIES = [
         slug="arqadagy-jaz", title="Арқадағы жаз", author_username="sayyn",
         cover="", genres=("balalar", "drama"),
         chapters=7, views=3890, likes=610, comments=45,
-        status="Published", secondary_genre="drama",
+        status="OnProcess", secondary_genre="drama",
         recent_views=260, annotation="Жазғы каникул, ескі велосипед және ауылдағы жеті апта. Әр бөлім — бір апта.",
         tags=("dostyk", "sayahat", "mektep"), audience="10+",
     ),
@@ -406,14 +406,14 @@ STORIES = [
         slug="aidana-tan",    title="Таң алдында",            author_username="aidana",
         cover="ipad_c9217632f98051fd88ca5763f218a9e3.webp", genres=("drama", None),
         chapters=8, views=1042, likes=87, comments=12,
-        status="Published", recent_views=310, annotation="Жас қыздың Алматыдан Таразға қайту туралы әңгімесі. Сегіз бөлімде, әр бөлім — жаңа қала.",
+        status="OnProcess", recent_views=310, annotation="Жас қыздың Алматыдан Таразға қайту туралы әңгімесі. Сегіз бөлімде, әр бөлім — жаңа қала.",
         tags=("sayahat", "jasospirim", "arman", "experimental"),
     ),
     Story(
         slug="aidana-koshe",  title="Көше әндері",            author_username="aidana",
         cover="ipad_e655bb59097d8f25698466168d385969.webp", genres=("drama", "komediya"),
         chapters=1, views=203, likes=18, comments=4,
-        status="OnProcess", recent_views=203, annotation="Қаладағы бес адамның бір күні. Әрқайсысының өз әні.",
+        status="Published", recent_views=203, annotation="Қаладағы бес адамның бір күні. Әрқайсысының өз әні.",
         secondary_genre="komediya",
         tags=("aua-ralighi", "dostyk", "mektep"),
         format="single",
@@ -428,7 +428,7 @@ STORIES = [
         slug="aidana-kysh",   title="Қыстың үнсіздігі",        author_username="aidana",
         cover="ipad_f0e918b204613b38cc0e04ba74e3e3ab.webp", genres=("drama", None),
         chapters=1, views=872, likes=64, comments=9,
-        status="Completed", recent_views=190, annotation="Қыстағы ауылда қалған әжемен өткізген бір ай. Аяқталған кітап.",
+        status="Published", recent_views=190, annotation="Қыстағы ауылда қалған әжемен өткізген бір ай. Аяқталған кітап.",
         format="single",
     ),
 ]
@@ -985,11 +985,39 @@ CATALOG_LENGTH_FILTERS = (
     ("long",   "30 минуттан ұзақ"),
 )
 
+# Legacy-ось: в панели её больше нет, но параметр читается — на неё ведут
+# старые ссылки. Читательский вопрос закрывает CATALOG_KIND_FILTERS.
 CATALOG_FORMAT_FILTERS = (
     ("",       "Барлығы"),
     ("single", "Бір бөлімді"),
     ("serial", "Көп бөлімді"),
 )
+
+# «Түрі» (DEC-37) — одна ось вместо «Формат» + «Мәртебесі».
+#
+# Прежний `status` держал две несовместимые вещи: путь модерации (Жоба →
+# Модерацияда → Жарияланды) и завершённость сериала. Первая читателю не нужна
+# вовсе — в каталоге всё и так прошло модерацию, «Жарияланған» стоял у 90%
+# выдачи и ничего не отбирал. Вторая нужна, но применима только к сериалу:
+# у одночастевого произведения текст цел по определению.
+#
+# Три значения покрывают все осмысленные сочетания и отбрасывают невозможное
+# (`single` + «пишется»), отвечая на «что я получу».
+CATALOG_KIND_FILTERS = (
+    ("",        "Барлығы"),
+    ("single",  "Бір бөлімді"),
+    ("done",    "Аяқталған сериал"),
+    ("ongoing", "Жазылып жатыр"),
+)
+
+# kind → предикат. «Любого сериала» среди значений нет намеренно: оба места,
+# которые раньше вели на `?format=serial` (ряд главной и пресет), означают
+# «продолжается», а не «сериал любой».
+KIND_PREDICATES = {
+    "single":  lambda s: s.format == "single",
+    "done":    lambda s: s.format == "serial" and s.status == "Completed",
+    "ongoing": lambda s: s.format == "serial" and s.status == "OnProcess",
+}
 
 # Порог «нового имени». Значение стаб-условное: авторов здесь шесть, и любая
 # граница между ними произвольна. После Ф14 это должен быть перцентиль по
@@ -1019,7 +1047,7 @@ PUBLIC_STATUSES = frozenset({"Published", "Completed", "OnProcess"})
 def apply_catalog_filters(stories: list, sort: str = CATALOG_DEFAULT_SORT,
                           status: str = "", audience: str = "", length: str = "",
                           format: str = "", badge: str = "",
-                          author_tier: str = "") -> list:
+                          author_tier: str = "", kind: str = "") -> list:
     """Применяет сорт + фильтры к списку Story.
 
     Sort:
@@ -1045,6 +1073,8 @@ def apply_catalog_filters(stories: list, sort: str = CATALOG_DEFAULT_SORT,
         out = [s for s in out if s.length_bucket == length]
     if format:
         out = [s for s in out if s.format == format]
+    if kind in KIND_PREDICATES:
+        out = [s for s in out if KIND_PREDICATES[kind](s)]
     if badge:
         label = BADGE_LABELS.get(badge)
         out = [s for s in out if label and label in s.badges] if label else []
@@ -1066,7 +1096,7 @@ def filter_catalog(*, query: str = "", genre: str = "", tag: str = "",
                    status: str = "", sort: str = CATALOG_DEFAULT_SORT,
                    audience: str = "", length: str = "",
                    format: str = "", badge: str = "",
-                   author_tier: str = "") -> list:
+                   author_tier: str = "", kind: str = "") -> list:
     """Единый фильтр-пайплайн для унифицированного каталога (DEC-27).
 
     Применяет все источники AND-комбинацией. Для пустых параметров — no-op.
@@ -1092,7 +1122,7 @@ def filter_catalog(*, query: str = "", genre: str = "", tag: str = "",
     return apply_catalog_filters(out, sort=sort, status=status,
                                  audience=audience, length=length,
                                  format=format, badge=badge,
-                                 author_tier=author_tier)
+                                 author_tier=author_tier, kind=kind)
 
 
 # Пресеты «Не оқимын?» (docs/13 §13.6). Готовые ответы на вопрос состояния,
@@ -1100,11 +1130,11 @@ def filter_catalog(*, query: str = "", genre: str = "", tag: str = "",
 # чтением дословно, но в панели она была двумя тапами в разных группах.
 CATALOG_PRESETS = (
     {"slug": "bir-otyrysta", "label": "Бір отырыста",
-     "filters": {"format": "single", "length": "short"}},
+     "filters": {"kind": "single", "length": "short"}},
     {"slug": "jalgasy-bar",  "label": "Жалғасы бар",
-     "filters": {"format": "serial"}},
+     "filters": {"kind": "ongoing"}},
     {"slug": "ayaqtalgan",   "label": "Аяқталған",
-     "filters": {"status": "Completed"}},
+     "filters": {"kind": "done"}},
     {"slug": "redaksiya",    "label": "Редакция таңдауы",
      "filters": {"badge": "editorial"}},
     {"slug": "baiqau",       "label": "Байқау жұмыстары",
@@ -1169,12 +1199,16 @@ def my_stories_of(username: str) -> list:
 def writer_stats(username: str) -> dict:
     """Агрегированная статистика автора — для правого рейла WRITE."""
     mine = my_stories_of(username)
-    published = [s for s in mine if s.status == "Published"]
+    # После DEC-37 дописанный сериал носит статус Completed — он тоже
+    # опубликован, и по литералу "Published" в счётчик бы не попал.
+    # Ключ назывался `drafts`, хотя считал OnProcess и подписан был
+    # «Жазылып жатыр»: черновик — это NotPublished, а не пишущийся сериал.
+    published = [s for s in mine if s.status in ("Published", "Completed")]
     return {
         "total":      len(mine),
         "published":  len(published),
         "on_moderation": sum(1 for s in mine if s.status == "OnModeration"),
-        "drafts":     sum(1 for s in mine if s.status == "OnProcess"),
+        "ongoing":    sum(1 for s in mine if s.status == "OnProcess"),
         "views":      sum(s.views for s in mine),
         "likes":      sum(s.likes for s in mine),
         "comments":   sum(s.comments for s in mine),

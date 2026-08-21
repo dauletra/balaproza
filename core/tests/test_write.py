@@ -38,9 +38,9 @@ class MyStoriesHelper(TestCase):
 
     def test_writer_stats_counts_statuses(self):
         stats = stub_data.writer_stats('aidana')
-        self.assertEqual(stats['published'], 1)
+        self.assertEqual(stats['published'], 2)
         self.assertEqual(stats['on_moderation'], 1)
-        self.assertEqual(stats['drafts'], 1)
+        self.assertEqual(stats['ongoing'], 1)
 
 
 # ───────────────────────── My stories ─────────────────────────
@@ -70,11 +70,13 @@ class MyStoriesAuthedHasItems(TestCase):
                 self.assertContains(self.response, s.title)
 
     def test_shows_status_badges_for_each(self):
-        # 4 status'а: Published, OnProcess, OnModeration, Completed → разные тексты
+        # У «aidana» три статуса: два one-shot'а Жарияланды, сериал
+        # Жазылып жатыр и один на модерации. «Аяқталды» у неё нет —
+        # после DEC-37 его носит только дописанный сериал, а её единственный
+        # ещё пишется. Все пять бейджей показывает /_design/components/.
         self.assertContains(self.response, 'Жарияланды')
         self.assertContains(self.response, 'Жазылып жатыр')
         self.assertContains(self.response, 'Модерацияда')
-        self.assertContains(self.response, 'Аяқталды')
 
     def test_does_not_show_empty_state(self):
         self.assertNotContains(self.response, 'Әлі шығарма жоқ')

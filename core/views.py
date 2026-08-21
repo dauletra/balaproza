@@ -51,7 +51,10 @@ def home(request):
     else:
         hero_focus = 'empty'
 
-    published = [s for s in stub_data.STORIES if s.status == 'Published']
+    # Не литерал 'Published': после DEC-37 опубликованный сериал носит
+    # OnProcess или Completed, и по литералу с главной пропали бы все десять.
+    published = [s for s in stub_data.STORIES
+                 if s.status in stub_data.PUBLIC_STATUSES]
 
     # Жанры на главной — полоса-вывеска, а не навигация (DEC-31): 12 цветных слов
     # объясняют, что это литературный портал, и ведут на /genres/<slug>/.
@@ -71,7 +74,10 @@ def home(request):
         'new_authors':     stub_data.new_authors(4),
         'top_stories':     sorted(published, key=lambda s: s.views, reverse=True)[:5],
         'short_stories':   [s for s in published if s.is_single and s.read_minutes <= 15][:5],
-        'serial_stories':  [s for s in published if s.is_serial][:5],
+        # Ряд называется «Жалғасып жатқан шығармалар» — значит именно те,
+        # что продолжаются, а не все сериалы подряд.
+        'serial_stories':  [s for s in published
+                            if s.is_serial and s.status == 'OnProcess'][:5],
         'portal_stats':    stub_data.portal_stats(),
         'popular_tags':    stub_data.popular_tags(8),
         'trending_tags':   stub_data.trending_tags(6),
@@ -145,6 +151,7 @@ def _catalog_controls(request, default_sort=None):
         'format':   stub_data.CATALOG_FORMAT_FILTERS,
         'badge':    stub_data.CATALOG_BADGE_FILTERS,
         'author_tier': stub_data.CATALOG_AUTHOR_FILTERS,
+        'kind':     stub_data.CATALOG_KIND_FILTERS,
     }
     valid_sorts = {k for k, _ in stub_data.CATALOG_SORTS}
     sort = request.GET.get('sort', default_sort)
@@ -157,12 +164,13 @@ def _catalog_controls(request, default_sort=None):
         sort if sort in valid_sorts else default_sort,
         picked['status'], picked['audience'], picked['length'],
         picked['format'], picked['badge'], picked['author_tier'],
+        picked['kind'],
     )
 
 
 def _catalog_href(*, mode='catalog', genre='', tag='', query='', sort='',
                   status='', audience='', length='', format='', badge='',
-                  author_tier=''):
+                  author_tier='', kind=''):
     """Канонический URL каталога с сохранением остального состояния (DEC-27).
 
     Путь выбирает «главная» ось: жанр → /genres/<slug>/, иначе тег →
@@ -190,7 +198,7 @@ def _catalog_href(*, mode='catalog', genre='', tag='', query='', sort='',
 
     params.update({'q': query, 'status': status, 'audience': audience,
                    'length': length, 'format': format, 'badge': badge,
-                   'author_tier': author_tier})
+                   'author_tier': author_tier, 'kind': kind})
     if sort and sort != _catalog_default_sort(target_mode):
         params['sort'] = sort
 
@@ -226,7 +234,8 @@ def _catalog_links(state: dict) -> dict:
     if state['tag']:
         t = stub_data.tag_by_slug(state['tag'])
         chips.append({'label': f'#{t.name}', 'href': href(tag='')})
-    for axis, table in (('author_tier', stub_data.CATALOG_AUTHOR_FILTERS),
+    for axis, table in (('kind',      stub_data.CATALOG_KIND_FILTERS),
+                        ('author_tier', stub_data.CATALOG_AUTHOR_FILTERS),
                         ('badge',    stub_data.CATALOG_BADGE_FILTERS),
                         ('status',   stub_data.CATALOG_STATUS_FILTERS),
                         ('format',   stub_data.CATALOG_FORMAT_FILTERS),
@@ -250,8 +259,8 @@ def _catalog_links(state: dict) -> dict:
     # Бейдж на кнопке считает реально включённые оси, а не показанные чипы:
     # внутри панели галочки пресета видны как обычные radio, и число обязано
     # совпадать с тем, что там отмечено.
-    axis_names = ('query', 'genre', 'tag', 'badge', 'status', 'format',
-                  'audience', 'length', 'author_tier')
+    axis_names = ('query', 'genre', 'tag', 'kind', 'badge', 'status',
+                  'format', 'audience', 'length', 'author_tier')
     return {
         'active_chips': chips,
         'active_count': sum(1 for a in axis_names if state[a]),
@@ -281,7 +290,7 @@ def _catalog_presets(state: dict, href) -> list:
     out = []
     for preset in stub_data.CATALOG_PRESETS:
         axes = {'format': '', 'length': '', 'status': '', 'badge': '',
-                'author_tier': ''}
+                'author_tier': '', 'kind': ''}
         axes.update(preset['filters'])
         active = all(state[k] == v for k, v in axes.items())
         count = len(stub_data.filter_catalog(
@@ -310,7 +319,8 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
     Путь всегда сильнее query: канонический URL остаётся источником истины.
     """
     query = request.GET.get('q', '').strip()
-    sort, status, audience, length, format, badge, author_tier = _catalog_controls(
+    (sort, status, audience, length, format, badge, author_tier,
+     kind) = _catalog_controls(
         request, default_sort=_catalog_default_sort(mode),
     )
 
@@ -346,7 +356,7 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
                                            status=status, sort=sort,
                                            audience=audience, length=length,
                                            format=format, badge=badge,
-                                           author_tier=author_tier)
+                                           author_tier=author_tier, kind=kind)
         if mode == 'genre':
             empty_title = "Әзірге шығарма жоқ"
             empty_text = "Бұл жанрда әлі шығарма жарияланбаған."
@@ -364,6 +374,7 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
         'sort': sort if 'sort' in request.GET else '',
         'status': status, 'audience': audience, 'length': length,
         'format': format, 'badge': badge, 'author_tier': author_tier,
+        'kind': kind,
     }
 
     sort_labels = dict(stub_data.CATALOG_SORTS)
@@ -381,14 +392,14 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
         'format':         format,
         'badge':          badge,
         'author_tier':    author_tier,
+        'kind':           kind,
         # Панель сүзгі рендерится одним циклом по группам — пять почти одинаковых
         # fieldset'ов в шаблоне расходились при каждой правке.
         'filter_groups': [
             {'name': 'sort',     'legend': 'Сұрыптау',   'options': stub_data.CATALOG_SORTS,            'current': sort},
+            {'name': 'kind',     'legend': 'Түрі',       'options': stub_data.CATALOG_KIND_FILTERS,     'current': kind},
             {'name': 'badge',    'legend': 'Белгі',      'options': stub_data.CATALOG_BADGE_FILTERS,    'current': badge},
             {'name': 'author_tier', 'legend': 'Автор',   'options': stub_data.CATALOG_AUTHOR_FILTERS,   'current': author_tier},
-            {'name': 'status',   'legend': 'Мәртебесі',  'options': stub_data.CATALOG_STATUS_FILTERS,   'current': status},
-            {'name': 'format',   'legend': 'Формат',     'options': stub_data.CATALOG_FORMAT_FILTERS,   'current': format},
             {'name': 'audience', 'legend': 'Жасың',      'options': stub_data.CATALOG_AUDIENCE_FILTERS, 'current': audience},
             {'name': 'length',   'legend': 'Оқу уақыты', 'options': stub_data.CATALOG_LENGTH_FILTERS,   'current': length},
         ],
@@ -791,7 +802,9 @@ def search_index_json(request):
                     'cover':  ('/media/' + s.cover) if s.cover else '',
                 }
                 for s in stub_data.STORIES
-                if s.status == 'Published'
+                # Тот же набор, что и в каталоге: по литералу 'Published'
+                # из Cmd+K выпали бы все сериалы (DEC-37).
+                if s.status in stub_data.PUBLIC_STATUSES
             ],
             'authors': [
                 {'username': a.username, 'name': a.public_name}
