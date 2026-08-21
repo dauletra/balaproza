@@ -8,43 +8,8 @@
 {% if not signed_in %}
     {% include "components/auth_gate.html" with reason="Профильді көру үшін" %}
 {% else %}
-    {# ── Шапка профиля ── #}
-    <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-        {% include "components/avatar.html" with size=96 name=profile_user.public_name username=profile_user.username %}
-
-        <div class="flex min-w-0 flex-1 flex-col gap-1.5">
-            <h1 class="font-display text-3xl font-bold text-slate-900">{{ profile_user.public_name }}</h1>
-            <p class="font-sans text-sm text-slate-500">@{{ profile_user.username }}</p>
-            {% if profile_user.bio %}
-                <p class="mt-1 font-sans text-sm leading-snug text-slate-700">{{ profile_user.bio }}</p>
-            {% endif %}
-        </div>
-
-        <div class="flex shrink-0 flex-wrap items-center gap-2">
-            {% url 'core:profile_me_edit' as edit_href %}
-            {% include "components/button.html" with kind="secondary" label="Профильді өңдеу" icon="pen" href=edit_href %}
-        </div>
-    </header>
-
-    {# ── 4 числа (FR-PROF-01) ── #}
-    <dl class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div class="rounded-lg border border-slate-200 bg-white p-4 text-center">
-            <dt class="font-sans text-xs text-slate-500">Шығарма</dt>
-            <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.works }}</dd>
-        </div>
-        <div class="rounded-lg border border-slate-200 bg-white p-4 text-center">
-            <dt class="font-sans text-xs text-slate-500">Ұнатулар</dt>
-            <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.likes }}</dd>
-        </div>
-        <div class="rounded-lg border border-slate-200 bg-white p-4 text-center">
-            <dt class="font-sans text-xs text-slate-500">Оқылды</dt>
-            <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.read }}</dd>
-        </div>
-        <div class="rounded-lg border border-slate-200 bg-white p-4 text-center">
-            <dt class="font-sans text-xs text-slate-500">Жазылулар</dt>
-            <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.followers }}</dd>
-        </div>
-    </dl>
+    {% include "partials/profile/_header.html" %}
+    {% include "partials/profile/_stats.html" %}
 
     {# ── Segmented control (DEC-15) ── #}
     {% include "components/segmented_control.html" with items=prof_items current=tab base_url=request.path %}
@@ -83,33 +48,7 @@
         {% endif %}
 
     {% elif tab == "about" %}
-        <section class="rounded-lg border border-slate-200 bg-white p-6">
-            <h2 class="font-display text-lg font-bold text-slate-900">Автор туралы</h2>
-            {% if profile_user.bio %}
-                <p class="mt-2 font-sans text-sm leading-relaxed text-slate-700">{{ profile_user.bio }}</p>
-            {% else %}
-                <p class="mt-2 font-sans text-sm text-slate-500">Био толтырылмаған.</p>
-            {% endif %}
-
-            <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
-                <div>
-                    <dt class="font-sans text-xs text-slate-500">Авторлық ат</dt>
-                    <dd class="font-sans text-slate-900">{{ profile_user.public_name }}</dd>
-                </div>
-                <div>
-                    <dt class="font-sans text-xs text-slate-500">Қолданушы аты</dt>
-                    <dd class="font-sans text-slate-900">@{{ profile_user.username }}</dd>
-                </div>
-                <div>
-                    <dt class="font-sans text-xs text-slate-500">Ресми аты-жөні</dt>
-                    <dd class="font-sans text-slate-900">{{ profile_user.name }}</dd>
-                </div>
-                <div>
-                    <dt class="font-sans text-xs text-slate-500">Жалпы шығарма</dt>
-                    <dd class="font-sans text-slate-900">{{ profile_user.works }}</dd>
-                </div>
-            </dl>
-        </section>
+        {% include "partials/profile/_about.html" %}
     {% endif %}
 {% endif %}
 {% endblock %}

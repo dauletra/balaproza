@@ -648,8 +648,15 @@ def _resolve_prof_tab(request, allowed) -> str:
 
 
 def _prof_items(username: str, allowed: tuple, is_self: bool) -> list:
-    """Сегменты PROF (label + count)."""
-    works_n = len(stub_data.my_stories_of(username))
+    """Сегменты PROF (label + count).
+
+    Счётчик работ у постороннего считался по `my_stories_of` — вместе с
+    черновиками. Сегмент обещал «Шығармалар 5» и открывал список из трёх.
+    """
+    works_n = len(
+        stub_data.my_stories_of(username) if is_self
+        else stub_data.public_stories_of(username)
+    )
     lib_n   = len(stub_data.library_of(username)) if is_self else 0
     labels = {
         "works":   ("Шығармалар", works_n),
@@ -664,8 +671,12 @@ def profile_me(request):
     username = _current_username(request)
     author = stub_data.AUTHORS_BY_USERNAME.get(username)
     tab = _resolve_prof_tab(request, _PROF_TABS_ME)
+    # Рейл профиля состоит из одного блока «Жазылулар»: без него
+    # partials/right_rail/profile.html не рендерит ничего, и гость получал
+    # пустую колонку в 300px, которая просто сдвигала гейт от центра.
+    following = stub_data.following_of(username) if username else []
     return render(request, 'pages/profile/profile_me.html', {
-        'has_right_rail':  True,
+        'has_right_rail':  bool(author and following),
         'profile_user':    author,
         'username':        username,
         'is_self':         True,
@@ -675,8 +686,7 @@ def profile_me(request):
         'lib_reading':     stub_data.library_of(username, 'reading') if username else [],
         'lib_saved':       stub_data.library_of(username, 'saved') if username else [],
         'stats':           stub_data.reader_stats(username) if username else None,
-        'followers':       stub_data.followers_of(username) if username else [],
-        'following':       stub_data.following_of(username) if username else [],
+        'following':       following,
         'new_story_href':  reverse('core:new_story'),
         'catalog_href':    reverse('core:catalog'),
     })
@@ -693,20 +703,30 @@ def profile_me_edit(request):
 
 
 def profile_other(request, username):
-    """Чужой профиль (FR-PROF-02/04). Кнопка «Жазылу» — если гость, ведёт на login."""
+    """Чужой профиль (FR-PROF-02/04). Кнопка «Жазылу» — если гость, ведёт на login.
+
+    Несуществующий автор — 404, а не страница-заглушка с кодом 200: в проекте
+    есть брендированная `404.html`, а прежняя заглушка позволяла поисковику
+    проиндексировать любой выдуманный `@username`.
+
+    Данные — только публичные (`public_stories_of` / `public_stats`).
+    """
     author = stub_data.AUTHORS_BY_USERNAME.get(username)
+    if not author:
+        raise Http404(f'Автор @{username} табылмады')
     me = _current_username(request)
     tab = _resolve_prof_tab(request, _PROF_TABS_OTHER)
+    following = stub_data.following_of(username)
     return render(request, 'pages/profile/profile_other.html', {
-        'has_right_rail': True,
+        'has_right_rail': bool(following),
         'profile_user':  author,
         'username':      username,
         'is_self':       False,
         'tab':           tab,
-        'prof_items':    _prof_items(username, _PROF_TABS_OTHER, False) if author else [],
-        'works':         stub_data.my_stories_of(username),
-        'stats':         stub_data.reader_stats(username) if author else None,
-        'following':     stub_data.following_of(username) if author else [],
+        'prof_items':    _prof_items(username, _PROF_TABS_OTHER, False),
+        'works':         stub_data.public_stories_of(username),
+        'stats':         stub_data.public_stats(username),
+        'following':     following,
         'is_followed':   stub_data.is_following(me, username) if me else False,
     })
 

@@ -194,8 +194,15 @@
 | Требование | View | Тест |
 |-----------|------|------|
 | FR-PROF-01, 03 | `profile_me` (+ `_resolve_prof_tab`, `_prof_items`) | `test_prof_lib_notif.ProfileMeAuthed` |
+| FR-PROF-01 (числа) | `stub_data.public_stats` / `reader_stats` | `PublicStatsHelper`, `ReaderStatsHelper` |
 | FR-PROF-02, 04 | `profile_other` | `ProfileOtherKnown`, `FollowGraph` |
+| BR-73 (черновики скрыты) | `stub_data.public_stories_of` → `profile_other` | `PublicStoriesHelper`, `ProfileOtherKnown.test_hides_drafts_and_moderation` |
+| FR-PROF-02 (404) | `profile_other` → `Http404` | `ProfileOtherUnknown.test_unknown_user_is_404` |
+| DEC-25 (рейл по данным) | `has_right_rail = bool(...)` в обоих profile-view | `ProfileMeGuestRail`, `ProfileOtherKnown.test_guest_gets_no_empty_rail` |
+| FR-PROF-01…04 (разметка) | `partials/profile/_header.html`, `_stats.html`, `_about.html` — общие для обоих профилей | `ProfileTemplatesShareParts` |
+| BR-73 (приватные поля) | `_about.html`, блок «Тек саған көрінеді» | `ProfileOtherKnown.test_about_hides_private_fields`, `ProfileMeAuthed.test_about_tab_shows_private_block_to_owner` |
 | FR-PROF-05 | `profile_me_edit` → `/me/edit/` | `ProfileMeAuthed` |
+| Инварианты конкурсных данных | `Contest.winners`, `SUBMISSIONS_BY_USER` | `test_contests.ContestWinners`, `SubmissionsMatchContestBadges`, `SubmissionIntegrity` |
 | FR-LIB-01…03 / BR-60, BR-61 | `library` + `segmented_control` | `LibraryAuthed`, `LibraryEmpty`, `LibraryHelpers` |
 | FR-NOTIF-01…04 / BR-70…72 | `notifications` | `NotificationsAuthed`, `NotificationsEmpty` |
 | FR-NOTIF-02 (бейдж) | `auth_state.unread_notifications` | `HeaderUnreadBadge` |

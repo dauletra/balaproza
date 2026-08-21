@@ -81,7 +81,7 @@ balaproza_v1/
 │   ├── context_processors.py     # auth_state, nav_state, site_links
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced, page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 616 тестов в 16 файлах (см. ниже)
+│   └── tests/                    # 640 тестов в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -112,6 +112,11 @@ balaproza_v1/
 │   │                             # (variant='rail'|'sheet' — в листе черновик, не автосабмит),
 │   │                             # _filter_sheet (mobile bottom-sheet), _hero_search,
 │   │                             # _hero_genre, _hero_tag, _hero_catalog.
+│   │                             # profile/_{header,stats,about}.html — общие для своего и
+│   │                             # чужого профиля. Были скопированы в оба шаблона и уже
+│   │                             # разошлись; в копии «Туралы» лежало настоящее имя автора
+│   │                             # без пометки приватности. Держит
+│   │                             # test_prof_lib_notif.ProfileTemplatesShareParts
 │   │                             # NB: sidebar.html удалён — DEC-25; genres_section удалён —
 │   │                             # жанры теперь полоса-вывеска genre_strip под hero (DEC-31).
 │   └── pages/                    # все страницы по модулям (home, auth, catalog, story,
@@ -175,7 +180,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 616 тестов
+uv run python manage.py test core       # все 640 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 

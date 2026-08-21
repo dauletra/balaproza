@@ -1,0 +1,30 @@
+{% load balaproza %}{% comment %}
+    Четыре числа профиля (FR-PROF-01). Общие для своего и чужого: владелец
+    не должен видеть другую арифметику, чем читатель. Считает
+    `stub_data.public_stats` — по публичным работам (BR-73).
+
+    Отличается только формат: автору — точное с разрядами, читателю —
+    сжатое (правило проекта «compact_count — читателю, spaced — автору»).
+
+    Контекст:
+      stats   — public_stats(...) / reader_stats(...)
+      is_self — свой профиль или чужой
+{% endcomment %}
+<dl class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div class="rounded-lg border border-slate-200 bg-white p-4 text-center">
+        <dt class="font-sans text-xs text-slate-500">Шығарма</dt>
+        <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.works }}</dd>
+    </div>
+    <div class="rounded-lg border border-slate-200 bg-white p-4 text-center">
+        <dt class="font-sans text-xs text-slate-500">Оқылым</dt>
+        <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{% if is_self %}{{ stats.reads|spaced }}{% else %}{{ stats.reads|compact_count }}{% endif %}</dd>
+    </div>
+    <div class="rounded-lg border border-slate-200 bg-white p-4 text-center">
+        <dt class="font-sans text-xs text-slate-500">Ұнатулар</dt>
+        <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{% if is_self %}{{ stats.likes|spaced }}{% else %}{{ stats.likes|compact_count }}{% endif %}</dd>
+    </div>
+    <div class="rounded-lg border border-slate-200 bg-white p-4 text-center">
+        <dt class="font-sans text-xs text-slate-500">Жазылушы</dt>
+        <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{% if is_self %}{{ stats.followers|spaced }}{% else %}{{ stats.followers|compact_count }}{% endif %}</dd>
+    </div>
+</dl>

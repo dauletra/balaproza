@@ -24,10 +24,15 @@
             </div>
             <div>
                 <dt class="font-sans text-xs text-slate-500">Жазылушы</dt>
-                <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.followers }}</dd>
+                <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.followers|spaced }}</dd>
             </div>
             <div>
-                <dt class="font-sans text-xs text-slate-500">Оқылды</dt>
+                {% comment %}
+                    «Оқылды» здесь значило просмотры, а в library_row и в
+                    прогрессе главы — «дочитано»: одно слово на два разных
+                    числа. Просмотры теперь везде «Оқылым» (docs/16).
+                {% endcomment %}
+                <dt class="font-sans text-xs text-slate-500">Оқылым</dt>
                 <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.views|spaced }}</dd>
             </div>
             <div>

@@ -1,0 +1,59 @@
+{% comment %}
+    Шапка профиля — общая для своего и чужого (FR-PROF-01/02/04).
+
+    Была скопирована в profile_me.html и profile_other.html. Копии уже
+    разошлись: в своей висела кнопка «Профильді өңдеу», в чужой — три ветки
+    подписки, а всё остальное совпадало символ в символ. Следующая правка
+    развела бы их дальше.
+
+    Контекст:
+      profile_user — Author
+      is_self      — свой профиль или чужой
+      is_followed  — подписан ли текущий пользователь (только для чужого)
+      signed_in    — из context_processors.auth_state
+{% endcomment %}
+<header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
+    {% include "components/avatar.html" with size=96 name=profile_user.public_name username=profile_user.username %}
+
+    <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+        <h1 class="font-display text-3xl font-bold text-slate-900">{{ profile_user.public_name }}</h1>
+        <p class="font-sans text-sm text-slate-500">@{{ profile_user.username }}</p>
+        {% if profile_user.bio %}
+            <p class="mt-1 font-sans text-sm leading-snug text-slate-700">{{ profile_user.bio }}</p>
+        {% endif %}
+    </div>
+
+    <div class="flex shrink-0 flex-wrap items-center gap-2">
+        {% if is_self %}
+            {% url 'core:profile_me_edit' as edit_href %}
+            {% include "components/button.html" with kind="secondary" label="Профильді өңдеу" icon="pen" href=edit_href %}
+        {% elif not signed_in %}
+            {# Гостю — не форма, а ссылка на вход с возвратом сюда (FR-PROF-04) #}
+            <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}"
+               class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:border-brand hover:text-brand">
+                {% include "components/icon.html" with name="plus" size=16 only %}
+                Жазылу
+            </a>
+        {% elif is_followed %}
+            <form method="post" action="#" x-data
+                  @submit.prevent="$dispatch('toast', { kind:'success', text:'Жазылудан бас тарттың (демо)' })">
+                {% csrf_token %}
+                <button type="submit"
+                        class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                    {% include "components/icon.html" with name="check" size=14 only %}
+                    Жазылдың
+                </button>
+            </form>
+        {% else %}
+            <form method="post" action="#" x-data
+                  @submit.prevent="$dispatch('toast', { kind:'success', text:'Жазылдың (демо)' })">
+                {% csrf_token %}
+                <button type="submit"
+                        class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:border-brand hover:text-brand">
+                    {% include "components/icon.html" with name="plus" size=16 only %}
+                    Жазылу
+                </button>
+            </form>
+        {% endif %}
+    </div>
+</header>

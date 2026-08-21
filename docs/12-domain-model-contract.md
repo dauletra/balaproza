@@ -79,11 +79,13 @@ Story and chapters:
 - `poll_of(story_slug: str, chapter_number: int) -> ChapterPoll | None` — опрос необязателен (BR-POLL-01)
 
 Author workspace, library, social:
-- `my_stories_of(username: str) -> list[Story]`
+- `my_stories_of(username: str) -> list[Story]` — **любой** статус: выдача авторского кабинета, не публичная
+- `public_stories_of(username: str) -> list[Story]` — только `is_public` (BR-73). Публичный профиль строится на ней; на `my_stories_of` он показывал посторонним черновики
 - `writer_stats(username: str) -> dict`
 - `library_of(username: str, kind: str = "") -> list[LibraryEntry]`
 - `in_library(username: str, story_slug: str) -> bool`
-- `reader_stats(username: str) -> dict`
+- `public_stats(username: str) -> dict` — `works` / `reads` / `likes` / `followers` по публичным работам (FR-PROF-01). `works` совпадает с `Author.works` по построению
+- `reader_stats(username: str) -> dict` — `public_stats` плюс приватное: `works_total` (с черновиками), `finished` (дочитано, из библиотеки). Ключ `read` переименован в `finished`, чтобы не путаться с `reads`
 - `is_following(me: str, them: str) -> bool`
 - `following_of(username: str) -> list[Author]`
 - `followers_of(username: str) -> list[Author]`
@@ -126,7 +128,12 @@ Story — stored fields plus computed properties. In the stubs the computed ones
 
 Author:
 - `username`, `name`, `bio`, `followers`
+- `joined_year` — год прихода на платформу («2024 жылдан бері»). Единственный факт профиля, который нельзя вывести из данных. Год, а не полная дата: подростку важно «давно или недавно», а точная дата — лишние персональные данные
 - `works` — **производное**, как `Collection.count`: число публичных работ автора. Было хранимым литералом и врало у всех шести авторов сразу, а рендерится в шести местах, включая карточку автора на странице произведения. Черновики в него не входят (BR-10: публично не видны)
+
+Contest:
+- `winners: tuple[str]` — слаги **произведений**-победителей, не имена авторов; автор выводится через `Story.author_username`. Второй литерал с именем разошёлся бы с первым ровно так же, как хранимый `Author.works` разошёлся с числом произведений. У active-конкурса пусто
+- `winner_stories` — производное: `Story` по слагам, неизвестные молча отбрасываются
 
 Genre:
 - `slug`, `name`, `hue`, `icon`, `count`

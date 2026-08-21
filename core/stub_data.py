@@ -157,6 +157,11 @@ class Author:
     pen_name: str   # публичное авторское имя / псевдоним
     bio: str
     followers: int
+    # Год прихода на платформу — «2024 жылдан бері» в шапке профиля.
+    # Единственный факт профиля, который нельзя вывести из данных: следов
+    # регистрации в стабе нет. Год, а не полная дата: подростку важно «давно
+    # или недавно», а не день; точная дата — лишние персональные данные.
+    joined_year: int
 
     @property
     def public_name(self) -> str:
@@ -182,13 +187,13 @@ class Author:
 
 
 AUTHORS = [
-    Author("rudazov",   "Алмат Рысқали",     "Rudazov",       "Фэнтези, шытырман",      8420),
-    Author("aygerim_k", "Айгерім Қасенова",  "aiqalam",       "Жас прозаик · Алматы",    184),
-    Author("bekzhan_t", "Бекжан Тұрсынов",   "BekTor",        "Қалалық әңгімелер",       312),
-    Author("dina_books","Дина Айдарбекова",  "dina.books",    "Балалар әдебиеті",        542),
-    Author("sayyn",     "Сайын Нұрбекұлы",   "sayyn",         "Фантастика, шытырман",     96),
+    Author("rudazov",   "Алмат Рысқали",     "Rudazov",       "Фэнтези, шытырман",      8420, 2023),
+    Author("aygerim_k", "Айгерім Қасенова",  "aiqalam",       "Жас прозаик · Алматы",    184, 2024),
+    Author("bekzhan_t", "Бекжан Тұрсынов",   "BekTor",        "Қалалық әңгімелер",       312, 2024),
+    Author("dina_books","Дина Айдарбекова",  "dina.books",    "Балалар әдебиеті",        542, 2023),
+    Author("sayyn",     "Сайын Нұрбекұлы",   "sayyn",         "Фантастика, шытырман",     96, 2025),
     # Демо-пользователь, под которым логинимся через фейк-сессию (см. core.views.login_view).
-    Author("aidana",    "Айдана Серікқызы",  "aidana",        "Жас прозаик · Тараз",      23),
+    Author("aidana",    "Айдана Серікқызы",  "aidana",        "Жас прозаик · Тараз",      23, 2025),
 ]
 
 AUTHORS_BY_USERNAME = {a.username: a for a in AUTHORS}
@@ -469,6 +474,11 @@ STORIES = [
         status="OnProcess", recent_views=310, annotation="Жас қыздың Алматыдан Таразға қайту туралы әңгімесі. Сегіз бөлімде, әр бөлім — жаңа қала.",
         tags=("sayahat", "jasospirim", "arman", "experimental"),
         updated_days_ago=2,
+        # Заявка на активный «Алтын қалам — 2024» лежала в SUBMISSIONS_BY_USER,
+        # а бейджа на работе не было: каталог по оси badge=contest её не находил,
+        # хотя автор в конкурсе участвует. Инвариант держит
+        # test_stub_data.SubmissionsMatchContestBadges.
+        badges=("Байқауға қатысады",),
     ),
     Story(
         slug="aidana-koshe",  title="Көше әндері",            author_username="aidana",
@@ -1289,6 +1299,22 @@ def my_stories_of(username: str) -> list:
     )
 
 
+def public_stories_of(username: str) -> list:
+    """Работы автора, которые видит посторонний — свежие сверху.
+
+    `my_stories_of` отдаёт любой статус: это выдача авторского кабинета.
+    Публичный профиль был построен на ней же, и на `/u/<username>/` висели
+    черновик и работа на модерации — обычными кликабельными карточками
+    (нарушение BR-10 и DEC-23). У `aidana` так утекали `aidana-kus`
+    (NotPublished) и `aidana-erteg` (OnModeration).
+
+    Публичность берётся из `Story.is_public`, а не из литерала `'Published'`:
+    после DEC-37 публичный сериал носит `Completed` или `OnProcess`, и
+    сравнение со строкой молча выкинуло бы из профиля все сериалы.
+    """
+    return [s for s in my_stories_of(username) if s.is_public]
+
+
 def writer_attention(username: str) -> list:
     """Что ждёт автора — короткая строка над списком (FR-WRITE-08).
 
@@ -1575,6 +1601,16 @@ class Contest:
     # BR-22: пороги объёма для подачи (знаки)
     min_chars: int = 5_000
     max_chars: int = 15_000
+    # Победители завершённого конкурса — слаги произведений, не имена авторов.
+    # Автор выводится через Story.author_username: второй литерал с именем
+    # разошёлся бы с первым ровно так же, как хранимый `Author.works` разошёлся
+    # с числом произведений. Для active-конкурса пусто.
+    winners: tuple = ()
+
+    @property
+    def winner_stories(self) -> list:
+        """Произведения-победители. Неизвестные слаги молча отбрасываются."""
+        return [STORIES_BY_SLUG[s] for s in self.winners if s in STORIES_BY_SLUG]
 
 
 CONTESTS = [
@@ -1634,6 +1670,9 @@ CONTESTS = [
         status="finished", days_left=None, prize_kzt=None, submissions=156,
         cover="img/book3.jpg",
         description="2023 жылғы байқау аяқталды. Жеңімпаздар: «Күңгірт мырза», «Қуыршақшының ойыны».",
+        # Те же две работы, что названы в description. Расхождение между
+        # текстом и полем ловит test_stub_data.ContestWinners.
+        winners=("temniy-lord", "igra-kuklovoda"),
         conditions=(),
         timeline=(
             TimelineStage("Өтінім қабылдау", "1 қыр — 1 жел", "done"),
@@ -1678,6 +1717,27 @@ SUBMISSIONS_BY_USER: dict = {
             contest_slug="zhas-aldym-2023", story_slug="aidana-kysh",
             submitted_relative="6 ай бұрын", status="rejected",
             note="Көлемі шарттан асып кеткен.",
+        ),
+    ],
+    # Заявки победителей «Жас алдым — 2023». Без них конкурсная история и
+    # знаки «Байқауға қабылданды» / «Байқау жеңімпазы» не на чем показать:
+    # заявка была ровно у одного автора, и та не принята.
+    "dina_books": [
+        Submission(
+            contest_slug="bolashak-mektebi", story_slug="igra-kuklovoda",
+            submitted_relative="8 күн бұрын", status="reviewing",
+        ),
+        Submission(
+            contest_slug="zhas-aldym-2023", story_slug="igra-kuklovoda",
+            submitted_relative="1 жыл бұрын", status="accepted",
+            note="Қазылар алқасының таңдауы.",
+        ),
+    ],
+    "bekzhan_t": [
+        Submission(
+            contest_slug="zhas-aldym-2023", story_slug="temniy-lord",
+            submitted_relative="1 жыл бұрын", status="accepted",
+            note="Қазылар алқасының таңдауы.",
         ),
     ],
 }
@@ -1805,20 +1865,50 @@ def in_library(username: str, story_slug: str) -> bool:
     return any(e.story_slug == story_slug for e in library_of(username))
 
 
-def reader_stats(username: str) -> dict:
-    """Сводка для PROF: своя статистика читателя/автора."""
-    mine = my_stories_of(username)
-    lib  = library_of(username)
+def public_stats(username: str) -> dict:
+    """Четыре числа публичного профиля (FR-PROF-01).
+
+    Отдельно от `reader_stats`, потому что зритель разный. `reader_stats`
+    считал по `my_stories_of` и по личной библиотеке — то есть чужой профиль
+    показывал число работ вместе с черновиками (у `aidana` «5» против «3» в
+    карточке автора на странице произведения) и счётчик дочитанных книг из
+    приватной библиотеки постороннего человека.
+
+    `works` совпадает с `Author.works` по построению: одно правило
+    публичности, посчитанное один раз, — иначе два числа под одним словом
+    снова разъедутся.
+    """
+    pub = public_stories_of(username)
+    author = AUTHORS_BY_USERNAME.get(username)
     return {
-        # «Шығарма» — собственные произведения
-        "works":     len(mine),
-        # «Ұнатулар» — лайки на собственных произведениях (сумма)
-        "likes":     sum(s.likes for s in mine),
-        # «Оқылды» — сколько прочитал (записей с kind='done')
-        "read":      sum(1 for e in lib if e.kind == "done"),
-        # «Жазылулар» — подписчики автора (если автор)
-        "followers": AUTHORS_BY_USERNAME[username].followers if username in AUTHORS_BY_USERNAME else 0,
+        # «Шығарма» — работы, видимые читателю
+        "works":     len(pub),
+        # «Оқылым» — сколько раз прочитали автора (сумма просмотров)
+        "reads":     sum(s.views for s in pub),
+        # «Ұнату» — лайки на публичных работах
+        "likes":     sum(s.likes for s in pub),
+        # «Жазылушы» — подписчики автора
+        "followers": author.followers if author else 0,
     }
+
+
+def reader_stats(username: str) -> dict:
+    """Сводка для своего профиля: то же самое плюс приватное.
+
+    Числа, которые видит посторонний, берутся из `public_stats` — свой
+    профиль не должен показывать владельцу другую арифметику, чем читателю.
+    Сверх них: `works_total` (с черновиками — владелец их видит) и
+    `finished` (сколько дочитал; только своё).
+    """
+    stats = dict(public_stats(username))
+    lib = library_of(username)
+    stats.update({
+        # Все свои работы, включая черновики и модерацию
+        "works_total": len(my_stories_of(username)),
+        # Сколько дочитал — записи библиотеки с kind='done'. Приватно.
+        "finished":    sum(1 for e in lib if e.kind == "done"),
+    })
+    return stats
 
 
 # ───────────────────────── PROF — граф подписок ───────────────────────────

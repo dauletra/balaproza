@@ -361,3 +361,91 @@ class MySubmissionsEmpty(TestCase):
         r = self.client.get(reverse('core:my_submissions'))
         self.assertContains(r, 'Әлі өтінім жоқ')
         self.assertContains(r, reverse('core:contest_list'))
+
+
+# ───────────────────── Инварианты конкурсных данных (Э0) ──────────────────
+
+class ContestWinners(TestCase):
+    """`Contest.winners` — слаги произведений, а не имена авторов."""
+
+    def test_winners_reference_known_stories(self):
+        for c in stub_data.CONTESTS:
+            for slug in c.winners:
+                with self.subTest(contest=c.slug, story=slug):
+                    self.assertIn(slug, stub_data.STORIES_BY_SLUG)
+
+    def test_active_contests_have_no_winners(self):
+        for c in stub_data.ACTIVE_CONTESTS:
+            with self.subTest(contest=c.slug):
+                self.assertEqual(c.winners, ())
+
+    def test_winner_stories_resolve_to_authors(self):
+        c = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        authors = {s.author_username for s in c.winner_stories}
+        self.assertEqual(authors, {'bekzhan_t', 'dina_books'})
+
+    def test_every_winner_has_a_submission(self):
+        """Победа без поданной заявки — конкурсной истории неоткуда взяться."""
+        for c in stub_data.CONTESTS:
+            for story in c.winner_stories:
+                with self.subTest(contest=c.slug, story=story.slug):
+                    self.assertTrue(stub_data.has_submission(
+                        story.author_username, c.slug))
+
+
+class SubmissionsMatchContestBadges(TestCase):
+    """Бейдж «Байқауға қатысады» на работе ⟺ заявка на идущий конкурс.
+
+    Данные расходились в обе стороны: у `igra-kuklovoda` бейдж стоял без
+    единой заявки, а у `aidana-tan` заявка на активный «Алтын қалам» была,
+    но бейджа не было — каталог по оси `badge=contest` работу не находил.
+    """
+
+    LABEL = 'Байқауға қатысады'
+
+    def _stories_with_active_submission(self):
+        active = {c.slug for c in stub_data.ACTIVE_CONTESTS}
+        return {
+            sub.story_slug
+            for subs in stub_data.SUBMISSIONS_BY_USER.values()
+            for sub in subs
+            if sub.contest_slug in active
+        }
+
+    def test_badge_implies_active_submission(self):
+        expected = self._stories_with_active_submission()
+        for s in stub_data.STORIES:
+            if self.LABEL in s.badges:
+                with self.subTest(story=s.slug):
+                    self.assertIn(s.slug, expected)
+
+    def test_active_submission_implies_badge(self):
+        for slug in self._stories_with_active_submission():
+            with self.subTest(story=slug):
+                self.assertIn(self.LABEL, stub_data.STORIES_BY_SLUG[slug].badges)
+
+
+class SubmissionIntegrity(TestCase):
+
+    def test_submissions_reference_known_contests_and_stories(self):
+        for username, subs in stub_data.SUBMISSIONS_BY_USER.items():
+            for sub in subs:
+                with self.subTest(user=username, contest=sub.contest_slug):
+                    self.assertIn(sub.contest_slug, stub_data.CONTESTS_BY_SLUG)
+                    self.assertIn(sub.story_slug, stub_data.STORIES_BY_SLUG)
+
+    def test_submitted_story_belongs_to_submitter(self):
+        for username, subs in stub_data.SUBMISSIONS_BY_USER.items():
+            for sub in subs:
+                with self.subTest(user=username, story=sub.story_slug):
+                    self.assertEqual(
+                        stub_data.STORIES_BY_SLUG[sub.story_slug].author_username,
+                        username,
+                    )
+
+    def test_one_work_per_contest(self):
+        """BR-23: один автор — не больше одной заявки на конкретный конкурс."""
+        for username, subs in stub_data.SUBMISSIONS_BY_USER.items():
+            slugs = [s.contest_slug for s in subs]
+            with self.subTest(user=username):
+                self.assertEqual(len(slugs), len(set(slugs)))

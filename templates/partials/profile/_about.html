@@ -1,0 +1,61 @@
+{% comment %}
+    Вкладка «Туралы» — общая для своего и чужого профиля.
+
+    Копии разошлись сильнее всего именно здесь: в своей было четыре поля,
+    в чужой — только био. Среди четырёх лежало `profile_user.name` —
+    настоящее имя-фамилия автора, ничем не помеченное как приватное.
+    Шапку профиля между этими файлами уже копировали; при следующем
+    копировании этого блока реальное имя ушло бы в публичный профиль.
+
+    Приватная часть отделена явно и рендерится только владельцу.
+
+    Контекст:
+      profile_user — Author
+      stats        — public_stats(...) / reader_stats(...)
+      is_self      — свой профиль или чужой
+{% endcomment %}
+<section class="rounded-lg border border-slate-200 bg-white p-6">
+    <h2 class="font-display text-lg font-bold text-slate-900">Автор туралы</h2>
+    {% if profile_user.bio %}
+        <p class="mt-2 font-sans text-sm leading-relaxed text-slate-700">{{ profile_user.bio }}</p>
+    {% else %}
+        <p class="mt-2 font-sans text-sm text-slate-500">Био толтырылмаған.</p>
+    {% endif %}
+
+    <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
+        <div>
+            <dt class="font-sans text-xs text-slate-500">Авторлық ат</dt>
+            <dd class="font-sans text-slate-900">{{ profile_user.public_name }}</dd>
+        </div>
+        <div>
+            <dt class="font-sans text-xs text-slate-500">Қолданушы аты</dt>
+            <dd class="font-sans text-slate-900">@{{ profile_user.username }}</dd>
+        </div>
+        <div>
+            <dt class="font-sans text-xs text-slate-500">Платформада</dt>
+            <dd class="font-sans text-slate-900">{{ profile_user.joined_year }} жылдан бері</dd>
+        </div>
+        <div>
+            <dt class="font-sans text-xs text-slate-500">Жарияланған шығарма</dt>
+            <dd class="font-sans text-slate-900">{{ stats.works }}</dd>
+        </div>
+    </dl>
+
+    {% if is_self %}
+        <div class="mt-5 border-t border-slate-100 pt-4">
+            <p class="mb-3 font-sans text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Тек саған көрінеді
+            </p>
+            <dl class="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                    <dt class="font-sans text-xs text-slate-500">Ресми аты-жөні</dt>
+                    <dd class="font-sans text-slate-900">{{ profile_user.name }}</dd>
+                </div>
+                <div>
+                    <dt class="font-sans text-xs text-slate-500">Барлық шығарма</dt>
+                    <dd class="font-sans text-slate-900">{{ stats.works_total }} <span class="text-slate-500">(жобалармен бірге)</span></dd>
+                </div>
+            </dl>
+        </div>
+    {% endif %}
+</section>
