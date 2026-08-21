@@ -638,7 +638,7 @@ def chapter_editor(request, slug, chapter=None):
 
 
 # ───────────────────────── PROF — профиль ────────────────────────────────
-_PROF_TABS_ME    = ("works", "library", "about")
+_PROF_TABS_ME    = ("works", "library", "stats", "about")
 _PROF_TABS_OTHER = ("works", "about")
 
 
@@ -661,6 +661,9 @@ def _prof_items(username: str, allowed: tuple, is_self: bool) -> list:
     labels = {
         "works":   ("Шығармалар", works_n),
         "library": ("Кітапхана",  lib_n),
+        # Счётчика у «Статистика» нет: число рядом обещало бы количество
+        # чего-то, а вкладка — про состояние, а не про список.
+        "stats":   ("Статистика", 0),
         "about":   ("Туралы",     0),
     }
     return [{'slug': k, 'label': labels[k][0], 'count': labels[k][1]} for k in allowed]
@@ -675,6 +678,8 @@ def profile_me(request):
     # partials/right_rail/profile.html не рендерит ничего, и гость получал
     # пустую колонку в 300px, которая просто сдвигала гейт от центра.
     following = stub_data.following_of(username) if username else []
+    catalog = stub_data.award_catalog(username) if username else []
+    ladder = stub_data.read_ladder(username) if username else []
     return render(request, 'pages/profile/profile_me.html', {
         'has_right_rail':  bool(author and following),
         'profile_user':    author,
@@ -689,6 +694,13 @@ def profile_me(request):
         'achievements':    stub_data.achievements_of(username) if username else [],
         'contests_n':      len(stub_data.submissions_of(username)) if username else 0,
         'contest_history': stub_data.contest_history(username, is_self=True) if username else [],
+        # FR-PROF-08 — своя статистика. Ничего из этого посторонний не видит.
+        'writer':          stub_data.writer_stats(username) if username else None,
+        'award_catalog':   catalog,
+        'awards_earned':   sum(1 for a in catalog if a['earned']),
+        'read_ladder':     ladder,
+        'reads_total':     stub_data.reads_total(username) if username else 0,
+        'next_tier':       next((s for s in ladder if s['is_next']), None),
         'following':       following,
         'new_story_href':  reverse('core:new_story'),
         'catalog_href':    reverse('core:catalog'),

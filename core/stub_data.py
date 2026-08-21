@@ -8,7 +8,7 @@
 import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 
 # ───────────────────────── Жанры (docs/03 — 12 шт) ─────────────────────────
@@ -1366,6 +1366,10 @@ def writer_stats(username: str) -> dict:
         "published":  len(published),
         "on_moderation": sum(1 for s in mine if s.status == "OnModeration"),
         "ongoing":    sum(1 for s in mine if s.status == "OnProcess"),
+        # Черновик считался только в `total`, и разбивка по статусам не
+        # сходилась с ним: у `aidana` 2+1+1 против «Барлығы 5». Разбивка,
+        # не дающая в сумме целое, — то же враньё, что и хранимый счётчик.
+        "draft":      sum(1 for s in mine if s.status == "NotPublished"),
         "views":      sum(s.views for s in mine),
         "likes":      sum(s.likes for s in mine),
         "comments":   sum(s.comments for s in mine),
@@ -2073,8 +2077,59 @@ READ_TIER_ART = {
 }
 
 
+@dataclass(frozen=True)
+class Award:
+    """Одна награда: чем она выглядит, за что даётся и как проверяется.
+
+    Условие лежит рядом с наградой, а не в отдельном списке «как получить»:
+    иначе получилось бы два места, описывающих одно правило, и однажды они
+    разошлись бы — как расходились две копии вкладки «Туралы».
+    """
+    key: str
+    label: str
+    art: str        # слаг иллюстрации в components/awards/_sprite.html
+    tier: str       # металл ступени, см. AWARD_TIERS
+    hint: str       # что нужно сделать — для своей статистики (FR-PROF-08)
+    earned: Callable  # username -> bool
+
+    def as_dict(self) -> dict:
+        return {"key": self.key, "label": self.label,
+                "art": self.art, "tier": self.tier}
+
+
+# Порядок стабильный — от первого шага к редкому (BR-ACH-02). Ступени
+# оқылым сюда не входят: у них четыре варианта и динамическая подпись,
+# они живут в READ_TIERS / READ_TIER_ART и добавляются отдельно.
+AWARDS = (
+    Award("first_publication", "Алғашқы жарияланым", "first-publication", "bronze",
+          "Бірінші шығармаңды жарияла",
+          lambda u: any(s.is_public for s in my_stories_of(u))),
+    Award("contest_participant", "Байқауға қатысты", "contest-participant", "bronze",
+          "Кез келген байқауға өтінім жібер",
+          lambda u: bool(submissions_of(u))),
+    # Дописанный сериал — самая ценная награда набора: дописать начатое
+    # подростку тяжелее всего, и это ровно то поведение, которое платформе
+    # нужно поощрять. Одиночный рассказ сюда не считается — он «дописан»
+    # в момент публикации (BR-10a, BR-ACH-04).
+    Award("finished_serial", "Сериалды аяқтады", "finished-serial", "silver",
+          "Көп бөлімді шығармаңды аяқта",
+          lambda u: any(s.status == "Completed" and not s.is_single
+                        for s in my_stories_of(u))),
+    Award("contest_accepted", "Байқауға қабылданды", "contest-accepted", "silver",
+          "Өтінімің қазылар алқасынан өтсін",
+          lambda u: any(s.status == "accepted" for s in submissions_of(u))),
+    Award("contest_winner", "Байқау жеңімпазы", "contest-winner", "gold",
+          "Байқауда жеңіске жет",
+          lambda u: bool(winning_stories_of(u))),
+    Award("editorial_choice", BADGE_LABELS["editorial"], "editorial-choice", "gold",
+          "Редакция шығармаңды таңдасын",
+          lambda u: any(BADGE_LABELS["editorial"] in s.badges
+                        for s in public_stories_of(u))),
+)
+
+
 def achievements_of(username: str) -> list:
-    """Награды автора — порядок стабильный, от первого шага к редкому.
+    """Полученные награды автора — публичный ряд (FR-PROF-06).
 
     Отдаёт `key` / `label` / `art` / `tier`; рендерит `components/award.html`.
     Ссылок здесь нет: URL-ы в слой данных не спускаем — как в каталоге
@@ -2084,63 +2139,59 @@ def achievements_of(username: str) -> list:
     металл постамента. Прежние `icon` / `kind` описывали пилюлю с
     монохромной иконкой; награда — предметная иллюстрация, и ступень
     ценности несёт металл, а не цвет фона (DEC-43, BR-ACH-02).
+
+    В ряд идёт только **высшая** взятая ступень оқылым: «Мың» и «Он мың»
+    рядом говорят одно и то же. Пройденные видно в своей статистике.
     """
     if username not in AUTHORS_BY_USERNAME:
         return []
 
-    mine = my_stories_of(username)
-    subs = submissions_of(username)
-    out = []
-
-    if any(s.is_public for s in mine):
-        out.append({
-            "key": "first_publication", "label": "Алғашқы жарияланым",
-            "art": "first-publication", "tier": "bronze",
-        })
-
-    if subs:
-        out.append({
-            "key": "contest_participant", "label": "Байқауға қатысты",
-            "art": "contest-participant", "tier": "bronze",
-        })
-
-    # Дописанный сериал. Самый ценный знак набора: дописать начатое
-    # подростку тяжелее всего, и это ровно то поведение, которое платформе
-    # нужно поощрять. Одиночный рассказ сюда не считается — он «дописан»
-    # в момент публикации (BR-10a).
-    if any(s.status == "Completed" and not s.is_single for s in mine):
-        out.append({
-            "key": "finished_serial", "label": "Сериалды аяқтады",
-            "art": "finished-serial", "tier": "silver",
-        })
-
-    if any(s.status == "accepted" for s in subs):
-        out.append({
-            "key": "contest_accepted", "label": "Байқауға қабылданды",
-            "art": "contest-accepted", "tier": "silver",
-        })
-
-    if winning_stories_of(username):
-        out.append({
-            "key": "contest_winner", "label": "Байқау жеңімпазы",
-            "art": "contest-winner", "tier": "gold",
-        })
-
-    if any(BADGE_LABELS["editorial"] in s.badges for s in mine if s.is_public):
-        out.append({
-            "key": "editorial_choice", "label": BADGE_LABELS["editorial"],
-            "art": "editorial-choice", "tier": "gold",
-        })
+    out = [a.as_dict() for a in AWARDS if a.earned(username)]
 
     tier = read_tier(username)
     if tier:
         art, metal = READ_TIER_ART[tier[0]]
-        out.append({
-            "key": "reads", "label": tier[1],
-            "art": art, "tier": metal,
-        })
+        out.append({"key": "reads", "label": tier[1], "art": art, "tier": metal})
 
     return out
+
+
+def award_catalog(username: str) -> list:
+    """Все награды с отметкой «взята» — для своей статистики (FR-PROF-08).
+
+    Тот же реестр `AWARDS`, что и у публичного ряда: список «что можно
+    получить» не может разойтись со списком «что получено», потому что это
+    один список.
+    """
+    return [{**a.as_dict(), "hint": a.hint,
+             "earned": bool(a.earned(username)),
+             # Готовый флаг «обесцветить»: `{% include %}` не умеет `not`,
+             # а обход через `earned|yesno:",True"` читается как ребус.
+             "dim": not a.earned(username)}
+            for a in AWARDS]
+
+
+def read_ladder(username: str) -> list:
+    """Ступени оқылым с отметкой пройденного и указанием следующей.
+
+    Публичный ряд показывает одну ступень; здесь видно весь путь — это и
+    есть ответ на «что дальше», ради которого своя статистика заводилась.
+    """
+    total = reads_total(username)
+    ahead = next_tier_for(total)
+    return [
+        {
+            "threshold": threshold,
+            "label":     label,
+            "art":       READ_TIER_ART[threshold][0],
+            "tier":      READ_TIER_ART[threshold][1],
+            "earned":    total >= threshold,
+            "dim":       total < threshold,
+            "is_next":   bool(ahead and ahead[0] == threshold),
+            "left":      max(0, threshold - total),
+        }
+        for threshold, label in READ_TIERS
+    ]
 
 
 # ───────────────────────── NOTIF — уведомления ────────────────────────────

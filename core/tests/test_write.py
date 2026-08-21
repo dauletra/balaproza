@@ -629,3 +629,36 @@ class MyStoryMenuOffersTheMissingActions(TestCase):
         serial = stub_data.STORIES_BY_SLUG['aidana-tan']
         self.assertEqual(serial.status, 'OnProcess')
         self.assertTrue(serial.is_public)
+
+
+class WriterStatsBreakdownSumsToTotal(TestCase):
+    """Разбивка по статусам обязана давать в сумме `total`.
+
+    Черновик считался только в `total`, и «Барлығы 5» стояло над
+    разбивкой 2+1+1. Слагаемые, не дающие целого, — то же враньё, что и
+    хранимый счётчик, только разложенное на части.
+    """
+
+    def test_every_author(self):
+        for a in stub_data.AUTHORS:
+            s = stub_data.writer_stats(a.username)
+            with self.subTest(author=a.username):
+                self.assertEqual(
+                    s['published'] + s['ongoing'] + s['on_moderation'] + s['draft'],
+                    s['total'],
+                )
+
+    def test_every_status_lands_in_exactly_one_bucket(self):
+        buckets = {
+            'published':     ('Published', 'Completed'),
+            'ongoing':       ('OnProcess',),
+            'on_moderation': ('OnModeration',),
+            'draft':         ('NotPublished',),
+        }
+        covered = [st for group in buckets.values() for st in group]
+        self.assertEqual(len(covered), len(set(covered)))
+        # Все пять статусов BR-10 разложены, ни один не потерян.
+        self.assertEqual(
+            set(covered),
+            {'Published', 'Completed', 'OnProcess', 'OnModeration', 'NotPublished'},
+        )

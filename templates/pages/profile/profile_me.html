@@ -48,6 +48,9 @@
             {% include "components/empty_state.html" with icon="bookmark" title="Кітапхана бос" text="Шығарманы сақтап немесе оқуды бастап, осында жина." cta_label="Каталогқа" cta_href=catalog_href %}
         {% endif %}
 
+    {% elif tab == "stats" %}
+        {% include "partials/profile/_statistics.html" %}
+
     {% elif tab == "about" %}
         {% include "partials/profile/_about.html" %}
     {% endif %}

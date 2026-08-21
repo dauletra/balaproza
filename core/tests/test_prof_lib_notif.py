@@ -228,11 +228,14 @@ class ProfileMeAuthed(TestCase):
         self.assertContains(r, 'Оқылым')
         self.assertContains(r, 'Жазылушы')
 
-    def test_segmented_control_has_three_segments(self):
+    def test_segmented_control_covers_every_own_tab(self):
         r = self.client.get(reverse('core:profile_me'))
-        self.assertContains(r, '?tab=works')
-        self.assertContains(r, '?tab=library')
-        self.assertContains(r, '?tab=about')
+        # Список ведём из самого источника: сегмент, добавленный в
+        # _PROF_TABS_ME и забытый в шаблоне, иначе остался бы незамеченным.
+        for slug in ('works', 'library', 'stats', 'about'):
+            with self.subTest(tab=slug):
+                self.assertContains(r, f'?tab={slug}')
+        self.assertEqual(len(r.context['prof_items']), 4)
 
     def test_library_tab_shows_library_rows(self):
         r = self.client.get(reverse('core:profile_me') + '?tab=library')
@@ -497,6 +500,135 @@ class ContestHistoryPrivacy(TestCase):
         for c in stub_data.CONTESTS:
             with self.subTest(contest=c.slug):
                 self.assertNotContains(r, c.name)
+
+
+class AwardRegistry(TestCase):
+    """Один реестр на «что получено» и «что можно получить» (FR-PROF-08)."""
+
+    def test_catalog_and_row_come_from_the_same_source(self):
+        for a in stub_data.AUTHORS:
+            earned_row = {x['key'] for x in stub_data.achievements_of(a.username)
+                          if x['key'] != 'reads'}
+            earned_cat = {x['key'] for x in stub_data.award_catalog(a.username)
+                          if x['earned']}
+            with self.subTest(author=a.username):
+                self.assertEqual(earned_row, earned_cat)
+
+    def test_catalog_lists_every_award_for_everyone(self):
+        keys = [x.key for x in stub_data.AWARDS]
+        for a in stub_data.AUTHORS:
+            with self.subTest(author=a.username):
+                self.assertEqual([x['key'] for x in stub_data.award_catalog(a.username)], keys)
+
+    def test_every_award_explains_how_to_get_it(self):
+        for a in stub_data.AWARDS:
+            with self.subTest(award=a.key):
+                self.assertTrue(a.hint.strip())
+                self.assertNotEqual(a.hint, a.label)
+
+    def test_dim_is_the_inverse_of_earned(self):
+        for a in stub_data.AUTHORS:
+            for item in stub_data.award_catalog(a.username) + stub_data.read_ladder(a.username):
+                with self.subTest(author=a.username, key=item.get('key') or item.get('threshold')):
+                    self.assertEqual(item['dim'], not item['earned'])
+
+    def test_ladder_marks_exactly_one_next_step(self):
+        for a in stub_data.AUTHORS:
+            ladder = stub_data.read_ladder(a.username)
+            with self.subTest(author=a.username):
+                self.assertEqual(len(ladder), len(stub_data.READ_TIERS))
+                self.assertLessEqual(sum(1 for s in ladder if s['is_next']), 1)
+                # Пройденные идут подряд с начала: ступень нельзя перепрыгнуть.
+                earned = [s['earned'] for s in ladder]
+                self.assertEqual(earned, sorted(earned, reverse=True))
+
+    def test_ladder_left_is_zero_once_taken(self):
+        for a in stub_data.AUTHORS:
+            for s in stub_data.read_ladder(a.username):
+                with self.subTest(author=a.username, step=s['threshold']):
+                    if s['earned']:
+                        self.assertEqual(s['left'], 0)
+                    else:
+                        self.assertGreater(s['left'], 0)
+
+    def test_unknown_user_gets_full_catalog_with_nothing_earned(self):
+        cat = stub_data.award_catalog('ghost')
+        self.assertEqual(len(cat), len(stub_data.AWARDS))
+        self.assertFalse(any(x['earned'] for x in cat))
+
+
+class ProfileStatsTab(TestCase):
+    """Вкладка «Статистика» — приватная и не повторяет кабинет."""
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+
+    def test_segment_exists_for_owner(self):
+        r = self.client.get(reverse('core:profile_me'))
+        self.assertContains(r, '?tab=stats')
+        self.assertContains(r, 'Статистика')
+
+    def test_stranger_has_no_stats_tab(self):
+        r = self.client.get(reverse('core:profile_other', kwargs={'username': 'aidana'}))
+        self.assertNotContains(r, '?tab=stats')
+
+    def test_stats_tab_is_marked_private(self):
+        r = self.client.get(reverse('core:profile_me') + '?tab=stats')
+        self.assertContains(r, 'Тек саған көрінеді')
+
+    def test_shows_private_breakdown(self):
+        r = self.client.get(reverse('core:profile_me') + '?tab=stats')
+        self.assertContains(r, 'Модерацияда')
+        self.assertContains(r, 'Жазылып жатыр')
+        self.assertContains(r, 'Оқып шыққаның')
+
+    def test_shows_whole_ladder_not_just_the_taken_step(self):
+        r = self.client.get(reverse('core:profile_me') + '?tab=stats')
+        for _, label in stub_data.READ_TIERS:
+            with self.subTest(tier=label):
+                self.assertContains(r, label)
+
+    def test_shows_unearned_awards_with_hints(self):
+        r = self.client.get(reverse('core:profile_me') + '?tab=stats')
+        unearned = [a for a in stub_data.award_catalog('aidana') if not a['earned']]
+        self.assertTrue(unearned, 'фикстура сломана: у aidana все награды взяты')
+        for a in unearned:
+            with self.subTest(award=a['key']):
+                self.assertContains(r, a['hint'])
+
+    def test_does_not_duplicate_the_cabinet(self):
+        """Кабинет отвечает «что делать», статистика — «как идёт» (FR-WRITE-08)."""
+        r = self.client.get(reverse('core:profile_me') + '?tab=stats')
+        self.assertNotContains(r, 'Назарыңды күтеді')
+
+    def test_guest_never_reaches_the_tab(self):
+        self.client.logout()
+        r = self.client.get(reverse('core:profile_me') + '?tab=stats')
+        self.assertNotContains(r, 'Тек саған көрінеді')
+        self.assertNotContains(r, 'Оқылым сатылары')
+
+
+class AwardSpriteIsIncludedOnce(TestCase):
+    """Два спрайта на странице — дублирующиеся id символов."""
+
+    MARKER = '<symbol id="award-contest-winner"'
+
+    def test_row_only(self):
+        r = self.client.get(reverse('core:profile_other', kwargs={'username': 'rudazov'}))
+        self.assertEqual(r.content.decode().count(self.MARKER), 1)
+
+    def test_row_and_stats_tab_together(self):
+        _login_as_aidana(self.client)
+        r = self.client.get(reverse('core:profile_me') + '?tab=stats')
+        self.assertTrue(r.context['achievements'])
+        self.assertEqual(r.content.decode().count(self.MARKER), 1)
+
+    def test_stats_tab_without_any_award(self):
+        # Автор без единой награды всё равно должен увидеть серые плитки:
+        # спрятанная награда не отвечает на вопрос «что дальше».
+        _login_as(self.client, 'lonely_writer')
+        r = self.client.get(reverse('core:profile_me') + '?tab=stats')
+        self.assertEqual(r.status_code, 200)
 
 
 class ProfileTemplatesShareParts(TestCase):

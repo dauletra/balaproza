@@ -52,6 +52,8 @@ balaproza_v1/
 │   │                             # reactions_of, reaction_breakdown, poll_of,
 │   │                             # library_of, in_library, public_stories_of, public_stats,
 │   │                             # reader_stats, writer_stats, is_following,
+│   │                             # AWARDS (реестр: условие рядом с наградой) / award_catalog /
+│   │                             # read_ladder (FR-PROF-08 — «что дальше»),
 │   │                             # achievements_of / reads_total / tier_for / read_tier /
 │   │                             # next_read_tier / winning_stories_of (FR-PROF-06, DEC-41 —
 │   │                             # знаки ВЫВОДЯТСЯ, хранить их нельзя; рейтинга нет),
@@ -87,7 +89,7 @@ balaproza_v1/
 │   ├── context_processors.py     # auth_state, nav_state, site_links
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced, page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 679 тестов в 16 файлах (см. ниже)
+│   └── tests/                    # 699 тестов в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -190,7 +192,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 679 тестов
+uv run python manage.py test core       # все 699 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 

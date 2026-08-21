@@ -1,0 +1,111 @@
+{% load balaproza %}{% comment %}
+    Вкладка «Статистика» — только свой профиль (FR-PROF-08).
+
+    Отвечает на «как идёт», а не на «что делать»: второе — работа
+    авторского кабинета, и полосу «Назарыңды күтеді» сюда дублировать
+    нельзя. Здесь нет ни одного числа, по которому автора можно сравнить
+    с другим автором: рейтинга на платформе нет и не будет (DEC-41).
+
+    Числа — через `spaced`: автору показываем точное с разрядами, сжатие
+    «2,1 мың» здесь было бы потерей смысла (правило проекта).
+
+    Спрайт наград подключается тут только когда наград нет вовсе, —
+    иначе его уже подключил `_achievements.html` выше на этой же странице,
+    и второй экземпляр дал бы дублирующиеся id символов. Ровно один спрайт
+    на странице держит `test_prof_lib_notif.AwardSpriteIsIncludedOnce`.
+
+    Контекст:
+      stats         — reader_stats(...)
+      writer        — writer_stats(...)
+      award_catalog — все награды с отметкой earned
+      read_ladder   — ступени оқылым
+      reads_total   — прочтений всего
+      achievements  — полученные награды (нужен только для решения о спрайте)
+{% endcomment %}
+{% if not achievements %}{% include "components/awards/_sprite.html" %}{% endif %}
+
+<p class="mb-4 font-sans text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+    Тек саған көрінеді
+</p>
+
+{# ── Что с твоими работами ── #}
+<section class="mb-6 rounded-lg border border-slate-200 bg-white p-5">
+    <h2 class="mb-4 font-display text-base font-bold text-slate-900">
+        Шығармаларың <span class="text-slate-400">{{ stats.works_total|spaced }}</span>
+    </h2>
+    {% comment %}
+        Четыре статуса дают в сумме «Барлығы». Черновика здесь сначала не
+        было, и разбивка не сходилась с целым — а это та же ложь, что и
+        хранимый счётчик, только разложенная на слагаемые. Держит
+        test_write.WriterStatsBreakdownSumsToTotal.
+    {% endcomment %}
+    <dl class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div>
+            <dt class="font-sans text-xs text-slate-500">Жарияланған</dt>
+            <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ writer.published|spaced }}</dd>
+        </div>
+        <div>
+            <dt class="font-sans text-xs text-slate-500">Жазылып жатыр</dt>
+            <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ writer.ongoing|spaced }}</dd>
+        </div>
+        <div>
+            <dt class="font-sans text-xs text-slate-500">Модерацияда</dt>
+            <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ writer.on_moderation|spaced }}</dd>
+        </div>
+        <div>
+            <dt class="font-sans text-xs text-slate-500">Жоба</dt>
+            <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ writer.draft|spaced }}</dd>
+        </div>
+    </dl>
+    <dl class="mt-4 grid grid-cols-2 gap-4 border-t border-slate-100 pt-4">
+        <div>
+            <dt class="font-sans text-xs text-slate-500">Пікірлер</dt>
+            <dd class="mt-1 font-display text-lg font-bold text-slate-900">{{ writer.comments|spaced }}</dd>
+        </div>
+        <div>
+            <dt class="font-sans text-xs text-slate-500">Оқып шыққаның</dt>
+            <dd class="mt-1 font-display text-lg font-bold text-slate-900">{{ stats.finished|spaced }}</dd>
+        </div>
+    </dl>
+</section>
+
+{# ── Ступени оқылым: весь путь, а не одна взятая ── #}
+<section class="mb-6 rounded-lg border border-slate-200 bg-white p-5">
+    <h2 class="font-display text-base font-bold text-slate-900">Оқылым сатылары</h2>
+    <p class="mt-1 font-sans text-sm text-slate-600">
+        Барлығы <strong class="text-slate-900">{{ reads_total|spaced }}</strong> оқылым.
+        {% if next_tier %}Келесі белгіге <strong class="text-slate-900">{{ next_tier.left|spaced }}</strong> қалды.{% else %}Барлық саты алынды.{% endif %}
+    </p>
+    <ul class="mt-4 flex flex-wrap gap-5">
+        {% for step in read_ladder %}
+            <li class="flex w-[92px] flex-col items-center text-center">
+                {% include "components/award.html" with art=step.art label=step.label size=52 interactive=False dim=step.dim only %}
+                <span class="mt-1 font-sans text-xs font-semibold {% if step.earned %}text-slate-900{% else %}text-slate-500{% endif %}">{{ step.label }}</span>
+                {% if step.is_next %}
+                    <span class="mt-0.5 font-sans text-[11px] text-brand">тағы {{ step.left|spaced }}</span>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+</section>
+
+{# ── Все награды: и взятые, и нет ── #}
+<section class="rounded-lg border border-slate-200 bg-white p-5">
+    <h2 class="font-display text-base font-bold text-slate-900">Марапаттар</h2>
+    <p class="mt-1 font-sans text-sm text-slate-600">
+        {{ awards_earned }} / {{ award_catalog|length }} алынды.
+    </p>
+    <ul class="mt-4 grid gap-4 sm:grid-cols-2">
+        {% for a in award_catalog %}
+            <li class="flex items-center gap-3">
+                {% include "components/award.html" with art=a.art label=a.label size=52 interactive=False dim=a.dim only %}
+                <div class="min-w-0">
+                    <p class="font-sans text-sm font-semibold {% if a.earned %}text-slate-900{% else %}text-slate-500{% endif %}">{{ a.label }}</p>
+                    <p class="font-sans text-xs leading-snug text-slate-500">
+                        {% if a.earned %}Алынды{% else %}{{ a.hint }}{% endif %}
+                    </p>
+                </div>
+            </li>
+        {% endfor %}
+    </ul>
+</section>
