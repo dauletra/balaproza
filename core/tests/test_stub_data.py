@@ -281,3 +281,68 @@ class DeclaredChapterCountMatchesLoadedChapters(unittest.TestCase):
             "Произведение обещает бөлім, которых нет в CHAPTERS_BY_STORY. "
             "Либо напиши текст в core/story_texts/, либо поставь chapters=0.",
         )
+
+
+class AuthorWorkCountIsDerived(unittest.TestCase):
+    """`Author.works` считается из данных, а не хранится рядом с ними.
+
+    Литерал врал у всех шести авторов сразу: `rudazov` заявлял 12 работ при
+    трёх, `sayyn` — 2 при трёх. Число рендерится в шести местах, включая
+    карточку автора на странице произведения и «Жаңа авторлар» на главной.
+    """
+
+    def test_matches_the_public_works(self):
+        for author in stub_data.AUTHORS:
+            with self.subTest(author=author.username):
+                public = [s for s in stub_data.STORIES
+                          if s.author_username == author.username and s.is_public]
+                self.assertEqual(author.works, len(public))
+
+    def test_drafts_are_not_advertised_publicly(self):
+        # BR-10: черновик публично не виден, значит и в публичный счётчик
+        # попадать не должен — иначе число выдаёт факт неопубликованного
+        hidden = [s for s in stub_data.my_stories_of('aidana') if not s.is_public]
+        self.assertTrue(hidden, 'у демо-автора не осталось непубличных работ')
+        self.assertEqual(
+            stub_data.AUTHORS_BY_USERNAME['aidana'].works,
+            len(stub_data.my_stories_of('aidana')) - len(hidden),
+        )
+
+
+class UpdatedLabelReadsAsTime(unittest.TestCase):
+    """Подпись «когда трогали» — единственная опора для «что я делал последним»."""
+
+    def test_scale(self):
+        cases = {0: "бүгін", 1: "кеше", 3: "3 күн бұрын",
+                 7: "1 апта бұрын", 20: "2 апта бұрын", 45: "1 ай бұрын"}
+        for days, expected in cases.items():
+            with self.subTest(days=days):
+                story = stub_data.Story(
+                    slug="x", title="X", author_username="aidana", cover="",
+                    genres=("drama", None), chapters=0, views=0, likes=0,
+                    comments=0, updated_days_ago=days)
+                self.assertEqual(story.updated_label, expected)
+
+    def test_unset_renders_nothing(self):
+        story = stub_data.Story(
+            slug="x", title="X", author_username="aidana", cover="",
+            genres=("drama", None), chapters=0, views=0, likes=0, comments=0)
+        self.assertEqual(story.updated_label, "")
+
+
+class WriterAttentionOnlySpeaksWhenThereIsSomething(unittest.TestCase):
+
+    def test_aidana_has_all_three_signals(self):
+        kinds = [i["kind"] for i in stub_data.writer_attention("aidana")]
+        self.assertEqual(kinds, ["moderation", "comments", "draft"])
+
+    def test_unknown_user_is_silent(self):
+        self.assertEqual(stub_data.writer_attention("no-such-user"), [])
+
+    def test_slug_is_set_only_for_a_single_item(self):
+        for item in stub_data.writer_attention("aidana"):
+            with self.subTest(kind=item["kind"]):
+                if item["count"] > 1 or item["kind"] == "comments":
+                    self.assertEqual(item["slug"], "")
+                else:
+                    self.assertIn(item["slug"], stub_data.STORIES_BY_SLUG)

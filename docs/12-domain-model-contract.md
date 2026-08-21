@@ -24,7 +24,9 @@ Secondary scenarios stay minimal until real usage exists:
 
 Fields are **not listed here.** Every stub dataclass is in `core/stub_data.py`, twenty lines above the data it holds — a prose copy of those field lists would be a second source that silently rots, which is exactly what happened to §12.3 before this revision.
 
-**`Story.recent_views` — единственное поле, которое в Ф14 не переносится как есть.** Это просмотры за 14 дней (DEC-36), в стабе — литерал, в бою — агрегат по логу просмотров с окном. Считать его от `views` нельзя: смысл оси в том, что она расходится с накопленным счётчиком. Инвариант `recent_views <= views` закрыт тестом `test_stub_data.RecentViewsAreConsistent`.
+**`Story.recent_views` и `Story.updated_days_ago` в Ф14 не переносятся как есть.** Второе — дельта в днях от «сегодня», в бою это `updated_at` с `auto_now`: хранить дельту нельзя, она устаревает каждые сутки. В стабе она числом потому, что фиксированная дата «сегодня» ломала бы тесты через день. Заполнена только у произведений демо-автора — кабинет показывает своё, а `None` значит «не задано» и уходит в конец сортировки.
+
+**`Story.recent_views` — про окно, а не про давность.** Это просмотры за 14 дней (DEC-36), в стабе — литерал, в бою — агрегат по логу просмотров с окном. Считать его от `views` нельзя: смысл оси в том, что она расходится с накопленным счётчиком. Инвариант `recent_views <= views` закрыт тестом `test_stub_data.RecentViewsAreConsistent`.
 
 **`NEW_AUTHOR_FOLLOWERS = 150` — стаб-условная константа, не правило.** Авторов в стабе шесть, и любая граница между ними произвольна. В Ф14 «новое имя» должно определяться перцентилем по подписчикам или возрастом аккаунта, а не абсолютным числом: 150 подписчиков на портале из двухсот авторов и из двадцати тысяч означают разное. Число не наследовать.
 
@@ -66,6 +68,9 @@ Catalog and search:
 Story and chapters:
 - `chapters_of(story_slug: str) -> list[Chapter]`
 - `chapter_of(story_slug: str, number: int) -> Chapter | None`
+- `Story.is_public -> bool` — видна ли работа читателю. По `PUBLIC_STATUSES`, а не по литералу `'Published'` (DEC-37)
+- `Story.updated_label -> str` — «кеше», «3 күн бұрын»; пусто, когда `updated_days_ago` не задан
+- `writer_attention(username: str) -> list[dict]` — сигналы кабинета (FR-WRITE-08): `kind` / `count` / `slug`. Только данные; ссылку строит view (`_attention_links`), как и в каталоге
 - `Story.text_chapter -> int | None` — номер главы с текстом одночастного произведения; None у сериала и у `single` без текста. Кнопка «Мәтін» / «Мәтінді өңдеу» обязана вести туда, а не в `chapter_new`: у `single` глава ровно одна, и пустой редактор давал автору сохранить вторую
 - `comments_of(story_slug: str) -> list[StoryComment]`
 - `comments_of_chapter(story_slug: str, chapter_number: int) -> list[StoryComment]`
@@ -116,10 +121,12 @@ Story — stored fields plus computed properties. In the stubs the computed ones
 - stored: `slug`, `title`, `cover`, `annotation`, `status`, `audience`, `badges`, `chapters`, `views`, `likes`, `comments`
 - resolved relations: `author`, `primary_genre`, `genres_resolved`, `tags_resolved`
 - format (DEC-28): `format`, `format_label`, `format_badge_label`, `is_single`, `is_serial`, `text_chapter`
+- статус и время: `is_public`, `updated_days_ago`, `updated_label`
 - reading effort: `total_chars`, `read_minutes`, `length_bucket`, `reading_meta_label`
 
 Author:
-- `username`, `name`, `bio`, `works`, `followers`
+- `username`, `name`, `bio`, `followers`
+- `works` — **производное**, как `Collection.count`: число публичных работ автора. Было хранимым литералом и врало у всех шести авторов сразу, а рендерится в шести местах, включая карточку автора на странице произведения. Черновики в него не входят (BR-10: публично не видны)
 
 Genre:
 - `slug`, `name`, `hue`, `icon`, `count`

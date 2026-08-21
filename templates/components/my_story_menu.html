@@ -1,0 +1,54 @@
+{% comment %}
+    Меню строки авторского кабинета: «Сайтта қарау» · «Баптаулар» · «Жою».
+
+    Параметры:
+      story — Story
+
+    Три точки помечают контейнер («ещё варианты»), а не действие — правило
+    docs/04 §4.2. Внутри самих пунктов иконки по смыслу: глаз, шестерня, урна.
+
+    Зачем меню. Из списка нельзя было ни посмотреть работу глазами читателя,
+    ни открыть баптаулар, ни удалить — любое из этих действий стоило захода
+    в «Басқару». При этом «посмотреть на сайте» для опубликованной работы —
+    самое частое желание автора.
+
+    «Сайтта қарау» показывается только для публичных статусов: у черновика и
+    работы на модерации публичной страницы нет. Проверка идёт через
+    `story.is_public` (PUBLIC_STATUSES), а не по литералу 'Published' —
+    иначе пункт пропал бы у всех сериалов разом (DEC-37).
+{% endcomment %}
+<div class="relative shrink-0" x-data="{ open: false }"
+     @click.outside="open = false" @keydown.escape.window="open = false">
+
+    <button type="button" @click="open = !open"
+            :aria-expanded="open" aria-haspopup="menu"
+            aria-label="{{ story.title }} — қосымша әрекеттер"
+            class="grid h-9 w-9 -mr-1 -mt-1 place-items-center rounded-pill text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+        {% include "components/icon.html" with name="dots-horizontal" size=16 only %}
+    </button>
+
+    <div x-show="open" x-cloak x-transition role="menu"
+         class="absolute right-0 z-20 mt-1 w-56 rounded-md border border-slate-200 bg-white py-1 shadow-modal">
+
+        {% if story.is_public %}
+            <a href="{% url 'core:story_detail' slug=story.slug %}" role="menuitem"
+               class="flex min-h-11 w-full items-center gap-2.5 px-4 font-sans text-sm text-slate-800 hover:bg-slate-50">
+                {% include "components/icon.html" with name="eye" size=15 cls="text-slate-400" only %}
+                Сайтта қарау
+            </a>
+        {% endif %}
+
+        <a href="{% url 'core:story_settings' slug=story.slug %}" role="menuitem"
+           class="flex min-h-11 w-full items-center gap-2.5 px-4 font-sans text-sm text-slate-800 hover:bg-slate-50">
+            {% include "components/icon.html" with name="cog" size=15 cls="text-slate-400" only %}
+            Баптаулар
+        </a>
+
+        <button type="button" role="menuitem"
+                @click="open = false; $dispatch('open-delete-confirm', { name: '{{ story.title|escapejs }}', confirm_url: '#' })"
+                class="flex min-h-11 w-full items-center gap-2.5 border-t border-slate-100 px-4 text-left font-sans text-sm text-status-error-fg hover:bg-slate-50">
+            {% include "components/icon.html" with name="trash" size=15 only %}
+            Жою
+        </button>
+    </div>
+</div>

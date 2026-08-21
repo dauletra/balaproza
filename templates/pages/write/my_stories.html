@@ -42,6 +42,31 @@
     {% elif page_state == 'error' %}
         {% include "components/error_state.html" with message="Шығармалар тізімін жүктеу мүмкін болмады." %}
     {% elif stories %}
+        {% comment %}
+            Полоса внимания (FR-WRITE-08). Список отвечал на вопрос «что у меня
+            есть» и молчал о том, что с этим делать: работа висела на модерации
+            без единого признака, сколько она там, новые пікір были видны только
+            в другом разделе, а начатый черновик ничем не отличался от готовой
+            работы. Все три сигнала уже лежали в данных.
+
+            Ссылка ставится только когда элемент один: вести «3 шығарма
+            модерацияда» в одну из трёх — врать. Порядок задаёт writer_attention.
+        {% endcomment %}
+        {% if attention %}
+            <div class="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <span class="font-sans text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Назарыңды күтеді</span>
+                {% for item in attention %}
+                    {% if item.kind == 'moderation' %}
+                        {% include "components/attention_item.html" with icon="adjustments" text=item.count|stringformat:"s"|add:" шығарма модерацияда" href=item.href %}
+                    {% elif item.kind == 'comments' %}
+                        {% include "components/attention_item.html" with icon="message-caption" text=item.count|stringformat:"s"|add:" жаңа пікір" href=item.href %}
+                    {% elif item.kind == 'draft' %}
+                        {% include "components/attention_item.html" with icon="pen" text=item.count|stringformat:"s"|add:" жоба бастамада тұр" href=item.href %}
+                    {% endif %}
+                {% endfor %}
+            </div>
+        {% endif %}
+
         {% if stats %}
             <div class="mb-8 xl:hidden">
                 {% include "components/stat_strip.html" with l1="Шығарма" v1=stats.total l2="Жазылушы" v2=stats.followers l3="Оқылды" v3=stats.views|spaced l4="Ұнатулар" v4=stats.likes|spaced %}

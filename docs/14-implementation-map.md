@@ -21,9 +21,9 @@
 | Маршруты | `core/urls.py`, `app_name='core'` | Все URL проекта, кроме `/admin/` |
 | Общий контекст | `core/context_processors.py` | `auth_state`, `nav_state`, `site_links` |
 | Фильтры | `core/templatetags/balaproza.py` | `compact_count`, `spaced`, `page_range`, `belongs_to` |
-| Шаблоны | корневая `templates/` (114 файлов) | 52 компонента · 31 партиал · 27 страниц · спрайт иконок · `base.html` · `404/500` |
+| Шаблоны | корневая `templates/` (116 файлов) | 54 компонента · 31 партиал · 27 страниц · спрайт иконок · `base.html` · `404/500` |
 | Токены | `static_src/input.css`, блок `@theme` | Единственный источник цветов, радиусов, теней ([02](02-design-system.md)) |
-| Тесты | `core/tests/` (16 файлов, 593 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
+| Тесты | `core/tests/` (16 файлов, 616 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
 
 **Шаблоны — не в `core/templates/`, а в корневой `templates/`.** Это задано `TEMPLATES.DIRS` в `config/settings.py`.
 
@@ -177,7 +177,9 @@
 | FR-WRITE-05 | `chapter_editor` | `pages/write/chapter_editor.html` | `test_write.ChapterEditorNew`, `ChapterEditorEdit` |
 | FR-WRITE-05 (вход в текст `single`) | `Story.text_chapter` | `components/my_story_row.html`, `pages/write/manage_story.html` | `test_write.SingleStoryTextButtonOpensExistingText` |
 | FR-WRITE-06 | `components/delete_confirm_modal.html` | — | — |
-| FR-WRITE-07 / BR-10, BR-11 | `Story.status` | `components/status_badge.html` | `test_write.MyStoriesAuthedHasItems` |
+| FR-WRITE-07 / BR-10, BR-11 | `Story.status` | `components/status_badge.html` | `test_write.MyStoriesAuthedHasItems`, `DraftBadgeIsNotAnError` |
+| FR-WRITE-08 (полоса внимания, DEC-40) | `writer_attention` + `_attention_links` | `components/attention_item.html` | `test_write.AttentionStripAnswersWhatToDoNext` |
+| Порядок и меню строки (DEC-40) | `my_stories_of` (сортировка), `Story.updated_label`, `Story.is_public` | `components/my_story_row.html`, `my_story_menu.html` | `test_write.MyStoriesAreOrderedByLastTouch`, `MyStoryMenuOffersTheMissingActions`, `NonPublicRowsReplaceZeroesWithProgress` |
 
 Все страницы раздела требуют авторизации и для гостя отдают gate — закрыто `MyStoriesGuest`, `NewStoryGuestSeesGate`.
 

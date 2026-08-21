@@ -53,7 +53,10 @@ class ReaderStatsHelper(TestCase):
 
     def test_reader_stats_for_aidana(self):
         stats = stub_data.reader_stats('aidana')
-        self.assertEqual(stats['works'], 4)
+        # Свой профиль считает все работы, включая черновик; публичный
+        # счётчик Author.works — только видимые читателю
+        self.assertEqual(stats['works'], len(stub_data.my_stories_of('aidana')))
+        self.assertGreater(stats['works'], stub_data.AUTHORS_BY_USERNAME['aidana'].works)
         self.assertEqual(stats['read'], 1)
         self.assertEqual(stats['followers'], stub_data.AUTHORS_BY_USERNAME['aidana'].followers)
 

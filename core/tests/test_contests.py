@@ -110,8 +110,8 @@ class EligibleForContest(TestCase):
 
     def test_eligible_returns_all_with_eligible_flag(self):
         items = stub_data.eligible_for_contest('aidana', 'altyn-qalam-2024')
-        # 4 произведения Айданы
-        self.assertEqual(len(items), 4)
+        # Все произведения Айданы, каждое с флагом пригодности
+        self.assertEqual(len(items), len(stub_data.my_stories_of('aidana')))
         for it in items:
             self.assertIn('story', it)
             self.assertIn('chars', it)

@@ -545,11 +545,34 @@ def _current_username(request) -> str:
     return request.session.get('user_username', '') if request.session.get('signed_in') else ''
 
 
+def _attention_links(username: str) -> list:
+    """Сигналы кабинета с готовыми ссылками (FR-WRITE-08).
+
+    `writer_attention` отдаёт только данные — kind/count/slug. Ссылку строит
+    view, как и в каталоге (`_catalog_href`): URL-ы не спускаются ни в слой
+    данных, ни в шаблон. Пустой `href` значит «вести некуда» — так помечены
+    сигналы, за которыми стоит больше одной работы.
+    """
+    items = []
+    for item in stub_data.writer_attention(username):
+        if item['kind'] == 'comments':
+            href = reverse('core:notifications')
+        elif item['slug']:
+            href = reverse('core:manage_story', kwargs={'slug': item['slug']})
+        else:
+            href = ''
+        items.append({**item, 'href': href})
+    return items
+
+
 def my_stories(request):
     username = _current_username(request)
     stories = stub_data.my_stories_of(username) if username else []
     stats = stub_data.writer_stats(username) if username else None
     return render(request, 'pages/write/my_stories.html', {
+        # FR-WRITE-08: что требует внимания — модерация, новые пікір, пустой
+        # черновик. Страница перечисляла имущество и молчала о том, что делать.
+        'attention': _attention_links(username) if username else [],
         # Рейл писателя целиком построен на stats: без них
         # partials/right_rail/writer.html не рендерит ничего, и гость получал
         # пустую колонку в 300px, которая просто сдвигала гейт от центра.

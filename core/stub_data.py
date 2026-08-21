@@ -156,22 +156,39 @@ class Author:
     name: str       # реальное имя для кабинета/модерации/конкурсов
     pen_name: str   # публичное авторское имя / псевдоним
     bio: str
-    works: int
     followers: int
 
     @property
     def public_name(self) -> str:
         return self.pen_name or f"@{self.username}"
 
+    @property
+    def works(self) -> int:
+        """Сколько работ автора видит читатель.
+
+        Было хранимым литералом и врало у всех шести авторов сразу: у
+        `rudazov` стояло 12 при трёх произведениях, у `sayyn` — 2 при трёх.
+        Число рендерится в шести местах, включая карточку автора на странице
+        произведения и блок «Жаңа авторлар» на главной, — то есть ошибка была
+        видна читателю везде, кроме того места, где её можно было заметить.
+        Считается, как `Collection.count`: из данных, не рядом с ними.
+
+        Считаются только публичные статусы: черновик публично не виден
+        (BR-10), и попадать в публичный счётчик он не должен — иначе число
+        выдаёт читателю, что у автора есть неопубликованное.
+        """
+        return sum(1 for s in STORIES
+                   if s.author_username == self.username and s.is_public)
+
 
 AUTHORS = [
-    Author("rudazov",   "Алмат Рысқали",     "Rudazov",       "Фэнтези, шытырман",      12, 8420),
-    Author("aygerim_k", "Айгерім Қасенова",  "aiqalam",       "Жас прозаик · Алматы",    3,  184),
-    Author("bekzhan_t", "Бекжан Тұрсынов",   "BekTor",        "Қалалық әңгімелер",       5,  312),
-    Author("dina_books","Дина Айдарбекова",  "dina.books",    "Балалар әдебиеті",        8,  542),
-    Author("sayyn",     "Сайын Нұрбекұлы",   "sayyn",         "Фантастика, шытырман",    2,   96),
+    Author("rudazov",   "Алмат Рысқали",     "Rudazov",       "Фэнтези, шытырман",      8420),
+    Author("aygerim_k", "Айгерім Қасенова",  "aiqalam",       "Жас прозаик · Алматы",    184),
+    Author("bekzhan_t", "Бекжан Тұрсынов",   "BekTor",        "Қалалық әңгімелер",       312),
+    Author("dina_books","Дина Айдарбекова",  "dina.books",    "Балалар әдебиеті",        542),
+    Author("sayyn",     "Сайын Нұрбекұлы",   "sayyn",         "Фантастика, шытырман",     96),
     # Демо-пользователь, под которым логинимся через фейк-сессию (см. core.views.login_view).
-    Author("aidana",    "Айдана Серікқызы",  "aidana",        "Жас прозаик · Тараз",     4,   23),
+    Author("aidana",    "Айдана Серікқызы",  "aidana",        "Жас прозаик · Тараз",      23),
 ]
 
 AUTHORS_BY_USERNAME = {a.username: a for a in AUTHORS}
@@ -216,6 +233,13 @@ class Story:
     audience: str = "10+"
     badges: tuple = ()
     format: str = "serial"  # single | serial
+    # Сколько дней назад автор трогал работу в последний раз. None — не задано:
+    # в кабинете показывается только своё, и заполнены только те произведения,
+    # которые там бывают. В Ф14 это `updated_at` с auto_now, а не число дней —
+    # хранить дельту нельзя, она устаревает каждые сутки. Ось «что я трогал
+    # последним» держится на этом поле: до него порядок списка был порядком
+    # объявления в STORIES.
+    updated_days_ago: int | None = None
 
     @property
     def author(self) -> Author:
@@ -242,6 +266,28 @@ class Story:
     @property
     def is_serial(self) -> bool:
         return self.format != "single"
+
+    @property
+    def is_public(self) -> bool:
+        """Видит ли работу читатель. По PUBLIC_STATUSES, а не по литералу
+        'Published' — иначе из выдачи молча пропадают все сериалы (DEC-37)."""
+        return self.status in PUBLIC_STATUSES
+
+    @property
+    def updated_label(self) -> str:
+        """«кеше», «3 күн бұрын», «2 апта бұрын». Пусто, если дата не задана."""
+        days = self.updated_days_ago
+        if days is None:
+            return ""
+        if days <= 0:
+            return "бүгін"
+        if days == 1:
+            return "кеше"
+        if days < 7:
+            return f"{days} күн бұрын"
+        if days < 30:
+            return f"{days // 7} апта бұрын"
+        return f"{days // 30} ай бұрын"
 
     @property
     def text_chapter(self) -> int | None:
@@ -422,6 +468,7 @@ STORIES = [
         chapters=8, views=1042, likes=87, comments=12,
         status="OnProcess", recent_views=310, annotation="Жас қыздың Алматыдан Таразға қайту туралы әңгімесі. Сегіз бөлімде, әр бөлім — жаңа қала.",
         tags=("sayahat", "jasospirim", "arman", "experimental"),
+        updated_days_ago=2,
     ),
     Story(
         slug="aidana-koshe",  title="Көше әндері",            author_username="aidana",
@@ -431,6 +478,7 @@ STORIES = [
         secondary_genre="komediya",
         tags=("aua-ralighi", "dostyk", "mektep"),
         format="single",
+        updated_days_ago=12,
     ),
     Story(
         slug="aidana-erteg",  title="Ертегі ертеректегі",      author_username="aidana",
@@ -443,6 +491,7 @@ STORIES = [
         # честное здесь — ноль, а не три пустые главы.
         chapters=0, views=0, likes=0, comments=0,
         status="OnModeration", recent_views=0, annotation="Дәстүрлі ертегі формасында жазылған заманауи тарих.",
+        updated_days_ago=4,
     ),
     Story(
         slug="aidana-kysh",   title="Қыстың үнсіздігі",        author_username="aidana",
@@ -450,6 +499,20 @@ STORIES = [
         chapters=1, views=872, likes=64, comments=9,
         status="Published", recent_views=190, annotation="Қыстағы ауылда қалған әжемен өткізген бір ай. Аяқталған кітап.",
         format="single",
+        updated_days_ago=45,
+    ),
+    # Черновик. В демо-наборе его не было вовсе, хотя NotPublished — дефолт
+    # нового произведения (BR-10): нейтральный бейдж «Жоба» (DEC-39) и сигнал
+    # «начата, но ни одного бөлім» негде было увидеть. Сериал, а не single:
+    # у одночастного в стабе обязана быть ровно одна загруженная глава
+    # (test_stub_data.test_single_stories_have_one_loaded_chapter).
+    Story(
+        slug="aidana-kus",    title="Құс жолы",                author_username="aidana",
+        cover="", genres=("fantastika", None),
+        chapters=0, views=0, likes=0, comments=0,
+        status="NotPublished", recent_views=0,
+        annotation="Ауыл баласы мен түнгі аспан туралы. Әзірге бас-аяғы ойда.",
+        updated_days_ago=9,
     ),
 ]
 
@@ -1212,8 +1275,56 @@ def related_stories(slug: str, limit: int = 6) -> list:
 # ───────────────────────── WRITE: «мои произведения» ───────────────────────
 
 def my_stories_of(username: str) -> list:
-    """Все произведения данного автора (любого статуса)."""
-    return [s for s in STORIES if s.author_username == username]
+    """Все произведения данного автора (любого статуса), свежие сверху.
+
+    Порядок был порядком объявления в STORIES, то есть случайным для автора:
+    единственная опора для вопроса «что я трогал последним» отсутствовала,
+    а с ростом числа работ список превращался в стену. Произведения без
+    даты правки уходят в конец, сохраняя между собой исходный порядок.
+    """
+    mine = [s for s in STORIES if s.author_username == username]
+    return sorted(
+        mine,
+        key=lambda s: (s.updated_days_ago is None, s.updated_days_ago or 0),
+    )
+
+
+def writer_attention(username: str) -> list:
+    """Что ждёт автора — короткая строка над списком (FR-WRITE-08).
+
+    Кабинет перечислял имущество, но не отвечал на вопрос, с которым автор
+    в него заходит. Все три сигнала уже лежали в данных и просто нигде не
+    сходились: статус работы, непрочитанные пікір и начатый черновик,
+    у которого нет ни одного бөлім.
+
+    Отдаёт `kind`/`count`/`slug`; тексты и ссылки собирает шаблон — URL-ы
+    в слой данных не спускаем. `slug` заполнен только когда элемент один:
+    вести «3 шығарма модерацияда» в одну из трёх было бы враньём.
+    """
+    mine = my_stories_of(username)
+    items = []
+
+    def _one(kind, stories):
+        if stories:
+            items.append({
+                "kind":  kind,
+                "count": len(stories),
+                "slug":  stories[0].slug if len(stories) == 1 else "",
+            })
+
+    _one("moderation", [s for s in mine if s.status == "OnModeration"])
+
+    unread_comments = sum(
+        1 for n in NOTIFICATIONS_BY_USER.get(username, [])
+        if n.kind == "comment" and not n.read
+    )
+    if unread_comments:
+        items.append({"kind": "comments", "count": unread_comments, "slug": ""})
+
+    _one("draft", [s for s in mine
+                   if s.status == "NotPublished" and not chapters_of(s.slug)])
+
+    return items
 
 
 def writer_stats(username: str) -> dict:

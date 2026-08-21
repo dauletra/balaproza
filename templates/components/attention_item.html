@@ -1,0 +1,23 @@
+{% comment %}
+    Один сигнал в полосе «Назарыңды күтеді» (FR-WRITE-08).
+
+    Параметры:
+      icon — имя иконки
+      text — готовая строка с числом: «1 шығарма модерацияда»
+      href — куда вести; пусто — рендерится как текст, без ссылки
+
+    Ссылки нет, когда элементов несколько: «3 шығарма модерацияда» некуда
+    вести, кроме самого списка, в котором автор уже стоит.
+{% endcomment %}
+{% if href %}
+    <a href="{{ href }}"
+       class="inline-flex items-center gap-1.5 rounded-chip bg-white px-2.5 py-1 font-sans text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:text-brand hover:ring-brand">
+        {% include "components/icon.html" with name=icon size=13 cls="text-slate-400" only %}
+        {{ text }}
+    </a>
+{% else %}
+    <span class="inline-flex items-center gap-1.5 rounded-chip bg-white px-2.5 py-1 font-sans text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+        {% include "components/icon.html" with name=icon size=13 cls="text-slate-400" only %}
+        {{ text }}
+    </span>
+{% endif %}

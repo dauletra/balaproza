@@ -23,7 +23,7 @@ class MyStoriesHelper(TestCase):
 
     def test_my_stories_filters_by_username(self):
         result = stub_data.my_stories_of('aidana')
-        self.assertEqual(len(result), 4)
+        self.assertEqual(len(result), 5)
         for s in result:
             self.assertEqual(s.author_username, 'aidana')
 
@@ -66,7 +66,7 @@ class MyStoriesAuthedHasItems(TestCase):
     def test_200(self):
         self.assertEqual(self.response.status_code, 200)
 
-    def test_lists_all_four_stories(self):
+    def test_lists_every_story(self):
         for s in stub_data.my_stories_of('aidana'):
             with self.subTest(story=s.slug):
                 self.assertContains(self.response, s.title)
@@ -200,14 +200,15 @@ class MyStoryRowMetricsAreAnnounced(TestCase):
         self.response = self.client.get(reverse('core:my_stories'))
 
     def test_metrics_carry_spoken_labels(self):
-        story = stub_data.STORIES_BY_SLUG['aidana-tan']   # 1042 / 87 / 12
-        self.assertContains(self.response, f'{spaced(story.views)} оқылым')
+        # Просмотры — за две недели (DEC-36), а не накопленные
+        story = stub_data.STORIES_BY_SLUG['aidana-tan']   # 310 / 87 / 12
+        self.assertContains(self.response, f'{spaced(story.recent_views)} оқылым')
         self.assertContains(self.response, f'{spaced(story.likes)} ұнату')
         self.assertContains(self.response, f'{spaced(story.comments)} пікір')
 
     def test_labels_are_reachable_by_screen_readers(self):
         # sr-only, а не aria-label: у <span> с role=generic имя не выставляется
-        views = spaced(stub_data.STORIES_BY_SLUG['aidana-tan'].views)
+        views = spaced(stub_data.STORIES_BY_SLUG['aidana-tan'].recent_views)
         self.assertContains(self.response, f'class="sr-only">{views} оқылым')
 
     def test_counts_are_exact_not_compacted(self):
@@ -507,3 +508,124 @@ class TagInputOnStorySettings(TestCase):
         for name in ('саяхат', 'жасөспірім', 'арман', 'эксперимент'):
             with self.subTest(tag=name):
                 self.assertContains(self.response, name)
+
+
+# ───────────────────────── Кабинет отвечает «что дальше» (DEC-40) ─────────
+
+class MyStoriesAreOrderedByLastTouch(TestCase):
+    """Свежее сверху. Порядок был порядком объявления в STORIES."""
+
+    def test_helper_sorts_recent_first(self):
+        mine = stub_data.my_stories_of('aidana')
+        days = [s.updated_days_ago for s in mine if s.updated_days_ago is not None]
+        self.assertEqual(days, sorted(days))
+
+    def test_stories_without_a_date_go_last(self):
+        mine = stub_data.my_stories_of('aidana')
+        known = [i for i, s in enumerate(mine) if s.updated_days_ago is not None]
+        unknown = [i for i, s in enumerate(mine) if s.updated_days_ago is None]
+        if known and unknown:
+            self.assertLess(max(known), min(unknown))
+
+    def test_page_renders_them_in_that_order(self):
+        _login_as_aidana(self.client)
+        body = self.client.get(reverse('core:my_stories')).content.decode()
+        positions = [body.index(s.title) for s in stub_data.my_stories_of('aidana')]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_row_shows_when_it_was_touched(self):
+        _login_as_aidana(self.client)
+        response = self.client.get(reverse('core:my_stories'))
+        self.assertContains(response, stub_data.STORIES_BY_SLUG['aidana-tan'].updated_label)
+
+
+class AttentionStripAnswersWhatToDoNext(TestCase):
+    """FR-WRITE-08: сигналы, которые лежали в данных и нигде не сходились."""
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+        self.response = self.client.get(reverse('core:my_stories'))
+
+    def test_moderation_is_surfaced(self):
+        self.assertContains(self.response, 'модерацияда')
+
+    def test_unread_comments_link_to_notifications(self):
+        unread = sum(1 for n in stub_data.NOTIFICATIONS_BY_USER['aidana']
+                     if n.kind == 'comment' and not n.read)
+        self.assertGreater(unread, 0, 'стаб потерял непрочитанные пікір')
+        self.assertContains(self.response, f'{unread} жаңа пікір')
+        self.assertContains(self.response, reverse('core:notifications'))
+
+    def test_empty_draft_is_surfaced(self):
+        self.assertContains(self.response, 'жоба бастамада тұр')
+
+    def test_single_item_links_to_that_work(self):
+        moderated = [s for s in stub_data.my_stories_of('aidana')
+                     if s.status == 'OnModeration']
+        self.assertEqual(len(moderated), 1)
+        self.assertContains(
+            self.response,
+            reverse('core:manage_story', kwargs={'slug': moderated[0].slug}))
+
+    def test_author_without_signals_gets_no_strip(self):
+        session = self.client.session
+        session['user_username'] = 'no-such-user'
+        session.save()
+        self.assertNotContains(
+            self.client.get(reverse('core:my_stories')), 'Назарыңды күтеді')
+
+    def test_guest_gets_no_strip(self):
+        self.assertNotContains(
+            self.client_class().get(reverse('core:my_stories')), 'Назарыңды күтеді')
+
+
+class NonPublicRowsReplaceZeroesWithProgress(TestCase):
+    """«0 · 0 · 0» — три нуля вместо ответа на единственный вопрос к работе."""
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+        self.response = self.client.get(reverse('core:my_stories'))
+
+    def test_moderation_says_how_long_it_waits(self):
+        story = stub_data.STORIES_BY_SLUG['aidana-erteg']
+        self.assertContains(self.response, f'{story.updated_days_ago} күн тексеруде')
+
+    def test_draft_says_it_has_no_chapters(self):
+        self.assertContains(self.response, 'әлі бір бөлім жоқ')
+
+    def test_no_zero_metric_pills_on_those_rows(self):
+        # Именно начало подписи: «310 оқылым» тоже содержит «0 оқылым»
+        self.assertNotContains(self.response, 'class="sr-only">0 оқылым')
+        self.assertNotContains(self.response, 'class="sr-only">0 ұнату')
+        self.assertNotContains(self.response, 'class="sr-only">0 пікір')
+
+
+class MyStoryMenuOffersTheMissingActions(TestCase):
+    """Из списка нельзя было ни посмотреть работу, ни открыть баптаулар, ни удалить."""
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+        self.response = self.client.get(reverse('core:my_stories'))
+
+    def test_every_row_offers_settings_and_delete(self):
+        for story in stub_data.my_stories_of('aidana'):
+            with self.subTest(story=story.slug):
+                self.assertContains(
+                    self.response,
+                    reverse('core:story_settings', kwargs={'slug': story.slug}))
+        self.assertContains(self.response, 'open-delete-confirm')
+
+    def test_public_works_can_be_viewed_as_a_reader(self):
+        for story in stub_data.my_stories_of('aidana'):
+            url = reverse('core:story_detail', kwargs={'slug': story.slug})
+            with self.subTest(story=story.slug, public=story.is_public):
+                if story.is_public:
+                    self.assertContains(self.response, url)
+                else:
+                    self.assertNotContains(self.response, url)
+
+    def test_public_check_is_not_a_literal(self):
+        # DEC-37: сериал в работе публичен, хотя статус не 'Published'
+        serial = stub_data.STORIES_BY_SLUG['aidana-tan']
+        self.assertEqual(serial.status, 'OnProcess')
+        self.assertTrue(serial.is_public)
