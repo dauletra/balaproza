@@ -1,20 +1,46 @@
 {% comment %}
-    Танымал тегтер в мобильном потоке главной.
+    Теги в мобильном потоке главной — вторая ось навигации (DEC-31).
 
-    Теги — самая «живая» навигация по интересам, но жили только в правом рейле
-    (hidden xl:block), то есть на телефоне были недоступны. Здесь блок обёрнут
-    в xl:hidden на стороне home.html — с xl его показывает рейл.
+    Жинақтар отвечают «зачем читать сейчас», теги — «о чём это и что актуально».
+    Теги единственные обновляются без участия редакции, поэтому сверху идёт
+    срез недели («осы аптада», weekly_count), а под ним — накопленное за всё
+    время («танымал», usage_count). Без верхней полосы блок показывал бы только
+    опоры портала и никогда — всплески.
 
-    Контекст: popular_tags
+    Блок обёрнут в xl:hidden на стороне home.html — с xl его показывает рейл.
+
+    Контекст: trending_tags, popular_tags
 {% endcomment %}
-{% if popular_tags %}
+{% if popular_tags or trending_tags %}
     <section>
         {% url 'core:catalog' as catalog_url %}
-        {% include "components/section_header.html" with title="Танымал тегтер" eyebrow="қызығушылық бойынша" link="каталог →" link_href=catalog_url %}
-        <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
-            {% for t in popular_tags %}
-                {% include "components/tag_chip.html" with tag=t size="md" %}
-            {% endfor %}
-        </div>
+        {% include "components/section_header.html" with title="Тегтер" eyebrow="қызығушылық бойынша" link="каталог →" link_href=catalog_url %}
+
+        {% if trending_tags %}
+            <div class="mb-4">
+                <div class="mb-2 flex items-center gap-2 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-brand-dark">
+                    <span aria-hidden="true" class="h-1.5 w-1.5 rounded-pill bg-brand"></span>
+                    Осы аптада
+                </div>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    {% for t in trending_tags %}
+                        {% include "components/tag_chip.html" with tag=t size="md" %}
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        {% if popular_tags %}
+            <div>
+                <div class="mb-2 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                    Танымал тегтер
+                </div>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    {% for t in popular_tags %}
+                        {% include "components/tag_chip.html" with tag=t size="md" %}
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
     </section>
 {% endif %}

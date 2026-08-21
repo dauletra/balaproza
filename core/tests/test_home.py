@@ -53,16 +53,21 @@ class HomeGuestMode(TestCase):
         self.assertTrue(self.response.context['serial_stories'])
         self.assertTrue(all(s.is_serial for s in self.response.context['serial_stories']))
 
-    def test_collections_render_before_genres(self):
+    def test_collections_open_the_page_above_every_row(self):
+        """DEC-31: главный вход в чтение — вопрос о настроении, а не ряд обложек."""
         html = self.response.content.decode()
-        self.assertLess(html.index('Қазір не оқығың келеді?'), html.index('Жанрлар бойынша'))
+        self.assertLess(html.index('Қазір не оқығың келеді?'),
+                        html.index('Қысқа оқылатын әңгімелер'))
+        self.assertLess(html.index('Қазір не оқығың келеді?'),
+                        html.index('Көп оқылған шығармалар'))
 
-    def test_home_uses_five_main_rows(self):
+    def test_home_uses_four_main_rows(self):
         self.assertContains(self.response, 'Қазір не оқығың келеді?')
-        self.assertContains(self.response, 'Жанрлар бойынша')
         self.assertContains(self.response, 'Көп оқылған шығармалар')
         self.assertContains(self.response, 'Қысқа оқылатын әңгімелер')
         self.assertContains(self.response, 'Жалғасып жатқан шығармалар')
+        # Жанровый скроллер убран (DEC-31) — осталась только полоса-вывеска.
+        self.assertNotContains(self.response, 'Жанрлар бойынша')
         self.assertNotContains(self.response, 'Жаңа шығармалар')
         self.assertNotContains(self.response, '10+ оқырманға')
         self.assertNotContains(self.response, 'Жас авторлар')
@@ -90,11 +95,19 @@ class HomeMobileFirstFold(TestCase):
         """Подзаголовок сообщает ценность (пишут ровесники), а не механику поиска."""
         self.assertContains(self.response, 'Құрдастарың жазған')
 
-    def test_first_row_renders_before_collections(self):
-        """Первый ряд обложек идёт сразу за hero — выше редакционных сборников."""
+    def test_genre_strip_sits_between_hero_and_collections(self):
+        """Жанр — вывеска (DEC-31): виден в первом фолде, но пропускает вперёд
+        вопрос о настроении. Порядок: hero → полоса жанров → жинақтар."""
         self.assertLess(
-            self.html.index('Қысқа оқылатын әңгімелер'),
+            self.html.index('aria-label="Жанрлар"'),
             self.html.index('Қазір не оқығың келеді?'),
+        )
+
+    def test_collections_render_before_first_row(self):
+        """Первым содержательным блоком идут жинақтар, а не ряд обложек."""
+        self.assertLess(
+            self.html.index('Қазір не оқығың келеді?'),
+            self.html.index('Қысқа оқылатын әңгімелер'),
         )
 
     def test_first_row_is_actually_filled(self):
@@ -148,35 +161,26 @@ class HomeMobileSecondFold(TestCase):
         )
         self.assertIsNotNone(wrapper)
 
-    def test_genres_render_only_active_genre(self):
-        """DEC-15 + вес страницы: в разметке один жанр, а не все двенадцать.
+    def test_genre_strip_shows_all_twelve_genres(self):
+        """Вывеска обязана показать весь ассортимент: двенадцать цветных слов
+        за пару секунд объясняют, что это литературный портал (DEC-31)."""
+        from core import stub_data
+        for genre in stub_data.GENRES:
+            with self.subTest(genre=genre.slug):
+                self.assertIn(f'/genres/{genre.slug}/', self.html)
 
-        Раньше view отдавал genre_tabs — по 6 карточек на каждый из 12 жанров,
-        и все они уезжали в DOM ради шести видимых.
-        """
-        self.assertNotIn('genre_tabs', self.response.context)
-        active = self.response.context['active_genre']
-        self.assertEqual(active.slug, 'fantastika')
-        stories = self.response.context['active_genre_stories']
-        self.assertTrue(stories)
-        self.assertLessEqual(len(stories), 6)
-        self.assertTrue(all(active.slug in s.genres for s in stories))
+    def test_genre_strip_leads_straight_to_genre_page(self):
+        """Чип ведёт на /genres/<slug>/, а не переключает состояние внутри
+        главной: скроллер произведений активного жанра удалён вместе с ?genre=."""
+        self.assertNotIn('active_genre', self.response.context)
+        self.assertNotIn('?genre=', self.html)
+        self.assertNotIn('id="zhanrlar"', self.html)
 
-    def test_genre_switch_uses_real_url(self):
+    def test_genre_query_no_longer_changes_the_page(self):
+        """Старые ссылки ?genre= не должны ломать страницу — просто игнорируются."""
         r = self.client.get(reverse('core:home') + '?genre=triller')
-        self.assertEqual(r.context['active_genre'].slug, 'triller')
-        self.assertTrue(all(
-            'triller' in s.genres for s in r.context['active_genre_stories']
-        ))
-
-    def test_unknown_genre_falls_back_to_first(self):
-        r = self.client.get(reverse('core:home') + '?genre=joq-zhanr')
-        self.assertEqual(r.context['active_genre'].slug, 'fantastika')
-
-    def test_genre_links_carry_anchor_for_sticky_header(self):
-        """Без якоря тап по чипу выбрасывал в начало страницы."""
-        self.assertContains(self.response, '?genre=triller#zhanrlar')
-        self.assertContains(self.response, 'id="zhanrlar"')
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn('active_genre', r.context)
 
     def test_every_genre_has_at_least_one_published_story(self):
         """Пустой чип — тупик: подросток тапает жанр и упирается в заглушку."""
@@ -197,14 +201,34 @@ class HomeMobileThirdFold(TestCase):
 
     def test_popular_tags_are_in_flow_not_only_in_rail(self):
         self.assertTrue(self.response.context['popular_tags'])
-        # Поток + рейл: каждый тег встречается ровно дважды.
+        # Поток + рейл. Тег, попавший и в недельный срез, встречается 4 раза.
         first = self.response.context['popular_tags'][0]
-        self.assertEqual(self.html.count(f'#</span>{first.name}'), 2)
+        self.assertGreaterEqual(self.html.count(f'#</span>{first.name}'), 2)
+
+    def test_weekly_tags_are_shown_next_to_all_time_tags(self):
+        """Теги — единственная ось, обновляющаяся без редакции (DEC-31), поэтому
+        накопленной популярности мало: нужен срез недели.
+
+        Списки обязаны различаться, иначе полоса «Осы аптада» вырождается
+        в копию «Танымал тегтер» и занимает место зря.
+        """
+        trending = self.response.context['trending_tags']
+        popular = self.response.context['popular_tags']
+        self.assertTrue(trending)
+        self.assertTrue(all(t.status == 'accepted' for t in trending))
+        self.assertTrue(all(t.weekly_count > 0 for t in trending))
+        self.assertNotEqual([t.slug for t in trending], [t.slug for t in popular[:len(trending)]])
+        self.assertEqual(self.html.count('Осы аптада'), 2)  # поток + рейл
 
     def test_tags_block_hidden_on_desktop_to_avoid_duplicate(self):
         """Первое вхождение — блок в потоке (main идёт раньше aside).
-        Он обязан лежать внутри ближайшей обёртки xl:hidden."""
-        idx = self.html.index('Танымал тегтер')
+        Он обязан лежать внутри ближайшей обёртки xl:hidden.
+
+        Якорь — eyebrow секции, а не «Танымал тегтер»: между началом блока и
+        накопленными тегами теперь стоит недельный срез, и расстояние до
+        заголовка перестало быть мерой вложенности.
+        """
+        idx = self.html.index('қызығушылық бойынша')
         wrapper = self.html.rindex('<div class="xl:hidden">', 0, idx)
         self.assertLess(idx - wrapper, 800)
 

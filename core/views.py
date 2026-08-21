@@ -51,15 +51,10 @@ def home(request):
 
     published = [s for s in stub_data.STORIES if s.status == 'Published']
 
-    # Секция жанров: активный жанр берём из ?genre= (DEC-15 — переключение через
-    # реальный URL, а не x-show). Рендерим только его — раньше в разметку уходило
-    # 12 панелей × 6 карточек ради шести видимых.
-    active_genre = stub_data.GENRES_BY_SLUG.get(
-        request.GET.get('genre', ''), stub_data.GENRES[0],
-    )
-    active_genre_stories = [
-        s for s in stub_data.stories_by_genre(active_genre.slug) if s.status == 'Published'
-    ][:5]
+    # Жанры на главной — полоса-вывеска, а не навигация (DEC-31): 12 цветных слов
+    # объясняют, что это литературный портал, и ведут на /genres/<slug>/.
+    # Скроллер произведений активного жанра убран вместе с ?genre= — его работу
+    # делают жинақтар и тематические ряды.
 
     return render(request, 'pages/home.html', {
         'has_right_rail':  True,
@@ -70,8 +65,6 @@ def home(request):
         'hero_contest':    stub_data.HERO_CONTEST,
         'collections':     stub_data.COLLECTIONS,
         'genres':          stub_data.GENRES,
-        'active_genre':         active_genre,
-        'active_genre_stories': active_genre_stories,
         'book_of_week':    stub_data.BOOK_OF_WEEK,
         'new_authors':     stub_data.new_authors(4),
         'top_stories':     sorted(published, key=lambda s: s.views, reverse=True)[:5],
@@ -79,6 +72,7 @@ def home(request):
         'serial_stories':  [s for s in published if s.is_serial][:5],
         'portal_stats':    stub_data.portal_stats(),
         'popular_tags':    stub_data.popular_tags(8),
+        'trending_tags':   stub_data.trending_tags(6),
         'school_links':    stub_data.SCHOOL_LINKS,
     })
 
@@ -129,20 +123,26 @@ def signup_success(request):
 
 
 # ───────────────────────── CAT — каталог и поиск ─────────────────────────
-def _catalog_controls(request):
-    """Достаёт sort/status из GET с валидацией по белым спискам."""
+def _catalog_controls(request, default_sort='popularity'):
+    """Достаёт sort/status из GET с валидацией по белым спискам.
+
+    `default_sort` задаётся режимом: страница тега открывается «жаңа» вперёд
+    (DEC-31). Тег — единственная ось, которая обновляется без участия редакции,
+    и её ценность в том, что там видно движение; сортировка по популярности
+    превращала бы её в архив.
+    """
     valid_sorts = {k for k, _ in stub_data.CATALOG_SORTS}
     valid_status = {k for k, _ in stub_data.CATALOG_STATUS_FILTERS}
     valid_audience = {k for k, _ in stub_data.CATALOG_AUDIENCE_FILTERS}
     valid_length = {k for k, _ in stub_data.CATALOG_LENGTH_FILTERS}
     valid_format = {k for k, _ in stub_data.CATALOG_FORMAT_FILTERS}
-    sort = request.GET.get('sort', 'popularity')
+    sort = request.GET.get('sort', default_sort)
     status = request.GET.get('status', '')
     audience = request.GET.get('audience', '')
     length = request.GET.get('length', '')
     format = request.GET.get('format', '')
     return (
-        sort if sort in valid_sorts else 'popularity',
+        sort if sort in valid_sorts else default_sort,
         status if status in valid_status else '',
         audience if audience in valid_audience else '',
         length if length in valid_length else '',
@@ -156,7 +156,9 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
     Используется search_results / catalog / genre_detail / (в Phase 3) tag_detail.
     """
     query = request.GET.get('q', '').strip()
-    sort, status, audience, length, format = _catalog_controls(request)
+    sort, status, audience, length, format = _catalog_controls(
+        request, default_sort='recent' if mode == 'tag' else 'popularity',
+    )
 
     empty_title, empty_text = "Шығарма табылмады", "Сүзгілерді өзгертіп көріңіз."
 
@@ -351,6 +353,8 @@ def story_detail(request, slug):
         'related':  stub_data.related_stories(slug, limit=6) if story else [],
         # docs/11: UGC-теги произведения (resolved Tag-объекты)
         'tags':      stub_data.tags_of(story) if story else [],
+        # DEC-31: обратный вход в настроение — подборки, где лежит произведение
+        'in_collections': stub_data.collections_of(story) if story else [],
         'is_author': is_author,
     })
 

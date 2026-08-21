@@ -7,14 +7,16 @@
     <div class="flex flex-col gap-10 sm:gap-14">
 
         {% comment %}
-            ФОЛД 1 (mobile ~480px): hero + первый ряд обложек.
-            Связка идёт с уменьшенным gap-6, чтобы обложки первого ряда
-            целиком попадали выше сгиба на 360×640.
+            ФОЛД 1 (mobile ~480px): hero + жанровая полоса + вопрос о настроении.
 
-            Первым рядом идут короткие тексты: «прочитаю за 4 минуты» —
-            единственное обещание, которое подросток может проверить прямо
-            сейчас, не регистрируясь. Чип длительности на обложке делает его
-            видимым до открытия карточки.
+            Порядок задан DEC-31. Первый экран должен задать вопрос «қазір не
+            оқығың келеді?», а не показать сетку обложек: подросток приходит с
+            состоянием, а не с жанровым запросом.
+
+            Жанровая полоса идёт сразу под hero и стоит ~44px: она работает как
+            вывеска — двенадцать цветных слов объясняют, что это литературный
+            портал. Раньше жанры занимали ~330px в середине страницы, то есть
+            там, где первого впечатления уже не бывает.
         {% endcomment %}
         <div class="flex flex-col gap-6">
             {% if signed_in %}
@@ -23,29 +25,38 @@
                 {% include "partials/home/hero_guest.html" %}
             {% endif %}
 
+            {% include "partials/home/genre_strip.html" %}
+
             {% if page_state == 'loading' %}
                 <div>
-                    {% include "components/skeleton_box.html" with w="w-[180px]" h="h-[22px]" radius="sm" %}
-                    <div class="mt-3 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
-                        {% for _ in '123456'|make_list %}
-                            {% include "components/skeleton_book_card_small.html" %}
+                    {% include "components/skeleton_box.html" with w="w-[220px]" h="h-[22px]" radius="sm" %}
+                    <div class="mt-3 flex gap-3.5 overflow-hidden">
+                        {% for _ in '123'|make_list %}
+                            {% include "components/skeleton_box.html" with h="h-[212px]" radius="lg" cls="w-[248px] shrink-0 sm:w-[284px]" %}
                         {% endfor %}
                     </div>
                 </div>
             {% elif page_state != 'error' %}
-                {% include "partials/home/book_row.html" with title="Қысқа оқылатын әңгімелер" eyebrow="бір оқылым" books=short_stories link_href="/catalog/?format=single&length=short" %}
+                {% include "partials/home/collections.html" %}
             {% endif %}
         </div>
 
         {% if page_state == 'loading' %}
             {% comment %}
-                Порядок скелетонов повторяет реальную раскладку: книга недели,
-                баннер конкурса, коллекции, полоса жанров с рядом. Иначе при
-                подстановке контента страница ощутимо дёргается.
+                Порядок скелетонов повторяет реальную раскладку: ряд коротких,
+                книга недели, баннер конкурса, два ряда. Иначе при подстановке
+                контента страница ощутимо дёргается.
             {% endcomment %}
+            <div>
+                {% include "components/skeleton_box.html" with w="w-[180px]" h="h-[22px]" radius="sm" %}
+                <div class="mt-3 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
+                    {% for _ in '123456'|make_list %}
+                        {% include "components/skeleton_book_card_small.html" %}
+                    {% endfor %}
+                </div>
+            </div>
             {% include "components/skeleton_box.html" with h="h-[340px]" radius="hero" %}
             {% include "components/skeleton_box.html" with h="h-[185px]" radius="lg" cls="xl:hidden" %}
-            {% include "components/skeleton_box.html" with h="h-[212px]" radius="lg" %}
             <div>
                 {% include "components/skeleton_box.html" with w="w-[140px]" h="h-[22px]" radius="sm" %}
                 <div class="mt-3 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
@@ -58,9 +69,16 @@
             {% include "components/error_state.html" with message="Басты бет контентін жүктеу мүмкін болмады." %}
         {% else %}
             {% comment %}
-                ФОЛД 2. Один сильный редакционный выбор сразу после ряда: для
-                подростка одна убедительная рекомендация работает лучше, чем
-                ещё шесть обложек.
+                ФОЛД 2. «Прочитаю за 4 минуты» — единственное обещание, которое
+                подросток может проверить сразу, не регистрируясь. Ряд опустился
+                на одну позицию: обложки уже есть в первом фолде — в стопках на
+                карточках жинақтар.
+            {% endcomment %}
+            {% include "partials/home/book_row.html" with title="Қысқа оқылатын әңгімелер" eyebrow="бір оқылым" books=short_stories link_href="/catalog/?format=single&length=short" %}
+
+            {% comment %}
+                Одна сильная редакционная рекомендация работает лучше, чем ещё
+                шесть обложек.
             {% endcomment %}
             {% include "partials/home/book_of_week.html" %}
 
@@ -73,27 +91,18 @@
                 {% include "partials/home/contest_banner.html" %}
             </div>
 
-            {% include "partials/home/collections.html" %}
-
-            {% comment %}
-                Граница зон. Выше — редакционная витрина (что читать сегодня),
-                ниже — навигация по таксономии (жанры, форматы, теги).
-                Раньше между всеми секциями стоял один и тот же gap, и две
-                разные по смыслу половины страницы читались как один поток.
-            {% endcomment %}
-            <div class="mt-4 sm:mt-6">
-                {% include "partials/home/genres_section.html" %}
-            </div>
-
             {% include "partials/home/book_row.html" with title="Көп оқылған шығармалар" books=top_stories link_href="/catalog/?sort=popular" %}
 
             {% include "partials/home/book_row.html" with title="Жалғасып жатқан шығармалар" eyebrow="көп бөлімді" books=serial_stories link="сериялар →" link_href="/catalog/?format=serial" %}
 
             {% comment %}
-                ФОЛД 3. Теги — навигация по интересам, а не по жанрам. В рейле
-                они видны только с xl, поэтому в потоке держим мобильную копию.
-                Ссылки «Авторлар мектебі» сюда не дублируем: footer отдаёт их
-                inline на всех ширинах.
+                ФОЛД 3. Теги — вторая ось навигации: жинақтар отвечают «зачем
+                читать сейчас», теги — «о чём это и что актуально». Единственная
+                ось, которая обновляется без участия редакции, поэтому здесь же
+                живёт полоса «осы аптада».
+
+                В рейле теги видны только с xl, поэтому в потоке держим
+                мобильную копию.
             {% endcomment %}
             <div class="xl:hidden">
                 {% include "partials/home/popular_tags.html" %}

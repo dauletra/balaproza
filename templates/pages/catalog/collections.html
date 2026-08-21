@@ -3,16 +3,19 @@
 {% block title %}Жинақтар — Balaproza{% endblock %}
 
 {% block content %}
-<header class="mb-8 flex flex-wrap items-end justify-between gap-4">
-    <div>
-        <h1 class="font-display text-4xl font-medium text-slate-900">Жинақтар</h1>
-        <p class="mt-2 max-w-xl font-sans text-sm text-slate-600">
-            Көңіл-күй мен тақырып бойынша жинақталған шығармалар. Әр жинақ — бір сезім немесе бір әлем.
-        </p>
-    </div>
-    {% if signed_in %}
-        {% include "components/button.html" with kind="secondary" label="Өз жинағыңды құру" icon="plus" %}
-    {% endif %}
+{% comment %}
+    Жинақтар создаёт только редакция (DEC-31). Кнопка «Өз жинағыңды құру»
+    убрана: пользовательских подборок на портале нет, личное хранение — это
+    «Кітапхана». Обещать сборку и не давать её — хуже, чем не обещать.
+{% endcomment %}
+<header class="mb-8">
+    <h1 class="font-display text-4xl font-medium text-slate-900">Жинақтар</h1>
+    <p class="mt-2 max-w-xl font-sans text-sm text-slate-600">
+        Көңіл-күй мен тақырып бойынша жинақталған шығармалар. Әр жинақ — бір сезім немесе бір әлем.
+    </p>
+    <p class="mt-3 font-sans text-xs text-slate-500">
+        Жинақтарды <strong class="font-semibold text-slate-700">редакция</strong> құрастырады.
+    </p>
 </header>
 
 <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">

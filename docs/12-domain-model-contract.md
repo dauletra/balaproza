@@ -1,6 +1,6 @@
 # 12. Domain model contract for F14
 
-> `Обновлён: 2026-08-20` · `Сверен с кодом: 5d39adb`
+> `Обновлён: 2026-08-21` · `Сверен с кодом: f1f896b`
 
 This document is the implementation contract for replacing `core/stub_data.py` with real Django models. It does not introduce models yet; it fixes the fields, relationships, computed values, and query helpers that the current templates already depend on.
 
@@ -33,7 +33,7 @@ What the table carries instead is the part `stub_data.py` cannot state: what mus
 | **Tag** | `Tag`, `TAGS`, `BLOCKED_TAG_PATTERNS` | Up to 10 per story (BR-TAG-01). `status`: `pending` / `accepted` / `rejected`. Pending visible to the author, hidden from public catalog and story views (BR-TAG-07). Blocked patterns stay admin-managed |
 | **Story** | `Story` | `OnProcess` is a continuation state, **not** a moderation state. Public catalog carries only `Published` and explicitly allowed public states. `format` is chosen by the author, never inferred from chapter count (DEC-28). Status labels — `components/status_badge.html`, see [16 §16.3](16-content-voice.md) |
 | **Chapter** | `Chapter`, `CHAPTERS_BY_STORY` | One-based numbers. Bodies live **outside** `stub_data.py` in `core/story_texts/<slug>/<n>.txt`; `_chapter()` loads them and derives `char_count`. Keep long prose out of the data module. Read via `?chapter=N` — no separate route (DEC-30) |
-| **Collection** | `Collection` | Ordered many-to-many with `Story`. Editorial curation by a moderator, not a smart auto-filter, and separate from contests (DEC-27) |
+| **Collection** | `Collection` | Ordered many-to-many with `Story`. Editorial curation by a moderator, not a smart auto-filter, and separate from contests (DEC-27). **Admin-authored only** — there is no user-created collection (DEC-31); `count` and `covers` are derived from `story_slugs`, never stored alongside it |
 | **Contest** | `Contest` | `status`: `active` / `finished`. Separate from collections. Admin UI is Django admin for MVP (DEC-23) |
 | **Submission** | `Submission` | One story per author per contest (BR-23). Eligibility is a query/service concern, never template logic (BR-22, BR-24) |
 | **LibraryEntry** | `LibraryEntry` | `kind`: `saved` / `reading` / `done`, non-overlapping (BR-60/61). Continue-reading is a first-class reader workflow — it drives both the hero and the mobile nav |
@@ -80,10 +80,14 @@ Contests:
 Tags (module 11):
 - `tag_by_slug(slug: str) -> Tag | None`
 - `tags_of(story: Story) -> list[Tag]`
-- `popular_tags(limit=10) -> list[Tag]`
+- `popular_tags(limit=10) -> list[Tag]` — all-time, by `usage_count`
+- `trending_tags(limit=6) -> list[Tag]` — last 7 days, by `weekly_count`; skips tags with no weekly activity (DEC-31)
 - `is_blocked(name: str) -> bool`
 - `accepted_tags_json() -> list`
 - `blocked_tag_patterns_list() -> list`
+
+Collections (DEC-31):
+- `collections_of(story: Story) -> list[Collection]` — reverse entry from the story page, in editorial order
 
 Home page:
 - `portal_stats() -> dict` — counters in the guest hero (FR-HOME-01)

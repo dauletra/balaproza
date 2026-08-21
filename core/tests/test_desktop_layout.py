@@ -20,13 +20,14 @@ CONTAINER_MAX = 1280
 PADDING_LG = 48 * 2
 RAIL = 300
 GAP = 24
+CONTENT_MAX = 860  # ширина колонки рядом с рейлом; она же max-w у <main>
 CARD_GAP = 14
 MOBILE_CARD = 138
 
 
 def _main_column(viewport: int, *, rail: bool) -> int:
     inner = min(viewport, CONTAINER_MAX) - PADDING_LG
-    return inner - (RAIL + GAP) if rail else inner
+    return min(inner - (RAIL + GAP) if rail else inner, CONTENT_MAX)
 
 
 def _card_width(column: int, columns: int) -> float:
@@ -57,6 +58,38 @@ class BookGridSizing(unittest.TestCase):
     def test_rail_at_lg_would_regress(self):
         """И причину, по которой рейл переехал с lg на xl: 1024px с рейлом."""
         self.assertLess(round(_card_width(_main_column(1024, rail=True), 6)), 100)
+
+
+class ContentColumnWidth(unittest.TestCase):
+    """Колонка контента одинакова с рейлом и без него.
+
+    Раньше `<main>` был просто `flex-1`: как только рейл прятался (ниже xl или
+    на странице без `has_right_rail`), контент забирал его 324px и становился
+    ШИРЕ, чем на большом экране. Тот же ряд из пяти карточек выглядел крупнее
+    на меньшем мониторе — ритм сетки ломался на ровном месте.
+    """
+
+    def test_cap_equals_column_next_to_rail(self):
+        inner = CONTAINER_MAX - PADDING_LG
+        self.assertEqual(inner - (RAIL + GAP), CONTENT_MAX)
+
+    def test_main_carries_the_cap(self):
+        base = (TEMPLATES_DIR / "base.html").read_text(encoding="utf-8")
+        self.assertIn(f'max-w-[{CONTENT_MAX}px]', base)
+        self.assertIn('<main class="mx-auto w-full min-w-0', base)
+
+    def test_column_never_widens_when_the_rail_disappears(self):
+        with_rail = _main_column(CONTAINER_MAX, rail=True)
+        for viewport in (1024, 1279, 1280, 1440, 1920):
+            with self.subTest(viewport=viewport):
+                self.assertLessEqual(_main_column(viewport, rail=False), with_rail)
+
+    def test_no_page_overrides_the_cap(self):
+        """Свой max-w шире 860 в шаблоне страницы вернёт тот же разнобой."""
+        for path in (TEMPLATES_DIR / "pages").rglob("*.html"):
+            for value in re.findall(r'max-w-\[(\d+)px\]', path.read_text(encoding="utf-8")):
+                with self.subTest(template=path.name, value=value):
+                    self.assertLessEqual(int(value), CONTENT_MAX)
 
 
 class RailBreakpointConsistency(unittest.TestCase):
@@ -178,7 +211,7 @@ class HomeRowSize(TestCase):
 
     def test_rows_carry_five_stories(self):
         r = self.client.get(reverse('core:home'))
-        for key in ('top_stories', 'serial_stories', 'active_genre_stories'):
+        for key in ('top_stories', 'serial_stories', 'short_stories'):
             with self.subTest(row=key):
                 self.assertLessEqual(len(r.context[key]), 5)
 

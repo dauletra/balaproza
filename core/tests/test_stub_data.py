@@ -142,3 +142,73 @@ class SchoolLinksHaveAllRequiredFields(unittest.TestCase):
                 self.assertTrue(l.url)
                 self.assertTrue(l.title)
                 self.assertTrue(l.subtitle)
+
+
+class CollectionsAreEditorialAndSelfConsistent(unittest.TestCase):
+    """Жинақ — первичный вход в чтение (DEC-31), поэтому цена ошибки в данных
+    выше, чем у витринного блока: подборка ведёт в тупик молча."""
+
+    def test_count_is_derived_not_stored(self):
+        """Число в UI не может соврать: `count` считается по резолвленным стори."""
+        for c in stub_data.COLLECTIONS:
+            with self.subTest(collection=c.slug):
+                self.assertEqual(c.count, len(c.stories))
+
+    def test_every_slug_resolves(self):
+        """Битый slug раньше молча уменьшал подборку — теперь ловим здесь."""
+        for c in stub_data.COLLECTIONS:
+            for slug in c.story_slugs:
+                with self.subTest(collection=c.slug, story=slug):
+                    self.assertIn(slug, stub_data.STORIES_BY_SLUG)
+
+    def test_collections_are_deep_enough_to_browse(self):
+        """Подборка из двух произведений — не навигация, а тупик."""
+        for c in stub_data.COLLECTIONS:
+            with self.subTest(collection=c.slug):
+                self.assertGreaterEqual(c.count, 5)
+
+    def test_covers_come_from_the_collection_itself(self):
+        """Отдельного cover_slugs нет намеренно: два списка одних и тех же
+        слагов рано или поздно разъезжаются."""
+        for c in stub_data.COLLECTIONS:
+            with self.subTest(collection=c.slug):
+                self.assertEqual(c.covers, c.stories[:3])
+
+    def test_all_collections_are_editorial(self):
+        """Пользовательских подборок на портале нет (DEC-31)."""
+        for c in stub_data.COLLECTIONS:
+            with self.subTest(collection=c.slug):
+                self.assertEqual(c.curator, 'редакция')
+
+    def test_collections_of_is_reverse_of_story_slugs(self):
+        for c in stub_data.COLLECTIONS:
+            for story in c.stories:
+                with self.subTest(collection=c.slug, story=story.slug):
+                    self.assertIn(c, stub_data.collections_of(story))
+
+    def test_every_story_in_a_collection_is_public(self):
+        """Черновик в редакционной подборке — утечка ненапечатанного (BR-10)."""
+        for c in stub_data.COLLECTIONS:
+            for story in c.stories:
+                with self.subTest(collection=c.slug, story=story.slug):
+                    self.assertIn(story.status, ('Published', 'Completed'))
+
+
+class TrendingTagsShowMovementNotArchive(unittest.TestCase):
+
+    def test_only_accepted_tags_with_weekly_activity(self):
+        for t in stub_data.trending_tags(10):
+            with self.subTest(tag=t.slug):
+                self.assertEqual(t.status, 'accepted')
+                self.assertGreater(t.weekly_count, 0)
+
+    def test_sorted_by_week_not_by_all_time(self):
+        weekly = [t.weekly_count for t in stub_data.trending_tags(10)]
+        self.assertEqual(weekly, sorted(weekly, reverse=True))
+
+    def test_week_and_all_time_lists_differ(self):
+        """Иначе блок «Осы аптада» — копия «Танымал тегтер» и занимает место зря."""
+        self.assertNotEqual(
+            [t.slug for t in stub_data.trending_tags(6)],
+            [t.slug for t in stub_data.popular_tags(6)],
+        )

@@ -63,22 +63,27 @@ class Tag:
     name: str           # оригинал, отображается; в Ф14 — original input автора
     status: str         # 'pending' | 'accepted' | 'rejected'
     usage_count: int    # денормализовано, для сортировки автокомплита/виджета
+    weekly_count: int = 0   # использований за последние 7 дней — «осы аптада»
 
 
+# usage_count — накопленное за всё время, weekly_count — срез недели. Две разные
+# витрины: первая показывает опоры портала, вторая — о чём пишут прямо сейчас
+# (DEC-31). У «сиқыр-академиясы» накоплено мало, а на неделе много — именно
+# такие всплески теги и должны ловить.
 TAGS = [
-    Tag('mektep',           'мектеп',           'accepted', 42),
-    Tag('dostyk',           'достық',           'accepted', 38),
-    Tag('sayahat',          'саяхат',           'accepted', 24),
-    Tag('jasospirim',       'жасөспірім',       'accepted', 56),
-    Tag('gashyqtyq',        'ғашықтық',         'accepted', 31),
-    Tag('mistika',          'мистика',          'accepted', 18),
-    Tag('syikyr-akademiya', 'сиқыр-академиясы', 'accepted', 12),
-    Tag('arman',            'арман',            'accepted', 27),
-    Tag('detektiv-jas',     'жас детектив',     'accepted',  9),
-    Tag('aua-ralighi',      'ауыл-қала',        'accepted', 14),
+    Tag('mektep',           'мектеп',           'accepted', 42, weekly_count=6),
+    Tag('dostyk',           'достық',           'accepted', 38, weekly_count=4),
+    Tag('sayahat',          'саяхат',           'accepted', 24, weekly_count=2),
+    Tag('jasospirim',       'жасөспірім',       'accepted', 56, weekly_count=9),
+    Tag('gashyqtyq',        'ғашықтық',         'accepted', 31, weekly_count=11),
+    Tag('mistika',          'мистика',          'accepted', 18, weekly_count=7),
+    Tag('syikyr-akademiya', 'сиқыр-академиясы', 'accepted', 12, weekly_count=13),
+    Tag('arman',            'арман',            'accepted', 27, weekly_count=3),
+    Tag('detektiv-jas',     'жас детектив',     'accepted',  9, weekly_count=5),
+    Tag('aua-ralighi',      'ауыл-қала',        'accepted', 14, weekly_count=1),
     # pending — для иллюстрации работы модерации (BR-TAG-03/07)
-    Tag('basqa-alem',       'басқа әлем',       'pending',   3),
-    Tag('experimental',     'эксперимент',      'pending',   1),
+    Tag('basqa-alem',       'басқа әлем',       'pending',   3, weekly_count=3),
+    Tag('experimental',     'эксперимент',      'pending',   1, weekly_count=1),
 ]
 
 TAGS_BY_SLUG = {t.slug: t for t in TAGS}
@@ -110,6 +115,20 @@ def popular_tags(limit: int = 10) -> list:
     return sorted(
         (t for t in TAGS if t.status == 'accepted'),
         key=lambda t: t.usage_count,
+        reverse=True,
+    )[:limit]
+
+
+def trending_tags(limit: int = 6) -> list:
+    """Топ-N accepted-тегов по weekly_count — виджет «Осы аптада».
+
+    Теги — единственная ось, которая обновляется без участия редакции, поэтому
+    именно они показывают актуальное. Теги без активности за неделю не
+    показываем: иначе полоса вырождается в копию «Танымал тегтер».
+    """
+    return sorted(
+        (t for t in TAGS if t.status == 'accepted' and t.weekly_count > 0),
+        key=lambda t: t.weekly_count,
         reverse=True,
     )[:limit]
 
@@ -895,110 +914,144 @@ BOOK_OF_WEEK = BookOfWeek(
 
 @dataclass(frozen=True)
 class Collection:
+    """Редакционная подборка — первичный вход в чтение (DEC-31).
+
+    Создаётся только редакцией/админом: пользовательских подборок на портале
+    нет (личное хранение — это «Кітапхана»). Подборка отвечает на вопрос
+    «зачем читать сейчас», поэтому имя — фраза-состояние, а не жанр.
+    """
     slug: str
     name: str
-    count: int
     tint_hue: int                # OKLCH hue для тонировки карточки и иконки
     icon: str                    # slug SVG-иконки из спрайта (без префикса icon-)
-    cover_slugs: tuple           # 3 story slug — для fallback и детальной (стопка обложек)
+    story_slugs: tuple           # все произведения внутри, в порядке подачи
     curator: str = "редакция"    # «Құрастырған: …»
     description: str = ""        # описание подборки на детальной
-    story_slugs: tuple = ()      # все произведения внутри; пусто → fallback на cover_slugs
-
-    @property
-    def covers(self) -> list:
-        """Story-объекты для стопки обложек на карточке коллекции."""
-        return [STORIES_BY_SLUG[s] for s in self.cover_slugs if s in STORIES_BY_SLUG]
 
     @property
     def stories(self) -> list:
         """Все произведения подборки (для детальной)."""
-        slugs = self.story_slugs or self.cover_slugs
-        return [STORIES_BY_SLUG[s] for s in slugs if s in STORIES_BY_SLUG]
+        return [STORIES_BY_SLUG[s] for s in self.story_slugs if s in STORIES_BY_SLUG]
+
+    @property
+    def covers(self) -> list:
+        """Стопка обложек на карточке — первые три из подборки.
+
+        Отдельного `cover_slugs` нет намеренно: два списка одних и тех же
+        слагов рано или поздно разъезжаются. Порядок в `story_slugs` и есть
+        редакционный порядок, первые три — витрина.
+        """
+        return self.stories[:3]
+
+    @property
+    def count(self) -> int:
+        """Считается по факту, а не хранится: число в UI не может соврать."""
+        return len(self.stories)
 
 
 COLLECTIONS = [
     Collection(
         slug="kulki-kerek", name="Күлкі керек болғанда",
-        count=5, tint_hue=60, icon="smile",
-        cover_slugs=("temniy-lord", "arhimag", "dalney-berega"),
-        curator="редакция",
+        tint_hue=60, icon="smile", curator="редакция",
         description="Күнің ауыр болса да, бір-екі беттен кейін тынысың ашылатын жеңіл, жылы, тапқыр оқиғалар.",
-        story_slugs=("temniy-lord", "arhimag", "dalney-berega", "sila-imperii", "kronchessii"),
+        story_slugs=(
+            "konshi-bala", "balkonnan-korinetin", "atam-aityp-berdi",
+            "arqadagy-jaz", "mektep-koridory", "kunnin-songy-sagaty",
+        ),
     ),
     Collection(
         slug="auyr-kun", name="Бәрі ауыр болып тұрғанда",
-        count=6, tint_hue=250, icon="drop",
-        cover_slugs=("dalney-berega", "temniy-lord", "igra-kuklovoda"),
-        curator="редакция",
+        tint_hue=250, icon="drop", curator="редакция",
         description="Ішіңде көп сөз қалып, бірақ ешкімге айтқың келмейтін күндерге арналған тыныш әрі терең мәтіндер.",
-        story_slugs=("dalney-berega", "temniy-lord", "igra-kuklovoda", "sila-imperii", "arhimag", "kronchessii"),
+        story_slugs=(
+            "almaty-ayazy", "aidana-tan", "sila-imperii",
+            "kunnin-songy-sagaty", "balkonnan-korinetin", "arqadagy-jaz",
+            "atam-aityp-berdi",
+        ),
     ),
     Collection(
         slug="algashky-mahabbat", name="Алғашқы махаббат",
-        count=5, tint_hue=8, icon="heart",
-        cover_slugs=("dalney-berega", "arhimag", "sila-imperii"),
-        curator="редакция",
+        tint_hue=8, icon="heart", curator="редакция",
         description="Айтылмай қалған сөздер, ыңғайсыз үнсіздік, қызғаныш және бірінші рет біреуді қатты ойлау туралы.",
-        story_slugs=("dalney-berega", "arhimag", "sila-imperii", "kronchessii", "temniy-lord"),
+        story_slugs=(
+            "mektep-koridory", "keiipkerge-hat", "aidana-tan",
+            "almaty-ayazy", "kunnin-songy-sagaty", "dalney-berega",
+        ),
     ),
     Collection(
         slug="kazak-avt", name="Өзіңді бөтен сезінгенде",
-        count=5, tint_hue=195, icon="feather",
-        cover_slugs=("temniy-lord", "igra-kuklovoda", "kronchessii"),
-        curator="редакция",
+        tint_hue=195, icon="feather", curator="редакция",
         description="Сыныпта, үйде немесе өз ойыңның ішінде жалғыз қалғандай сезілген сәттерге арналған оқиғалар.",
-        story_slugs=("kronchessii", "arhimag", "sila-imperii", "dalney-berega", "igra-kuklovoda"),
+        story_slugs=(
+            "almaty-ayazy", "temniy-lord", "balkonnan-korinetin",
+            "aidana-tan", "kunnin-songy-sagaty", "mektep-koridory", "arhimag",
+        ),
     ),
     Collection(
         slug="aramyzda-qubyzhyq", name="Арамыздағы құбыжықтар",
-        count=5, tint_hue=25, icon="skull",
-        cover_slugs=("igra-kuklovoda", "kronchessii", "dalney-berega"),
-        curator="редакция",
+        tint_hue=25, icon="skull", curator="редакция",
         description="Қорқыныш сыртта емес, кейде адамдардың ішінде жүргенін сездіретін триллер мен қараңғы фэнтези.",
-        story_slugs=("igra-kuklovoda", "temniy-lord", "kronchessii", "dalney-berega", "arhimag"),
+        story_slugs=(
+            "korkynyshty-koilek", "igra-kuklovoda", "tunge-deiin",
+            "temniy-lord", "kronchessii",
+        ),
     ),
     Collection(
         slug="kala-anyzdary", name="Қала аңыздары",
-        count=5, tint_hue=15, icon="cityscape",
-        cover_slugs=("igra-kuklovoda", "temniy-lord", "kronchessii"),
-        curator="редакция",
+        tint_hue=15, icon="cityscape", curator="редакция",
         description="Түнгі көше, жабық подъезд, ескі мектеп, біреу айтып берген сияқты көрінетін қауіпті әңгімелер.",
-        story_slugs=("igra-kuklovoda", "temniy-lord", "kronchessii", "dalney-berega", "arhimag"),
+        story_slugs=(
+            "tunge-deiin", "almaty-ayazy", "igra-kuklovoda",
+            "korkynyshty-koilek", "aidana-tan", "kronchessii",
+        ),
     ),
     Collection(
         slug="geimerler-turaly", name="Ойыннан кейін де ойда қалатын",
-        count=5, tint_hue=280, icon="planet",
-        cover_slugs=("sila-imperii", "arhimag", "kronchessii"),
-        curator="редакция",
+        tint_hue=280, icon="planet", curator="редакция",
         description="Виртуал әлем, команда, жеңіс құмарлығы және экран сөнгеннен кейін басталатын шынайы таңдау.",
-        story_slugs=("sila-imperii", "arhimag", "kronchessii", "igra-kuklovoda", "dalney-berega"),
+        story_slugs=(
+            "zhuldyz-kartasy", "kronchessii", "arhimag",
+            "temniy-lord", "dalney-berega", "igra-kuklovoda",
+        ),
     ),
     Collection(
         slug="sport-minez", name="Спорт мінезді шыңдағанда",
-        count=5, tint_hue=130, icon="trophy",
-        cover_slugs=("sila-imperii", "dalney-berega", "kronchessii"),
-        curator="редакция",
+        tint_hue=130, icon="trophy", curator="редакция",
         description="Жаттығу, жарыс, қысым, жеңіліс және өзіңді қайта жинап шығу туралы жігерлі мәтіндер.",
-        story_slugs=("sila-imperii", "dalney-berega", "kronchessii", "arhimag", "igra-kuklovoda"),
+        story_slugs=(
+            "arqadagy-jaz", "sila-imperii", "dalney-berega",
+            "kunnin-songy-sagaty", "balkonnan-korinetin",
+        ),
     ),
     Collection(
         slug="mektep-qupiyalary", name="Мектептегі құпиялар",
-        count=5, tint_hue=145, icon="backpack",
-        cover_slugs=("igra-kuklovoda", "temniy-lord", "arhimag"),
-        curator="редакция",
+        tint_hue=145, icon="backpack", curator="редакция",
         description="Күнделік, сыныптағы сыбыс, жоғалған заттар және сабақтан кейін ашылатын кішкентай детективтер.",
-        story_slugs=("igra-kuklovoda", "temniy-lord", "arhimag", "kronchessii", "dalney-berega"),
+        story_slugs=(
+            "mektep-koridory", "igra-kuklovoda", "tunge-deiin",
+            "konshi-bala", "arqadagy-jaz", "balkonnan-korinetin", "arhimag",
+        ),
     ),
     Collection(
         slug="bir-keshke", name="Бір кешке жететін қысқа мәтіндер",
-        count=5, tint_hue=210, icon="book",
-        cover_slugs=("sila-imperii", "dalney-berega", "temniy-lord"),
-        curator="редакция",
+        tint_hue=210, icon="book", curator="редакция",
         description="Ұзақ серияға кірмей-ақ, бүгін бастап бүгін аяқтағың келетін қысқа әрі жинақы оқиғалар.",
-        story_slugs=("sila-imperii", "dalney-berega", "temniy-lord", "arhimag", "igra-kuklovoda"),
+        story_slugs=(
+            "kunnin-songy-sagaty", "tunge-deiin", "konshi-bala",
+            "mektep-koridory", "atam-aityp-berdi", "almaty-ayazy",
+            "korkynyshty-koilek", "balkonnan-korinetin", "sila-imperii",
+        ),
     ),
 ]
+
+
+def collections_of(story: "Story") -> list:
+    """Подборки, в которых лежит произведение (обратный вход с STORY-страницы).
+
+    Порядок — как в COLLECTIONS: он редакционный, а не по релевантности.
+    """
+    return [c for c in COLLECTIONS if story.slug in c.story_slugs]
+
 
 COLLECTIONS_BY_SLUG = {c.slug: c for c in COLLECTIONS}
 

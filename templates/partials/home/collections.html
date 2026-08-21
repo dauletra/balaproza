@@ -1,11 +1,20 @@
 {% comment %}
-    HomeEditorialCollections. Редакционные сборники под настроение подростка.
+    HomeEditorialCollections — главный вход в чтение (DEC-31).
+
+    Стоит в первом фолде: подросток приходит с состоянием («хочу поржать»,
+    «когда всё тяжело»), а не с жанровым запросом. Имя жинақа — фраза-состояние,
+    поэтому заголовок секции задаёт вопрос, а карточки на него отвечают.
+
+    Карусель, а не сетка 2×2: на 375px сетка съест весь фолд, а обрезанная
+    третья карточка сама показывает, что ряд листается.
+
+    Жинақтар создаёт только редакция — отсюда eyebrow с атрибуцией.
 
     Контекст: collections (list of Collection)
 {% endcomment %}
 <section x-data="{}">
     {% url 'core:collections' as collections_url %}
-    {% include "components/section_header.html" with title="Қазір не оқығың келеді?" eyebrow="көңіл күйге қарай" link="барлығы →" link_href=collections_url %}
+    {% include "components/section_header.html" with title="Қазір не оқығың келеді?" eyebrow="редакция жинақтары" link="барлығы →" link_href=collections_url %}
 
     <div class="-mx-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
         <div class="flex w-max gap-3.5">
@@ -41,7 +50,7 @@
             {% endfor %}
 
             <a href="{{ collections_url }}"
-               class="group flex h-[212px] w-[248px] shrink-0 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 text-center transition-colors hover:border-brand hover:bg-brand/5 sm:hidden">
+               class="group relative flex h-[212px] w-[248px] shrink-0 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 text-center transition-colors hover:border-brand hover:bg-brand/5">
                 <span class="flex h-10 w-10 items-center justify-center rounded-pill bg-slate-100 text-slate-600 group-hover:bg-brand/10 group-hover:text-brand-dark">
                     {% include "components/icon.html" with name="arrow-right" size=18 %}
                 </span>

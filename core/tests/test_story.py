@@ -264,3 +264,38 @@ class StoryDetailTags(TestCase):
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': self.OWN_PENDING_SLUG}))
         self.assertContains(r, 'эксперимент')   # pending-тег
         self.assertContains(r, 'проверкада')    # бейдж модерации
+
+
+class StoryLinksBackToItsCollections(TestCase):
+    """DEC-31: дочитавший ищет «ещё такого же». Жанр отвечает на это хуже
+    всего — две фэнтези бывают совсем разными; подборка собрана по состоянию."""
+
+    def setUp(self):
+        self.response = self.client.get(
+            reverse('core:story_detail', kwargs={'slug': 'tunge-deiin'}))
+        self.html = self.response.content.decode()
+
+    def test_block_lists_every_collection_holding_the_story(self):
+        from core import stub_data
+        story = stub_data.STORIES_BY_SLUG['tunge-deiin']
+        collections = stub_data.collections_of(story)
+        self.assertTrue(collections)
+        self.assertContains(self.response, 'Мына жинақтарда бар')
+        for c in collections:
+            with self.subTest(collection=c.slug):
+                self.assertContains(self.response, f'/collections/{c.slug}/')
+
+    def test_collections_stand_above_genre_recommendations(self):
+        """Редакционная подборка сильнее автоматической выдачи по жанру."""
+        self.assertLess(
+            self.html.index('Мына жинақтарда бар'),
+            self.html.index('Басқа шығармалар'),
+        )
+
+    def test_block_absent_when_story_is_in_no_collection(self):
+        from core import stub_data
+        orphan = next(
+            (s for s in stub_data.STORIES if not stub_data.collections_of(s)), None)
+        self.assertIsNotNone(orphan, 'нужен стори вне подборок для проверки пустого случая')
+        r = self.client.get(reverse('core:story_detail', kwargs={'slug': orphan.slug}))
+        self.assertNotContains(r, 'Мына жинақтарда бар')

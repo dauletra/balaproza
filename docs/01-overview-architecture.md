@@ -58,7 +58,7 @@ Balaproza — литературная UGC-платформа (user-generated co
 
 Все страницы наследуют `templates/base.html`, который задаёт блоки `title`, `content`, `right_rail` и подключает глобальные элементы: спрайт иконок, Alpine/htmx, `toast_host`, `search_popup` (Cmd+K), favicon, theme-color.
 
-- **Каркас:** `partials/header.html` + контентный контейнер `max-w-[1280px]` + опциональный правый `<aside>` 300px + `partials/footer.html` + `partials/mobile_nav.html`.
+- **Каркас:** `partials/header.html` + контентный контейнер `max-w-[1280px]` (колонка контента `max-w-[860px]`, центрируется без рейла) + опциональный правый `<aside>` 300px + `partials/footer.html` + `partials/mobile_nav.html`.
 - **Правый рейл** рендерится **только** если view передал `has_right_rail=True` в контекст, и виден только с брейкпоинта `xl`. Левый sidebar исключён (DEC-25); контентная навигация — секции главной и колонка «Контент» в footer.
 - **Mobile:** тот же каркас; хедер сжимается, `mobile_nav` (плавающая пилюля, 5 слотов) показывается до `md`.
 

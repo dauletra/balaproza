@@ -1,6 +1,6 @@
 # 14 · Карта реализации: требование → код
 
-> `Обновлён: 2026-08-20` · `Сверен с кодом: 5d39adb`
+> `Обновлён: 2026-08-21` · `Сверен с кодом: f1f896b`
 
 Этот документ отвечает на два вопроса, на которые остальное ТЗ не отвечает: **где живёт то, что описано требованием**, и **что придётся обновить, если это изменить**.
 
@@ -23,7 +23,7 @@
 | Фильтры | `core/templatetags/balaproza.py` | `compact_count`, `spaced`, `page_range` |
 | Шаблоны | корневая `templates/` (109 файлов) | 50 компонентов · 28 партиалов · 27 страниц · `base.html` · `404/500` |
 | Токены | `static_src/input.css`, блок `@theme` | Единственный источник цветов, радиусов, теней ([02](02-design-system.md)) |
-| Тесты | `core/tests/` (16 файлов, 405 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
+| Тесты | `core/tests/` (16 файлов, 425 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
 
 **Шаблоны — не в `core/templates/`, а в корневой `templates/`.** Это задано `TEMPLATES.DIRS` в `config/settings.py`.
 
@@ -73,10 +73,10 @@
 | FR-HOME-02 (короткие) | `partials/home/book_row.html` | `test_home.HomeMobileFirstFold` |
 | FR-HOME-03 (книга недели) | `partials/home/book_of_week.html` | `test_home.HomeEditorialBlocks` |
 | FR-HOME-04 (конкурс) | `partials/home/contest_banner.html` | `test_home.HomeMobileSecondFold` |
-| FR-HOME-05 (коллекции) | `partials/home/collections.html` | `test_home.HomeEditorialBlocks` |
-| FR-HOME-06 (жанры) | `partials/home/genres_section.html` | `test_home.HomeMobileSecondFold` |
+| FR-HOME-05 (жинақтар — главный вход) | `partials/home/collections.html` | `test_home.HomeEditorialBlocks`, `test_catalog.CollectionsAreAdminOnly` |
+| FR-HOME-06 (жанровая полоса-вывеска) | `partials/home/genre_strip.html` | `test_home.HomeMobileSecondFold` |
 | FR-HOME-07 (ещё два ряда) | `partials/home/book_row.html` | `test_desktop_layout.HomeRowSize` |
-| FR-HOME-08 (теги) | `partials/home/popular_tags.html` | `test_home.HomeMobileThirdFold` |
+| FR-HOME-08 (теги: неделя + всё время) | `partials/home/popular_tags.html` | `test_home.HomeMobileThirdFold` |
 | FR-HOME-09 (новые авторы) | `partials/home/new_authors.html` | `test_home.HomeMobileThirdFold` |
 | FR-HOME-10 (CTA) | `partials/home/become_author.html` | `test_home.GuestAuthorCta` |
 | FR-HOME-11 (рейл) | `partials/right_rail/home.html` | `test_desktop_layout.RailContentHasMobileEquivalent` |
@@ -203,6 +203,7 @@ Showcase-маршруты `/_design/tokens/`, `/_design/components/`, `/_design/
 | OKLCH-значение в шаблоне | [03 §3.3](03-genre-color-system.md) — реестр ролей; новые пары `L C` без внесения запрещены |
 | `partials/mobile_nav.html` | [07 §7.6](07-layout-navigation.md) — единственный авторитет; в [04 §4.7](04-component-library.md) только ссылка |
 | `partials/header.html`, `footer.html` | [07 §7.2 / §7.5](07-layout-navigation.md) |
+| Ширина контейнера, колонки контента или рейла в `base.html` | [07 §7.1](07-layout-navigation.md), [02 «Размеры каркаса»](02-design-system.md), константы в `test_desktop_layout.py` |
 | Состав/порядок секций `pages/home.html` | [05 §5.2](05-functional-spec.md) FR-HOME-*, эта карта §14.3 |
 | `_render_catalog`, `filter_catalog` | [05](05-functional-spec.md) FR-CAT-07 (таблица параметров), [12 §12.3](12-domain-model-contract.md) |
 | Сигнатура хелпера в `stub_data.py` | [12 §12.3](12-domain-model-contract.md) |

@@ -105,16 +105,31 @@
         </a>
     {% endif %}
 
-    {% if popular_tags %}
+    {# ── Теги: срез недели + накопленное (DEC-31). Дубль потоковой секции с xl ── #}
+    {% if trending_tags or popular_tags %}
         <section class="rounded-lg border border-slate-200 bg-white p-5">
-            <h3 class="mb-3 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                Танымал тегтер
-            </h3>
-            <div class="flex flex-wrap gap-2">
-                {% for t in popular_tags %}
-                    {% include "components/tag_chip.html" with tag=t size="sm" %}
-                {% endfor %}
-            </div>
+            {% if trending_tags %}
+                <h3 class="mb-3 flex items-center gap-2 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-brand-dark">
+                    <span aria-hidden="true" class="h-1.5 w-1.5 rounded-pill bg-brand"></span>
+                    Осы аптада
+                </h3>
+                <div class="flex flex-wrap gap-2">
+                    {% for t in trending_tags %}
+                        {% include "components/tag_chip.html" with tag=t size="sm" %}
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% if popular_tags %}
+                <h3 class="mb-3 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 {% if trending_tags %}mt-5 border-t border-slate-100 pt-4{% endif %}">
+                    Танымал тегтер
+                </h3>
+                <div class="flex flex-wrap gap-2">
+                    {% for t in popular_tags %}
+                        {% include "components/tag_chip.html" with tag=t size="sm" %}
+                    {% endfor %}
+                </div>
+            {% endif %}
         </section>
     {% endif %}
 

@@ -59,8 +59,11 @@
             {% include "components/icon.html" with name="home" size=22 %}
             <span class="font-sans text-[10px] font-semibold leading-none">Басты</span>
         </a>
-        {# 2 · Каталог #}
-        <a href="{% url 'core:catalog' %}"
+        {% comment %}
+            2 · Оқу → жинақтар (DEC-31): гостю без запроса нужен вопрос
+            «что ты хочешь читать», а не сетка из всего каталога.
+        {% endcomment %}
+        <a href="{% url 'core:collections' %}"
            class="flex flex-1 flex-col items-center justify-center gap-0.5{% if nav_active == 'catalog' %} text-brand{% else %} text-slate-800{% endif %}">
             {% include "components/icon.html" with name="book" size=22 %}
             <span class="font-sans text-[10px] font-semibold leading-none">Оқу</span>

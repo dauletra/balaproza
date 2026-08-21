@@ -1,0 +1,33 @@
+{% comment %}
+    Жанровая полоса-вывеска под hero (DEC-31).
+
+    Жанр на портале делает работу вывески, а не двери: двенадцать цветных слов
+    за пару секунд объясняют, что здесь литература, а не соцсеть. Навигацию
+    ведут жинақтар («зачем читать сейчас») и теги («о чём это»).
+
+    Поэтому здесь нет ни заголовка секции, ни «барлығы →», ни скроллера
+    произведений — было ~330px в середине страницы, стало ~44px в первом
+    фолде. Жанры видно раньше, а место уходит вопросу «не оқығың келеді?».
+
+    Чип ведёт сразу на /genres/<slug>/ — прежнее переключение ?genre= внутри
+    главной больше не нужно (и не нарушает DEC-15: это обычные ссылки).
+
+    Контекст: genres
+{% endcomment %}
+<nav aria-label="Жанрлар" class="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
+    <div class="flex w-max items-center gap-2">
+        {% for g in genres %}
+            <a href="{% url 'core:genre_detail' slug=g.slug %}"
+               class="inline-flex h-11 shrink-0 items-center gap-2 rounded-pill border border-slate-200 bg-white px-4 font-sans text-[13px] font-semibold text-slate-700 transition-colors hover:border-brand hover:text-brand">
+                <span aria-hidden="true" class="h-1.5 w-1.5 rounded-pill" style="background: oklch(0.55 0.14 {{ g.hue }});"></span>
+                {{ g.name }}
+            </a>
+        {% endfor %}
+
+        <a href="{% url 'core:genre_index' %}"
+           class="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-pill px-3 font-sans text-[13px] font-semibold text-slate-500 transition-colors hover:text-brand">
+            Барлығы
+            {% include "components/icon.html" with name="arrow-right" size=14 %}
+        </a>
+    </div>
+</nav>

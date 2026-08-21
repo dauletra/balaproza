@@ -373,3 +373,47 @@ class SearchIndexHasTags(TestCase):
         names = [t['slug'] for t in data['tags']]
         self.assertIn('mektep', names)
         self.assertNotIn('basqa-alem', names)
+
+
+class TagPageOpensWithMovement(TestCase):
+    """Тег — единственная ось, обновляющаяся без участия редакции (DEC-31).
+    Её ценность в том, что там видно движение, поэтому «жаңа» вперёд."""
+
+    def test_tag_page_defaults_to_recent(self):
+        r = self.client.get(reverse('core:tag_detail', kwargs={'slug': 'mektep'}))
+        self.assertEqual(r.context['sort'], 'recent')
+
+    def test_explicit_sort_still_wins(self):
+        r = self.client.get(
+            reverse('core:tag_detail', kwargs={'slug': 'mektep'}) + '?sort=popularity')
+        self.assertEqual(r.context['sort'], 'popularity')
+
+    def test_other_modes_keep_popularity(self):
+        r = self.client.get(reverse('core:catalog'))
+        self.assertEqual(r.context['sort'], 'popularity')
+        r = self.client.get(reverse('core:genre_detail', kwargs={'slug': 'triller'}))
+        self.assertEqual(r.context['sort'], 'popularity')
+
+
+class CollectionsAreAdminOnly(TestCase):
+    """DEC-31: подборки создаёт только редакция. Личное хранение — «Кітапхана»."""
+
+    def test_no_create_button_for_signed_in_user(self):
+        s = self.client.session
+        s['signed_in'] = True
+        s['user_name'] = 'Айдана'
+        s['user_username'] = 'aidana'
+        s.save()
+        r = self.client.get(reverse('core:collections'))
+        self.assertNotContains(r, 'Өз жинағыңды құру')
+
+    def test_page_states_who_curates(self):
+        r = self.client.get(reverse('core:collections'))
+        self.assertContains(r, 'редакция')
+
+    def test_counts_shown_match_actual_stories(self):
+        from core import stub_data
+        r = self.client.get(reverse('core:collections'))
+        for c in stub_data.COLLECTIONS:
+            with self.subTest(collection=c.slug):
+                self.assertContains(r, f'{c.count} шығарма')

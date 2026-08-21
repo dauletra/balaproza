@@ -32,7 +32,14 @@
 
     {# Контент · правый рейл (опц.). docs/07.1 — DesktopShell без sidebar (DEC-25). #}
     <div class="mx-auto flex max-w-[1280px] gap-6 px-4 pt-6 pb-24 sm:px-6 md:pb-12 lg:px-12">
-        <main class="min-w-0 flex-1">
+        {% comment %}
+        Колонка контента не зависит от того, отрисован рейл или нет: 1184 (1280
+        минус lg:px-12) − 300 (рейл) − 24 (gap) = 860. Рядом с рейлом flex-1
+        даёт ровно эти 860, без рейла max-w удерживает ту же ширину, а mx-auto
+        центрирует колонку. Иначе на экране <xl контент забирал место рейла и
+        становился ШИРЕ, чем на большом экране.
+        {% endcomment %}
+        <main class="mx-auto w-full min-w-0 max-w-[860px] flex-1">
             {% block content %}{% endblock %}
         </main>
 

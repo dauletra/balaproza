@@ -14,7 +14,8 @@
     </div>
 {% else %}
 
-<div class="mx-auto flex max-w-[920px] flex-col gap-8"
+{# Ширину колонки держит <main> в base.html (860px) — своего max-w здесь не нужно. #}
+<div class="flex flex-col gap-8"
      x-data="{ readerSize: 'reader-size-base', readerWidth: 'reader-width-comfort', readerTheme: 'reader-theme-paper' }">
 
     {# ─────────────────────── Шапка произведения ─────────────────────── #}
@@ -296,6 +297,31 @@
                     <p class="rounded-md bg-slate-50 px-4 py-6 text-center font-sans text-sm text-slate-500">
                         Әлі пікір жоқ. Бірінші бол.
                     </p>
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
+
+    {% comment %}
+        Обратный вход в настроение (DEC-31). Дочитавший ищет «ещё такого же»,
+        и жанр отвечает на это хуже всего: две фэнтези бывают совсем разными.
+        Подборка же собрана по состоянию, поэтому именно она — правильный
+        следующий шаг. Стоит выше «Басқа шығармалар»: рекомендация редакции
+        сильнее автоматической выдачи по жанру.
+    {% endcomment %}
+    {% if in_collections %}
+        <section aria-labelledby="in-collections-heading" class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-5">
+            <h2 id="in-collections-heading" class="mb-3 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                Мына жинақтарда бар
+            </h2>
+            <div class="flex flex-wrap gap-2">
+                {% for c in in_collections %}
+                    <a href="{% url 'core:collection_detail' slug=c.slug %}"
+                       class="inline-flex items-center gap-2 rounded-pill px-3 py-1.5 font-sans text-[13px] font-semibold transition-transform hover:-translate-y-0.5"
+                       style="background: oklch(0.95 0.05 {{ c.tint_hue }}); color: oklch(0.32 0.13 {{ c.tint_hue }}); box-shadow: inset 0 0 0 1px oklch(0.86 0.08 {{ c.tint_hue }});">
+                        {% include "components/icon.html" with name=c.icon size=14 %}
+                        {{ c.name }}
+                    </a>
                 {% endfor %}
             </div>
         </section>
