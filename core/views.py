@@ -389,7 +389,7 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
             {'name': 'author_tier', 'legend': 'Автор',   'options': stub_data.CATALOG_AUTHOR_FILTERS,   'current': author_tier},
             {'name': 'status',   'legend': 'Мәртебесі',  'options': stub_data.CATALOG_STATUS_FILTERS,   'current': status},
             {'name': 'format',   'legend': 'Формат',     'options': stub_data.CATALOG_FORMAT_FILTERS,   'current': format},
-            {'name': 'audience', 'legend': 'Жас',        'options': stub_data.CATALOG_AUDIENCE_FILTERS, 'current': audience},
+            {'name': 'audience', 'legend': 'Жасың',      'options': stub_data.CATALOG_AUDIENCE_FILTERS, 'current': audience},
             {'name': 'length',   'legend': 'Оқу уақыты', 'options': stub_data.CATALOG_LENGTH_FILTERS,   'current': length},
         ],
         'genres':             stub_data.GENRES,

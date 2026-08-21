@@ -857,3 +857,51 @@ class NewAuthorsAxis(TestCase):
         for s in out:
             self.assertIn('balalar', s.genres)
             self.assertLess(s.author.followers, stub_data.NEW_AUTHOR_FOLLOWERS)
+
+
+class AudienceIsCumulative(TestCase):
+    """DEC-38: ось «Жасың» отвечает на «сколько мне лет», а не «какая отметка
+    у работы».
+
+    Точное совпадение работало против читателя: четырнадцатилетний выбирал
+    «14+» и терял пятнадцать из двадцати одной работы, которые ему полностью
+    доступны. Безопасное направление при этом одинаково в обоих вариантах —
+    младшая вилка старших отметок не показывает, — поэтому менять было можно.
+    """
+
+    def test_older_bracket_includes_the_younger(self):
+        out = stub_data.filter_catalog(audience='14+')
+        self.assertEqual(len(out), len(stub_data.filter_catalog()))
+        self.assertSetEqual({s.audience for s in out}, {'10+', '14+'})
+
+    def test_younger_bracket_still_hides_the_older(self):
+        """Единственное, что этот фильтр обязан гарантировать."""
+        for s in stub_data.filter_catalog(audience='10+'):
+            self.assertEqual(s.audience, '10+')
+
+    def test_order_drives_the_comparison_not_equality(self):
+        self.assertEqual(stub_data.AUDIENCE_ORDER, ('10+', '14+'))
+        younger = stub_data.filter_catalog(audience='10+')
+        older = stub_data.filter_catalog(audience='14+')
+        self.assertLess(len(younger), len(older))
+
+    def test_unknown_bracket_is_ignored(self):
+        plain = self.client.get(reverse('core:catalog'))
+        junk = self.client.get(reverse('core:catalog') + '?audience=99%2B')
+        self.assertEqual(junk.status_code, 200)
+        self.assertEqual(len(junk.context['results']), len(plain.context['results']))
+
+    def test_label_names_the_reader_not_the_work(self):
+        """«10+» в подписи повторяло ключ и читалось как отметка работы."""
+        labels = dict(stub_data.CATALOG_AUDIENCE_FILTERS)
+        self.assertEqual(labels['10+'], '10-13')
+        r = self.client.get(reverse('core:catalog'))
+        legend = next(g['legend'] for g in r.context['filter_groups']
+                      if g['name'] == 'audience')
+        self.assertEqual(legend, 'Жасың')
+
+    def test_it_combines_with_other_axes(self):
+        out = stub_data.filter_catalog(audience='10+', format='single')
+        for s in out:
+            self.assertEqual(s.audience, '10+')
+            self.assertTrue(s.is_single)

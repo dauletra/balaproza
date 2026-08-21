@@ -962,9 +962,18 @@ CATALOG_STATUS_FILTERS = (
     ("OnProcess",  "Жазылып жатыр"),
 )
 
+# Возрастные отметки произведения, от младшей к старшей. Порядок значим:
+# фильтр сравнивает по индексу, а не по равенству (DEC-38).
+AUDIENCE_ORDER = ("10+", "14+")
+
+# Ось «Жасың» — про читателя, а не про произведение. Ключ остаётся отметкой
+# произведения (это верхняя граница того, что читателю подходит), подпись —
+# возрастная вилка самого читателя. Прежняя подпись «10+ / 14+» повторяла
+# ключ и читалась как отметка работы, из-за чего выбор «14+» выглядел как
+# «покажи только взрослое» и прятал 15 из 21 доступной работы.
 CATALOG_AUDIENCE_FILTERS = (
     ("",    "Барлығы"),
-    ("10+", "10+"),
+    ("10+", "10-13"),
     ("14+", "14+"),
 )
 
@@ -1025,8 +1034,13 @@ def apply_catalog_filters(stories: list, sort: str = CATALOG_DEFAULT_SORT,
     out = list(stories)
     if status:
         out = [s for s in out if s.status == status]
-    if audience:
-        out = [s for s in out if s.audience == audience]
+    if audience in AUDIENCE_ORDER:
+        # Накопительно, а не точным совпадением (DEC-38): читателю четырнадцати
+        # лет доступно и то, что помечено 10+. Точное совпадение прятало от него
+        # три четверти каталога. Безопасное направление сохраняется — выбравший
+        # младшую вилку не видит старших отметок.
+        allowed = set(AUDIENCE_ORDER[:AUDIENCE_ORDER.index(audience) + 1])
+        out = [s for s in out if s.audience in allowed]
     if length:
         out = [s for s in out if s.length_bucket == length]
     if format:

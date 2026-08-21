@@ -23,7 +23,7 @@
 | Фильтры | `core/templatetags/balaproza.py` | `compact_count`, `spaced`, `page_range`, `belongs_to` |
 | Шаблоны | корневая `templates/` (113 файлов) | 51 компонент · 31 партиал · 27 страниц · спрайт иконок · `base.html` · `404/500` |
 | Токены | `static_src/input.css`, блок `@theme` | Единственный источник цветов, радиусов, теней ([02](02-design-system.md)) |
-| Тесты | `core/tests/` (16 файлов, 551 тест) | Контракт поведения, описан в [15](15-testing-contract.md) |
+| Тесты | `core/tests/` (16 файлов, 557 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
 
 **Шаблоны — не в `core/templates/`, а в корневой `templates/`.** Это задано `TEMPLATES.DIRS` в `config/settings.py`.
 
@@ -113,6 +113,7 @@
 | Ось знака качества | `STORY_BADGES`, `badge=` в `filter_catalog` | `test_catalog.QualityBadgeAxis` |
 | FR-CAT-12 (границы длины) | `Story.length_bucket`, `CATALOG_LENGTH_FILTERS` | `test_catalog.ReadingTimeBuckets` |
 | FR-CAT-13 (ось «Автор») | `is_new_author`, `CATALOG_AUTHOR_FILTERS` | `test_catalog.NewAuthorsAxis` |
+| FR-CAT-14 (накопительный возраст) | `AUDIENCE_ORDER`, `apply_catalog_filters` | `test_catalog.AudienceIsCumulative` |
 | DEC-23 в выдаче | `PUBLIC_STATUSES` в `filter_catalog` | `test_catalog.DraftsAndModerationStayOutOfTheCatalog` |
 
 **Состояние сүзгі живёт в URL и собирается во view.** `_catalog_href(mode=, genre=, tag=, query=, sort=, status=, audience=, length=, format=)` строит канонический URL: путь занимает «главная» ось (жанр → `/genres/<slug>/`, иначе тег → `/tag/<slug>/`, иначе режим), всё остальное едет в query. `_catalog_links(state)` поверх него отдаёт в контекст `active_chips` (каждый чип — «состояние минус эта ось»), `active_count`, `clear_href`, `genre_options`, `tag_options`.

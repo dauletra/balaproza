@@ -56,6 +56,7 @@ Catalog and search:
 - `stories_by_genre(genre_slug: str) -> list[Story]`
 - `PUBLIC_STATUSES` — статусы, видимые публике (DEC-23). `filter_catalog` режет по ним на входе
 - `is_new_author(username) -> bool`, `NEW_AUTHOR_FOLLOWERS`, `CATALOG_AUTHOR_FILTERS` — ось «Автор» (FR-CAT-13)
+- `AUDIENCE_ORDER` — отметки от младшей к старшей; ось «Жасың» сравнивает по индексу, не по равенству (DEC-38)
 - `CATALOG_PRESETS`, `STORY_BADGES` / `BADGE_LABELS`, `CATALOG_BADGE_FILTERS`, `CATALOG_DEFAULT_SORT` — справочники осей каталога
 - `search_stories(query: str) -> list[Story]`
 - `search_authors(query: str, limit=5) -> list[Author]`
