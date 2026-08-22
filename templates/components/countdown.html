@@ -2,6 +2,12 @@
     Countdown (docs/04.7). Отсчёт «N күн қалды».
     На дизайн-этапе — статика; в проде заменится на Alpine-таймер.
 
+    Иконка — часы. До этого здесь стояли ползунки (`adjustments`), взятые
+    за неимением своей: перед «12 күн қалды» иконка фильтра не значит
+    ничего, а спрайт менять было лень. Ровно это CLAUDE.md и запрещает —
+    нужной иконки нет, значит в спрайт добавляется новый `<symbol>`,
+    а не берётся похожая по наличию.
+
     Параметры:
       days   — int, сколько осталось
       size   — 'sm' (default, h-7) | 'md' (h-9)
@@ -15,7 +21,7 @@
 <span class="inline-flex items-center gap-1.5 rounded-pill font-sans font-semibold
              {% if sz == 'md' %}h-9 px-3 text-sm{% else %}h-7 px-2.5 text-xs{% endif %}
              {% if muted %}bg-slate-100 text-slate-700{% else %}bg-status-attention-bg text-status-attention-fg{% endif %}">
-    {% include "components/icon.html" with name="adjustments" size=12 only %}
+    {% include "components/icon.html" with name="clock" size=12 only %}
     {{ days }} {{ suffix|default:"күн қалды" }}
 </span>
 {% endwith %}

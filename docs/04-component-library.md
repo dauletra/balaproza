@@ -141,9 +141,11 @@
 
 - **Навигация:** Search, ArrowRight/Left, AngleLeft/Right, ChevronLeft/Right, X
 - **Действия:** Home, Bookmark/-filled, Bell, UserCircle, Plus, Pen, Cog, Trash, Upload, PaperPlane, List, Check, Adjustments, Book, ArrowRightToBracket
-- **Метрики:** ThumbsUp/-filled, Eye, MessageCaption, Heart/-filled
+- **Метрики и время:** ThumbsUp/-filled, Eye, MessageCaption, Heart/-filled, Clock (отсчёт до дедлайна конкурса)
 - **Меню:** DotsHorizontal, DotsVertical
 - **Модерация и безопасность:** Flag (жалоба, BR-33), Shield (плашка «защищено правилами модерации»)
+
+> **Правило: похожую по наличию не берут.** Нужной иконки нет — в спрайт добавляется новый `<symbol>`, а не подставляется первая подходящая по форме. В отсчёте «12 күн қалды» два месяца стояли ползунки фильтра (`Adjustments`): их взяли потому, что часов в спрайте не было, и перед числом дней оказалась иконка, не значащая ничего. `Adjustments` остаётся у кнопки сүзгі каталога, где она и есть про настройку.
 
 > **Правило: три точки — только на триггере меню.** `DotsHorizontal`/`DotsVertical` означают «ещё варианты» — это иконка контейнера, а не действия. Ставить их на конкретный пункт нельзя: в меню из трёх точек получается «ещё варианты → ещё варианты». Именно так на «Шағым жіберу» два раза оказались точки вместо флажка. Флажок для жалобы — конвенция YouTube, Instagram, Reddit и GitHub; восклицательный знак не годится, он читается как «ошибка» и пересекается со `status-error`. Правило закрыто тестом `test_story.ReportUsesItsOwnIcon`.
 

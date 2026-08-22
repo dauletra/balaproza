@@ -1263,6 +1263,29 @@ class PosterStripHasAWidthBudget(TestCase):
                       'без переноса отсчёт не помещается в полосу узкой карточки')
 
 
+class CountdownIconMeansTime(TestCase):
+    """Иконка отсчёта — часы, а не ползунки фильтра.
+
+    `adjustments` стояла перед «12 күн қалды» потому, что часов в спрайте
+    не было, а добавить `<symbol>` было лень. Иконка, взятая по наличию,
+    не значит ничего — CLAUDE.md и docs/04 §4.2 запрещают ровно это.
+    """
+
+    def test_countdown_uses_the_clock(self):
+        body = (TEMPLATES / 'components' / 'countdown.html').read_text(encoding='utf-8')
+        self.assertIn('name="clock"', body)
+        self.assertNotIn('name="adjustments"', body)
+
+    def test_clock_exists_in_the_sprite(self):
+        sprite = (TEMPLATES / 'components' / 'icons' / '_sprite.html').read_text(encoding='utf-8')
+        self.assertIn('id="icon-clock"', sprite)
+
+    def test_adjustments_stays_where_it_means_something(self):
+        """У кнопки сүзгі каталога ползунки — на своём месте."""
+        body = (TEMPLATES / 'pages' / 'catalog' / 'catalog.html').read_text(encoding='utf-8')
+        self.assertIn('name="adjustments"', body)
+
+
 class ContestEditionsAreLinked(TestCase):
     """Завершённый конкурс перестал быть тупиком (FR-CONT-13, BR-47)."""
 
