@@ -1,6 +1,6 @@
 # 14 · Карта реализации: требование → код
 
-> `Обновлён: 2026-08-22` · `Сверен с кодом: f80eca0`
+> `Обновлён: 2026-08-22` · `Сверен с кодом: 561cfad`
 
 Этот документ отвечает на два вопроса, на которые остальное ТЗ не отвечает: **где живёт то, что описано требованием**, и **что придётся обновить, если это изменить**.
 
@@ -23,7 +23,7 @@
 | Фильтры | `core/templatetags/balaproza.py` | `compact_count`, `spaced`, `page_range`, `belongs_to` |
 | Шаблоны | корневая `templates/` (135 файлов) | 61 компонент · 41 партиал · 28 страниц · два спрайта · `base.html` · `404/500` |
 | Токены | `static_src/input.css`, блок `@theme` | Единственный источник цветов, радиусов, теней ([02](02-design-system.md)) |
-| Тесты | `core/tests/` (16 файлов, 862 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
+| Тесты | `core/tests/` (16 файлов, 876 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
 
 **Шаблоны — не в `core/templates/`, а в корневой `templates/`.** Это задано `TEMPLATES.DIRS` в `config/settings.py`.
 
@@ -242,7 +242,10 @@
 | Относительное время ([16 §16.4](16-content-voice.md)) | `kk_ago` — одна лесенка для уведомлений и заявок | `test_prof_lib_notif.NotificationTime`, `SubmissionDatesAreReal` |
 | «Қабылданды» — только вердикт жюри | тост подачи говорит «жіберілді» | `AcceptedIsTheJuryWord` |
 | DEC-21 (AI-декларация) | радио + `<details>` в `contest_submit.html` | `ContestSubmitForm` |
-| DEC-24 (возраст) | чекбокс `confirm_age` | `ContestSubmitForm` |
+| BR-48 (вилка у конкурса) | `Contest.min_age`/`max_age` → `eligibility_line` | `AgeIsTheContestsRule` |
+| BR-48a / FR-CONT-15 (общие правила) | `stub_data.common_rules` → секция «Барлық байқауларға ортақ» + чек-лист | `CommonRulesAreWrittenOnce` |
+| DEC-47 (аудитория не называется) | подписи полей возраста, чекбокс подтверждения | `test_template_lint.PlatformDoesNotNameItsAudience`, `test_auth_links.SignupPage` |
+| DEC-24 (возраст) | чекбокс `confirm_age`, генерится из вилки конкурса | `ContestSubmitForm`, `CommonRulesAreWrittenOnce` |
 | FR-CONT-11 / BR-47a | `components/contest_poster.html`, `Contest.poster` | `ContestPosterIsItsOwn` |
 | FR-CONT-12 | `components/share_button.html` (`tone='on-dark'`) в хиро детальной | `ContestPageCanBeShared` |
 | FR-CONT-13 / BR-47 | `Contest.series` → `other_editions` → `partials/contest/_editions.html` | `ContestEditionsAreLinked` |
@@ -295,6 +298,7 @@ Showcase-маршруты `/_design/tokens/`, `/_design/components/`, `/_design/
 | Новый тест-файл | [15](15-testing-contract.md), счётчики в `README.md`, `CLAUDE.md` и `AGENTS.md` |
 | Новые тесты в существующем файле | счётчики в `README.md`, `CLAUDE.md` и `AGENTS.md` (их держит `test_docs_sync.TestCounters`) |
 | Строка интерфейса | [16](16-content-voice.md) — тон, обращение на «сен», одно слово на одну сущность |
+| Любая строка про возраст или аудиторию | [08 BR-48](08-business-rules.md), [10 DEC-47](10-resolved-decisions.md) — вилку называет только страница конкурса, платформа молчит |
 | `partials/right_rail/*.html` | FR-раздела в [05](05-functional-spec.md) + флаг `has_right_rail` во view: рейл ставится по наличию данных, а не безусловно (DEC-25) |
 | `config/settings.py` | [17](17-deployment.md), [09 §9.7](09-nonfunctional.md) |
 | Отмена/пересмотр решения | [10](10-resolved-decisions.md) — **новым DEC**, не правкой старого |

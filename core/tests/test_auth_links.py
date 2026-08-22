@@ -55,9 +55,19 @@ class SignupPage(TestCase):
         self.assertContains(self.response, 'value="boy"')
         self.assertContains(self.response, 'value="girl"')
 
-    def test_age_field_with_hint(self):
+    def test_age_field_asks_without_naming_a_bracket(self):
+        """Возраст спрашиваем, аудиторию не объявляем (BR-48, DEC-47).
+
+        Подсказка поля говорила «Байқауға қатысу үшін 14-18 жас керек» —
+        платформа представлялась как «для 14-18» каждому, кто дошёл до
+        регистрации, ещё до всякого конкурса. Ценза у платформы нет,
+        вилку ставит конкурс.
+        """
         self.assertContains(self.response, 'name="age"')
-        self.assertContains(self.response, '14-18')   # BR-20
+        self.assertNotContains(self.response, '14-18')
+        # Поле объясняет, зачем спрашивает, — иначе оно выглядит как
+        # сбор личных данных без причины.
+        self.assertContains(self.response, 'байқаулар')
 
     def test_bio_textarea(self):
         self.assertContains(self.response, 'name="bio"')

@@ -113,11 +113,27 @@
         </section>
     {% endif %}
 
-    {# ── Условия ── #}
-    {% if contest.conditions %}
+    {% comment %}
+        Условия разделены на два блока (BR-48a). Раньше был один, и в нём
+        каждый конкурс переписывал правила платформы себе: «14-18 жас» у
+        четырёх из пяти, «5 000-15 000 таңба» литералом при хранимых
+        порогах, «(BR-23)» и «(DEC-21)» — коды ТЗ в тексте для подростка.
+        Копия успела разойтись: AI-декларация обязательна для всех, а
+        названа была у одного.
+
+        Сверху — то, чем этот конкурс отличается (возрастная вилка и свои
+        условия), ниже — общее, из одного реестра.
+    {% endcomment %}
+    {% if contest.eligibility_line or contest.conditions %}
         <section class="mb-8 rounded-lg border border-slate-200 bg-white p-6">
             <h2 class="font-display text-lg font-bold text-slate-900">Шарттар</h2>
             <ul class="mt-3 flex flex-col gap-2 font-sans text-sm leading-snug text-slate-700">
+                {% if contest.eligibility_line %}
+                    <li class="flex items-start gap-2">
+                        <span class="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-pill bg-brand"></span>
+                        <span>Қатысушы: {{ contest.eligibility_line }}</span>
+                    </li>
+                {% endif %}
                 {% for cond in contest.conditions %}
                     <li class="flex items-start gap-2">
                         <span class="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-pill bg-brand"></span>
@@ -127,6 +143,19 @@
             </ul>
         </section>
     {% endif %}
+
+    {# ── Общее для всех байқау: один реестр, не копия у каждого ── #}
+    <section class="mb-8 rounded-lg border border-slate-200 bg-white p-6">
+        <h2 class="font-display text-lg font-bold text-slate-900">Барлық байқауларға ортақ</h2>
+        <ul class="mt-3 flex flex-col gap-2 font-sans text-sm leading-snug text-slate-600">
+            {% for rule in common_rules %}
+                <li class="flex items-start gap-2">
+                    <span class="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-pill bg-slate-300"></span>
+                    <span>{{ rule.label }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
 
     {# ── Таймлайн. У завершённого свёрнут: победители уже названы выше ── #}
     {% if contest.timeline %}

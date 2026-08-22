@@ -6,6 +6,7 @@
 кнопка просто ничего не делает. И то и другое заметно только на живом сайте.
 """
 
+import re
 import unittest
 from html.parser import HTMLParser
 from pathlib import Path
@@ -337,3 +338,76 @@ class IconNamesExistInSprite(unittest.TestCase):
             for name in re.findall(r'icon\.html" with name="([a-z0-9-]+)"', body):
                 with self.subTest(template=path.name, icon=name):
                     self.assertIn(name, ids)
+
+
+class PlatformDoesNotNameItsAudience(TestCase):
+    """Продукт не объявляет, для кого он (DEC-47, BR-48).
+
+    Аудитория — внутренняя информация: платформой пользуются и школьники,
+    и студенты колледжей и вузов. Пока возрастной ценз был правилом
+    платформы (прежнее BR-20), «14-18» стояло в подсказке поля на
+    регистрации и в редактировании профиля — то есть каждый, кто доходил
+    до формы, читал, что здесь для 14-18 лет, ещё не увидев ни одного
+    конкурса.
+
+    **Возрастная вилка законна ровно в одном месте — на странице
+    конкретного конкурса**, где это его собственное условие (BR-48).
+    Поэтому маршруты конкурсов из проверки исключены, а все остальные
+    обязаны молчать.
+
+    Проверка идёт и по отрендеренному HTML, и по исходникам шаблонов:
+    первое ловит текст, попавший на экран, второе — вилку, вписанную
+    литералом вместо `Contest.eligibility_line`.
+    """
+
+    # «14-18 жас», «14–18 жас», «10-18 лет» — вилка рядом со словом о возрасте.
+    AGE_BRACKET = re.compile(r'\d{1,2}\s*[-–—]\s*\d{1,2}\s*(жас|лет|года|жыл)')
+
+    # Слова, которыми продукт назвал бы свою аудиторию как целое.
+    AUDIENCE_WORDS = ('оқушыларға арналған платформа', 'жасөспірімдерге арналған платформа')
+
+    @staticmethod
+    def _platform_urls():
+        """Все публичные маршруты, кроме конкурсных.
+
+        У конкурса своя вилка — она обязана быть видна, иначе автор не
+        узнает, подавать ли ему.
+        """
+        from core.tests.test_urls_smoke import PUBLIC_URLS
+        return [(n, kw, label) for n, kw, label in PUBLIC_URLS
+                if not n.startswith('core:contest')]
+
+    def test_rendered_pages_name_no_age_bracket(self):
+        from django.urls import reverse
+        for name, kwargs, label in self._platform_urls():
+            with self.subTest(page=label):
+                html = self.client.get(reverse(name, kwargs=kwargs)).content.decode()
+                found = self.AGE_BRACKET.search(html)
+                self.assertIsNone(
+                    found,
+                    f'{label}: страница называет возрастную вилку '
+                    f'«{found.group(0) if found else ""}». Ценз ставит конкурс, '
+                    f'не платформа (BR-48)')
+
+    def test_rendered_pages_do_not_declare_the_audience(self):
+        from django.urls import reverse
+        for name, kwargs, label in self._platform_urls():
+            with self.subTest(page=label):
+                html = self.client.get(reverse(name, kwargs=kwargs)).content.decode().lower()
+                for word in self.AUDIENCE_WORDS:
+                    self.assertNotIn(word, html, f'{label}: продукт объявляет аудиторию')
+
+    def test_no_template_hardcodes_an_age_bracket(self):
+        """Вилка приходит из данных конкурса, а не вписывается в шаблон."""
+        for path in _templates():
+            body = path.read_text(encoding='utf-8')
+            # Комментарии объясняют правило и потому называют старую строку.
+            body = re.sub(r'\{%\s*comment\s*%\}.*?\{%\s*endcomment\s*%\}', '',
+                          body, flags=re.S)
+            body = re.sub(r'\{#.*?#\}', '', body, flags=re.S)
+            with self.subTest(template=path.name):
+                found = self.AGE_BRACKET.search(body)
+                self.assertIsNone(
+                    found,
+                    f'{path.name}: вилка «{found.group(0) if found else ""}» вписана '
+                    f'литералом — она должна приходить из `Contest.eligibility_line`')

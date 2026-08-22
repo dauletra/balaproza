@@ -1,6 +1,6 @@
 # 12. Domain model contract for F14
 
-> `Обновлён: 2026-08-22` · `Сверен с кодом: f80eca0`
+> `Обновлён: 2026-08-22` · `Сверен с кодом: 561cfad`
 
 This document is the implementation contract for replacing `core/stub_data.py` with real Django models. It does not introduce models yet; it fixes the fields, relationships, computed values, and query helpers that the current templates already depend on.
 
@@ -108,7 +108,8 @@ Contests:
 - `submissions_of(username: str) -> list[Submission]`
 - `has_submission(username: str, contest_slug: str) -> bool`
 - `contest_history(username: str, *, is_self: bool = False) -> list[dict]` — конкурсная биография (FR-PROF-07). Правило видимости живёт здесь, а не в шаблоне (BR-74a): при `is_self=False` результат режется до победы/принятия, `note` приходит пустым, непубличная работа не называется. Второе место с тем же правилом однажды разошлось бы с первым
-- `submission_checklist(story: Story, contest: Contest) -> list` — пороги объёма берутся у конкурса, а не вписаны в подпись литералом (FR-CONT-07); числа в подписях и подсказках проходят через `spaced_number`
+- `common_rules(contest: Contest) -> list[dict]` — правила, действующие на любом конкурсе: `{key, label, hint, per_work}`. Один источник для секции «Барлық байқауларға ортақ» и чек-листа подачи (BR-48a). `per_work=False` у правил про автора, а не про текст («Бір автор — бір өтінім»)
+- `submission_checklist(story: Story, contest: Contest) -> list` — общая часть из `common_rules`, возрастной пункт только при непустом `eligibility_line` (BR-48). Пороги объёма берутся у конкурса, а не вписаны в подпись литералом (FR-CONT-07); числа проходят через `spaced_number`
 - `spaced_number(value) -> str` — разряды через неразрывный пробел, канонический вид числа для автора. Живёт в слое данных, а не в фильтре `balaproza.spaced`: те же числа собираются и в подсказках чек-листа. Фильтр вызывает эту функцию — двух реализаций одной формы записи быть не должно
 - `eligible_for_contest(username: str, contest_slug: str) -> list[dict]` — кандидаты на подачу: `{story, chars, eligible, reason, hint}`. Только публичные работы (BR-24); `reason` — ключ из `INELIGIBLE_REASONS` (`too_short` · `too_long` · `busy`), пустой у проходящей
 - `busy_contest_of(username, story_slug, *, besides='') -> Contest | None` — незавершённый конкурс, который уже держит эту работу (BR-23a)
@@ -164,6 +165,8 @@ Contest — **хранятся три даты, остальное выводи�
 - `current_stage` / `next_stage` — производные: этап, идущий сейчас, и ближайший будущий. Нужны правому рейлу (FR-CONT-09) — «что идёт сейчас» единственное, чего нет в хиро
 - `poster: str` — афиша, файл в `MEDIA_ROOT` (`contests/<slug>.<ext>`), грузит админ; пусто — типографическая афиша (BR-47a). Прежнее `cover` указывало в `static/img/bookN.jpg` — фотографию книжной обложки, к конкурсу отношения не имевшую
 - `series: str` — слаг семейства повторяющегося конкурса (BR-47). Пусто — разовый
+- `min_age` / `max_age: int | None` — возрастная вилка **этого конкурса** (BR-48). Любая граница может отсутствовать, обе — тоже. У платформы ценза нет и быть не может (DEC-47)
+- `eligibility_line` — производное: «16-25 жас» · «18 жастан бастап» · «22 жасқа дейін» · пусто. Собирать её в шаблоне запрещено — её показывают три поверхности сразу
 - `other_editions` — производное: другие выпуски того же семейства, свежие сверху. Связь по `series`, не по совпадению имён
 
 ContestAward (BR-44, BR-46):

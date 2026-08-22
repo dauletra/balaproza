@@ -917,6 +917,9 @@ def contest_detail(request, slug):
         'page_state':     _page_state(request),
         'slug':           slug,
         'contest':        contest,
+        # Общие правила приходят из одного реестра (BR-48a), а не
+        # переписываются в `conditions` каждого конкурса.
+        'common_rules':   stub_data.common_rules(contest) if contest else [],
         # Присуждения, а не просто работы: строка победителя называет
         # номинацию, а её знает только грант (DEC-46).
         'grants':         contest.grants if contest else [],

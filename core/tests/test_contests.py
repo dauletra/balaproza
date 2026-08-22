@@ -1,6 +1,7 @@
 """CONT · конкурсы: список / детальная / подача / мои заявки."""
 
 import re
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 from unittest import mock
@@ -1184,6 +1185,133 @@ class AcceptedIsTheJuryWord(TestCase):
         _login_as(self.client, 'dina_books')
         r = self.client.get(reverse('core:my_submissions'))
         self.assertContains(r, stub_data.CONTEST_RESULT_LABELS['accepted'])
+
+
+# ════════════════════════════ CONT-8 · требования конкурса ═════════════════
+
+class AgeIsTheContestsRule(TestCase):
+    """Возрастную вилку ставит конкурс, а не платформа (BR-48).
+
+    Прежнее BR-20 объявляло «14-18 лет» правилом платформы, и потому
+    конкурс со своей вилкой выразить было нечем: четыре конкурса из пяти
+    повторяли одну и ту же строку руками, чек-лист держал её в коде,
+    а форма регистрации сообщала её каждому новому пришедшему.
+    """
+
+    def test_line_reads_right_in_every_shape(self):
+        C = stub_data.Contest
+        base = dict(slug='x', name='X', subtitle='',
+                    opens_on=date(2026, 1, 1), closes_on=date(2026, 2, 1),
+                    results_on=date(2026, 3, 1), prize_kzt=None)
+        cases = [
+            ({'min_age': 16, 'max_age': 25}, '16-25 жас'),
+            ({'min_age': 18},                '18 жастан бастап'),
+            ({'max_age': 22},                '22 жасқа дейін'),
+            ({},                             ''),
+        ]
+        for extra, expected in cases:
+            with self.subTest(**extra):
+                self.assertEqual(C(**base, **extra).eligibility_line, expected)
+
+    def test_contests_do_not_all_share_one_bracket(self):
+        """Если у всех одна вилка, поле ничем не отличается от константы."""
+        brackets = {(c.min_age, c.max_age) for c in stub_data.CONTESTS}
+        self.assertGreater(len(brackets), 1)
+        self.assertIn((None, None), brackets,
+                      'нужен конкурс без ценза — иначе ветка «нет требования» не показана')
+
+    def test_conditions_no_longer_repeat_the_age(self):
+        for c in stub_data.CONTESTS:
+            for cond in c.conditions:
+                with self.subTest(contest=c.slug, cond=cond):
+                    self.assertNotIn('жас', cond,
+                                     'возраст приходит из min_age/max_age, не из conditions')
+
+    def test_conditions_carry_no_spec_codes(self):
+        """«(BR-23)» и «(DEC-21)» читал подросток."""
+        for c in stub_data.CONTESTS:
+            for cond in c.conditions:
+                with self.subTest(contest=c.slug, cond=cond):
+                    self.assertNotRegex(cond, r'\b(BR|DEC|FR|NFR)-\d+')
+
+    def test_detail_shows_the_bracket_from_data(self):
+        c = stub_data.CONTESTS_BY_SLUG['altyn-qalam']
+        r = self.client.get(reverse('core:contest_detail', args=[c.slug]))
+        self.assertContains(r, c.eligibility_line)
+
+    def test_detail_of_an_unrestricted_contest_claims_no_age(self):
+        c = stub_data.CONTESTS_BY_SLUG['qys-ertegisi']
+        self.assertEqual(c.eligibility_line, '')
+        html = self.client.get(reverse('core:contest_detail', args=[c.slug])).content.decode()
+        self.assertNotIn('Қатысушы:', html)
+
+
+class CommonRulesAreWrittenOnce(TestCase):
+    """Общие правила — один реестр, а не копия в каждом конкурсе (BR-48a).
+
+    Копия успела разойтись тремя способами: неполно (AI-декларация
+    обязательна для всех, названа была у одного из пяти), литералом
+    («5 000-15 000 таңба» при хранимых порогах) и с кодами ТЗ в тексте.
+    """
+
+    def test_thresholds_come_from_the_contest(self):
+        for slug in ('altyn-qalam', 'bolashak-mektebi'):
+            c = stub_data.CONTESTS_BY_SLUG[slug]
+            vol = next(r for r in stub_data.common_rules(c) if r['key'] == 'volume')
+            with self.subTest(contest=slug):
+                self.assertIn(stub_data.spaced_number(c.min_chars), vol['label'])
+                self.assertIn(stub_data.spaced_number(c.max_chars), vol['label'])
+
+    def test_every_contest_page_states_them_all(self):
+        for slug in stub_data.CONTESTS_BY_SLUG:
+            r = self.client.get(reverse('core:contest_detail', args=[slug]))
+            contest = stub_data.CONTESTS_BY_SLUG[slug]
+            for rule in stub_data.common_rules(contest):
+                with self.subTest(contest=slug, rule=rule['key']):
+                    self.assertContains(r, rule['label'])
+
+    def test_checklist_is_built_from_the_same_registry(self):
+        c = stub_data.CONTESTS_BY_SLUG['altyn-qalam']
+        story = stub_data.STORIES_BY_SLUG['aidana-tan']
+        checklist = {i['key'] for i in stub_data.submission_checklist(story, c)}
+        per_work = {r['key'] for r in stub_data.common_rules(c) if r['per_work']}
+        self.assertTrue(per_work <= checklist)
+        # «Бір автор — бір өтінім» — про автора, не про текст: его держит
+        # сама форма (BR-23), в чек-лист работы он не идёт.
+        self.assertNotIn('one_entry', checklist)
+
+    def test_checklist_age_item_follows_the_contest(self):
+        story = stub_data.STORIES_BY_SLUG['aidana-tan']
+        with_age = stub_data.submission_checklist(
+            story, stub_data.CONTESTS_BY_SLUG['altyn-qalam'])
+        self.assertIn('eligibility', {i['key'] for i in with_age})
+        without = stub_data.submission_checklist(
+            story, stub_data.CONTESTS_BY_SLUG['qys-ertegisi'])
+        self.assertNotIn('eligibility', {i['key'] for i in without},
+                         'конкурс без ценза не должен показывать вечно пройденный пункт')
+
+    def test_confirmation_checkbox_only_where_there_is_a_rule(self):
+        """Форма обязана рендериться в обоих случаях, иначе проверка пустая.
+
+        Первая версия брала «Қыс ертегісі» как конкурс без вилки — но он
+        в фазе `upcoming`, формы там нет вовсе, и `confirm_age`
+        отсутствовал совсем по другой причине. Конкурс без ценза,
+        который сейчас принимает заявки, в стабе не заведён, поэтому он
+        собирается здесь из существующего.
+        """
+        _login_as_aidana(self.client)
+        slug = 'bolashak-mektebi'
+        with_age = self.client.get(reverse('core:contest_submit', args=[slug])).content.decode()
+        self.assertIn('confirm_rules', with_age, 'форма не отрендерилась — проверка пуста')
+        self.assertIn('confirm_age', with_age)
+
+        contest = stub_data.CONTESTS_BY_SLUG[slug]
+        no_age = replace(contest, min_age=None, max_age=None)
+        with mock.patch.dict(stub_data.CONTESTS_BY_SLUG, {slug: no_age}):
+            without = self.client.get(
+                reverse('core:contest_submit', args=[slug])).content.decode()
+        self.assertIn('confirm_rules', without, 'форма не отрендерилась — проверка пуста')
+        self.assertNotIn('confirm_age', without)
 
 
 # ════════════════════════════ CONT-7 · афиша и выходы ══════════════════════

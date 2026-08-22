@@ -205,7 +205,16 @@
                     {% include "components/radio_option.html" with name="ai_used" value="yes" label="Иә, AI айтарлықтай қолданылды" %}
                 </fieldset>
 
-                {% include "components/checkbox.html" with name="confirm_age" label="Жасым 14-18 аралығында" required=True %}
+                {% comment %}
+                    Подтверждение возраста — только у конкурса, который
+                    вилку ставит (BR-48). Прежний чекбокс говорил «Жасым
+                    14-18 аралығында» всем подряд: у конкурса с другой
+                    вилкой автор подтверждал не то, а у конкурса без
+                    ограничений — подтверждал несуществующее требование.
+                {% endcomment %}
+                {% if contest.eligibility_line %}
+                    {% include "components/checkbox.html" with name="confirm_age" label="Жасым байқау талабына сай: "|add:contest.eligibility_line required=True %}
+                {% endif %}
                 {% include "components/checkbox.html" with name="confirm_rules" label="Байқау ережелерімен таныстым және келісемін" required=True %}
             {% endif %}
 
