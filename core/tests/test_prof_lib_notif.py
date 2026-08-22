@@ -1,6 +1,7 @@
 """PROF / LIB / NOTIF — три родственных авторизованных раздела."""
 
 from pathlib import Path
+from unittest import mock
 
 from django.test import TestCase
 from django.urls import reverse
@@ -161,13 +162,15 @@ class NotificationsHelpers(TestCase):
 
     def test_groups_into_buckets(self):
         g = stub_data.notifications_for_user('aidana')
-        self.assertIn('today', g)
-        self.assertIn('yesterday', g)
-        self.assertIn('past_week', g)
-        # БҮГІН — 3 уведомления (comment + like + moderation).
-        self.assertEqual(len(g['today']), 3)
-        self.assertEqual(len(g['yesterday']), 2)
-        self.assertEqual(len(g['past_week']), 3)
+        for b in stub_data.NOTIF_BUCKETS:
+            self.assertIn(b, g)
+        # Раскладка сходится с самими данными: числа-литералы здесь
+        # устаревали бы при каждой правке демо-ленты.
+        items = stub_data.NOTIFICATIONS_BY_USER['aidana']
+        for b in stub_data.NOTIF_BUCKETS:
+            self.assertEqual(len(g[b]), sum(1 for n in items if n.bucket == b))
+        self.assertTrue(all(g[b] for b in stub_data.NOTIF_BUCKETS),
+                        'у aidana должен быть непустым каждый из трёх бакетов')
 
     def test_unknown_user_empty_buckets(self):
         g = stub_data.notifications_for_user('no-such-user')
@@ -175,8 +178,10 @@ class NotificationsHelpers(TestCase):
             self.assertEqual(g[b], [])
 
     def test_unread_count(self):
-        # БҮГІН непрочитанные (3 шт), КЕШЕ/АПТА — все read=True.
-        self.assertEqual(stub_data.unread_count_for_user('aidana'), 3)
+        items = stub_data.NOTIFICATIONS_BY_USER['aidana']
+        expected = sum(1 for n in items if not n.read and n.bucket)
+        self.assertEqual(stub_data.unread_count_for_user('aidana'), expected)
+        self.assertGreater(expected, 0)
 
     def test_unread_zero_for_unknown(self):
         self.assertEqual(stub_data.unread_count_for_user('ghost'), 0)
@@ -185,6 +190,120 @@ class NotificationsHelpers(TestCase):
         for n in stub_data.NOTIFICATIONS_BY_USER['aidana']:
             with self.subTest(kind=n.kind):
                 self.assertIn(n.kind, stub_data.NOTIF_KINDS)
+
+
+class NotificationTime(TestCase):
+    """Время уведомления выводится из `days_ago`, а не хранится строкой (BR-70a).
+
+    Хранимые `when="5 күн бұрын"` и `bucket="past_week"` устаревали на
+    следующий день — тот же класс ошибки, что `days_left=12` до DEC-45,
+    только незаметнее: лента выглядит правдоподобной всегда.
+    """
+
+    def test_time_fields_are_not_stored(self):
+        stored = stub_data.Notification.__dataclass_fields__
+        for gone in ('when', 'bucket'):
+            self.assertNotIn(
+                gone, stored,
+                f'`{gone}` снова стало полем — это хранимое производное (BR-70a)')
+
+    def test_bucket_follows_the_calendar(self):
+        cases = {0: 'today', 1: 'yesterday', 2: 'past_week',
+                 7: 'past_week', 8: '', 400: ''}
+        for days, expected in cases.items():
+            with self.subTest(days=days):
+                n = stub_data.Notification(kind='like', days_ago=days)
+                self.assertEqual(n.bucket, expected)
+
+    def test_older_than_a_week_is_not_shown_and_not_counted(self):
+        """Групп три; четвёртой «раньше» в FR-NOTIF-01 нет.
+
+        Значит, событие старше недели в ленту не попадает — и в бейдж
+        тоже, иначе шапка звала бы на страницу, где его нет.
+        """
+        stale = stub_data.Notification(kind='like', days_ago=30)
+        with mock.patch.dict(stub_data.NOTIFICATIONS_BY_USER, {'ghost': [stale]}):
+            grouped = stub_data.notifications_for_user('ghost')
+            self.assertEqual([], [n for b in grouped.values() for n in b])
+            self.assertEqual(0, stub_data.unread_count_for_user('ghost'))
+
+    def test_wording_of_kk_ago(self):
+        self.assertEqual(stub_data.kk_ago(0, 2), '2 сағат бұрын')
+        self.assertEqual(stub_data.kk_ago(0), 'бүгін')
+        self.assertEqual(stub_data.kk_ago(1), 'кеше')
+        self.assertEqual(stub_data.kk_ago(5), '5 күн бұрын')
+        self.assertEqual(stub_data.kk_ago(60), '2 ай бұрын')
+        self.assertEqual(stub_data.kk_ago(800), '2 жыл бұрын')
+
+    def test_hours_only_refine_today(self):
+        """«26 сағат бұрын» человек переводит в дни сам — короче «кеше»."""
+        self.assertEqual(stub_data.kk_ago(1, 26), 'кеше')
+
+    def test_freshest_first_inside_a_bucket(self):
+        """Порядок объявления в данных — не порядок ленты.
+
+        Сегодняшние события шли «2 сағат · 4 сағат · 9 сағат · 6 сағат».
+        """
+        for bucket in stub_data.notifications_for_user('aidana').values():
+            keys = [(n.days_ago, n.hours_ago or 0) for n in bucket]
+            self.assertEqual(keys, sorted(keys))
+
+
+class NotificationsLeadSomewhere(TestCase):
+    """Уведомление ведёт к своему предмету (FR-NOTIF-05, BR-72a).
+
+    Конкурсное событие знало о конкурсе только по имени внутри `text`
+    и потому не вело никуда: прочитав «шорт-лист басталды», автор шёл
+    искать конкурс через меню.
+    """
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+        self.response = self.client.get(reverse('core:notifications'))
+
+    def test_contest_notification_links_to_its_contest(self):
+        contest_notifs = [n for n in stub_data.NOTIFICATIONS_BY_USER['aidana']
+                          if n.kind == 'contest']
+        self.assertTrue(contest_notifs, 'стаб потерял конкурсные уведомления')
+        for n in contest_notifs:
+            with self.subTest(contest=n.contest_slug):
+                self.assertTrue(n.contest, 'конкурсное уведомление без конкурса')
+                self.assertContains(
+                    self.response,
+                    reverse('core:contest_detail', kwargs={'slug': n.contest.slug}))
+
+    def test_moderation_notification_links_to_the_story(self):
+        mods = [n for n in stub_data.NOTIFICATIONS_BY_USER['aidana']
+                if n.kind == 'moderation' and n.story]
+        self.assertTrue(mods, 'стаб потерял уведомление о модерации')
+        for n in mods:
+            with self.subTest(story=n.story_slug):
+                # Работа на модерации не публична — вести на неё можно
+                # только в авторский кабинет (BR-73).
+                self.assertContains(
+                    self.response,
+                    reverse('core:manage_story', kwargs={'slug': n.story.slug}))
+
+    def test_text_does_not_repeat_the_name_of_its_subject(self):
+        """Имя предмета берётся у предмета, а не переписывается литералом.
+
+        Второй литерал разошёлся бы с первым ровно так же, как хранимый
+        `Author.works` разошёлся с числом произведений (DEC-40).
+        """
+        for n in stub_data.NOTIFICATIONS_BY_USER['aidana']:
+            if n.kind == 'comment':
+                continue  # у комментария `text` — цитата читателя, чужой UGC
+            with self.subTest(kind=n.kind):
+                if n.contest:
+                    self.assertNotIn(n.contest.name.strip('«»'), n.text)
+                if n.story:
+                    self.assertNotIn(n.story.title, n.text)
+
+    def test_contest_notification_names_the_deadline(self):
+        """FR-NOTIF-06: срок считает конкурс, а не текст уведомления."""
+        contest = stub_data.CONTESTS_BY_SLUG['bolashak-mektebi']
+        self.assertTrue(contest.timing_line)
+        self.assertContains(self.response, contest.timing_line)
 
 
 # ════════════════════════════ PROF · profile_me ════════════════════════════
@@ -977,7 +1096,6 @@ class NotificationsAuthed(TestCase):
         self.assertContains(self.response, 'Өткен аптада')
 
     def test_renders_all_notifications(self):
-        # 3 + 2 + 3 = 8 уведомлений у aidana
         # Уникальные тексты по типам
         self.assertContains(self.response, 'пікір қалдырды')   # comment
         self.assertContains(self.response, 'ұнатты')           # like
@@ -987,7 +1105,8 @@ class NotificationsAuthed(TestCase):
         self.assertContains(self.response, 'Байқау')           # contest
 
     def test_unread_summary_shows_count(self):
-        self.assertContains(self.response, '3 оқылмаған')
+        unread = stub_data.unread_count_for_user('aidana')
+        self.assertContains(self.response, f'{unread} оқылмаған')
 
     def test_mark_all_button_present_when_has_items(self):
         self.assertContains(self.response, 'Барлығын оқылды деп белгілеу')
@@ -1016,7 +1135,7 @@ class HeaderUnreadBadge(TestCase):
     def test_authed_aidana_sees_unread_badge(self):
         _login_as_aidana(self.client)
         r = self.client.get(reverse('core:home'))
-        # Бейдж непрочитанных = 3 (из stub_data.unread_count_for_user)
+        # Бейдж непрочитанных — из stub_data.unread_count_for_user
         self.assertContains(r, 'оқылмаған')
 
     def test_authed_no_notifs_no_badge_number(self):

@@ -76,6 +76,10 @@
             чужим. Сервер по-прежнему рендерит строку для выбранной по
             умолчанию — без JS форма остаётся правдивой, — а Alpine
             переписывает её при смене выбора (FR-CONT-04).
+
+            Тост говорит «жіберілді», а не «қабылданды»: «Қабылданды» —
+            решение жюри (BR-41), и автор читал отправку формы как победу
+            в первом же круге.
         {% endcomment %}
         <form method="post" action="{% url 'core:contest_submit' slug=contest.slug %}"
               x-data="{
@@ -83,7 +87,7 @@
                   vols: JSON.parse(document.getElementById('submit-volumes').textContent),
                   get vol() { return this.vols[this.picked] || {}; }
               }"
-              @submit.prevent="$dispatch('toast', { kind:'success', text:'Өтінім қабылданды (демо)' })"
+              @submit.prevent="$dispatch('toast', { kind:'success', text:'Өтінім жіберілді (демо)' })"
               class="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
             {% csrf_token %}
 

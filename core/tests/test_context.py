@@ -3,6 +3,7 @@
 from django.test import RequestFactory, TestCase
 from django.contrib.sessions.middleware import SessionMiddleware
 
+from core import stub_data
 from core.context_processors import auth_state, nav_state
 
 
@@ -39,7 +40,12 @@ class AuthState(TestCase):
         self.assertTrue(ctx['signed_in'])
         self.assertEqual(ctx['current_user_name'], 'Айдана')
         self.assertEqual(ctx['current_user_username'], 'aidana')
-        self.assertEqual(ctx['unread_notifications'], 3)
+        # Число не вписывается литералом: непрочитанные считает stub_data,
+        # и вторая копия этого числа разъезжалась бы с первой при каждой
+        # правке демо-данных.
+        self.assertEqual(ctx['unread_notifications'],
+                         stub_data.unread_count_for_user('aidana'))
+        self.assertGreater(ctx['unread_notifications'], 0)
 
 
 class NavState(TestCase):

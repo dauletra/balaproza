@@ -1,6 +1,6 @@
 # 12. Domain model contract for F14
 
-> `Обновлён: 2026-08-22` · `Сверен с кодом: b43b190`
+> `Обновлён: 2026-08-22` · `Сверен с кодом: b3ba26d`
 
 This document is the implementation contract for replacing `core/stub_data.py` with real Django models. It does not introduce models yet; it fixes the fields, relationships, computed values, and query helpers that the current templates already depend on.
 
@@ -41,10 +41,10 @@ What the table carries instead is the part `stub_data.py` cannot state: what mus
 | **Chapter** | `Chapter`, `CHAPTERS_BY_STORY` | One-based numbers. Bodies live **outside** `stub_data.py` in `core/story_texts/<slug>/<n>.txt`; `_chapter()` loads them and derives `char_count`. Keep long prose out of the data module. Read via `?chapter=N` — no separate route (DEC-30). **`Story.chapters` не может обещать больше, чем есть записей**: запись главы обязана нести текст, поэтому произведение без текста несёт `chapters=0`, а не пустые главы. Закрыто `test_stub_data.DeclaredChapterCountMatchesLoadedChapters`, там же заморожен список каталожных сериалов, которым текст ещё не написан |
 | **Collection** | `Collection` | Ordered many-to-many with `Story`. Editorial curation by a moderator, not a smart auto-filter, and separate from contests (DEC-27). **Admin-authored only** — there is no user-created collection (DEC-31); `count` and `covers` are derived from `story_slugs`, never stored alongside it |
 | **Contest** | `Contest` | Хранятся три даты (`opens_on` / `closes_on` / `results_on`); фаза, отсчёт, год и число заявок **выводятся** (DEC-45, BR-40a). Хранимого `status` нет и заводить его нельзя — это тот же класс поля, что `Author.works`. Separate from collections. Admin UI is Django admin for MVP (DEC-23) |
-| **Submission** | `Submission` | One story per author per contest (BR-23). Eligibility is a query/service concern, never template logic (BR-22, BR-24) |
+| **Submission** | `Submission` | One story per author per contest (BR-23). Eligibility is a query/service concern, never template logic (BR-22, BR-24). `submitted_on` is a date; the relative wording is derived (BR-41a) |
 | **LibraryEntry** | `LibraryEntry` | `kind`: `saved` / `reading` / `done`, non-overlapping (BR-60/61). Continue-reading is a first-class reader workflow — it drives both the hero and the mobile nav |
 | **Comment** | `StoryComment` | One reply level only (BR-30). Anchored to a chapter via `chapter_number`; `None` means the whole work. Reply form and comment-like persistence can wait |
-| **Notification** | `Notification` | Secondary in MVP: header badge plus the notifications page are enough (BR-70…72) |
+| **Notification** | `Notification` | Secondary in MVP: header badge plus the notifications page are enough (BR-70…72). Stores when the event happened, not how long ago; every notification links to its subject (BR-70a, BR-72a) |
 
 ## 12.3 Query/service helpers to preserve
 
@@ -100,8 +100,9 @@ Author workspace, library, social:
 - `is_following(me: str, them: str) -> bool`
 - `following_of(username: str) -> list[Author]` — оба списка публичны (BR-75), страницу собирает `profile_people`
 - `followers_of(username: str) -> list[Author]`
-- `notifications_for_user(username: str) -> dict`
-- `unread_count_for_user(username: str) -> int`
+- `notifications_for_user(username: str) -> dict` — три бакета FR-NOTIF-01; событие старше недели не попадает ни в один (BR-70a)
+- `unread_count_for_user(username: str) -> int` — считает то же, что показывается: скрытое старое уведомление в бейдж не идёт
+- `kk_ago(days: int, hours: int | None = None) -> str` — «как давно» словами, одна формулировка на проект: её берут `Notification.when` и `Submission.submitted_label`
 
 Contests:
 - `submissions_of(username: str) -> list[Submission]`
@@ -154,6 +155,7 @@ Contest — **хранятся три даты, остальное выводи�
 - `year` — производное: год `results_on`. Нужен конкурсной биографии (FR-PROF-07): «1 жыл бұрын» из `Submission.submitted_relative` устаревает каждый день
 - `submissions` — производное: число заявок по `SUBMISSIONS_BY_USER`. Было хранимым литералом и показывало «87» при одной настоящей заявке
 - `opens_on_label` / `closes_on_label` / `results_on_label` — производные: дата в казахской короткой форме («9 қыр»). Своё форматирование, а не Django-фильтр `date`, который берёт месяцы из локали
+- `timing_line` — производное: «что дальше и когда» одной строкой, у завершённого пусто. Спрашивают об этом из трёх мест (строка заявки, конкурсное уведомление, рейл), и собирать формулировку в шаблоне запрещено — первая версия стояла inline в `pages/contests/my_submissions.html`. Отсчёта в днях в строке нет: он протухает назавтра (BR-40a)
 - `winners: tuple[str]` — слаги **произведений**-победителей, не имена авторов; автор выводится через `Story.author_username`. Второй литерал с именем разошёлся бы с первым ровно так же, как хранимый `Author.works` разошёлся с числом произведений. У незавершённого конкурса пусто
 - `awards: tuple[ContestAward]` — номинации конкурса, произвольный набор (BR-44)
 - `grants` — производное: присуждения этого конкурса в порядке номинаций
@@ -166,6 +168,17 @@ ContestAward (BR-44, BR-46):
 
 AwardGrant (BR-45) — **хранится**, в отличие от системных знаков:
 - `contest_slug`, `award_slug`, `story_slug`, `note`; автор выводится из работы
+
+Submission (BR-41, BR-41a):
+- `contest_slug`, `story_slug`, `submitted_on: date`, `status`, `note`
+- `submitted_label` — производное: «5 күн бұрын» через `kk_ago()`. Хранимая строка `submitted_relative` не только устаревала, но и лгала проверяемо — «6 ай бұрын» у конкурса, закрывшегося в 2023-м
+- инвариант: `contest.opens_on <= submitted_on <= contest.closes_on`
+
+Notification (BR-70a, BR-72a) — **хранится «когда», выводится «как давно»**:
+- stored: `kind`, `days_ago: int`, `hours_ago: int | None`, `actor_username`, `story_slug`, `contest_slug`, `text`, `read`
+- `when` / `bucket` — производные. Полей с этими именами нет: `when="5 күн бұрын"` и `bucket="past_week"` устаревали назавтра
+- `actor` / `story` / `contest` — резолвы ссылок. Уведомление обязано вести к своему предмету, и `contest_slug` заведён именно для этого
+- `text` несёт только событие. Имя конкурса или работы в нём не повторяется — оно приходит из объекта (исключение: `comment`, где `text` — цитата читателя)
 
 TimelineStage:
 - `label`, `starts: date`, `ends: date` — однодневный этап задаётся равными датами

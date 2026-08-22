@@ -31,7 +31,7 @@
                 {% with sub=it.sub c=it.contest %}
                 <article class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-5 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0 flex-1">
-                        <p class="font-sans text-xs uppercase tracking-wide text-slate-500">{{ sub.submitted_relative }}</p>
+                        <p class="font-sans text-xs uppercase tracking-wide text-slate-500">{{ sub.submitted_label }}</p>
                         <h2 class="mt-1 font-display text-lg font-bold leading-tight text-slate-900">
                             {% if c %}
                                 <a href="{% url 'core:contest_detail' slug=c.slug %}" class="hover:text-brand">{{ c.name }}</a>
@@ -49,16 +49,13 @@
                         {% comment %}
                             Срок вместо тишины: «Қаралуда» без даты не отвечает
                             на «а когда узнаю» — самый частый вопрос после
-                            подачи. Дата берётся у фазы конкурса (DEC-45).
+                            подачи. Строку собирает сам конкурс
+                            (`Contest.timing_line`, DEC-45): её же показывает
+                            конкурсное уведомление, а две рукописные копии
+                            одной формулировки расходятся.
                         {% endcomment %}
-                        {% if c and not c.is_finished %}
-                            <p class="mt-1.5 font-sans text-xs text-slate-500">
-                                {% if c.is_accepting %}
-                                    Қабылдау {{ c.closes_on_label }} жабылады · жеңімпаздар {{ c.results_on_label }}
-                                {% else %}
-                                    Жеңімпаздар {{ c.results_on_label }} жарияланады
-                                {% endif %}
-                            </p>
+                        {% if c.timing_line %}
+                            <p class="mt-1.5 font-sans text-xs text-slate-500">{{ c.timing_line }}</p>
                         {% endif %}
 
                         {% if sub.note %}

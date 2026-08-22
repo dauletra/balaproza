@@ -1610,6 +1610,32 @@ def kk_period(starts: date, ends: date) -> str:
     return kk_date(starts) if starts == ends else f"{kk_date(starts)} — {kk_date(ends)}"
 
 
+def kk_ago(days: int, hours: Optional[int] = None) -> str:
+    """«Сколько времени назад» словами — одна формулировка на весь проект.
+
+    Относительное время до этого лежало в данных строкой: у уведомления
+    «5 күн бұрын», у заявки «6 ай бұрын». Это то же хранимое производное,
+    что `days_left=12` (DEC-45, BR-40a), только заметить его труднее —
+    страница выглядит правдоподобно ровно один день. Заявка `aidana` на
+    «Жас алдым — 2023» говорила «6 ай бұрын» о конкурсе, закрывшемся в
+    декабре 2023-го.
+
+    Часы называются только сегодня: «26 сағат бұрын» человек в уме
+    переводит в дни, и «кеше» короче.
+    """
+    if days <= 0:
+        if hours:
+            return f"{hours} сағат бұрын"
+        return "бүгін"
+    if days == 1:
+        return "кеше"
+    if days < 30:
+        return f"{days} күн бұрын"
+    if days < 365:
+        return f"{days // 30} ай бұрын"
+    return f"{days // 365} жыл бұрын"
+
+
 @dataclass(frozen=True)
 class TimelineStage:
     """Этап конкурса. Хранятся даты, состояние выводится.
@@ -1753,6 +1779,26 @@ class Contest:
     @property
     def results_on_label(self) -> str:
         return kk_date(self.results_on)
+
+    @property
+    def timing_line(self) -> str:
+        """«Что дальше и когда» одной строкой. У завершённого — пусто.
+
+        Живёт здесь, а не в шаблоне, потому что спрашивают об этом из
+        трёх разных мест: строка заявки в «Менің өтінімдерім», конкурсное
+        уведомление и рейл. Первая версия стояла inline в
+        `my_submissions.html`; вторая копия разошлась бы с ней ровно так
+        же, как разошлись две рукописные копии правил (см. предыдущий
+        коммит ветки).
+        """
+        if self.phase == "upcoming":
+            return f"Қабылдау {self.opens_on_label} басталады"
+        if self.phase == "accepting":
+            return (f"Қабылдау {self.closes_on_label} жабылады · "
+                    f"жеңімпаздар {self.results_on_label} жарияланады")
+        if self.phase == "judging":
+            return f"Жеңімпаздар {self.results_on_label} жарияланады"
+        return ""
 
     @property
     def year(self) -> int:
@@ -2050,9 +2096,16 @@ AWARD_GRANTS = [
 
 @dataclass(frozen=True)
 class Submission:
+    """Заявка автора. Хранится дата подачи, подпись выводится (BR-41a).
+
+    Прежнее `submitted_relative` было строкой: «6 ай бұрын» стояло у
+    заявки на конкурс, закрывшийся в декабре 2023-го, — то есть подача
+    приходилась на полгода позже дедлайна. Дата, наоборот, проверяема:
+    подача обязана лежать внутри окна приёма своего конкурса.
+    """
     contest_slug: str
     story_slug: str
-    submitted_relative: str    # «3 күн бұрын», «бүгін»
+    submitted_on: date         # когда подана; внутри opens_on…closes_on конкурса
     status: str                # 'reviewing' | 'accepted' | 'rejected'
     note: str = ""             # жюри-комментарий (для rejected/accepted)
 
@@ -2064,16 +2117,21 @@ class Submission:
     def story(self):
         return STORIES_BY_SLUG.get(self.story_slug)
 
+    @property
+    def submitted_label(self) -> str:
+        """«5 күн бұрын» — производное от даты, а не хранимая строка."""
+        return kk_ago((date.today() - self.submitted_on).days)
+
 
 SUBMISSIONS_BY_USER: dict = {
     "aidana": [
         Submission(
             contest_slug="altyn-qalam", story_slug="aidana-tan",
-            submitted_relative="5 күн бұрын", status="reviewing",
+            submitted_on=_d(-5), status="reviewing",
         ),
         Submission(
             contest_slug="zhas-aldym-2023", story_slug="aidana-kysh",
-            submitted_relative="6 ай бұрын", status="rejected",
+            submitted_on=date(2023, 11, 20), status="rejected",
             # Работа на 2 524 знака при пороге 5 000 — отказ по недобору.
             # Прежняя формулировка говорила «асып кеткен» (превысил) и
             # противоречила собственным данным.
@@ -2086,18 +2144,18 @@ SUBMISSIONS_BY_USER: dict = {
     "dina_books": [
         Submission(
             contest_slug="bolashak-mektebi", story_slug="igra-kuklovoda",
-            submitted_relative="8 күн бұрын", status="reviewing",
+            submitted_on=_d(-8), status="reviewing",
         ),
         Submission(
             contest_slug="zhas-aldym-2023", story_slug="igra-kuklovoda",
-            submitted_relative="1 жыл бұрын", status="accepted",
+            submitted_on=date(2023, 10, 12), status="accepted",
             note="Қазылар алқасының таңдауы.",
         ),
     ],
     "bekzhan_t": [
         Submission(
             contest_slug="zhas-aldym-2023", story_slug="temniy-lord",
-            submitted_relative="1 жыл бұрын", status="accepted",
+            submitted_on=date(2023, 10, 5), status="accepted",
             note="Қазылар алқасының таңдауы.",
         ),
     ],
@@ -2685,12 +2743,28 @@ NOTIF_BUCKET_LABELS = {
 
 @dataclass(frozen=True)
 class Notification:
+    """Событие в ленте автора. Хранится «когда», выводится «как давно».
+
+    Два правила, которых у уведомления не было (BR-70a, BR-72a):
+
+    **Время не хранится строкой.** Было `when="5 күн бұрын"` и
+    `bucket="past_week"` — оба поля устаревали на следующий день, ровно
+    как `days_left` до DEC-45. Теперь хранится `days_ago`, а подпись и
+    группа выводятся из него.
+
+    **Уведомление ведёт к своему предмету.** Конкурсное событие знало о
+    конкурсе только по имени внутри `text` и потому не вело никуда:
+    прочитав «шорт-лист басталды», автор шёл искать конкурс через меню.
+    Имя предмета берётся у самого предмета — второй литерал разошёлся бы
+    с первым, как разошёлся хранимый `Author.works` (DEC-40).
+    """
     kind: str               # см. NOTIF_KINDS
-    bucket: str             # 'today' | 'yesterday' | 'past_week'
-    when: str               # «2 сағат бұрын», «кеше 18:40», «5 қаңтар»
+    days_ago: int = 0       # сколько дней назад; 0 — сегодня
+    hours_ago: Optional[int] = None   # уточнение для сегодняшних событий
     actor_username: str = ""    # кто инициатор (для comment/like/follower); '' если системное
-    story_slug: str = ""        # к чему относится (для comment/like/new_chapter); '' если нет
-    text: str = ""              # короткое тело (для comment — выдержка, для остальных — auto-build)
+    story_slug: str = ""        # к чему относится (comment/like/new_chapter/moderation)
+    contest_slug: str = ""      # к какому конкурсу относится (kind='contest')
+    text: str = ""              # только событие: имя предмета приходит из объекта
     read: bool = False          # прочитано ли
 
     @property
@@ -2701,47 +2775,91 @@ class Notification:
     def story(self):
         return STORIES_BY_SLUG.get(self.story_slug) if self.story_slug else None
 
+    @property
+    def contest(self):
+        return CONTESTS_BY_SLUG.get(self.contest_slug) if self.contest_slug else None
+
+    @property
+    def when(self) -> str:
+        return kk_ago(self.days_ago, self.hours_ago)
+
+    @property
+    def bucket(self) -> str:
+        """Группа FR-NOTIF-01 или '' — если событие старше недели.
+
+        Групп ровно три, и четвёртой («раньше») в требовании нет. Значит,
+        неделя и есть глубина ленты; событие старше в неё не попадает —
+        см. `notifications_for_user`.
+        """
+        if self.days_ago <= 0:
+            return "today"
+        if self.days_ago == 1:
+            return "yesterday"
+        return "past_week" if self.days_ago <= 7 else ""
+
 
 NOTIFICATIONS_BY_USER: dict = {
     "aidana": [
         # ── Бүгін ──
         Notification(
-            kind="comment", bucket="today", when="2 сағат бұрын",
+            kind="comment", hours_ago=2,
             actor_username="aygerim_k", story_slug="aidana-tan",
             text="Соңғы бөлім жанға тиді. Сегізіншіде Айданың Таразға қайтуы — нағыз қазақша драма!",
         ),
         Notification(
-            kind="like", bucket="today", when="4 сағат бұрын",
+            kind="like", hours_ago=4,
             actor_username="bekzhan_t", story_slug="aidana-tan",
         ),
         Notification(
-            kind="moderation", bucket="today", when="бүгін 09:15",
+            kind="moderation", hours_ago=9,
             story_slug="aidana-erteg",
-            text="«Ертегі ертеректегі» — модерациядан өтуде. 1-2 күн қажет.",
+            # Название работы в тексте не повторяется: его несёт ссылка на
+            # саму работу. Раньше строка начиналась с «Ертегі ертеректегі»,
+            # и переименование произведения оставило бы уведомление
+            # говорить о старом имени.
+            # «Модерация: … модерациядан өтуде» повторяло корень дважды:
+            # тип события уже назван подписью и иконкой, тексту остаётся срок.
+            text="1-2 күн қажет.",
+        ),
+        # Срок, а не тишина: приём в «Болашақтың мектебі» ещё идёт, и это
+        # то единственное уведомление, по которому автор может что-то
+        # сделать прямо сейчас. Сколько именно осталось, знает конкурс —
+        # в тексте этого числа нет (BR-40a).
+        Notification(
+            kind="contest", hours_ago=6,
+            contest_slug="bolashak-mektebi",
+            # Про дедлайн говорит строка срока под текстом; здесь — то,
+            # что автор может сделать. «Жабылады» в обеих строках подряд
+            # было одним фактом, сказанным дважды.
+            text="өтінім беруге әлі үлгересің.",
         ),
         # ── Кеше ──
         Notification(
-            kind="follower", bucket="yesterday", when="кеше 18:40",
+            kind="follower", days_ago=1,
             actor_username="dina_books", read=True,
         ),
         Notification(
-            kind="new_chapter", bucket="yesterday", when="кеше 14:20",
+            kind="new_chapter", days_ago=1,
             actor_username="rudazov", story_slug="arhimag",
-            text="«Сиқыршы: бөтен әлемдер» — жаңа бөлім қосылды.",
+            text="жаңа бөлім қосылды.",
             read=True,
         ),
         # ── Өткен аптада ──
         Notification(
-            kind="like", bucket="past_week", when="3 күн бұрын",
+            kind="like", days_ago=3,
             actor_username="sayyn", story_slug="aidana-kysh", read=True,
         ),
+        # У aidana в этом конкурсе лежит заявка, и уведомление обязано
+        # вести к нему: дата объявления итогов — первый вопрос после
+        # закрытия приёма, и она приходит из `Contest.timing_line`.
         Notification(
-            kind="contest", bucket="past_week", when="5 күн бұрын",
-            text="«Алтын қалам» байқауының шорт-лист кезеңі басталды.",
+            kind="contest", days_ago=4,
+            contest_slug="altyn-qalam",
+            text="өтінім қабылдау жабылды, жұмыстар қазылар алқасында.",
             read=True,
         ),
         Notification(
-            kind="comment", bucket="past_week", when="6 күн бұрын",
+            kind="comment", days_ago=6,
             actor_username="rudazov", story_slug="aidana-tan",
             text="Жас автордың тілі жаңа да жанды. Әрі қарай жалғастыр.",
             read=True,
@@ -2754,18 +2872,34 @@ def notifications_for_user(username: str) -> dict:
     """Уведомления, сгруппированные по бакетам времени (FR-NOTIF-01).
 
     Возвращает {'today': [...], 'yesterday': [...], 'past_week': [...]}.
+
+    Групп три, и старше недели событие не показывается: `Notification.bucket`
+    отдаёт у такого пустую строку, и в выдачу оно не попадает. Глубина ленты
+    объявлена самим требованием — четвёртой группы «раньше» в нём нет.
+
+    Внутри группы — свежие сверху. Порядок объявления в данных таким не
+    является: сегодняшние события шли «2 сағат · 4 сағат · 9 сағат ·
+    6 сағат», и лента читалась как перемешанная.
     """
     items = NOTIFICATIONS_BY_USER.get(username, [])
     grouped = {b: [] for b in NOTIF_BUCKETS}
     for n in items:
         if n.bucket in grouped:
             grouped[n.bucket].append(n)
+    for bucket in grouped.values():
+        bucket.sort(key=lambda n: (n.days_ago, n.hours_ago or 0))
     return grouped
 
 
 def unread_count_for_user(username: str) -> int:
-    """Сколько непрочитанных уведомлений у пользователя (для бейджа в шапке)."""
-    return sum(1 for n in NOTIFICATIONS_BY_USER.get(username, []) if not n.read)
+    """Сколько непрочитанных уведомлений у пользователя (для бейджа в шапке).
+
+    Считается то же, что показывается: событие старше недели в ленту не
+    попадает (BR-70a), и учитывать его в бейдже значит послать автора
+    искать уведомление, которого на странице нет.
+    """
+    return sum(1 for n in NOTIFICATIONS_BY_USER.get(username, [])
+               if not n.read and n.bucket)
 
 
 # ───────────────────────── Глобальные «цифры платформы» ────────────────────

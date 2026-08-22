@@ -43,11 +43,15 @@ balaproza_v1/
 │   ├── stub_data.py              # ВСЕ «данные» проекта (Genre, Tag, Author, Story, Chapter,
 │   │                             # Collection (только редакция, count/covers — производные),
 │   │                             # Contest (три даты — opens_on/closes_on/results_on;
-│   │                             # phase/days_left/year/submissions ВЫВОДЯТСЯ — DEC-45),
+│   │                             # phase/days_left/year/submissions/timing_line
+│   │                             # ВЫВОДЯТСЯ — DEC-45),
 │   │                             # ContestAward (номинации, произвольный набор) +
 │   │                             # AwardGrant (присуждение ХРАНИТСЯ — DEC-46),
-│   │                             # Submission, LibraryEntry,
-│   │                             # Notification, ReadingProgress, FOLLOWING, etc.)
+│   │                             # Submission (хранится submitted_on: date,
+│   │                             # submitted_label выводится — BR-41a), LibraryEntry,
+│   │                             # Notification (хранится days_ago + contest_slug;
+│   │                             # when/bucket ВЫВОДЯТСЯ — BR-70a/72a),
+│   │                             # ReadingProgress, FOLLOWING, etc.)
 │   │                             # Story.status дефолт = "NotPublished" (Draft) — см. BR-10
 │   │                             # Story.tags: tuple = () — UGC-теги, до 10 (docs/11, BR-TAG-*)
 │   │                             # Genre.icon — slug SVG-иконки для тайла жанра на главной
@@ -73,6 +77,8 @@ balaproza_v1/
 │   │                             # причина отказа), busy_contest_of (BR-23a),
 │   │                             # can_withdraw (BR-23b), spaced_number (канонические
 │   │                             # разряды; фильтр `spaced` вызывает её — одна реализация),
+│   │                             # kk_date / kk_period / kk_ago (одна лесенка
+│   │                             # относительного времени — docs/16 §16.4),
 │   │                             # tag_by_slug, tags_of, is_blocked, popular_tags,
 │   │                             # accepted_tags_json, blocked_tag_patterns_list
 │   │                             # + константы: READ_TIERS, CATALOG_SORTS, CATALOG_DEFAULT_SORT,
@@ -101,7 +107,7 @@ balaproza_v1/
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
 │   │                             # stub_data.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 821 тест в 16 файлах (см. ниже)
+│   └── tests/                    # 840 тестов в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -217,7 +223,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 821 тест
+uv run python manage.py test core       # все 840 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 
@@ -284,6 +290,8 @@ def _login_as_aidana(client):
   **Подключать всегда с `only`**: `{% include "components/icon.html" with name="pen" size=16 only %}`. Без него include наследует родительский контекст, и `label` кнопки/бейджа/пилюли утекает в иконку — та получает `role="img"` с той же подписью, что и текст рядом, и скринридер читает её дважды («Жаңа шығарма Жаңа шығарма»). Осознанно `label` иконке не передаёт ни один вызов в проекте. Закрыто `test_template_lint.IconIncludesAreIsolated` + `IconLabelsDoNotDuplicateText`
 - **Метрики в `stat_pill`** — всегда с `label` (полная озвучка с числом: `story.views|spaced|add:" оқылым"`). Значение под `aria-hidden`, иконка декоративная — без подписи цифры пропадают из озвучки целиком. Подпись рендерится в `sr-only`, а не в `aria-label`: у `<span>` с role=generic имя не выставляется
 - **Числа: `compact_count` — читателю, `spaced` — автору.** Узкие карточки каталога сжимают («2,1 мың»), авторский кабинет показывает точное с разрядами («1 042»). `stringformat:"d"` не форматирует ничего и запрещён
+- **Относительное время — только `stub_data.kk_ago()`.** «5 күн бұрын» в данных — хранимое производное: у уведомления оно устаревало назавтра, у заявки врало проверяемо («6 ай бұрын» о конкурсе, закрывшемся два с половиной года назад). Хранится момент (`days_ago`, `submitted_on: date`), подпись выводится (BR-70a, BR-41a)
+- **Уведомление ведёт к своему предмету и не переписывает его имя** (BR-72a). Имя конкурса или работы приходит из объекта (`n.contest.name`, `n.story.title`), в `text` лежит только событие. Исключение — `comment`: там `text` это цитата читателя
 - **Три точки (`dots-*`) — только на кнопке, открывающей меню.** Они значат «ещё варианты», то есть помечают контейнер, а не действие. На пункте меню или на самостоятельной кнопке они не значат ничего. Жалоба — `flag`, защита/модерация — `shield` (docs/04 §4.2)
 - **Эмодзи запрещены** в шаблонах, stub_data и любом контенте проекта. Стандартные emoji-символы (☀️ 📖 😢 🎒 👽 🌆 🇰🇿 🕯️ ✍️ 🎄 🧟 😄 и т.п.) выглядят дёшево и роняют уровень дизайна. Альтернативы: SVG-иконка через `components/icon.html`, типографический акцент (крупная буква), абстрактный геометрический паттерн OKLCH, либо ничего. Это правило касается и текстового контента — приветствий, заголовков, описаний
 - **Обложки произведений** — `components/cover_placeholder.html` (двухрежимный): если `story.cover` непустой → рендерит `<img src="/media/{cover}">` с object-cover; иначе — типографическая плашка OKLCH + буква + «корешок» по hue primary жанра. Не использовать `{% static story.cover %}` напрямую — путь к файлу инкапсулирован в компоненте

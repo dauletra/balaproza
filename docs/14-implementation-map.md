@@ -1,6 +1,6 @@
 # 14 · Карта реализации: требование → код
 
-> `Обновлён: 2026-08-22` · `Сверен с кодом: d119b85`
+> `Обновлён: 2026-08-22` · `Сверен с кодом: b3ba26d`
 
 Этот документ отвечает на два вопроса, на которые остальное ТЗ не отвечает: **где живёт то, что описано требованием**, и **что придётся обновить, если это изменить**.
 
@@ -23,7 +23,7 @@
 | Фильтры | `core/templatetags/balaproza.py` | `compact_count`, `spaced`, `page_range`, `belongs_to` |
 | Шаблоны | корневая `templates/` (131 файлов) | 59 компонентов · 40 партиалов · 28 страниц · спрайт иконок · `base.html` · `404/500` |
 | Токены | `static_src/input.css`, блок `@theme` | Единственный источник цветов, радиусов, теней ([02](02-design-system.md)) |
-| Тесты | `core/tests/` (16 файлов, 821 тест) | Контракт поведения, описан в [15](15-testing-contract.md) |
+| Тесты | `core/tests/` (16 файлов, 840 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
 
 **Шаблоны — не в `core/templates/`, а в корневой `templates/`.** Это задано `TEMPLATES.DIRS` в `config/settings.py`.
 
@@ -217,6 +217,8 @@
 | Инварианты конкурсных данных | `Contest.winners`, `SUBMISSIONS_BY_USER` | `test_contests.ContestWinners`, `SubmissionsMatchContestBadges`, `SubmissionIntegrity` |
 | FR-LIB-01…03 / BR-60, BR-61 | `library` + `segmented_control` | `LibraryAuthed`, `LibraryEmpty`, `LibraryHelpers` |
 | FR-NOTIF-01…04 / BR-70…72 | `notifications` | `NotificationsAuthed`, `NotificationsEmpty` |
+| FR-NOTIF-01 / BR-70a (время выводится) | `Notification.days_ago` → `when` / `bucket`, `stub_data.kk_ago` | `test_prof_lib_notif.NotificationTime` |
+| FR-NOTIF-05, 06 / BR-72a | `Notification.contest_slug` → `components/notification_item.html`, `Contest.timing_line` | `test_prof_lib_notif.NotificationsLeadSomewhere` |
 | FR-NOTIF-02 (бейдж) | `auth_state.unread_notifications` | `HeaderUnreadBadge` |
 
 Переключение вкладок — реальный `?tab=` через `components/segmented_control.html`, не псевдо-табы (DEC-15). Разметка сегментов навигационная (`<nav>` + `aria-current`), ролей `tablist`/`tab` в них нет — они обещают панель, которой при переходе по URL не бывает (`test_template_lint.TabRolesPromiseAPanel`). Списки людей передают сегментам готовый `href`: они различаются путём, а не состоянием страницы.
@@ -229,7 +231,7 @@
 | FR-CONT-03 / BR-42, BR-43 | `contest_detail`, `components/contest_status.html` (4 фазы) | `ContestDetailKnown`, `ContestDetailFinished`, `DetailHeroSpeaksByPhase`, `PhaseLabelsAreOneRegistry` |
 | FR-CONT-04 / BR-22, BR-24 | `contest_submit` + `submission_checklist`, `eligible_for_contest`, живой пересчёт объёма на Alpine | `ChecklistHelpers`, `ContestSubmitForm`, `ChecklistFollowsTheChoice`, `ChecklistSurvivesWithoutAnEligibleWork`, `EligibilityReasons` |
 | FR-CONT-05 / BR-23, BR-25 | `has_submission`, `eligible_for_contest`, `Contest.is_accepting` | `ContestSubmitAlreadyDone`, `ContestSubmitGuest`, `SubmitIsGatedByPhase` |
-| FR-CONT-06 / BR-41, BR-23b | `my_submissions`, `can_withdraw`, `components/withdraw_confirm_modal.html` | `MySubmissionsAuthed`, `MySubmissionsEmpty`, `WithdrawSubmission`, `SubmissionsPageNamesTheDates` |
+| FR-CONT-06 / BR-41, BR-41a, BR-23b | `my_submissions`, `can_withdraw`, `Submission.submitted_on`, `Contest.timing_line`, `components/withdraw_confirm_modal.html` | `MySubmissionsAuthed`, `MySubmissionsEmpty`, `WithdrawSubmission`, `SubmissionsPageNamesTheDates`, `SubmissionDatesAreReal`, `ContestTimingLineIsOneImplementation` |
 | FR-CONT-07 / BR-24 | порог объёма из `Contest.min_chars`/`max_chars` | `EligibleForContest`, `ChecklistNumbers` |
 | FR-CONT-08 / BR-45 | `partials/contest/_winners.html`, `_timeline.html`, `contest_card` | `ContestWinnersOnDetail`, `ContestWinnersOnCard`, `ContestAwardsOnDetail` |
 | FR-CONT-10 / BR-44, BR-46 / DEC-46 | `partials/contest/_awards.html`, `ContestAward`, `AwardGrant`, `components/award_art.html` | `ContestAwardsData`, `ContestAwardImages`, `SystemWinnerAwardIsRetired` |
@@ -237,6 +239,8 @@
 | Словарь: «байқау», не «конкурс» ([16 §16.4](16-content-voice.md)) | шаблоны CONT + подсказка возраста в регистрации | `ContestVocabulary` |
 | Подписи фаз ([16 §16.3a](16-content-voice.md)) | `CONTEST_PHASE_LABELS` / `CONTEST_PHASE_BADGE` | `PhaseLabelsAreOneRegistry` |
 | Даты по-казахски | `kk_date` / `kk_period` | `KazakhDateFormatting` |
+| Относительное время ([16 §16.4](16-content-voice.md)) | `kk_ago` — одна лесенка для уведомлений и заявок | `test_prof_lib_notif.NotificationTime`, `SubmissionDatesAreReal` |
+| «Қабылданды» — только вердикт жюри | тост подачи говорит «жіберілді» | `AcceptedIsTheJuryWord` |
 | DEC-21 (AI-декларация) | радио + `<details>` в `contest_submit.html` | `ContestSubmitForm` |
 | DEC-24 (возраст) | чекбокс `confirm_age` | `ContestSubmitForm` |
 | BR-42 (₸) | фильтр `spaced` | `test_desktop_layout.MoneyFormatting` |
@@ -278,6 +282,8 @@ Showcase-маршруты `/_design/tokens/`, `/_design/components/`, `/_design/
 | Сигнатура хелпера в `stub_data.py` | [12 §12.3](12-domain-model-contract.md) |
 | Поле/property на `Story` | [12 §12.4](12-domain-model-contract.md) |
 | Даты или фаза `Contest` | [08 BR-40/40a](08-business-rules.md), [12 §12.4](12-domain-model-contract.md), [05](05-functional-spec.md) FR-CONT-01…03 |
+| Поле `Notification` или `Submission` | [08 BR-70a / BR-72a / BR-41a](08-business-rules.md), [12 §12.4](12-domain-model-contract.md), [05](05-functional-spec.md) FR-NOTIF-05/06 |
+| Строка с относительным временем | только через `kk_ago()` — [16 §16.4](16-content-voice.md); писать её в данных запрещено |
 | Номинация, присуждение или эмблема награды | [08 BR-44…46](08-business-rules.md), [12 §12.4](12-domain-model-contract.md), [05](05-functional-spec.md) FR-CONT-10 / FR-PROF-06, [03 §3.6](03-genre-color-system.md) |
 | Новый маршрут в `core/urls.py` | [05 §5.13](05-functional-spec.md) (карта переходов), эта карта, `PUBLIC_URLS` в `test_urls_smoke.py` |
 | Новый компонент в `templates/components/` | [04](04-component-library.md), счётчик в `CLAUDE.md` |

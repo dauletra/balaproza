@@ -1,5 +1,7 @@
 """CONT · конкурсы: список / детальная / подача / мои заявки."""
 
+from datetime import date
+
 from django.test import TestCase
 from django.urls import reverse
 
@@ -1085,6 +1087,98 @@ class SubmissionsPageNamesTheDates(TestCase):
         r = self.client.get(reverse('core:my_submissions'))
         self.assertContains(r,
                             stub_data.CONTESTS_BY_SLUG['altyn-qalam'].results_on_label)
+
+
+# ════════════════════════════ CONT-6 · сроки и слова ═══════════════════════
+
+class SubmissionDatesAreReal(TestCase):
+    """Дата подачи хранится датой и лежит внутри окна приёма (BR-41a).
+
+    Хранимое `submitted_relative="6 ай бұрын"` стояло у заявки на конкурс,
+    закрывшийся в декабре 2023-го: подача приходилась на полгода позже
+    дедлайна, и заметить это было нечем — строка ведь не дата.
+    """
+
+    def test_relative_string_is_not_stored(self):
+        stored = stub_data.Submission.__dataclass_fields__
+        self.assertNotIn(
+            'submitted_relative', stored,
+            '`submitted_relative` снова стало полем — это хранимое производное')
+
+    def test_submitted_inside_the_acceptance_window(self):
+        for username, subs in stub_data.SUBMISSIONS_BY_USER.items():
+            for sub in subs:
+                with self.subTest(user=username, contest=sub.contest_slug):
+                    c = sub.contest
+                    self.assertGreaterEqual(sub.submitted_on, c.opens_on)
+                    self.assertLessEqual(sub.submitted_on, c.closes_on)
+
+    def test_label_follows_the_date(self):
+        sub = stub_data.SUBMISSIONS_BY_USER['aidana'][0]
+        self.assertEqual(
+            sub.submitted_label,
+            stub_data.kk_ago((date.today() - sub.submitted_on).days))
+
+    def test_old_submission_is_not_called_a_year_ago_forever(self):
+        """Заявка 2023 года в 2026-м — не «1 жыл бұрын»."""
+        sub = stub_data.SUBMISSIONS_BY_USER['bekzhan_t'][0]
+        years = (date.today() - sub.submitted_on).days // 365
+        self.assertEqual(sub.submitted_label, f'{years} жыл бұрын')
+
+
+class ContestTimingLineIsOneImplementation(TestCase):
+    """«Что дальше и когда» собирает конкурс, а не шаблон.
+
+    Формулировка стояла inline в `my_submissions.html`; вторая копия для
+    конкурсного уведомления разошлась бы с ней ровно так же, как разошлись
+    две рукописные копии правил подачи.
+    """
+
+    def test_line_matches_the_phase(self):
+        for c in stub_data.CONTESTS:
+            with self.subTest(contest=c.slug, phase=c.phase):
+                line = c.timing_line
+                if c.phase == 'finished':
+                    self.assertEqual(line, '')
+                elif c.phase == 'upcoming':
+                    self.assertIn(c.opens_on_label, line)
+                elif c.phase == 'accepting':
+                    self.assertIn(c.closes_on_label, line)
+                    self.assertIn(c.results_on_label, line)
+                else:
+                    self.assertIn(c.results_on_label, line)
+
+    def test_line_carries_no_countdown_number(self):
+        """Числа «12 күн» в строке нет: оно протухло бы назавтра (BR-40a)."""
+        for c in stub_data.CONTESTS:
+            with self.subTest(contest=c.slug):
+                self.assertNotIn('күн қалды', c.timing_line)
+
+    def test_submissions_page_renders_the_shared_line(self):
+        _login_as(self.client, 'dina_books')
+        r = self.client.get(reverse('core:my_submissions'))
+        self.assertContains(r,
+                            stub_data.CONTESTS_BY_SLUG['bolashak-mektebi'].timing_line)
+
+
+class AcceptedIsTheJuryWord(TestCase):
+    """«Қабылданды» — решение жюри (BR-41), а не факт получения формы.
+
+    Тост подачи говорил именно это слово, и автор читал отправку как победу
+    в первом же круге. Одна сущность — одно слово (docs/16 §16.4).
+    """
+
+    def test_submit_form_does_not_promise_acceptance(self):
+        _login_as_aidana(self.client)
+        html = self.client.get(
+            reverse('core:contest_submit', args=['bolashak-mektebi'])).content.decode()
+        self.assertNotIn('Өтінім қабылданды', html)
+        self.assertIn('Өтінім жіберілді', html)
+
+    def test_word_survives_where_it_means_the_verdict(self):
+        _login_as(self.client, 'dina_books')
+        r = self.client.get(reverse('core:my_submissions'))
+        self.assertContains(r, stub_data.CONTEST_RESULT_LABELS['accepted'])
 
 
 class BlockedSubmitExplainsItself(TestCase):
