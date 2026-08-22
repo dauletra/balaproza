@@ -206,7 +206,7 @@ class MyStoryRowMetricsAreAnnounced(TestCase):
         # Просмотры — за две недели (DEC-36), а не накопленные
         story = stub_data.STORIES_BY_SLUG['aidana-tan']   # 310 / 87 / 12
         self.assertContains(self.response, f'{spaced(story.recent_views)} оқылым')
-        self.assertContains(self.response, f'{spaced(story.likes)} ұнату')
+        self.assertContains(self.response, f'{spaced(story.likes)} реакция')
         self.assertContains(self.response, f'{spaced(story.comments)} пікір')
 
     def test_labels_are_reachable_by_screen_readers(self):
@@ -910,7 +910,7 @@ class NonPublicRowsReplaceZeroesWithProgress(TestCase):
     def test_no_zero_metric_pills_on_those_rows(self):
         # Именно начало подписи: «310 оқылым» тоже содержит «0 оқылым»
         self.assertNotContains(self.response, 'class="sr-only">0 оқылым')
-        self.assertNotContains(self.response, 'class="sr-only">0 ұнату')
+        self.assertNotContains(self.response, 'class="sr-only">0 реакция')
         self.assertNotContains(self.response, 'class="sr-only">0 пікір')
 
 

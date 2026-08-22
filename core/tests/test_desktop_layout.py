@@ -148,8 +148,8 @@ class RailContentHasMobileEquivalent(TestCase):
     """
 
     PAGES = [
-        ('/me/',                        ['Шығарма', 'Ұнатулар', 'Оқылым']),
-        ('/u/rudazov/',                 ['Шығарма', 'Жазылушы', 'Ұнатулар', 'Оқылым']),
+        ('/me/',                        ['Шығарма', 'Реакциялар', 'Оқылым']),
+        ('/u/rudazov/',                 ['Шығарма', 'Жазылушы', 'Реакциялар', 'Оқылым']),
         ('/contests/bolashak-mektebi/', ['Сыйақы', 'Өтінім', 'Қазылар']),
         ('/story/dalney-berega/',       ['Автор', 'Бөлім']),
         ('/catalog/',                   ['Сүзгілер']),
@@ -186,7 +186,7 @@ class ProfileStatsNotDuplicated(TestCase):
     def test_stats_render_once(self):
         html = self.client.get('/me/').content.decode()
         self.assertNotIn('Қысқа сан', html)
-        self.assertEqual(html.count('>Ұнатулар</dt>'), 1)
+        self.assertEqual(html.count('>Реакциялар</dt>'), 1)
 
 
 class MoneyFormatting(TestCase):

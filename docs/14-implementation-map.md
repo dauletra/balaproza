@@ -229,6 +229,8 @@
 | DEC-17 на уведомлениях | `views.notifications` → `has_data` | `test_prof_lib_notif.NotificationsHeaderFollowsTheState` |
 | BR-11 / BR-72b (исход модерации) | `Notification.outcome` → `outcome_label`, `MODERATION_OUTCOME_LABELS` | `test_prof_lib_notif.ModerationNotificationNamesItsOutcome` |
 | FR-NOTIF-03 / DEC-32 (отклик, не лайк) | `components/notification_item.html` | `test_prof_lib_notif.ReactionNotificationDoesNotSayLike` |
+| BR-14 / DEC-32 (метрика — реакции) | `stat_pill` на 6 поверхностях, docs/16 §16.3a-bis | `test_prof_lib_notif.StoryMetricIsCalledAReaction` |
+| BR-14a (итог сходится с главами) | `Story.likes` ↔ `Chapter.likes` | `test_stub_data.StoryReactionsMatchTheirChapters` |
 | Отметка «непрочитано» видна и озвучена | `components/notification_item.html` | `test_prof_lib_notif.UnreadIsVisibleAndAnnounced`, `test_template_lint.GenericElementsCarryNoAriaLabel` |
 
 Переключение вкладок — реальный `?tab=` через `components/segmented_control.html`, не псевдо-табы (DEC-15). Разметка сегментов навигационная (`<nav>` + `aria-current`), ролей `tablist`/`tab` в них нет — они обещают панель, которой при переходе по URL не бывает (`test_template_lint.TabRolesPromiseAPanel`). Списки людей передают сегментам готовый `href`: они различаются путём, а не состоянием страницы.

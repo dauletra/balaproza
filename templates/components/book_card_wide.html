@@ -93,7 +93,7 @@
             число остаётся в aria-label.
         {% endcomment %}
         <div class="mt-auto flex flex-wrap items-center gap-3 pt-1 sm:gap-4">
-            {% include "components/stat_pill.html" with icon="thumbs-up" value=story.likes|compact_count label=story.likes|spaced|add:" ұнату" %}
+            {% include "components/stat_pill.html" with icon="heart" value=story.likes|compact_count label=story.likes|spaced|add:" реакция" %}
             {% include "components/stat_pill.html" with icon="eye" value=story.views|compact_count label=story.views|spaced|add:" оқылды" %}
             {% include "components/stat_pill.html" with icon="message-caption" value=story.comments|compact_count label=story.comments|spaced|add:" пікір" %}
         </div>

@@ -142,6 +142,7 @@ Templates should continue receiving objects with these attributes:
 Story — stored fields plus computed properties. In the stubs the computed ones are `@property` on the dataclass; after F14 they may become model properties, annotations, or denormalised columns, but the template-facing names must not change.
 
 - stored: `slug`, `title`, `cover`, `annotation`, `status`, `audience`, `badges`, `chapters`, `views`, `likes`, `comments`
+- ⛔ `likes` — **сумма реакций по главам** (BR-14, DEC-32), и по общему правилу его следовало бы вычислять, как `Author.works`. Пока хранится: у четырёх работ главы не написаны вовсе (48 глав текста, `KNOWN_TEXTLESS`), и вычисление обнулило бы им метрику в каталоге. Инвариант условный — где главы несут реакции, итог обязан сходиться с их суммой (BR-14a, `test_stub_data.StoryReactionsMatchTheirChapters`). **После Ф14 — агрегат запроса**, имя для шаблонов не меняется
 - resolved relations: `author`, `primary_genre`, `genres_resolved`, `tags_resolved`
 - format (DEC-28): `format`, `format_label`, `format_badge_label`, `is_single`, `is_serial`, `text_chapter`
 - статус и время: `is_public`, `updated_days_ago`, `updated_label`
@@ -188,7 +189,8 @@ Notification (BR-70a, BR-72a, BR-11) — **хранится «когда», вы
 - stored: `kind`, `days_ago: int`, `hours_ago: int | None`, `actor_username`, `story_slug`, `contest_slug`, `outcome`, `text`, `read`
 - `when` / `bucket` — производные. Полей с этими именами нет: `when="5 күн бұрын"` и `bucket="past_week"` устаревали назавтра
 - `actor` / `story` / `contest` — резолвы ссылок. Уведомление обязано вести к своему предмету, и `contest_slug` заведён именно для этого
-- `outcome` — **хранится**, только у `kind='moderation'`: `approved` · `rejected` · `''` (решения ещё нет). Это акт модератора, а не состояние работы: вывести его из `Story.status` нельзя, потому что статус живёт дальше события — автор правит работу и отправляет снова, и вчерашний отказ начинает говорить «Модерацияда». Тот же довод, по которому `AwardGrant` хранит присуждение (DEC-46), а не вычисляет победу из данных
+- `outcome` — **хранится**, только у `kind='moderation'`: `approved` · `needs_work` · `rejected` · `''` (решения ещё нет). Это акт модератора, а не состояние работы: вывести его из `Story.status` нельзя, потому что статус живёт дальше события — автор правит работу и отправляет снова, и вчерашний отказ начинает говорить «Модерацияда». Тот же довод, по которому `AwardGrant` хранит присуждение (DEC-46), а не вычисляет победу из данных
+- отрицательных исхода два: `needs_work` (возврат с замечанием) и `rejected` (отказ по правилам) — BR-72b. Оба обязаны нести причину в `text`; инвариант данных — работа с таким исходом не может быть публичной
 - `outcome_label` — производное: подпись из `MODERATION_OUTCOME_LABELS`. В шаблоне слово не собирается, как не собираются статусы работы (BR-10) и фазы конкурса (BR-40)
 - `text` несёт только событие. Имя конкурса или работы в нём не повторяется — оно приходит из объекта. Исключений **два**, и оба про чужие слова, а не про пересказ данных: у `comment` в `text` цитата читателя, у отклонённой `moderation` — причина от модератора, которую требует BR-11
 

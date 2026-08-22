@@ -248,6 +248,53 @@ class RecentViewsAreConsistent(unittest.TestCase):
                 self.assertLessEqual(s.recent_views, s.views)
 
 
+class StoryReactionsMatchTheirChapters(unittest.TestCase):
+    """Итог произведения не расходится с суммой по главам (BR-14, DEC-32).
+
+    Расхождение видно **на экране**, а не только в данных: список глав
+    показывает счётчик у каждой главы, шапка — итог, и читатель может
+    сложить одно и получить другое. Так и было — «Алыс жағалауларда»
+    объявляла 4 821 при 5 230 по главам, «Империя құдіреті» — 3 890
+    при 245.
+
+    Это тот же класс, что `Author.works` (DEC-40) и `days_left` (DEC-45):
+    хранимое значение рядом с собственным источником. Разница в том, что
+    здесь источник **неполон** — у четырёх работ главы не написаны вовсе
+    (`DeclaredChapterCountMatchesLoadedChapters.KNOWN_TEXTLESS`), и
+    вычислять итог из пустоты значило бы обнулить каталог. Поэтому
+    правило условное: сверяем там, где источник есть.
+
+    После Ф14, когда главы будут у всех, `Story.likes` обязан стать
+    агрегатом запроса, а этот тест — проверкой самого агрегата.
+    """
+
+    def _with_reactions(self):
+        for story in stub_data.STORIES:
+            chapters = stub_data.chapters_of(story.slug)
+            if any(c.reactions for c in chapters):
+                yield story, chapters
+
+    def test_total_equals_the_sum_where_chapters_carry_reactions(self):
+        checked = 0
+        for story, chapters in self._with_reactions():
+            checked += 1
+            with self.subTest(story=story.slug):
+                self.assertEqual(
+                    story.likes, sum(c.likes for c in chapters),
+                    'итог в шапке не сходится с числами в списке глав — '
+                    'читатель может сложить их сам',
+                )
+        self.assertTrue(checked, 'ни у одной главы нет реакций — тест ничего не проверяет')
+
+    def test_reaction_slugs_are_from_the_closed_set(self):
+        """Словарь реакций закрыт (BR-REACT-01): опечатка в слаге — мёртвая кнопка."""
+        for chapters in stub_data.CHAPTERS_BY_STORY.values():
+            for c in chapters:
+                for slug, _ in c.reactions:
+                    with self.subTest(slug=slug):
+                        self.assertIn(slug, stub_data.REACTIONS_BY_SLUG)
+
+
 class DeclaredChapterCountMatchesLoadedChapters(unittest.TestCase):
     """`Story.chapters` не должен обещать больше, чем стаб умеет показать.
 

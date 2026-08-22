@@ -364,7 +364,7 @@ class Story:
 
 
 STORIES = [
-    Story("dalney-berega",  "Алыс жағалауларда",     "sayyn",      "ipad_19b0bc4bcd9c1a1dc4c3cc12cf20dce5.webp", ("fantastika",  None),         12, 12482, 4821, 312, status="Completed", recent_views=2980, annotation="Үш дос жоғалған жолды іздеп шығады. Таудағы сапар оларды өз қорқынышымен, достықпен және белгісіз ауылдың құпиясымен беттестіреді.", tags=("arman", "sayahat", "jasospirim"), audience="10+", badges=("Редакция таңдауы",)),
+    Story("dalney-berega",  "Алыс жағалауларда",     "sayyn",      "ipad_19b0bc4bcd9c1a1dc4c3cc12cf20dce5.webp", ("fantastika",  None),         12, 12482, 5230, 312, status="Completed", recent_views=2980, annotation="Үш дос жоғалған жолды іздеп шығады. Таудағы сапар оларды өз қорқынышымен, достықпен және белгісіз ауылдың құпиясымен беттестіреді.", tags=("arman", "sayahat", "jasospirim"), audience="10+", badges=("Редакция таңдауы",)),
     Story("temniy-lord",    "Күңгірт мырза",         "bekzhan_t",  "ipad_42f033cf1b9a2bcad744d05b9d429609.webp", ("fantezi",     "horror"),      3,  8920, 2440, 156, status="OnProcess", recent_views=1810, annotation="Қараңғы патшалыққа түскен жас кейіпкер биліктің бағасын түсіне бастайды. Сиқыр, қорқыныш және таңдау туралы фэнтези.", tags=("mistika", "arman", "basqa-alem"), audience="14+"),
     Story("igra-kuklovoda", "Қуыршақшының ойыны",    "dina_books", "ipad_499539963221e0fe36b0888bf8601067.webp", ("triller",     "drama"),       3, 18102, 6230, 421, status="OnProcess", recent_views=4120, annotation="Мектептегі тыныш күндер бір жұмбақ ойыннан кейін өзгереді. Әр белгі жаңа күдікке апарады, ал шындық жақын жерде жасырынып тұр.", tags=("mistika", "jasospirim", "detektiv-jas"), audience="14+", badges=("Байқауға қатысады",)),
     Story("kronchessii",    "Тас уәделер",           "rudazov",    "ipad_5916b4e19c616e74d008125ba9a1be8e.webp", ("shyttyrman",  "fantezi"),     3, 32540, 11200, 890, status="Completed", recent_views=890, annotation="Ескі қала қабырғаларындағы тасқа қашалған уәделер оянады. Кейіпкерлер өткеннің шартын бұзбай, болашақты сақтауға тырысады.", tags=("sayahat", "arman", "syikyr-akademiya"), audience="10+"),
@@ -722,7 +722,7 @@ CHAPTERS_BY_STORY: dict = {
     ],
     "sila-imperii": [
         _chapter("sila-imperii", 1, "Толық мәтін",
-                 reactions=(("tangaldym", 100), ("shabyt", 70), ("kuldim", 40), ("juregim", 20), ("jyladym", 15))),
+                 reactions=(("tangaldym", 1580), ("shabyt", 1110), ("kuldim", 640), ("juregim", 320), ("jyladym", 240))),
     ],
 }
 
@@ -2979,11 +2979,25 @@ NOTIF_KINDS = ("comment", "like", "new_chapter", "follower", "moderation", "cont
 # победу: акт человека не восстанавливается из состояния объекта.
 #
 # Пустая строка — решения ещё нет: модерация идёт.
-MODERATION_OUTCOMES = ("approved", "rejected")
+#
+# Исходов три, а не два, потому что «доработай» и «нарушает правила» —
+# разные события, и одним словом они не называются. docs/13 §13.5 требует
+# обучающего тона прямо сейчас («вместо "отклонено" — "толықтыру қажет"»),
+# и пока оба случая лежали под `rejected`, правило нарушалось на первом из
+# них. Смягчить формулировку сразу для обоих было нельзя: детской
+# платформе нужен исход, который не обещает возврата.
+#
+# `needs_work` — часть авторского пути: работа возвращается с замечанием.
+# `rejected` — редкий твёрдый отказ по правилам, без приглашения продолжить.
+#
+# NB: `NeedsWork` как **статус произведения** остаётся V2-кандидатом
+# (docs/16 §16.3). Здесь это исход события, а не состояние работы.
+MODERATION_OUTCOMES = ("approved", "needs_work", "rejected")
 MODERATION_OUTCOME_LABELS = {
-    "approved": "Жарияланды",
-    "rejected": "Қабылданбады",
-    "":         "Модерацияда",
+    "approved":   "Жарияланды",
+    "needs_work": "Толықтыру қажет",
+    "rejected":   "Қабылданбады",
+    "":           "Модерацияда",
 }
 
 # Группы по времени (FR-NOTIF-01).
@@ -3115,15 +3129,19 @@ NOTIFICATIONS_BY_USER: dict = {
             kind="like", days_ago=3,
             actor_username="sayyn", story_slug="aidana-kysh", read=True,
         ),
-        # Отказ с причиной — BR-11 требует именно её, иначе автор не знает,
-        # что исправлять. Причина лежит в `text`: это собственные слова
-        # модератора, а не пересказ данных, — то же исключение из BR-72a,
-        # по которому у `comment` в `text` стоит цитата читателя.
-        # Работа после отказа вернулась в черновики (`aidana-kus` —
+        # Возврат на доработку с замечанием — BR-11 требует именно его,
+        # иначе автор не знает, что исправлять. Замечание лежит в `text`:
+        # это собственные слова модератора, а не пересказ данных, — то же
+        # исключение из BR-72a, по которому у `comment` в `text` стоит
+        # цитата читателя.
+        #
+        # Это `needs_work`, а не `rejected`: работу просят продолжить, и
+        # docs/13 §13.5 требует называть такое приглашением, а не отказом.
+        # Работа при этом вернулась в черновики (`aidana-kus` —
         # `NotPublished`): данные не должны противоречить статусу.
         Notification(
             kind="moderation", days_ago=5,
-            story_slug="aidana-kus", outcome="rejected",
+            story_slug="aidana-kus", outcome="needs_work",
             text="Бірінші бөлімде диалогтар үзіліп қалған. Толықтырып, қайта жіберші.",
             read=True,
         ),

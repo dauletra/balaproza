@@ -38,7 +38,7 @@
                     {% include "components/stat_pill.html" with icon="book" value=story.chapters|stringformat:"s"|add:" бөлім" %}
                 {% endif %}
                 {% include "components/stat_pill.html" with icon="eye" value=story.views|spaced label=story.views|spaced|add:" оқылым" %}
-                {% include "components/stat_pill.html" with icon="thumbs-up" value=story.likes|spaced label=story.likes|spaced|add:" ұнату" %}
+                {% include "components/stat_pill.html" with icon="heart" value=story.likes|spaced label=story.likes|spaced|add:" реакция" %}
                 {% include "components/stat_pill.html" with icon="message-caption" value=story.comments|spaced label=story.comments|spaced|add:" пікір" %}
             </div>
 

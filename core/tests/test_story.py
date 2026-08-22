@@ -467,7 +467,7 @@ class ChapterListShowsLikes(TestCase):
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
         first = stub_data.chapter_of(STORY_SLUG, 1)
         self.assertTrue(first.likes, 'нужна глава с реакциями для проверки')
-        self.assertContains(r, f'{first.likes} ұнату')
+        self.assertContains(r, f'{first.likes} реакция')
 
     def test_no_like_button_in_the_list(self):
         """Ряд реакций живёт только под текстом главы — реакция требует прочтения (BR-REACT-04)."""

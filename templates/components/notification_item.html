@@ -35,6 +35,15 @@
         иконок — `shield`, а исход несёт цвет и слово рядом: цветом одним
         различие не передаётся.
 
+        Красный — только у `rejected`. `needs_work` носит `warning`:
+        работу вернули с замечанием, это часть авторского пути, а не
+        приговор (docs/13 §13.5). Пока оба исхода были одним `rejected`,
+        приглашение доработать приходило под цветом ошибки.
+
+        `attention` занят у пустого исхода намеренно — он же стоит на
+        статусе `OnModeration` (docs/16 §16.3), а «решения ещё нет» и
+        «работа на модерации» это одно состояние, и цвет у них один.
+
         `like` носил `heart-filled` и пару `status-error-*`. Токен подписан
         «Отказ и удаление (DEC-39)» — красный здесь значил не «сердце», а
         «ошибка»; а залитое сердце после DEC-32 занято реакцией «Жүрегім»,
@@ -50,6 +59,7 @@
         {% elif n.kind == 'moderation' %}
             {% if n.outcome == 'approved' %}bg-status-published-bg text-status-published-fg
             {% elif n.outcome == 'rejected' %}bg-status-error-bg text-status-error-fg
+            {% elif n.outcome == 'needs_work' %}bg-status-warning-bg text-status-warning-fg
             {% else %}bg-status-attention-bg text-status-attention-fg{% endif %}
         {% elif n.kind == 'contest' %}bg-status-warning-bg text-status-warning-fg
         {% else %}bg-slate-100 text-slate-500{% endif %}">

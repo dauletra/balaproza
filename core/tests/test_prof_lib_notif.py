@@ -346,7 +346,7 @@ class ProfileMeAuthed(TestCase):
         # плитке значило подписчиков, а в заголовке рейла — подписки:
         # одно слово на два противоположных смысла.
         self.assertContains(r, 'Шығарма')
-        self.assertContains(r, 'Ұнатулар')
+        self.assertContains(r, 'Реакциялар')
         self.assertContains(r, 'Оқылым')
         self.assertContains(r, 'Жазылушы')
 
@@ -676,7 +676,7 @@ class ProfileStatTilesLinkToLists(TestCase):
         self.assertContains(r, '/me/?tab=works')
 
     def test_sums_get_no_link(self):
-        # «Оқылым» и «Ұнатулар» — суммы, открывать в них нечего. Две ссылки
+        # «Оқылым» и «Реакциялар» — суммы, открывать в них нечего. Две ссылки
         # на четыре плитки, и ни одной лишней.
         r = self.client.get(reverse('core:profile_other', kwargs={'username': 'rudazov'}))
         self.assertEqual(r.content.decode().count('class="absolute inset-0 rounded-lg"'), 2)
@@ -1171,25 +1171,78 @@ class ModerationNotificationNamesItsOutcome(TestCase):
                 self.assertContains(
                     self.response, stub_data.MODERATION_OUTCOME_LABELS[outcome])
 
-    def test_rejection_carries_a_reason(self):
-        """BR-11: при отклонении автор получает уведомление с причиной."""
-        rejected = [n for n in stub_data.NOTIFICATIONS_BY_USER['aidana']
-                    if n.kind == 'moderation' and n.outcome == 'rejected']
-        self.assertTrue(rejected, 'в стабе нет ни одного отказа — ветка не отрендерится')
-        for n in rejected:
-            with self.subTest(story=n.story_slug):
-                self.assertTrue(n.text.strip(), 'отказ без причины ничего не сообщает')
+    def test_negative_outcome_carries_a_reason(self):
+        """BR-11: автор узнаёт, что именно исправить.
+
+        Без причины «Толықтыру қажет» сообщает ровно столько же, сколько
+        «Қабылданбады», — то есть ничего, кроме факта неудачи.
+        """
+        negative = [n for n in stub_data.NOTIFICATIONS_BY_USER['aidana']
+                    if n.kind == 'moderation' and n.outcome in ('needs_work', 'rejected')]
+        self.assertTrue(negative, 'в стабе нет ни одного отрицательного исхода')
+        for n in negative:
+            with self.subTest(story=n.story_slug, outcome=n.outcome):
+                self.assertTrue(n.text.strip(), 'исход без причины ничего не сообщает')
                 self.assertContains(self.response, n.text)
 
     def test_outcome_does_not_contradict_the_story_status(self):
-        """Отклонённая работа не может лежать опубликованной."""
+        """Непринятая работа не может лежать опубликованной."""
         for n in stub_data.NOTIFICATIONS_BY_USER['aidana']:
-            if n.kind != 'moderation' or n.outcome != 'rejected' or not n.story:
+            if n.kind != 'moderation' or not n.story:
                 continue
-            with self.subTest(story=n.story_slug):
+            if n.outcome not in ('needs_work', 'rejected'):
+                continue
+            with self.subTest(story=n.story_slug, outcome=n.outcome):
                 self.assertFalse(
                     n.story.is_public,
-                    'отказ модерации и публичная работа — противоречие в данных')
+                    'работа не прошла модерацию и при этом публична — '
+                    'противоречие в данных')
+
+    def test_return_for_work_is_not_painted_as_an_error(self):
+        """docs/13 §13.5: «толықтыру қажет» — приглашение, а не приговор.
+
+        Пока оба отрицательных исхода были одним `rejected`, возврат на
+        доработку приходил под пpо́шенным красным `status-error` —
+        токеном, подписанным «Отказ и удаление» (DEC-39).
+        """
+        chip = NotificationIconsFollowTheRegistry.ITEM.read_text(encoding='utf-8')
+        branch = chip.split("n.outcome == 'needs_work'", 1)[1].split('{% el', 1)[0]
+        self.assertNotIn('status-error', branch)
+        self.assertIn('status-warning', branch)
+
+    def test_hard_refusal_keeps_its_own_words_and_colour(self):
+        """`rejected` остаётся твёрдым — иначе смягчение стало бы враньём.
+
+        В демо-ленте его нет намеренно: свободной непубличной работы под
+        него не осталось, а вешать отказ на ту же работу, которую только
+        что попросили доработать, значит противоречить данным. Ветку
+        проверяем подменой, как и «событие старше недели».
+        """
+        hard = stub_data.Notification(
+            kind='moderation', days_ago=2, story_slug='aidana-kus',
+            outcome='rejected', text='Ережеге қайшы келеді.',
+        )
+        with mock.patch.dict(stub_data.NOTIFICATIONS_BY_USER, {'aidana': [hard]}):
+            r = self.client.get(reverse('core:notifications'))
+        self.assertContains(r, stub_data.MODERATION_OUTCOME_LABELS['rejected'])
+        self.assertNotContains(r, stub_data.MODERATION_OUTCOME_LABELS['needs_work'])
+        self.assertContains(r, 'status-error')
+
+    def test_three_outcomes_are_distinguishable(self):
+        """Ни одна пара исходов не совпадает ни словом, ни цветом."""
+        labels = [stub_data.MODERATION_OUTCOME_LABELS[o]
+                  for o in stub_data.MODERATION_OUTCOMES]
+        self.assertEqual(len(labels), len(set(labels)))
+
+        chip = NotificationIconsFollowTheRegistry.ITEM.read_text(encoding='utf-8')
+        # Срез обрывается на следующем `kind`: у `contest` тот же `warning`,
+        # и без границы тест ловил бы соседа вместо второго исхода.
+        moderation = chip.split("n.kind == 'moderation'", 1)[1].split('{% elif n.kind', 1)[0]
+        tokens = re.findall(r'bg-status-([a-z]+)-bg', moderation)
+        self.assertEqual(len(tokens), len(set(tokens)),
+                         f'два исхода носят один цвет: {tokens}')
+        self.assertEqual(len(tokens), len(stub_data.MODERATION_OUTCOMES) + 1,
+                         'у какого-то исхода нет своей ветки цвета')
 
     def test_outcome_only_belongs_to_moderation(self):
         for n in stub_data.NOTIFICATIONS_BY_USER['aidana']:
@@ -1198,6 +1251,65 @@ class ModerationNotificationNamesItsOutcome(TestCase):
             with self.subTest(kind=n.kind):
                 self.assertEqual(n.outcome, '',
                                  'исход есть только у модерации')
+
+
+class StoryMetricIsCalledAReaction(TestCase):
+    """Метрика произведения — сумма реакций по главам, а не лайки (DEC-32).
+
+    Слово «ұнату» стояло на шести поверхностях: карточка каталога, строка
+    кабинета, шапка произведения, «Аптаның кітабы», плитка профиля и
+    список глав. Ни одна из них не показывала лайки — все показывали
+    `Chapter.likes`, то есть сумму пяти реакций.
+
+    Иконка при этом расходилась на том же числе: `thumbs-up` в трёх
+    местах, `heart` в четвёртом. `thumbs-up` вдобавок означает ровно тот
+    жест, который DEC-32 убрал.
+
+    **Лайк комментария (BR-31) — другое понятие и остаётся лайком.**
+    Читатель действительно нажимает «ұнату» под комментарием; там нет ни
+    глав, ни пяти реакций. Тест обязан различать эти два случая, иначе
+    следующий проход по «ұнату» сравняет и его.
+    """
+
+    SURFACES = [
+        ('core:catalog',      {},                        'карточка каталога'),
+        ('core:my_stories',   {},                        'строка кабинета'),
+        ('core:story_detail', {'slug': 'dalney-berega'}, 'шапка произведения'),
+        ('core:home',         {},                        'Аптаның кітабы'),
+        ('core:profile_me',   {},                        'плитка профиля'),
+    ]
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+
+    def test_no_surface_calls_the_sum_a_like(self):
+        for name, kwargs, label in self.SURFACES:
+            with self.subTest(surface=label):
+                html = self.client.get(reverse(name, kwargs=kwargs)).content.decode()
+                # Вырезаем комментарии: их «Ұнату» законен (BR-31).
+                without_comments = html.replace('aria-label="Ұнату"', '')
+                self.assertNotIn('ұнату', without_comments)
+                self.assertNotIn('ұнатты', without_comments)
+
+    def test_comment_keeps_its_like(self):
+        """BR-31 не отменён: под комментарием по-прежнему лайк."""
+        html = self.client.get(
+            reverse('core:story_detail', kwargs={'slug': 'dalney-berega'})).content.decode()
+        self.assertIn('aria-label="Ұнату"', html)
+
+    def test_one_glyph_for_one_metric(self):
+        """`thumbs-up` означал жест, который DEC-32 убрал."""
+        offenders = []
+        for path in (TEMPLATES / 'components').glob('*.html'):
+            body = path.read_text(encoding='utf-8')
+            if 'story.likes' in body and 'thumbs-up' in body:
+                offenders.append(path.name)
+        for path in (TEMPLATES / 'pages').rglob('*.html'):
+            body = path.read_text(encoding='utf-8')
+            if 'story.likes' in body and 'thumbs-up' in body:
+                offenders.append(path.name)
+        self.assertFalse(offenders,
+                         f'сумма реакций под иконкой лайка: {offenders}')
 
 
 class ReactionNotificationDoesNotSayLike(TestCase):
