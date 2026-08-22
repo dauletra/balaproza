@@ -42,7 +42,11 @@ balaproza_v1/
 ├── core/
 │   ├── stub_data.py              # ВСЕ «данные» проекта (Genre, Tag, Author, Story, Chapter,
 │   │                             # Collection (только редакция, count/covers — производные),
-│   │                             # Contest, Submission, LibraryEntry,
+│   │                             # Contest (три даты — opens_on/closes_on/results_on;
+│   │                             # phase/days_left/year/submissions ВЫВОДЯТСЯ — DEC-45),
+│   │                             # ContestAward (номинации, произвольный набор) +
+│   │                             # AwardGrant (присуждение ХРАНИТСЯ — DEC-46),
+│   │                             # Submission, LibraryEntry,
 │   │                             # Notification, ReadingProgress, FOLLOWING, etc.)
 │   │                             # Story.status дефолт = "NotPublished" (Draft) — см. BR-10
 │   │                             # Story.tags: tuple = () — UGC-теги, до 10 (docs/11, BR-TAG-*)
@@ -64,7 +68,11 @@ balaproza_v1/
 │   │                             # submissions_of, has_submission,
 │   │                             # contest_history (FR-PROF-07 — правило приватности
 │   │                             # BR-74a живёт ЗДЕСЬ, не в шаблоне),
-│   │                             # submission_checklist (BR-22), eligible_for_contest,
+│   │                             # submission_checklist (BR-22 — пороги берутся у конкурса),
+│   │                             # eligible_for_contest (только публичные работы +
+│   │                             # причина отказа), busy_contest_of (BR-23a),
+│   │                             # can_withdraw (BR-23b), spaced_number (канонические
+│   │                             # разряды; фильтр `spaced` вызывает её — одна реализация),
 │   │                             # tag_by_slug, tags_of, is_blocked, popular_tags,
 │   │                             # accepted_tags_json, blocked_tag_patterns_list
 │   │                             # + константы: READ_TIERS, CATALOG_SORTS, CATALOG_DEFAULT_SORT,
@@ -90,14 +98,15 @@ balaproza_v1/
 │   │                             # /me/edit/, /u/<username>/{followers,following}/,
 │   │                             # 5 legal routes
 │   ├── context_processors.py     # auth_state, nav_state, site_links
-│   ├── templatetags/balaproza.py # filters: compact_count, spaced, page_range,
+│   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
+│   │                             # stub_data.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 730 тестов в 16 файлах (см. ниже)
+│   └── tests/                    # 821 тест в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
 │   ├── 404.html / 500.html       # branded error pages (500 — standalone, без base.html)
-│   ├── components/               # 57 атомов и composites (см. docs/04)
+│   ├── components/               # 59 атомов и composites (см. docs/04)
 │   │                             # включая cover_placeholder (двухрежимный: <img> если
 │   │                             # story.cover задан, иначе типографическая плашка OKLCH +
 │   │                             # буква по primary genre.hue),
@@ -119,6 +128,9 @@ balaproza_v1/
 │   │                             # _filter_panel в каталоге (DEC-27)
 │   ├── partials/                 # header, footer (карта сайта), mobile_nav, page_header,
 │   │                             # right_rail/{home,story,writer,profile,contest,catalog}.html
+│   │                             # contest/{_winners,_timeline}.html — победители
+│   │                             # (FR-CONT-08) и этапы; таймлайн вынесен, потому что у
+│   │                             # завершённого конкурса он живёт свёрнутым в <details>
 │   │                             # story/{author_card,chapter_list,whats_next}.html — общие
 │   │                             # для рейла и мобильных вставок; whats_next меняет позицию
 │   │                             # в зависимости от has_next (FR-STORY-02)
@@ -146,7 +158,11 @@ balaproza_v1/
 │                                 # удалены — один общий catalog.html обслуживает все режимы
 │                                 # (search/genre/tag/catalog) — DEC-27
 ├── media/                       # фото-обложки произведений (placeholder из стороннего
-│                                # источника, заменить перед публичным деплоем).
+│                                # источника, заменить перед публичным деплоем) +
+│                                # awards/<contest>/<award>.png — эмблемы наград
+│                                # конкурсов, их грузит админ (BR-46; SVG не принимать).
+│                                # Каталог в .gitignore целиком: на чистом клоне
+│                                # файлов нет и рендерится типографическая заглушка.
 │                                # MEDIA_URL='/media/', MEDIA_ROOT=BASE_DIR/'media'
 ├── static/
 │   ├── css/output.css            # Tailwind output (gitignored ИЛИ нет — спросить юзера)
@@ -180,6 +196,8 @@ balaproza_v1/
 - **DEC-26**: Введена **UGC-таксономия тегов** параллельно жанрам. До 10 на произведение, free-form input. Новые попадают в `pending`, модератор переводит в `accepted` (через Django admin, BR-TAG-*). Часть паттернов в блок-листе — `is_blocked()`. Pending-теги скрыты от публики (BR-TAG-07). См. `docs/11`
 - **DEC-31**: Первичный вход в чтение — **жинақтар** (`/collections/`): «зачем читать сейчас». Стоят в первом фолде главной и заменяют каталог во втором слоте mobile nav у гостя. Создаёт их **только редакция** — пользовательских подборок нет (личное хранение — «Кітапхана»). **Жанр понижен до вывески**: полоса чипов под hero, `genres_section` и `?genre=` на главной удалены; цветовая система по `Genre.hue` не меняется. **Теги показывают актуальное**: `weekly_count` → «Осы аптада», `/tag/<slug>/` открывается сортировкой `recent`. Новых таксономий не вводится — связь «настроение → произведения» это `Collection.story_slugs`
 - **DEC-37**: Оси «Формат» и «Мәртебесі» в каталоге заменены одной — **«Түрі»** (`kind`): `single` · `done` · `ongoing`. Правило данных (BR-10a): публичный `single` носит `Published`, публичный `serial` — `Completed` или `OnProcess`; `Published` у сериала невалиден. `status` и `format` остаются полями модели и legacy-параметрами. **Сравнивать статус с литералом `'Published'` запрещено** — берётся `stub_data.PUBLIC_STATUSES`, иначе из выдачи молча пропадают все сериалы
+- **DEC-46**: У каждого конкурса **свой произвольный набор номинаций** (`ContestAward`), эмблему грузит админ файлом в `media/awards/<contest>/<award>.png` (растр, не SVG — файл из `/media/` открывается в origin сайта). Победа фиксируется `AwardGrant` (конкурс + номинация + работа) и **хранится**: «1-орын» из данных не вычисляется, это акт жюри. Хранится присуждение, а не список наград автора — колонки `Author.badges` по-прежнему нет (BR-ACH-01), ряд в профиле остаётся запросом. `Contest.winners` — производное от присуждений. **Раму рисует платформа**: медальон, кольцо, тень; чужая картинка своей геометрии не получает. Металла у конкурсной награды нет — правило золота (BR-ACH-02) касается только системных знаков, а классы различает силуэт: медальон против статуэтки на постаменте. Номинации показываются **до** итогов. Системный «Байқау жеңімпазы» снят вместе со своим `<symbol>` — его вытеснила награда конкретного конкурса
+- **DEC-45**: Фаза конкурса **выводится из трёх дат** (`opens_on` · `closes_on` · `results_on`), а не хранится. Фаз четыре: `upcoming` · `accepting` · `judging` · `finished`; четвёртая заведена ради промежутка «приём закрыт, победители не названы» — раньше конкурс там врал «Белсенді, 0 күн қалды». Хранимых `status`, `days_left`, `year`, `submissions` и `TimelineStage.state` больше нет: «87 өтінім» стояло при одной настоящей заявке. **«Можно подать работу» и «конкурс не завершён» — разные вопросы**: кнопку «Қатысу», баннер главной и доступ к форме подачи решает `is_accepting`, бейдж работы «Байқауға қатысады» — `not is_finished`. Даты идущих конкурсов в стаб-данных заданы **относительно сегодня** (`_d(±N)`) — абсолютные литералы протухают молча; завершённый конкурс держит настоящие прошлые даты
 - **DEC-38**: Ось «Жасың» в каталоге **накопительная**, не точное совпадение: выбравшему `14+` доступно и то, что помечено `10+`. Безопасное направление не меняется — младшая вилка старших отметок не показывает. Ключи остались отметками работы, подписи называют вилку читателя («10-13», «14+»)
 - **DEC-36**: Каталог отвечает на вопрос читателя, а не описывает атрибуты. **Дефолт сортировки — «Қазір танымал»**: окно в 14 дней по `Story.recent_views`; накопленный `views` остался отдельным пунктом «Ең көп оқылған». Тег по-прежнему открывается `recent` — DEC-31 не отменён. Ось **`badge`** (`editorial` / `contest`) — единственная, где качество заявлено отдельно от просмотров. **Пресеты** `CATALOG_PRESETS` («Бір отырыста» = `single+short` по docs/13 §13.11) стоят в контенте, а не в панели: ниже `xl` панель за модалкой. Счётчик пресета настоящий, пустые не рендерятся, активный поглощает чипы своих осей. Жинақтар — в рейле каталога и в пустом состоянии. Попутно восстановлен DEC-23: `filter_catalog` режет по `PUBLIC_STATUSES`, до этого «Модерацияда» лежала в публичном каталоге
 - **DEC-27**: Каталог унифицирован — **один движок** `_render_catalog` обслуживает search/genre/tag/catalog. Canonical URLs сохранены (`/search/?q=`, `/genres/<slug>/`, `/tag/<slug>/`, `/catalog/`), комбинации через query (`/genres/triller/?tag=mektep`). Общий `_filter_panel` в правом рейле / mobile bottom-sheet, `variant` переключает автосабмит. **Коллекции (Жинақтар) НЕ объединены** — это editorial curation, отдельный content type.
@@ -199,7 +217,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 730 тестов
+uv run python manage.py test core       # все 821 тест
 uv run python manage.py test core.tests.test_<file>
 ```
 
@@ -230,7 +248,7 @@ def _login_as_aidana(client):
 - `base.html` определяет блоки `title`, `content`, `right_rail` — каждая страница может переопределить рейл
 - `base.html` глобально подключает: sprite, alpine/htmx, toast_host, **search_popup** (Cmd+K), favicon, theme-color
 - **`has_right_rail` флаг** (DEC-25): `<aside>` правого рейла рендерится только если view передал `'has_right_rail': True` в контекст. Иначе контент тянется на всю ширину контейнера. См. `home`, `story_detail`, `profile_me/other`, `contest_detail/submit`, `manage_story`, `chapter_editor`, `my_stories`, `new_story`, `story_settings`.
-  **Флаг ставится по наличию данных рейла, а не безусловно.** `my_stories` и `manage_story` слали `True` всегда, а `right_rail/writer.html` пуст без `stats` — гость и неизвестный slug получали пустую колонку в 300px, которая просто сдвигала контент от центра. Закрыто `test_write.MyStoriesGuestHasNoEmptyRail`
+  **Флаг ставится по наличию данных рейла, а не безусловно.** `my_stories` и `manage_story` слали `True` всегда, а `right_rail/writer.html` пуст без `stats` — гость и неизвестный slug получали пустую колонку в 300px, которая просто сдвигала контент от центра. Закрыто `test_write.MyStoriesGuestHasNoEmptyRail`. Та же ошибка была у конкурсов: `contest_detail` и `contest_submit` слали `True` даже на неизвестный slug — теперь считает `_contest_rail_has_content` (FR-CONT-09), закрыто `test_contests.ContestRail`
 - **Container**: `max-w-[1280px]` (после удаления sidebar) с padding `lg:px-12`
 - В компонентах используем `{% comment %}…{% endcomment %}` для документации параметров (НЕ многострочный `{# … #}` — Django парсит его как single-line)
 - В именах template-переменных нельзя начинать с `_` (Django блокирует) — использовать `rid`, `id` и т.п.
@@ -242,6 +260,7 @@ def _login_as_aidana(client):
 - `open-catalog-filters` — открывает mobile bottom-sheet с фильтр-панелью каталога (DEC-27)
 - `reading-mode` — `{on: bool}`, шлёт страница произведения при входе/выходе текста главы из кадра. `mobile_nav` прячет пилюлю, её место занимает панель чтения (docs/07 §7.6)
 - `open-delete-confirm` — открывает delete_confirm_modal с целью `{name, confirm_url}`
+- `open-withdraw-confirm` — `{contest, story}` → подтверждение отзыва заявки с конкурса (BR-23b). Отдельная модалка: отзыв ничего не удаляет, и копия «өшіру керек пе?» с красной корзиной здесь врала бы
 
 **`@click`/`@submit` требуют `x-data` в предках — иначе директива мёртвая.** Alpine 3 обходит только поддеревья, найденные по `x-data`; элемент вне такого корня он не инициализирует вовсе. Ошибки в консоли нет, вид не меняется — кнопка просто ничего не делает. Так молча не работали кнопка сүзгі каталога, «Іздеу ашу» на 404, обе кнопки удаления произведения и семь форм с `@submit.prevent` (последние вдобавок уходили настоящим POST вместо демо-тоста). Лечение — пустой `x-data` на самом элементе:
 ```django
@@ -270,7 +289,7 @@ def _login_as_aidana(client):
 - **Обложки произведений** — `components/cover_placeholder.html` (двухрежимный): если `story.cover` непустой → рендерит `<img src="/media/{cover}">` с object-cover; иначе — типографическая плашка OKLCH + буква + «корешок» по hue primary жанра. Не использовать `{% static story.cover %}` напрямую — путь к файлу инкапсулирован в компоненте
 - **Аватары** — `components/avatar.html` (буквенные инициалы на OKLCH-фоне по длине seed=username+name). Передавать `username` для стабильного цвета
 - **Статусы произведения** — только через `components/status_badge.html` с key из 5: `Published|NotPublished|OnProcess|Completed|OnModeration` (BR-10/11)
-- **Награды автора** — только через `components/award.html` + спрайт `components/awards/_sprite.html` (DEC-43). Это **не иконки**: иконка монохромна и читается при 16px, награда цветная и ниже 48px рассыпается — в иконочный спрайт их не класть, он подключён глобально. Слаги иллюстраций приходят из `stub_data.achievements_of`; новую награду без нового `<symbol>` не добавлять (ловит `test_template_lint.IconNamesExistInSprite`). Палитра металлов закрыта — `docs/03 §3.6`, новых оттенков без внесения в таблицу нет. Подпись рядом с наградой не ставить: её несёт тултип, и открываться он обязан по наведению, фокусу **и тапу** — на телефоне ховера нет (BR-ACH-06)
+- **Награды автора** — только через `components/award.html` (+ `award_art.html`). Знаков **два класса**: системный (`art` — `<symbol>` из спрайта `components/awards/_sprite.html`, DEC-43) и награда конкурса (`image` — загруженная эмблема в медальоне, DEC-46). Спрайт нужен только первому. Это **не иконки**: иконка монохромна и читается при 16px, награда цветная и ниже 48px рассыпается — в иконочный спрайт их не класть, он подключён глобально. Слаги иллюстраций приходят из `stub_data.achievements_of`; новую награду без нового `<symbol>` не добавлять (ловит `test_template_lint.IconNamesExistInSprite`). Палитра металлов закрыта — `docs/03 §3.6`, новых оттенков без внесения в таблицу нет. Подпись рядом с наградой не ставить: её несёт тултип, и открываться он обязан по наведению, фокусу **и тапу** — на телефоне ховера нет (BR-ACH-06)
 - **Реакции на главу** — закрытый словарь из 5 (`stub_data.REACTIONS`, BR-REACT-01), рендер только через `components/reaction_bar.html`. Каждая реакция обязана иметь подпись словом: эмодзи запрещены, а монохромная иконка 20px без подписи неразличима. Новых реакций не добавлять без нового DEC
 - **Жанры** — только через `components/genre_chip.html` (DEC-14: `GenrePill` запрещён). На главной жанр — полоса-вывеска `partials/home/genre_strip.html` (DEC-31), а не навигация: заголовка, «барлығы →» и скроллера у неё нет. `Genre.icon` используется на карточках `/genres/`
 - **Теги (UGC)** — `components/tag_chip.html` (slate-style + `#`-префикс, отличается от цветного `genre_chip`). Pending-теги автоматически с пунктирной рамкой + бейдж «проверкада». Группа тегов на стори — через `components/tag_list.html` (фильтрует pending для не-автора, BR-TAG-07). Ввод тегов в формах — `components/tag_input.html` (Alpine, автокомплит, лимит 10, blocklist-валидация)

@@ -7,6 +7,7 @@
 
 import zlib
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -1594,27 +1595,89 @@ class JuryMember:
     role: str   # «Төраға», «Мүше», ...
 
 
+# Сокращения месяцев для дат конкурса: «10 қаз — 5 жел».
+KK_MONTHS_SHORT = ("қаң", "ақп", "нау", "сәу", "мам", "мау",
+                   "шіл", "там", "қыр", "қаз", "қар", "жел")
+
+
+def kk_date(d: date) -> str:
+    """«5 желтоқсан» в короткой форме — «5 жел»."""
+    return f"{d.day} {KK_MONTHS_SHORT[d.month - 1]}"
+
+
+def kk_period(starts: date, ends: date) -> str:
+    """Диапазон дат одной строкой; однодневный этап — просто дата."""
+    return kk_date(starts) if starts == ends else f"{kk_date(starts)} — {kk_date(ends)}"
+
+
 @dataclass(frozen=True)
 class TimelineStage:
-    label: str          # «Өтінім қабылдау»
-    period: str         # «10 қаз — 5 жел»
-    state: str          # 'done' | 'active' | 'upcoming'
+    """Этап конкурса. Хранятся даты, состояние выводится.
+
+    Раньше `state` ('done'/'active'/'upcoming') и подпись периода лежали
+    в данных руками. Значит, они устаревали молча: у «Алтын қалам — 2024»
+    этап «Өтінім қабылдау» стоял `active` в 2026 году, а конкурс носил год
+    2024. Хранимое производное уже подводило проект в `Author.works`
+    (DEC-40) и подвело здесь — DEC-45.
+    """
+    label: str
+    starts: date
+    ends: date
+
+    @property
+    def period(self) -> str:
+        return kk_period(self.starts, self.ends)
+
+    @property
+    def state(self) -> str:
+        today = date.today()
+        if today > self.ends:
+            return "done"
+        if today >= self.starts:
+            return "active"
+        return "upcoming"
+
+
+@dataclass(frozen=True)
+class ContestAward:
+    """Номинация конкурса и её награда (DEC-46).
+
+    Набор произвольный: админ заводит столько номинаций, сколько нужно
+    этому конкурсу, — «Бас жүлде» и «Оқырман таңдауы» у одного, четыре
+    места у другого. Общего реестра номинаций нет и быть не может: он
+    и есть то, чем один конкурс отличается от другого.
+
+    `image` — файл эмблемы в MEDIA_ROOT (`awards/<contest>/<award>.png`),
+    его загружает админ. Спрайт `components/awards/_sprite.html` тут ни при
+    чём: он рукописный, и дописать в него `<symbol>` из админки нельзя.
+    Пусто — рендерится типографическая заглушка, как у обложки без файла.
+
+    Раму (медальон, кольцо, тень) рисует платформа, а не картинка. Иначе
+    через десять конкурсов ряд наград стал бы коллекцией чужих JPEG.
+    """
+    slug: str
+    title: str
+    image: str = ""
+    description: str = ""
 
 
 @dataclass(frozen=True)
 class Contest:
+    """Конкурс. Заводит админ; всё, что можно вывести, выводится (DEC-45).
+
+    Хранятся три даты — открытие приёма, дедлайн и объявление итогов. Из
+    них считаются фаза, отсчёт дней и год; число заявок считается по самим
+    заявкам. Прежние поля `status`, `days_left`, `year` и `submissions`
+    были хранимыми производными: заведённые руками «87 өтінім» стояли при
+    одной реальной заявке, а `days_left=12` протухал назавтра.
+    """
     slug: str
     name: str
     subtitle: str                # категория/подзаголовок
-    status: str                  # 'active' | 'finished'
-    days_left: Optional[int]     # для active
-    prize_kzt: Optional[int]     # для active
-    submissions: int
-    # Год проведения. Нужен конкурсной биографии автора (FR-PROF-07): там
-    # «2023» на месте, а «1 жыл бұрын» из `Submission.submitted_relative`
-    # устаревает каждый день и в списке достижений выглядит странно.
-    # Без значения по умолчанию: новый конкурс без года завести нельзя.
-    year: int
+    opens_on: date               # приём заявок открывается
+    closes_on: date              # дедлайн подачи
+    results_on: date             # объявление итогов
+    prize_kzt: Optional[int]     # None — конкурс без денежного приза
     cover: str = "img/book1.jpg"
     description: str = ""
     conditions: tuple = ()       # bullet points
@@ -1623,22 +1686,178 @@ class Contest:
     # BR-22: пороги объёма для подачи (знаки)
     min_chars: int = 5_000
     max_chars: int = 15_000
-    # Победители завершённого конкурса — слаги произведений, не имена авторов.
-    # Автор выводится через Story.author_username: второй литерал с именем
-    # разошёлся бы с первым ровно так же, как хранимый `Author.works` разошёлся
-    # с числом произведений. Для active-конкурса пусто.
-    winners: tuple = ()
+    # Номинации этого конкурса (DEC-46). Показываются ДО итогов — «вот что
+    # получит победитель» отвечает на «зачем участвовать» лучше, чем сумма
+    # в тенге.
+    awards: tuple = ()
+
+    # ── Фаза и сроки ──────────────────────────────────────────────────────
+    @property
+    def phase(self) -> str:
+        """Одна из CONTEST_PHASES. Единственный источник — три даты.
+
+        Четвёртая фаза («қазылар қарауда») появилась потому, что двух
+        статусов не хватало: между дедлайном и объявлением итогов конкурс
+        либо врал «Белсенді, 0 күн қалды», либо резко становился
+        «Аяқталды» без победителей (BR-40).
+        """
+        today = date.today()
+        if today < self.opens_on:
+            return "upcoming"
+        if today <= self.closes_on:
+            return "accepting"
+        if today < self.results_on:
+            return "judging"
+        return "finished"
+
+    @property
+    def phase_label(self) -> str:
+        return CONTEST_PHASE_LABELS[self.phase]
+
+    @property
+    def is_accepting(self) -> bool:
+        """Можно ли подавать работу. Именно это, а не «конкурс активен»,
+        решает судьбу кнопки «Қатысу»."""
+        return self.phase == "accepting"
+
+    @property
+    def is_finished(self) -> bool:
+        return self.phase == "finished"
+
+    @property
+    def days_left(self) -> Optional[int]:
+        """Сколько дней до дедлайна. Только пока идёт приём."""
+        return (self.closes_on - date.today()).days if self.is_accepting else None
+
+    @property
+    def days_until_open(self) -> Optional[int]:
+        """Сколько дней до открытия приёма. Только у ещё не начавшегося."""
+        if self.phase != "upcoming":
+            return None
+        return (self.opens_on - date.today()).days
+
+    @property
+    def opens_on_label(self) -> str:
+        """«9 қыр» — дата открытия приёма для строки в хиро.
+
+        Своё форматирование, а не Django-фильтр `date`: тот берёт названия
+        месяцев из локали, а проект казахоязычный при `LANGUAGE_CODE`,
+        который за это не отвечает. Та же функция форматирует таймлайн.
+        """
+        return kk_date(self.opens_on)
+
+    @property
+    def closes_on_label(self) -> str:
+        return kk_date(self.closes_on)
+
+    @property
+    def results_on_label(self) -> str:
+        return kk_date(self.results_on)
+
+    @property
+    def year(self) -> int:
+        """Год проведения — год объявления итогов.
+
+        Нужен конкурсной биографии автора (FR-PROF-07): «1 жыл бұрын» из
+        `Submission.submitted_relative` устаревает каждый день.
+        """
+        return self.results_on.year
+
+    @property
+    def submissions(self) -> int:
+        """Число поданных работ — по самим заявкам, а не хранимым числом."""
+        return sum(1 for subs in SUBMISSIONS_BY_USER.values()
+                   for s in subs if s.contest_slug == self.slug)
+
+    # ── Производное от состава ────────────────────────────────────────────
+    @property
+    def awards_by_slug(self) -> dict:
+        return {a.slug: a for a in self.awards}
+
+    @property
+    def grants(self) -> list:
+        """Присуждения этого конкурса, в порядке номинаций (DEC-46).
+
+        Победа — акт жюри, а не вычислимая метрика, поэтому присуждение
+        хранится. Хранится именно оно, а не список наград у автора:
+        колонки `Author.badges` как не было, так и нет (BR-ACH-01).
+        """
+        order = {a.slug: i for i, a in enumerate(self.awards)}
+        mine = [g for g in AWARD_GRANTS if g.contest_slug == self.slug]
+        return sorted(mine, key=lambda g: order.get(g.award_slug, len(order)))
+
+    @property
+    def winners(self) -> tuple:
+        """Слаги произведений-победителей — производное от присуждений.
+
+        Автор выводится через `Story.author_username`: второй литерал
+        с именем разошёлся бы с первым ровно так же, как хранимый
+        `Author.works` разошёлся с числом произведений.
+        """
+        seen, out = set(), []
+        for g in self.grants:
+            if g.story_slug not in seen:
+                seen.add(g.story_slug)
+                out.append(g.story_slug)
+        return tuple(out)
 
     @property
     def winner_stories(self) -> list:
         """Произведения-победители. Неизвестные слаги молча отбрасываются."""
         return [STORIES_BY_SLUG[s] for s in self.winners if s in STORIES_BY_SLUG]
 
+    @property
+    def current_stage(self) -> Optional["TimelineStage"]:
+        """Этап, который идёт сейчас, или None.
+
+        Нужен правому рейлу (FR-CONT-09): «что происходит прямо сейчас» —
+        единственное, чего нет в хиро.
+        """
+        return next((t for t in self.timeline if t.state == "active"), None)
+
+    @property
+    def next_stage(self) -> Optional["TimelineStage"]:
+        """Ближайший ещё не наступивший этап или None."""
+        return next((t for t in self.timeline if t.state == "upcoming"), None)
+
+
+# Фазы конкурса (BR-40, DEC-45). Порядок — хронологический.
+CONTEST_PHASES = ("upcoming", "accepting", "judging", "finished")
+
+CONTEST_PHASE_LABELS = {
+    "upcoming":  "Жақында",
+    "accepting": "Өтінім қабылдау",
+    "judging":   "Қазылар қарауда",
+    "finished":  "Аяқталды",
+}
+
+# Семантика бейджа фазы — та же шкала, что у статусов произведения.
+CONTEST_PHASE_BADGE = {
+    "upcoming":  "info",
+    "accepting": "published",
+    "judging":   "attention",
+    "finished":  "neutral",
+}
+
+
+# Даты идущих конкурсов заданы относительно сегодняшнего дня. Абсолютные
+# литералы в стаб-данных протухают молча: «Алтын қалам — 2024» стоял
+# активным в 2026-м с этапом «Өтінім қабылдау» в статусе `active`.
+# Завершённый конкурс, наоборот, держит настоящие прошлые даты — он и
+# должен оставаться в своём году.
+TODAY = date.today()
+
+
+def _d(days: int) -> date:
+    """Дата со сдвигом от сегодня — для конкурсов, которые идут сейчас."""
+    return TODAY + timedelta(days=days)
+
 
 CONTESTS = [
     Contest(
         "bolashak-mektebi", "«Болашақтың мектебі»", "Оқушыларға арналған әдеби байқау",
-        status="active", days_left=12, prize_kzt=500_000, submissions=87, year=2026,
+        opens_on=_d(-30), closes_on=_d(12), results_on=_d(40),
+        prize_kzt=500_000,
         cover="img/book1.jpg",
         description=(
             "Республикалық мектеп оқушыларына арналған әдеби байқау. Мақсаты — "
@@ -1651,19 +1870,36 @@ CONTESTS = [
             "Бір автор — бір өтінім (BR-23)",
         ),
         timeline=(
-            TimelineStage("Өтінім қабылдау", "10 қаз — 5 жел", "active"),
-            TimelineStage("Қазылар қарауы", "6 жел — 15 жел", "upcoming"),
-            TimelineStage("Жеңімпаздар", "20 жел", "upcoming"),
+            TimelineStage("Өтінім қабылдау", _d(-30), _d(12)),
+            TimelineStage("Қазылар қарауы", _d(13), _d(39)),
+            TimelineStage("Жеңімпаздар", _d(40), _d(40)),
         ),
         jury=(
             JuryMember("Алмат Рысқали", "Төраға"),
             JuryMember("Бекжан Тұрсынов",   "Мүше"),
             JuryMember("Дина Айдарбекова",  "Мүше"),
         ),
+        awards=(
+            ContestAward("bas-zhulde", "Бас жүлде",
+                         image="awards/bolashak-mektebi/bas-zhulde.png",
+                         description="Қазылар алқасы таңдаған үздік шығарма."),
+            ContestAward("ekinshi-oryn", "Екінші орын"),
+            ContestAward("ushinshi-oryn", "Үшінші орын"),
+            # Эмблемы у этой номинации ещё нет: админ её не загрузил.
+            # Так выглядит типографическая заглушка в живом наборе.
+            ContestAward("uzdik-debut", "Үздік дебют",
+                         description="Платформадағы алғашқы шығармасымен қатысқан авторға."),
+        ),
     ),
+    # Приём закрыт, победители ещё не названы — фаза `judging`. Ради неё
+    # четвёртая фаза и заведена: раньше конкурс в этом промежутке показывал
+    # «Белсенді, 0 күн қалды» либо «Аяқталды» без единого победителя.
+    # Год ушёл из слага: он теперь выводится из даты итогов, а слаг с
+    # зашитым годом у переезжающего конкурса разошёлся бы с ней снова.
     Contest(
-        "altyn-qalam-2024", "Алтын қалам — 2024", "Жас прозаиктер байқауы",
-        status="active", days_left=14, prize_kzt=300_000, submissions=42, year=2024,
+        "altyn-qalam", "Алтын қалам", "Жас прозаиктер байқауы",
+        opens_on=_d(-70), closes_on=_d(-4), results_on=_d(10),
+        prize_kzt=300_000,
         cover="img/book2.jpg",
         description=(
             "Қазақ тіліндегі жас прозаиктердің ұлттық байқауы. "
@@ -1677,37 +1913,137 @@ CONTESTS = [
             "AI-декларация міндетті (DEC-21)",
         ),
         timeline=(
-            TimelineStage("Жарияланды", "1 қыр", "done"),
-            TimelineStage("Өтінім қабылдау", "1 қыр — 1 жел", "active"),
-            TimelineStage("Шорт-лист", "5 жел", "upcoming"),
-            TimelineStage("Финал", "15 жел", "upcoming"),
+            TimelineStage("Жарияланды", _d(-70), _d(-70)),
+            TimelineStage("Өтінім қабылдау", _d(-69), _d(-4)),
+            TimelineStage("Шорт-лист", _d(-3), _d(3)),
+            TimelineStage("Финал", _d(10), _d(10)),
         ),
         jury=(
             JuryMember("Айгерім Қасенова", "Төраға"),
             JuryMember("Сайын Нұрбекұлы",  "Мүше"),
         ),
+        awards=(
+            ContestAward("bas-zhulde", "Бас жүлде",
+                         description="Қазылар алқасының бірінші орны."),
+            ContestAward("oqyrman-tandauy", "Оқырман таңдауы",
+                         description="Оқырман дауысы бойынша үздік шығарма."),
+        ),
     ),
+    # Приём ещё не открыт. До DEC-45 такого состояния не было вовсе:
+    # конкурс появлялся сразу «активным», и анонсировать его заранее было
+    # нечем.
     Contest(
-        "zhas-aldym-2023", "Жас алдым — 2023", "Жабылды",
-        status="finished", days_left=None, prize_kzt=None, submissions=156, year=2023,
+        "qys-ertegisi", "«Қыс ертегісі»", "Қысқа әңгіме байқауы",
+        opens_on=_d(9), closes_on=_d(45), results_on=_d(70),
+        prize_kzt=200_000,
+        cover="img/book4.jpg",
+        description=(
+            "Қысқы демалысқа арналған әңгіме байқауы. Тақырып еркін, "
+            "бірақ оқиға қыс мезгілінде өтуі керек."
+        ),
+        conditions=(
+            "Қатысушы жасы — 14-18 жас",
+            "Көлемі 5 000-15 000 таңба",
+            "Бір автор — бір өтінім (BR-23)",
+        ),
+        timeline=(
+            TimelineStage("Өтінім қабылдау", _d(9), _d(45)),
+            TimelineStage("Қазылар қарауы", _d(46), _d(69)),
+            TimelineStage("Жеңімпаздар", _d(70), _d(70)),
+        ),
+        jury=(JuryMember("Айгерім Қасенова", "Төраға"),),
+        awards=(
+            ContestAward("bas-zhulde", "Бас жүлде"),
+            ContestAward("uzdik-qys-angimesi", "Үздік қысқы әңгіме"),
+        ),
+    ),
+    # Настоящие прошлые даты: завершённый конкурс остаётся в своём году,
+    # и `year` (2023) сходится с годом в слаге.
+    Contest(
+        "zhas-aldym-2023", "Жас алдым — 2023", "Республикалық әдеби байқау",
+        opens_on=date(2023, 9, 1), closes_on=date(2023, 12, 1),
+        results_on=date(2023, 12, 15),
+        prize_kzt=None,
         cover="img/book3.jpg",
         description="2023 жылғы байқау аяқталды. Жеңімпаздар: «Күңгірт мырза», «Қуыршақшының ойыны».",
         # Те же две работы, что названы в description. Расхождение между
         # текстом и полем ловит test_stub_data.ContestWinners.
-        winners=("temniy-lord", "igra-kuklovoda"),
         conditions=(),
         timeline=(
-            TimelineStage("Өтінім қабылдау", "1 қыр — 1 жел", "done"),
-            TimelineStage("Финал", "15 жел", "done"),
+            TimelineStage("Өтінім қабылдау", date(2023, 9, 1), date(2023, 12, 1)),
+            TimelineStage("Финал", date(2023, 12, 15), date(2023, 12, 15)),
         ),
         jury=(JuryMember("Алмат Рысқали", "Төраға"),),
+        awards=(
+            ContestAward("bas-zhulde", "Бас жүлде",
+                         image="awards/zhas-aldym-2023/bas-zhulde.png",
+                         description="Қазылар алқасы таңдаған үздік шығарма."),
+            ContestAward("oqyrman-tandauy", "Оқырман таңдауы",
+                         image="awards/zhas-aldym-2023/oqyrman-tandauy.png",
+                         description="Оқырман дауысы бойынша үздік шығарма."),
+        ),
     ),
 ]
 
 CONTESTS_BY_SLUG = {c.slug: c for c in CONTESTS}
 
-ACTIVE_CONTESTS = [c for c in CONTESTS if c.status == "active"]
-HERO_CONTEST = ACTIVE_CONTESTS[0]
+# Два разных вопроса, и раньше они смешивались в одном слове «активный»:
+# «можно ли подать работу» и «конкурс ещё не закрыт». Бейдж работы
+# «Байқауға қатысады» держится вторым, кнопка «Қатысу» — первым.
+ACCEPTING_CONTESTS = [c for c in CONTESTS if c.is_accepting]
+
+# Порядок в списке — по тому, что читатель может сделать: сначала куда
+# можно подать работу прямо сейчас, потом что откроется, потом что уже
+# судят. Алфавит и порядок объявления такой вопрос не решают.
+_OPEN_ORDER = ("accepting", "upcoming", "judging")
+OPEN_CONTESTS = sorted((c for c in CONTESTS if not c.is_finished),
+                       key=lambda c: _OPEN_ORDER.index(c.phase))
+FINISHED_CONTESTS = [c for c in CONTESTS if c.is_finished]
+
+HERO_CONTEST = ACCEPTING_CONTESTS[0] if ACCEPTING_CONTESTS else None
+
+
+@dataclass(frozen=True)
+class AwardGrant:
+    """Присуждение: кому и за что вручена награда конкурса (DEC-46).
+
+    Хранится сам акт, а не список наград у автора. Разница принципиальная:
+    «1-орын в Алтын қалам» из данных не вычисляется — это решение жюри, и
+    в этом конкурсные награды отличаются от системных знаков (BR-ACH-01).
+    Но производной остаётся выдача: ряд наград в профиле — запрос по
+    присуждениям, а не колонка `Author.badges`.
+
+    Автор не хранится: он выводится из произведения, как и у победителей.
+    """
+    contest_slug: str
+    award_slug: str
+    story_slug: str
+    note: str = ""
+
+    @property
+    def contest(self):
+        return CONTESTS_BY_SLUG.get(self.contest_slug)
+
+    @property
+    def award(self) -> Optional[ContestAward]:
+        contest = self.contest
+        return contest.awards_by_slug.get(self.award_slug) if contest else None
+
+    @property
+    def story(self):
+        return STORIES_BY_SLUG.get(self.story_slug)
+
+    @property
+    def author(self):
+        story = self.story
+        return story.author if story else None
+
+
+AWARD_GRANTS = [
+    AwardGrant("zhas-aldym-2023", "bas-zhulde", "temniy-lord",
+               note="Қазылар алқасының бірауыздан шешімі."),
+    AwardGrant("zhas-aldym-2023", "oqyrman-tandauy", "igra-kuklovoda"),
+]
 
 
 # ───────────────────────── CONT — заявки автора ───────────────────────────
@@ -1732,13 +2068,16 @@ class Submission:
 SUBMISSIONS_BY_USER: dict = {
     "aidana": [
         Submission(
-            contest_slug="altyn-qalam-2024", story_slug="aidana-tan",
+            contest_slug="altyn-qalam", story_slug="aidana-tan",
             submitted_relative="5 күн бұрын", status="reviewing",
         ),
         Submission(
             contest_slug="zhas-aldym-2023", story_slug="aidana-kysh",
             submitted_relative="6 ай бұрын", status="rejected",
-            note="Көлемі шарттан асып кеткен.",
+            # Работа на 2 524 знака при пороге 5 000 — отказ по недобору.
+            # Прежняя формулировка говорила «асып кеткен» (превысил) и
+            # противоречила собственным данным.
+            note="Көлемі шарттан аз — кемінде 5 000 таңба керек.",
         ),
     ],
     # Заявки победителей «Жас алдым — 2023». Без них конкурсная история и
@@ -1809,18 +2148,41 @@ def contest_history(username: str, *, is_self: bool = False) -> list:
         contest, story = sub.contest, sub.story
         if not contest or not story:
             continue
-        result = "winner" if story.slug in contest.winners else sub.status
+        # Награды конкретного конкурса (DEC-46). Если работа их взяла,
+        # строка называет номинацию — «Бас жүлде» точнее общего
+        # «Жеңімпаз», который одинаково звучал у первого места и у приза
+        # зрительских симпатий.
+        titles = [g.award.title for g in contest.grants
+                  if g.story_slug == story.slug and g.award]
+        result = "winner" if titles else sub.status
         if not is_self and result not in PUBLIC_CONTEST_RESULTS:
             result = ""
+        label = ", ".join(titles) if result == "winner" and titles \
+            else CONTEST_RESULT_LABELS.get(result, "")
         out.append({
             "contest":      contest,
             "story":        story if (is_self or story.is_public) else None,
             "year":         contest.year,
             "result":       result,
-            "result_label": CONTEST_RESULT_LABELS.get(result, ""),
+            "result_label": label,
             "note":         sub.note if is_self else "",
         })
     return sorted(out, key=lambda i: (-i["year"], i["contest"].name))
+
+
+def spaced_number(value) -> str:
+    """Разряды через неразрывный пробел: 500000 -> «500 000».
+
+    Канонический вид числа для автора. Живёт здесь, а не в фильтре
+    `balaproza.spaced`, потому что те же числа собираются на стороне
+    данных — в подсказках `submission_checklist`. Фильтр вызывает эту
+    функцию; двух реализаций одной формы записи в проекте быть не должно.
+    """
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return value
+    return f"{n:,}".replace(",", " ")
 
 
 def submission_checklist(story: "Story", contest: "Contest") -> list:
@@ -1832,15 +2194,20 @@ def submission_checklist(story: "Story", contest: "Contest") -> list:
     """
     # Считаем объём по сумме char_count глав (если есть) или по фикс-аппрокс
     total_chars = sum(c.char_count for c in chapters_of(story.slug)) or 0
+    have = spaced_number(total_chars)
+    lo, hi = spaced_number(contest.min_chars), spaced_number(contest.max_chars)
     if total_chars < contest.min_chars:
-        vol_passed, vol_hint = False, f"Көлемі тым аз — {total_chars} таңба (мин. {contest.min_chars})"
+        vol_passed, vol_hint = False, f"Көлемі тым аз — {have} таңба (мин. {lo})"
     elif total_chars > contest.max_chars:
-        vol_passed, vol_hint = False, f"Көлемі тым үлкен — {total_chars} таңба (макс. {contest.max_chars})"
+        vol_passed, vol_hint = False, f"Көлемі тым үлкен — {have} таңба (макс. {hi})"
     else:
-        vol_passed, vol_hint = True, f"{total_chars} таңба — нормада"
+        vol_passed, vol_hint = True, f"{have} таңба — нормада"
 
     return [
-        {"key": "volume",    "label": "Көлемі (5 000-15 000 таңба)", "passed": vol_passed,
+        # Пороги берутся у конкурса, а не вписаны в подпись: «5 000-15 000»
+        # литералом врало бы любому конкурсу с другими границами, а границы
+        # у каждого свои — их задаёт админ.
+        {"key": "volume",    "label": f"Көлемі ({lo}-{hi} таңба)", "passed": vol_passed,
          "hint": vol_hint, "auto": True},
         {"key": "language",  "label": "Тіл — қазақша немесе орысша", "passed": True,
          "hint": "Платформа екі тілді қолдайды.", "auto": False},
@@ -1853,20 +2220,77 @@ def submission_checklist(story: "Story", contest: "Contest") -> list:
     ]
 
 
-def eligible_for_contest(username: str, contest_slug: str) -> list:
-    """Произведения пользователя, проходящие порог объёма (BR-24).
+# Почему работу нельзя подать. Пустая строка — можно (BR-24, BR-23a).
+INELIGIBLE_REASONS = {
+    "too_short": "Көлемі тым аз",
+    "too_long":  "Көлемі тым үлкен",
+    "busy":      "Бұл шығарма басқа байқауда тұр",
+}
 
-    Возвращает [(story, total_chars, eligible_bool), ...] — UI сам решает рендер.
+
+def busy_contest_of(username: str, story_slug: str, *, besides: str = "") -> Optional["Contest"]:
+    """Незавершённый конкурс, в котором эта работа уже участвует (BR-23a).
+
+    Одна работа не может идти в двух конкурсах одновременно: жюри читают
+    параллельно, и одним текстом нельзя выиграть дважды. Завершённый
+    конкурс не мешает — работа своё отучаствовала.
+    """
+    for sub in submissions_of(username):
+        if sub.story_slug != story_slug or sub.contest_slug == besides:
+            continue
+        contest = sub.contest
+        if contest and not contest.is_finished:
+            return contest
+    return None
+
+
+def eligible_for_contest(username: str, contest_slug: str) -> list:
+    """Работы автора как кандидаты на подачу (BR-24, BR-23a).
+
+    В список идут **только публичные** работы: черновик и работа на
+    модерации кандидатами не являются вовсе, а показывать их
+    заблокированными значит предлагать выбрать то, что нельзя выбрать
+    в принципе. Раньше они попадали в выбор, и от подачи черновика
+    спасал только нулевой объём — работа на 6 000 знаков со статусом
+    `NotPublished` подавалась бы (DEC-23).
+
+    Порог объёма, наоборот, показывается заблокированным с причиной:
+    это про эту работу и этот конкурс, и автор может её дописать.
+
+    Возвращает [{story, chars, eligible, reason, hint}, ...] — UI решает рендер.
     """
     contest = CONTESTS_BY_SLUG.get(contest_slug)
     if not contest:
         return []
     result = []
-    for s in my_stories_of(username):
+    for s in public_stories_of(username):
         total = sum(c.char_count for c in chapters_of(s.slug))
-        is_ok = contest.min_chars <= total <= contest.max_chars
-        result.append({"story": s, "chars": total, "eligible": is_ok})
+        busy = busy_contest_of(username, s.slug, besides=contest_slug)
+        if total < contest.min_chars:
+            reason, hint = "too_short", f"{INELIGIBLE_REASONS['too_short']} — мин. {spaced_number(contest.min_chars)}"
+        elif total > contest.max_chars:
+            reason, hint = "too_long", f"{INELIGIBLE_REASONS['too_long']} — макс. {spaced_number(contest.max_chars)}"
+        elif busy:
+            reason, hint = "busy", f"{INELIGIBLE_REASONS['busy']}: «{busy.name}»"
+        else:
+            reason, hint = "", ""
+        result.append({"story": s, "chars": total,
+                       "eligible": not reason, "reason": reason, "hint": hint})
     return result
+
+
+def can_withdraw(username: str, contest_slug: str) -> bool:
+    """Можно ли отозвать заявку (BR-23b).
+
+    Пока идёт приём и жюри ещё не вынесло решения. BR-23 разрешает одну
+    работу на конкурс — без отзыва это значило, что ошибся работой и всё:
+    ни заменить, ни отказаться от участия.
+    """
+    contest = CONTESTS_BY_SLUG.get(contest_slug)
+    if not contest or not contest.is_accepting:
+        return False
+    return any(s.contest_slug == contest_slug and s.status == "reviewing"
+               for s in submissions_of(username))
 
 
 # ───────────────────────── Авторлар мектебі — внешние ссылки (FR-LINKS) ────
@@ -2064,13 +2488,43 @@ def next_read_tier(username: str) -> Optional[tuple]:
 
 
 def winning_stories_of(username: str) -> list:
-    """Работы автора, победившие в завершённых конкурсах."""
-    return [
-        story
-        for contest in CONTESTS
-        for story in contest.winner_stories
-        if story.author_username == username
-    ]
+    """Работы автора, отмеченные наградой конкурса (DEC-46)."""
+    seen, out = set(), []
+    for grant in AWARD_GRANTS:
+        story = grant.story
+        if story and story.author_username == username and story.slug not in seen:
+            seen.add(story.slug)
+            out.append(story)
+    return out
+
+
+def contest_awards_of(username: str) -> list:
+    """Награды конкурсов, полученные автором (DEC-46), свежие сверху.
+
+    Второй класс знаков рядом с системными `AWARDS`. Разница — в источнике
+    факта: системный знак вычисляется из данных, конкурсная награда
+    присуждается жюри и потому хранится присуждением. Ряд в профиле
+    по-прежнему собирается запросом, а не полем автора (BR-ACH-01).
+
+    Работа называется только пока она публична (BR-73): снятая с
+    публикации не должна проступать через награду. Сама награда при этом
+    остаётся — она принадлежит автору, а не видимости текста.
+    """
+    out = []
+    for grant in AWARD_GRANTS:
+        story, award, contest = grant.story, grant.award, grant.contest
+        if not (story and award and contest) or story.author_username != username:
+            continue
+        out.append({
+            "key":     f"{contest.slug}:{award.slug}",
+            "title":   award.title,
+            "image":   award.image,
+            "contest": contest,
+            "story":   story if story.is_public else None,
+            "year":    contest.year,
+            "note":    grant.note,
+        })
+    return sorted(out, key=lambda i: (-i["year"], i["contest"].name, i["title"]))
 
 
 # Слаг иллюстрации и металл ступени для каждой награды (DEC-43).
@@ -2131,9 +2585,11 @@ AWARDS = (
     Award("contest_accepted", "Байқауға қабылданды", "contest-accepted", "silver",
           "Өтінімің қазылар алқасынан өтсін",
           lambda u: any(s.status == "accepted" for s in submissions_of(u))),
-    Award("contest_winner", "Байқау жеңімпазы", "contest-winner", "gold",
-          "Байқауда жеңіске жет",
-          lambda u: bool(winning_stories_of(u))),
+    # Системного «Байқау жеңімпазы» здесь больше нет — DEC-46. Один общий
+    # знак на все конкурсы всех лет вытесняется наградой конкретного
+    # конкурса: она называет номинацию, год и работу, а общий — только
+    # факт. Держать оба значило бы дважды сказать одно и то же, причём
+    # менее точным способом.
     Award("editorial_choice", BADGE_LABELS["editorial"], "editorial-choice", "gold",
           "Редакция шығармаңды таңдасын",
           lambda u: any(BADGE_LABELS["editorial"] in s.badges
@@ -2281,7 +2737,7 @@ NOTIFICATIONS_BY_USER: dict = {
         ),
         Notification(
             kind="contest", bucket="past_week", when="5 күн бұрын",
-            text="«Алтын қалам — 2024» байқауына өтінімің қабылданды.",
+            text="«Алтын қалам» байқауының шорт-лист кезеңі басталды.",
             read=True,
         ),
         Notification(

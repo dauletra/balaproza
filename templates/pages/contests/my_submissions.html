@@ -7,7 +7,7 @@
     {% include "components/auth_gate.html" with reason="Өтінімдеріңді көру үшін" %}
 {% else %}
     <p class="mb-4 font-sans text-xs text-slate-500">
-        <a href="{% url 'core:contest_list' %}" class="hover:text-brand">Конкурстар</a> /
+        <a href="{% url 'core:contest_list' %}" class="hover:text-brand">Байқаулар</a> /
         <span class="text-slate-700">менің өтінімдерім</span>
     </p>
 
@@ -21,19 +21,20 @@
         <a href="{% url 'core:contest_list' %}"
            class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
             {% include "components/icon.html" with name="paper-plane" size=14 only %}
-            Барлық конкурстар
+            Барлық байқаулар
         </a>
     </header>
 
-    {% if submissions %}
+    {% if items %}
         <div class="flex flex-col gap-3">
-            {% for sub in submissions %}
-                <article class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
+            {% for it in items %}
+                {% with sub=it.sub c=it.contest %}
+                <article class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-5 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0 flex-1">
                         <p class="font-sans text-xs uppercase tracking-wide text-slate-500">{{ sub.submitted_relative }}</p>
                         <h2 class="mt-1 font-display text-lg font-bold leading-tight text-slate-900">
-                            {% if sub.contest %}
-                                <a href="{% url 'core:contest_detail' slug=sub.contest.slug %}" class="hover:text-brand">{{ sub.contest.name }}</a>
+                            {% if c %}
+                                <a href="{% url 'core:contest_detail' slug=c.slug %}" class="hover:text-brand">{{ c.name }}</a>
                             {% else %}
                                 {{ sub.contest_slug }}
                             {% endif %}
@@ -44,6 +45,22 @@
                                 <a href="{% url 'core:story_detail' slug=sub.story.slug %}" class="font-semibold text-slate-900 hover:text-brand">«{{ sub.story.title }}»</a>
                             </p>
                         {% endif %}
+
+                        {% comment %}
+                            Срок вместо тишины: «Қаралуда» без даты не отвечает
+                            на «а когда узнаю» — самый частый вопрос после
+                            подачи. Дата берётся у фазы конкурса (DEC-45).
+                        {% endcomment %}
+                        {% if c and not c.is_finished %}
+                            <p class="mt-1.5 font-sans text-xs text-slate-500">
+                                {% if c.is_accepting %}
+                                    Қабылдау {{ c.closes_on_label }} жабылады · жеңімпаздар {{ c.results_on_label }}
+                                {% else %}
+                                    Жеңімпаздар {{ c.results_on_label }} жарияланады
+                                {% endif %}
+                            </p>
+                        {% endif %}
+
                         {% if sub.note %}
                             <p class="mt-2 rounded-md bg-slate-50 px-3 py-2 font-sans text-xs leading-snug text-slate-700">
                                 Қазылар: {{ sub.note }}
@@ -51,7 +68,7 @@
                         {% endif %}
                     </div>
 
-                    <div class="shrink-0">
+                    <div class="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                         {% if sub.status == 'reviewing' %}
                             {% include "components/badge.html" with kind="attention" label="Қаралуда" %}
                         {% elif sub.status == 'accepted' %}
@@ -59,13 +76,28 @@
                         {% elif sub.status == 'rejected' %}
                             {% include "components/badge.html" with kind="error" label="Қабылданбады" %}
                         {% endif %}
+
+                        {% if it.can_withdraw %}
+                            {% comment %}
+                                BR-23b. Без отзыва правило «одна работа на конкурс»
+                                означало: ошибся работой — и всё, ни заменить, ни
+                                отказаться. Демо-действие: подтверждение и тост.
+                            {% endcomment %}
+                            <button type="button" x-data
+                                    @click="$dispatch('open-withdraw-confirm', { contest: '{{ c.name|escapejs }}', story: '{{ sub.story.title|escapejs }}' })"
+                                    class="font-sans text-xs font-semibold text-slate-500 underline underline-offset-2 hover:text-status-error-fg">
+                                Қайтарып алу
+                            </button>
+                        {% endif %}
                     </div>
                 </article>
+                {% endwith %}
             {% endfor %}
         </div>
+        {% if any_withdrawable %}{% include "components/withdraw_confirm_modal.html" %}{% endif %}
     {% else %}
         {% url 'core:contest_list' as cl_href %}
-        {% include "components/empty_state.html" with icon="paper-plane" title="Әлі өтінім жоқ" text="Белсенді байқауларға қатысып, оларды осында тап." cta_label="Конкурстарға" cta_href=cl_href %}
+        {% include "components/empty_state.html" with icon="paper-plane" title="Әлі өтінім жоқ" text="Белсенді байқауларға қатысып, оларды осында тап." cta_label="Байқауларға" cta_href=cl_href %}
     {% endif %}
 {% endif %}
 {% endblock %}

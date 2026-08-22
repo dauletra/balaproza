@@ -1,8 +1,22 @@
 {% comment %}
-    Награда автора (FR-PROF-06, DEC-43) — предметная иллюстрация на
-    постаменте, а не пилюля с монохромной иконкой.
+    Награда автора — предметная иллюстрация, а не пилюля (DEC-43).
 
-    Два режима:
+    Два класса наград, один компонент:
+
+    • **Системный знак** (`art`) — рисунок из `components/awards/_sprite.html`
+      на постаменте; металл несёт ступень ценности (BR-ACH-02). Реестр
+      закрыт кодом, новых не появляется без нового `<symbol>`.
+
+    • **Награда конкурса** (`image`, DEC-46) — медальон: эмблему грузит
+      админ файлом, раму рисует платформа. Своей геометрии у чужой
+      картинки быть не должно — иначе через десять конкурсов ряд станет
+      коллекцией чужих JPEG. Металла у неё нет: ступень внутри рисунка,
+      а золото на постаменте остаётся редким знаком трёх системных
+      наград. Силуэт (диск против статуэтки) и различает два класса.
+      Файла нет — типографическая заглушка первой буквой номинации,
+      ровно как у обложки без файла (`cover_placeholder`).
+
+    Два режима подачи:
 
     • `interactive=True` (по умолчанию) — публичный ряд на профиле.
       Подписи рядом нет намеренно: ряд из семи подписанных пилюль и был
@@ -12,9 +26,10 @@
       Это `<button>`, а не картинка. `aria-label` несёт название —
       иллюстрация для скринридера декоративна.
 
-    • `interactive=False` — плитка в своей статистике (FR-PROF-08), где
-      название и условие уже написаны рядом. Тултип там повторял бы
-      видимый текст, а кнопка обещала бы действие, которого нет.
+    • `interactive=False` — плитка в своей статистике (FR-PROF-08) и на
+      странице конкурса, где название и условие уже написаны рядом.
+      Тултип там повторял бы видимый текст, а кнопка обещала бы действие,
+      которого нет.
 
     `dim=True` — награда ещё не получена: обесцвечиваем, а не прячем.
     Спрятанная награда не отвечает на вопрос «что дальше», ради которого
@@ -24,10 +39,12 @@
     найденные по `x-data`, и директива вне такого корня — мёртвый атрибут
     без единой ошибки в консоли.
 
-    Требует подключённого `components/awards/_sprite.html` на странице.
+    Режим `art` требует подключённого `components/awards/_sprite.html`;
+    медальону спрайт не нужен вовсе.
 
     Параметры:
-      art         — слаг иллюстрации (`award-<art>` в спрайте)
+      art         — слаг иллюстрации системного знака (`award-<art>`)
+      image       — путь эмблемы конкурса в MEDIA_ROOT; пусто → буква
       label       — название: тултип + доступное имя
       size        — px, по умолчанию 56. Ниже 48 иллюстрация не читается
       interactive — тултип и кнопка (по умолчанию да)
@@ -44,16 +61,12 @@
             @click.outside="open = false"
             class="relative inline-flex shrink-0 rounded-md transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand{% if dim %} opacity-40 grayscale{% endif %}"
             aria-label="{{ label }}">
-        <svg width="{{ s }}" height="{{ s }}" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-            <use href="#award-{{ art }}"/>
-        </svg>
+        {% include "components/award_art.html" with art=art image=image label=label s=s only %}
         {% include "components/tooltip.html" with text=label only %}
     </button>
 {% else %}
     <span class="inline-flex shrink-0{% if dim %} opacity-40 grayscale{% endif %}">
-        <svg width="{{ s }}" height="{{ s }}" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-            <use href="#award-{{ art }}"/>
-        </svg>
+        {% include "components/award_art.html" with art=art image=image label=label s=s only %}
     </span>
 {% endif %}
 {% endwith %}

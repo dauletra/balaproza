@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
 
-{% block title %}Конкурстар — Balaproza{% endblock %}
+{% block title %}Байқаулар — Balaproza{% endblock %}
 
 {% block content %}
     <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-            <h1 class="font-display text-3xl font-bold text-slate-900">Конкурстар</h1>
+            <h1 class="font-display text-3xl font-bold text-slate-900">Байқаулар</h1>
             <p class="mt-1 font-sans text-sm text-slate-600">
                 Жас прозаиктерге арналған әдеби байқаулар. Жеңімпаздар сыйақы алады, үздіктер басты бетке шығады.
             </p>
@@ -21,7 +21,13 @@
 
     {% if active_contests %}
         <section class="mb-10">
-            <h2 class="mb-4 font-display text-sm font-bold uppercase tracking-[0.12em] text-slate-500">Белсенді</h2>
+            {% comment %}
+                «Ағымдағы», а не «Белсенді»: в группе и объявленный конкурс,
+                и тот, что уже на судействе. Точную фазу называет бейдж на
+                карточке, порядок внутри группы — от «можно подать сейчас»
+                к «уже судят» (DEC-45).
+            {% endcomment %}
+            <h2 class="mb-4 font-display text-sm font-bold uppercase tracking-[0.12em] text-slate-500">Ағымдағы</h2>
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {% for c in active_contests %}
                     {% include "components/contest_card.html" with contest=c %}

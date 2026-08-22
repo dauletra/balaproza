@@ -1,0 +1,30 @@
+{% comment %}
+    Сама картинка награды, без обвязки. Вынесена из `award.html`, потому
+    что там два режима подачи (кнопка с тултипом и немая плитка), и рисунок
+    в них один и тот же: две копии разошлись бы, как расходились две копии
+    вкладки «Туралы» в профилях.
+
+    Ветка выбирается по `art`: системный знак всегда имеет слаг в спрайте,
+    конкурсная награда — никогда (DEC-46).
+
+    Параметры: art · image · label · s (размер в px)
+{% endcomment %}
+{% if art %}
+    <svg width="{{ s }}" height="{{ s }}" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <use href="#award-{{ art }}"/>
+    </svg>
+{% else %}
+    {# Медальон: раму рисует платформа, внутри — эмблема от админа #}
+    <span class="grid shrink-0 place-items-center overflow-hidden rounded-pill bg-slate-50 ring-1 ring-slate-300 shadow-[0_1px_3px_rgba(15,23,42,0.18)]"
+          style="width: {{ s }}px; height: {{ s }}px;" aria-hidden="true">
+        {% if image %}
+            <img src="/media/{{ image }}" alt="" loading="lazy"
+                 style="width: 76%; height: 76%;" class="object-contain">
+        {% else %}
+            <span class="font-display font-bold leading-none text-slate-500"
+                  style="font-size: {{ s }}px; transform: scale(0.42);">
+                {{ label|slice:":1"|upper }}
+            </span>
+        {% endif %}
+    </span>
+{% endif %}

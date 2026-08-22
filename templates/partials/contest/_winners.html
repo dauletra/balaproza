@@ -1,0 +1,51 @@
+{% comment %}
+    Победители завершённого конкурса (FR-CONT-08, DEC-46).
+
+    Данные — присуждения `Contest.grants` — существовали и не были
+    отрендерены нигде: завершённый конкурс показывал описание и серый
+    таймлайн, то есть ровно не то, ради чего на завершённый конкурс
+    заходят.
+
+    Строка называет **номинацию**, а не общее «жеңімпаз»: набор номинаций
+    у каждого конкурса свой, и «Оқырман таңдауы» — не то же, что «Бас
+    жүлде». Работа и автор ведут на обе страницы: победа в равной мере
+    событие произведения и событие человека.
+
+    Награда здесь немая (`interactive=False`): её название написано
+    рядом, и тултип повторял бы видимый текст.
+
+    Контекст:
+      grants — list[AwardGrant]
+{% endcomment %}
+{% if grants %}
+    <section class="mb-8 rounded-lg border border-slate-200 bg-white p-6">
+        <h2 class="font-display text-lg font-bold text-slate-900">Жеңімпаздар</h2>
+        <ul class="mt-4 grid gap-4 sm:grid-cols-2">
+            {% for g in grants %}
+                <li class="flex gap-4 rounded-md border border-slate-200 p-3 transition-shadow hover:shadow-card-hover">
+                    {% url 'core:story_detail' slug=g.story.slug as story_href %}
+                    {% include "components/cover_placeholder.html" with story=g.story href=story_href cls="h-[108px] w-[72px] rounded-md shadow-[0_1px_3px_rgba(0,0,0,0.08)]" letter_cls="text-3xl" %}
+                    <div class="flex min-w-0 flex-1 items-start gap-3">
+                        <div class="min-w-0 flex-1">
+                            <p class="font-sans text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+                                {{ g.award.title }}
+                            </p>
+                            <a href="{% url 'core:story_detail' slug=g.story.slug %}"
+                               class="mt-1 block font-sans text-base font-bold leading-tight text-slate-900 hover:text-brand">
+                                {{ g.story.title }}
+                            </a>
+                            <a href="{% url 'core:profile_other' username=g.story.author.username %}"
+                               class="font-sans text-[13px] text-slate-500 hover:text-brand">
+                                {{ g.story.author.public_name }}
+                            </a>
+                            {% if g.note %}
+                                <p class="mt-1.5 font-sans text-xs leading-snug text-slate-600">{{ g.note }}</p>
+                            {% endif %}
+                        </div>
+                        {% include "components/award.html" with image=g.award.image label=g.award.title size=48 interactive=False only %}
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+{% endif %}

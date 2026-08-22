@@ -12,11 +12,16 @@
       icon_right — имя иконки справа (опц.)
       size     — 'md' (default · h-9 px-5 text-sm) | 'lg' (h-11 px-6 text-base)
       full     — занять всю ширину (boolean)
-      disabled — boolean
+      disabled — boolean (состояние на момент рендера)
+      x_disabled — Alpine-выражение: кнопка гаснет и блокируется реактивно.
+                   Нужно там, где условие меняется в браузере — например,
+                   выбор произведения в подаче на конкурс. Работает вместе
+                   с `disabled`: сервер задаёт начальное состояние, Alpine
+                   ведёт дальнейшие. Требует `x-data` в предках
       aria_label — для иконочной кнопки
 {% endcomment %}
 {% with k=kind|default:"primary" sz=size|default:"md" %}
-{% if href %}<a href="{{ href }}"{% if aria_label %} aria-label="{{ aria_label }}"{% endif %}{% else %}<button type="{{ type|default:'button' }}"{% if disabled %} disabled{% endif %}{% if aria_label %} aria-label="{{ aria_label }}"{% endif %}{% endif %}
+{% if href %}<a href="{{ href }}"{% if aria_label %} aria-label="{{ aria_label }}"{% endif %}{% else %}<button type="{{ type|default:'button' }}"{% if disabled %} disabled{% endif %}{% if x_disabled %} :disabled="{{ x_disabled }}" :class="({{ x_disabled }}) ? 'opacity-50 cursor-not-allowed' : ''"{% endif %}{% if aria_label %} aria-label="{{ aria_label }}"{% endif %}{% endif %}
    class="inline-flex items-center justify-center gap-2 rounded-md font-sans font-bold transition-colors
           {% if sz == 'lg' %}h-11 px-6 text-base{% else %}h-9 px-5 text-sm{% endif %}
           {% if full %}w-full{% endif %}

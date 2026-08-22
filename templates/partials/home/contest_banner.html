@@ -8,10 +8,10 @@
 
     Placeholder с CTA на список, если активного конкурса нет.
 
-    Контекст: hero_contest (опц., Contest со status='active')
+    Контекст: hero_contest (опц., Contest в фазе приёма заявок)
 {% endcomment %}
 
-{% if hero_contest and hero_contest.status == 'active' %}
+{% if hero_contest and hero_contest.is_accepting %}
     <a href="{% url 'core:contest_detail' slug=hero_contest.slug %}"
        class="group relative block overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-card-hover">
         <div class="relative flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:gap-6 md:px-7 md:py-5">

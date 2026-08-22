@@ -1,0 +1,55 @@
+{% comment %}
+    Подтверждение отзыва заявки с конкурса (BR-23b).
+    Триггер: $dispatch('open-withdraw-confirm', { contest: '…', story: '…' })
+
+    Отдельный компонент, а не параметр `delete_confirm_modal`: тот
+    спрашивает «өшіру керек пе?» красной кнопкой с корзиной, и его копия
+    сшита с удалением произведения. Отзыв заявки ничего не удаляет —
+    произведение остаётся, автор просто выходит из конкурса и может
+    подать другую работу. Одеть это в красную корзину значило бы напугать
+    там, где пугать нечем.
+
+    Сейчас (дизайн-фаза) подтверждение закрывает модалку и шлёт тост.
+    В Ф14 сюда придут csrf-токен и настоящий POST.
+{% endcomment %}
+<div x-data="{ open: false, contest: '', story: '' }"
+     @open-withdraw-confirm.window="open = true; contest = $event.detail?.contest || ''; story = $event.detail?.story || ''"
+     @keydown.escape.window="open = false"
+     x-show="open" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center p-4"
+     role="alertdialog" aria-modal="true" aria-labelledby="withdraw-modal-title">
+
+    <div x-show="open" x-transition.opacity
+         class="absolute inset-0 bg-slate-900/60" @click="open = false"></div>
+
+    <div x-show="open"
+         x-transition:enter="ease-out duration-200"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         class="relative w-full max-w-md rounded-hero bg-white p-7 shadow-modal sm:p-9">
+
+        <div class="grid h-12 w-12 place-items-center rounded-pill bg-status-attention-bg text-status-attention-fg">
+            {% include "components/icon.html" with name="arrow-left" size=22 only %}
+        </div>
+
+        <h2 id="withdraw-modal-title" class="mt-4 font-display text-xl font-bold text-slate-900">
+            Өтінімді қайтарып алу керек пе?
+        </h2>
+        <p class="mt-2 font-sans text-sm leading-relaxed text-slate-600">
+            «<span x-text="story"></span>» «<span x-text="contest"></span>» байқауынан шығады.
+            Шығарма өшпейді — қабылдау жабылғанша басқа жұмысты жібере аласың.
+        </p>
+
+        <div class="mt-6 flex justify-end gap-2.5">
+            <button type="button" @click="open = false"
+                    class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                Қалдыру
+            </button>
+            <button type="button"
+                    @click="open = false; $dispatch('toast', { kind: 'info', text: 'Өтінім қайтарып алынды (демо)' })"
+                    class="inline-flex h-9 items-center gap-2 rounded-md bg-slate-900 px-5 font-sans text-sm font-bold text-white hover:bg-slate-700">
+                Қайтарып алу
+            </button>
+        </div>
+    </div>
+</div>

@@ -30,23 +30,35 @@ class ContestModel(TestCase):
         for c in stub_data.CONTESTS:
             with self.subTest(slug=c.slug):
                 self.assertTrue(c.name)
-                self.assertIn(c.status, ('active', 'finished'))
+                self.assertIn(c.phase, stub_data.CONTEST_PHASES)
                 self.assertGreaterEqual(c.submissions, 0)
-                # для active обязателен days_left
-                if c.status == 'active':
-                    self.assertIsNotNone(c.days_left)
-                    self.assertIsNotNone(c.prize_kzt)
+                # Отсчёт есть ровно там, где ему есть что считать.
+                self.assertEqual(c.days_left is not None, c.is_accepting)
+                self.assertEqual(c.days_until_open is not None,
+                                 c.phase == 'upcoming')
 
     def test_contests_by_slug_lookup(self):
         self.assertEqual(
-            stub_data.CONTESTS_BY_SLUG['altyn-qalam-2024'].name,
-            'Алтын қалам — 2024',
+            stub_data.CONTESTS_BY_SLUG['altyn-qalam'].name,
+            'Алтын қалам',
         )
 
-    def test_active_contests_filter(self):
-        self.assertEqual(len(stub_data.ACTIVE_CONTESTS), 2)
-        for c in stub_data.ACTIVE_CONTESTS:
-            self.assertEqual(c.status, 'active')
+    def test_every_phase_is_represented_in_the_stub_set(self):
+        """Демо-набор покрывает все четыре фазы — иначе `judging` и
+        `upcoming` не на чем увидеть, а ради них DEC-45 и заводился."""
+        self.assertEqual({c.phase for c in stub_data.CONTESTS},
+                         set(stub_data.CONTEST_PHASES))
+
+    def test_contest_groups_do_not_overlap(self):
+        accepting = {c.slug for c in stub_data.ACCEPTING_CONTESTS}
+        open_ = {c.slug for c in stub_data.OPEN_CONTESTS}
+        finished = {c.slug for c in stub_data.FINISHED_CONTESTS}
+        self.assertTrue(accepting <= open_)
+        self.assertEqual(open_ & finished, set())
+        self.assertEqual(open_ | finished, {c.slug for c in stub_data.CONTESTS})
+
+    def test_hero_contest_is_the_one_accepting_work(self):
+        self.assertTrue(stub_data.HERO_CONTEST.is_accepting)
 
     def test_jury_and_timeline_present_for_active(self):
         c = stub_data.CONTESTS_BY_SLUG['bolashak-mektebi']
@@ -54,6 +66,53 @@ class ContestModel(TestCase):
         self.assertGreater(len(c.timeline), 0)
         # ровно одна активная фаза
         self.assertEqual(sum(1 for t in c.timeline if t.state == 'active'), 1)
+
+
+class ContestDatesAreTheSource(TestCase):
+    """DEC-45: фаза, отсчёт, год и число заявок выводятся, а не хранятся."""
+
+    def test_dates_are_ordered(self):
+        for c in stub_data.CONTESTS:
+            with self.subTest(slug=c.slug):
+                self.assertLessEqual(c.opens_on, c.closes_on)
+                self.assertLess(c.closes_on, c.results_on)
+
+    def test_timeline_lies_inside_the_contest_window(self):
+        for c in stub_data.CONTESTS:
+            for t in c.timeline:
+                with self.subTest(slug=c.slug, stage=t.label):
+                    self.assertLessEqual(t.starts, t.ends)
+                    self.assertGreaterEqual(t.ends, c.opens_on)
+                    self.assertLessEqual(t.starts, c.results_on)
+
+    def test_timeline_stages_are_chronological(self):
+        for c in stub_data.CONTESTS:
+            starts = [t.starts for t in c.timeline]
+            with self.subTest(slug=c.slug):
+                self.assertEqual(starts, sorted(starts))
+
+    def test_submission_count_matches_real_submissions(self):
+        """Хранимое «87 өтінім» стояло при одной настоящей заявке."""
+        for c in stub_data.CONTESTS:
+            real = sum(1 for subs in stub_data.SUBMISSIONS_BY_USER.values()
+                       for s in subs if s.contest_slug == c.slug)
+            with self.subTest(slug=c.slug):
+                self.assertEqual(c.submissions, real)
+
+    def test_year_comes_from_the_results_date(self):
+        for c in stub_data.CONTESTS:
+            with self.subTest(slug=c.slug):
+                self.assertEqual(c.year, c.results_on.year)
+
+    def test_only_finished_contests_have_winners(self):
+        for c in stub_data.CONTESTS:
+            if c.winners:
+                with self.subTest(slug=c.slug):
+                    self.assertTrue(c.is_finished)
+
+    def test_stage_state_follows_the_calendar(self):
+        c = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        self.assertTrue(all(t.state == 'done' for t in c.timeline))
 
 
 class SubmissionsHelpers(TestCase):
@@ -66,7 +125,7 @@ class SubmissionsHelpers(TestCase):
         self.assertEqual(stub_data.submissions_of('ghost'), [])
 
     def test_has_submission_true(self):
-        self.assertTrue(stub_data.has_submission('aidana', 'altyn-qalam-2024'))
+        self.assertTrue(stub_data.has_submission('aidana', 'altyn-qalam'))
 
     def test_has_submission_false(self):
         self.assertFalse(stub_data.has_submission('aidana', 'bolashak-mektebi'))
@@ -77,7 +136,7 @@ class ChecklistHelpers(TestCase):
     def test_checklist_short_story_fails_volume(self):
         # aidana-koshe: главы 800+1200+950+1100+700 = 4750 < 5000
         story = stub_data.STORIES_BY_SLUG['aidana-koshe']
-        contest = stub_data.CONTESTS_BY_SLUG['altyn-qalam-2024']
+        contest = stub_data.CONTESTS_BY_SLUG['altyn-qalam']
         cl = stub_data.submission_checklist(story, contest)
         vol = next(i for i in cl if i['key'] == 'volume')
         self.assertFalse(vol['passed'])
@@ -92,14 +151,14 @@ class ChecklistHelpers(TestCase):
         # aidana-erteg в CHAPTERS_BY_STORY отсутствует → total=0 → fail.
         # Нет идеальной — проверим что для 0 главы fail и для слишком большой fail.
         story = stub_data.STORIES_BY_SLUG['aidana-erteg']  # без глав → 0 chars
-        contest = stub_data.CONTESTS_BY_SLUG['altyn-qalam-2024']
+        contest = stub_data.CONTESTS_BY_SLUG['altyn-qalam']
         cl = stub_data.submission_checklist(story, contest)
         vol = next(i for i in cl if i['key'] == 'volume')
         self.assertFalse(vol['passed'])
 
     def test_checklist_ai_declaration_required(self):
         story = stub_data.STORIES_BY_SLUG['aidana-tan']
-        contest = stub_data.CONTESTS_BY_SLUG['altyn-qalam-2024']
+        contest = stub_data.CONTESTS_BY_SLUG['altyn-qalam']
         cl = stub_data.submission_checklist(story, contest)
         ai = next(i for i in cl if i['key'] == 'ai_decl')
         self.assertFalse(ai['passed'])
@@ -108,20 +167,32 @@ class ChecklistHelpers(TestCase):
 
 class EligibleForContest(TestCase):
 
-    def test_eligible_returns_all_with_eligible_flag(self):
-        items = stub_data.eligible_for_contest('aidana', 'altyn-qalam-2024')
-        # Все произведения Айданы, каждое с флагом пригодности
-        self.assertEqual(len(items), len(stub_data.my_stories_of('aidana')))
-        for it in items:
-            self.assertIn('story', it)
-            self.assertIn('chars', it)
-            self.assertIn('eligible', it)
+    def test_only_public_works_are_candidates(self):
+        """Черновик и работа на модерации кандидатами не являются (DEC-23).
+
+        Раньше они попадали в выбор, и от подачи черновика спасал только
+        нулевой объём — работа на 6 000 знаков со статусом `NotPublished`
+        подавалась бы. Порог объёма, наоборот, остаётся видимым
+        заблокированным пунктом (BR-24): его автор может исправить.
+        """
+        items = stub_data.eligible_for_contest('aidana', 'altyn-qalam')
+        self.assertEqual([i['story'].slug for i in items],
+                         [s.slug for s in stub_data.public_stories_of('aidana')])
+        self.assertTrue(all(i['story'].is_public for i in items))
+
+    def test_shape_is_complete(self):
+        for it in stub_data.eligible_for_contest('aidana', 'altyn-qalam'):
+            with self.subTest(story=it['story'].slug):
+                self.assertEqual(set(it),
+                                 {'story', 'chars', 'eligible', 'reason', 'hint'})
+                self.assertEqual(bool(it['reason']), not it['eligible'])
+                self.assertEqual(bool(it['hint']), not it['eligible'])
 
     def test_eligible_unknown_contest(self):
         self.assertEqual(stub_data.eligible_for_contest('aidana', 'no-such'), [])
 
     def test_eligible_unknown_user(self):
-        self.assertEqual(stub_data.eligible_for_contest('ghost', 'altyn-qalam-2024'), [])
+        self.assertEqual(stub_data.eligible_for_contest('ghost', 'altyn-qalam'), [])
 
 
 # ════════════════════════════ Contest list ═════════════════════════════════
@@ -131,16 +202,16 @@ class ContestList(TestCase):
     def test_renders_for_guest(self):
         r = self.client.get(reverse('core:contest_list'))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'Конкурстар')
+        self.assertContains(r, 'Байқаулар')
 
     def test_lists_active_and_finished_sections(self):
         r = self.client.get(reverse('core:contest_list'))
-        self.assertContains(r, 'Белсенді')
+        self.assertContains(r, 'Ағымдағы')
         self.assertContains(r, 'Аяқталған')
 
     def test_shows_all_active_cards(self):
         r = self.client.get(reverse('core:contest_list'))
-        for c in stub_data.ACTIVE_CONTESTS:
+        for c in stub_data.OPEN_CONTESTS:
             with self.subTest(slug=c.slug):
                 self.assertContains(r, c.name)
                 self.assertContains(
@@ -202,7 +273,7 @@ class ContestDetailKnown(TestCase):
 
 class ContestDetailAlreadySubmitted(TestCase):
 
-    SLUG = 'altyn-qalam-2024'
+    SLUG = 'altyn-qalam'
 
     def setUp(self):
         _login_as_aidana(self.client)   # aidana уже подала на altyn-qalam-2024
@@ -232,7 +303,7 @@ class ContestDetailUnknown(TestCase):
     def test_unknown_slug_renders_not_found(self):
         r = self.client.get(reverse('core:contest_detail', kwargs={'slug': 'ghost'}))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'Конкурс табылмады')
+        self.assertContains(r, 'Байқау табылмады')
 
 
 # ════════════════════════════ Contest submit ═══════════════════════════════
@@ -258,10 +329,17 @@ class ContestSubmitForm(TestCase):
     def test_200(self):
         self.assertEqual(self.response.status_code, 200)
 
-    def test_form_lists_all_user_stories(self):
-        for s in stub_data.my_stories_of('aidana'):
+    def test_form_lists_the_public_works(self):
+        for s in stub_data.public_stories_of('aidana'):
             with self.subTest(slug=s.slug):
                 self.assertContains(self.response, f'value="{s.slug}"')
+
+    def test_form_hides_drafts_and_moderation(self):
+        for s in stub_data.my_stories_of('aidana'):
+            if s.is_public:
+                continue
+            with self.subTest(slug=s.slug):
+                self.assertNotContains(self.response, f'value="{s.slug}"')
 
     def test_disables_too_short_story(self):
         # aidana-koshe: 4750 < 5000 → disabled
@@ -286,7 +364,7 @@ class ContestSubmitForm(TestCase):
 
 class ContestSubmitAlreadyDone(TestCase):
 
-    SLUG = 'altyn-qalam-2024'   # aidana уже подала
+    SLUG = 'altyn-qalam'   # aidana уже подала
 
     def setUp(self):
         _login_as_aidana(self.client)
@@ -308,7 +386,7 @@ class ContestSubmitUnknown(TestCase):
     def test_unknown_slug_renders_not_found(self):
         _login_as_aidana(self.client)
         r = self.client.get(reverse('core:contest_submit', kwargs={'slug': 'ghost'}))
-        self.assertContains(r, 'Конкурс табылмады')
+        self.assertContains(r, 'Байқау табылмады')
 
 
 # ════════════════════════════ My submissions ═══════════════════════════════
@@ -349,7 +427,7 @@ class MySubmissionsAuthed(TestCase):
                 )
 
     def test_rejected_shows_jury_note(self):
-        self.assertContains(self.response, 'Көлемі шарттан асып кеткен')
+        self.assertContains(self.response, 'Көлемі шарттан аз')
 
 
 class MySubmissionsEmpty(TestCase):
@@ -375,7 +453,7 @@ class ContestWinners(TestCase):
                     self.assertIn(slug, stub_data.STORIES_BY_SLUG)
 
     def test_active_contests_have_no_winners(self):
-        for c in stub_data.ACTIVE_CONTESTS:
+        for c in stub_data.OPEN_CONTESTS:
             with self.subTest(contest=c.slug):
                 self.assertEqual(c.winners, ())
 
@@ -404,7 +482,7 @@ class SubmissionsMatchContestBadges(TestCase):
     LABEL = 'Байқауға қатысады'
 
     def _stories_with_active_submission(self):
-        active = {c.slug for c in stub_data.ACTIVE_CONTESTS}
+        active = {c.slug for c in stub_data.OPEN_CONTESTS}
         return {
             sub.story_slug
             for subs in stub_data.SUBMISSIONS_BY_USER.values()
@@ -466,3 +544,561 @@ class ContestYear(TestCase):
             if m:
                 with self.subTest(contest=c.slug):
                     self.assertEqual(c.year, int(m.group(1)))
+
+
+# ════════════════════════════ CONT-1 · словарь и рейл ══════════════════════
+
+class ContestVocabulary(TestCase):
+    """Одна сущность — одно слово: в интерфейсе «байқау», не «конкурс».
+
+    Шапка, нижнее меню, футер и баннер главной всегда говорили «Байқаулар»,
+    а сам раздел называл себя «Конкурстар» — в h1, во всех хлебных крошках,
+    в кнопках и в пустом состоянии. Русское заимствование в казахском
+    интерфейсе (docs/16).
+    """
+
+    URLS = (
+        '/contests/',
+        '/contests/bolashak-mektebi/',
+        '/contests/zhas-aldym-2023/',
+        '/contests/bolashak-mektebi/submit/',
+        '/contests/my-submissions/',
+        '/contests/unknown-slug/',
+    )
+
+    def test_contest_pages_never_say_konkurs(self):
+        _login_as_aidana(self.client)
+        for url in self.URLS:
+            with self.subTest(url=url):
+                html = self.client.get(url).content.decode()
+                self.assertNotIn('онкурс', html)
+
+    def test_contest_pages_never_say_konkurs_for_guest(self):
+        for url in self.URLS:
+            with self.subTest(url=url):
+                html = self.client.get(url).content.decode()
+                self.assertNotIn('онкурс', html)
+
+
+class ContestRail(TestCase):
+    """Правый рейл конкурса: не копия страницы и не пустая колонка (DEC-25)."""
+
+    def test_unknown_slug_has_no_rail(self):
+        for url in ('/contests/unknown-slug/', '/contests/unknown-slug/submit/'):
+            with self.subTest(url=url):
+                r = self.client.get(url)
+                self.assertFalse(r.context['has_right_rail'])
+
+    def test_finished_contest_without_open_stages_has_no_rail(self):
+        """У «Жас алдым — 2023» все этапы позади: рейлу нечего сказать."""
+        r = self.client.get(reverse('core:contest_detail', args=['zhas-aldym-2023']))
+        self.assertFalse(r.context['has_right_rail'])
+
+    def test_active_contest_rail_names_current_and_next_stage(self):
+        r = self.client.get(reverse('core:contest_detail', args=['bolashak-mektebi']))
+        self.assertTrue(r.context['has_right_rail'])
+        html = r.content.decode()
+        self.assertIn('Қазылар қарауы', html)   # следующий этап — только в рейле
+
+    def test_rail_does_not_repeat_the_prize_from_the_hero(self):
+        """Сыйақы написан в хиро; вторая копия в рейле — не дополнение, а дубль."""
+        r = self.client.get(reverse('core:contest_detail', args=['bolashak-mektebi']))
+        money = stub_data.spaced_number(500_000)
+        self.assertEqual(r.content.decode().count(money), 1)
+
+    def test_submit_page_rail_has_no_cta_to_itself(self):
+        _login_as_aidana(self.client)
+        r = self.client.get(reverse('core:contest_submit', args=['bolashak-mektebi']))
+        self.assertTrue(r.context['hide_submit_cta'])
+        # Ссылка на подачу остаётся ровно одна — action самой формы.
+        target = reverse('core:contest_submit', args=['bolashak-mektebi'])
+        self.assertEqual(r.content.decode().count(f'"{target}"'), 1)
+
+
+class ContestStages(TestCase):
+
+    def test_current_stage_is_the_active_one(self):
+        c = stub_data.CONTESTS_BY_SLUG['bolashak-mektebi']
+        self.assertEqual(c.current_stage.state, 'active')
+        self.assertEqual(c.current_stage.label, 'Өтінім қабылдау')
+
+    def test_next_stage_is_the_first_upcoming(self):
+        c = stub_data.CONTESTS_BY_SLUG['bolashak-mektebi']
+        self.assertEqual(c.next_stage.label, 'Қазылар қарауы')
+
+    def test_finished_contest_has_no_open_stages(self):
+        c = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        self.assertIsNone(c.current_stage)
+        self.assertIsNone(c.next_stage)
+
+
+class ChecklistNumbers(TestCase):
+    """Числа в подсказках — с разрядами, пороги — из конкурса, не литералом."""
+
+    def setUp(self):
+        self.contest = stub_data.CONTESTS_BY_SLUG['altyn-qalam']
+        self.story = stub_data.STORIES_BY_SLUG['aidana-tan']
+        self.volume = next(i for i in stub_data.submission_checklist(self.story, self.contest)
+                           if i['key'] == 'volume')
+
+    def test_thresholds_come_from_the_contest(self):
+        self.assertIn(stub_data.spaced_number(self.contest.min_chars), self.volume['label'])
+        self.assertIn(stub_data.spaced_number(self.contest.max_chars), self.volume['label'])
+
+    def test_char_count_is_spaced(self):
+        total = sum(c.char_count for c in stub_data.chapters_of(self.story.slug))
+        self.assertIn(stub_data.spaced_number(total), self.volume['hint'])
+        self.assertNotIn(str(total), self.volume['hint'])
+
+
+class RejectionNoteMatchesTheData(TestCase):
+    """Отказ по объёму должен называть ту сторону порога, которая нарушена."""
+
+    def test_aidana_rejection_says_too_small(self):
+        sub = next(s for s in stub_data.submissions_of('aidana') if s.status == 'rejected')
+        total = sum(c.char_count for c in stub_data.chapters_of(sub.story_slug))
+        self.assertLess(total, sub.contest.min_chars)
+        self.assertIn('аз', sub.note)
+
+
+# ════════════════════════════ CONT-2 · победители ══════════════════════════
+
+class ContestWinnersOnDetail(TestCase):
+    """FR-CONT-08. `winner_stories` существовал и не был отрендерен нигде."""
+
+    def setUp(self):
+        self.contest = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        self.response = self.client.get(
+            reverse('core:contest_detail', args=['zhas-aldym-2023']))
+
+    def test_section_is_present(self):
+        # Именно заголовок секции: «Жеңімпаздар» — ещё и подпись последнего
+        # этапа в таймлайне активного конкурса, по голому слову не отличить.
+        self.assertContains(self.response, '>Жеңімпаздар</h2>')
+
+    def test_every_winner_is_named(self):
+        for story in self.contest.winner_stories:
+            with self.subTest(story=story.slug):
+                self.assertContains(self.response, story.title)
+
+    def test_winner_links_to_story_and_author(self):
+        for story in self.contest.winner_stories:
+            with self.subTest(story=story.slug):
+                self.assertContains(
+                    self.response, reverse('core:story_detail', args=[story.slug]))
+                self.assertContains(
+                    self.response,
+                    reverse('core:profile_other', args=[story.author.username]))
+
+    def test_timeline_is_collapsed_once_winners_are_known(self):
+        self.assertContains(self.response, '<summary')
+
+    def test_active_contest_has_no_winners_section(self):
+        r = self.client.get(reverse('core:contest_detail', args=['bolashak-mektebi']))
+        self.assertEqual(r.context['grants'], [])
+        self.assertNotContains(r, '>Жеңімпаздар</h2>')
+
+
+class ContestWinnersOnCard(TestCase):
+
+    def test_finished_card_names_its_winners(self):
+        r = self.client.get(reverse('core:contest_list'))
+        for story in stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023'].winner_stories:
+            with self.subTest(story=story.slug):
+                self.assertContains(r, story.title)
+
+    def test_active_card_says_nothing_about_winners(self):
+        html = self.client.get(reverse('core:contest_list')).content.decode()
+        self.assertEqual(html.count('Жеңімпаз:'), 1)
+
+
+# ════════════════════════════ CONT-3 · фазы ════════════════════════════════
+
+class SubmitIsGatedByPhase(TestCase):
+    """Форма подачи живёт только в фазе приёма (DEC-45).
+
+    Прямая ссылка открывалась в любой момент и предлагала подать работу
+    в конкурс, который ещё не начался или уже ушёл на судейство.
+    """
+
+    def setUp(self):
+        # Не aidana: у неё уже есть заявка в «Алтын қалам», и страница
+        # показала бы блок «өтінім бергенсің» раньше, чем блок фазы.
+        _login_as(self.client, 'bekzhan_t')
+
+    # Голого `<form` мало: базовый шаблон несёт свои формы (поиск, жалоба).
+    # Признак именно формы подачи — поле выбора произведения.
+    FIELD = 'name="story_slug"'
+
+    def test_upcoming_contest_shows_no_form(self):
+        r = self.client.get(reverse('core:contest_submit', args=['qys-ertegisi']))
+        self.assertNotContains(r, self.FIELD)
+        self.assertContains(r, 'Өтінім қабылдау әлі басталған жоқ')
+
+    def test_judging_contest_shows_no_form(self):
+        r = self.client.get(reverse('core:contest_submit', args=['altyn-qalam']))
+        self.assertNotContains(r, self.FIELD)
+        self.assertContains(r, 'Өтінім қабылдау жабылды')
+
+    def test_finished_contest_shows_no_form(self):
+        r = self.client.get(reverse('core:contest_submit', args=['zhas-aldym-2023']))
+        self.assertNotContains(r, self.FIELD)
+
+    def test_accepting_contest_still_shows_the_form(self):
+        r = self.client.get(reverse('core:contest_submit', args=['bolashak-mektebi']))
+        self.assertContains(r, self.FIELD)
+
+
+class DetailHeroSpeaksByPhase(TestCase):
+
+    def test_accepting_offers_the_button(self):
+        r = self.client.get(reverse('core:contest_detail', args=['bolashak-mektebi']))
+        self.assertContains(r, reverse('core:contest_submit', args=['bolashak-mektebi']))
+
+    def test_upcoming_names_the_opening_date_instead_of_a_button(self):
+        c = stub_data.CONTESTS_BY_SLUG['qys-ertegisi']
+        r = self.client.get(reverse('core:contest_detail', args=['qys-ertegisi']))
+        self.assertNotContains(r, reverse('core:contest_submit', args=['qys-ertegisi']))
+        self.assertContains(r, c.opens_on_label)
+
+    def test_judging_names_the_results_date(self):
+        c = stub_data.CONTESTS_BY_SLUG['altyn-qalam']
+        r = self.client.get(reverse('core:contest_detail', args=['altyn-qalam']))
+        self.assertNotContains(r, reverse('core:contest_submit', args=['altyn-qalam']))
+        self.assertContains(r, c.results_on_label)
+
+    def test_finished_offers_nothing_to_submit(self):
+        r = self.client.get(reverse('core:contest_detail', args=['zhas-aldym-2023']))
+        self.assertNotContains(r, reverse('core:contest_submit', args=['zhas-aldym-2023']))
+
+
+class ContestListOrdersByWhatYouCanDo(TestCase):
+
+    def test_accepting_contest_comes_first(self):
+        self.assertTrue(stub_data.OPEN_CONTESTS[0].is_accepting)
+
+    def test_every_open_contest_is_on_the_page(self):
+        html = self.client.get(reverse('core:contest_list')).content.decode()
+        positions = [html.index(c.name) for c in stub_data.OPEN_CONTESTS]
+        self.assertEqual(positions, sorted(positions))
+
+
+class PhaseLabelsAreOneRegistry(TestCase):
+    """Подпись фазы приходит из `CONTEST_PHASE_LABELS`, не из шаблона."""
+
+    def test_every_phase_has_a_label_and_a_badge_kind(self):
+        for phase in stub_data.CONTEST_PHASES:
+            with self.subTest(phase=phase):
+                self.assertIn(phase, stub_data.CONTEST_PHASE_LABELS)
+                self.assertIn(phase, stub_data.CONTEST_PHASE_BADGE)
+
+    def test_card_shows_the_registry_label(self):
+        html = self.client.get(reverse('core:contest_list')).content.decode()
+        for c in stub_data.CONTESTS:
+            with self.subTest(slug=c.slug):
+                self.assertIn(stub_data.CONTEST_PHASE_LABELS[c.phase], html)
+
+
+class KazakhDateFormatting(TestCase):
+
+    def test_single_day_stage_has_no_dash(self):
+        c = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        final = next(t for t in c.timeline if t.label == 'Финал')
+        self.assertEqual(final.period, '15 жел')
+
+    def test_range_stage_joins_two_dates(self):
+        c = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        intake = next(t for t in c.timeline if t.label == 'Өтінім қабылдау')
+        self.assertEqual(intake.period, '1 қыр — 1 жел')
+
+
+# ════════════════════════════ CONT-4 · награды конкурса ════════════════════
+
+class ContestAwardsData(TestCase):
+    """DEC-46: набор номинаций у каждого конкурса свой, победа — акт жюри."""
+
+    def test_award_slugs_are_unique_within_a_contest(self):
+        for c in stub_data.CONTESTS:
+            slugs = [a.slug for a in c.awards]
+            with self.subTest(contest=c.slug):
+                self.assertEqual(len(slugs), len(set(slugs)))
+
+    def test_every_contest_declares_at_least_one_award(self):
+        """Номинация — ответ на «зачем участвовать». Конкурс без неё
+        предлагает только сумму в тенге."""
+        for c in stub_data.CONTESTS:
+            with self.subTest(contest=c.slug):
+                self.assertTrue(c.awards)
+
+    def test_grants_reference_known_contest_award_and_story(self):
+        for g in stub_data.AWARD_GRANTS:
+            with self.subTest(grant=(g.contest_slug, g.award_slug, g.story_slug)):
+                self.assertIsNotNone(g.contest)
+                self.assertIsNotNone(g.award)
+                self.assertIsNotNone(g.story)
+
+    def test_grant_implies_a_finished_contest(self):
+        """Награду нельзя вручить, пока жюри не закончило."""
+        for g in stub_data.AWARD_GRANTS:
+            with self.subTest(grant=g.award_slug):
+                self.assertTrue(g.contest.is_finished)
+
+    def test_grant_implies_a_submission_by_the_same_author(self):
+        for g in stub_data.AWARD_GRANTS:
+            subs = stub_data.submissions_of(g.story.author_username)
+            with self.subTest(grant=g.award_slug):
+                self.assertIn(g.contest_slug, {s.contest_slug for s in subs})
+
+    def test_one_award_is_granted_at_most_once(self):
+        seen = [(g.contest_slug, g.award_slug) for g in stub_data.AWARD_GRANTS]
+        self.assertEqual(len(seen), len(set(seen)))
+
+    def test_winners_are_derived_from_grants(self):
+        c = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        self.assertEqual(c.winners, tuple(g.story_slug for g in c.grants))
+
+    def test_contest_without_grants_has_no_winners(self):
+        for c in stub_data.CONTESTS:
+            if not c.grants:
+                with self.subTest(contest=c.slug):
+                    self.assertEqual(c.winners, ())
+
+
+class ContestAwardImages(TestCase):
+    """Эмблему грузит админ файлом — путь обязан вести к реальному файлу."""
+
+    def test_declared_images_exist_in_media(self):
+        """Путь эмблемы ведёт к настоящему файлу — если он вообще есть локально.
+
+        `media/` целиком в `.gitignore` (там же лежат обложки-плейсхолдеры),
+        поэтому на чистом клоне файлов нет, и жёсткая проверка падала бы не
+        на ошибке, а на отсутствии необязательных ассетов. Контракт пути
+        проверяется отдельно и всегда — `test_image_path_follows_the_contract`.
+        """
+        from pathlib import Path
+
+        from django.conf import settings
+        root = Path(settings.MEDIA_ROOT) / 'awards'
+        if not root.is_dir():
+            self.skipTest('media/awards/ нет локально — ассеты не в репозитории')
+        for c in stub_data.CONTESTS:
+            for a in c.awards:
+                if not a.image:
+                    continue
+                with self.subTest(contest=c.slug, award=a.slug):
+                    self.assertTrue((Path(settings.MEDIA_ROOT) / a.image).is_file(),
+                                    f'нет файла: {a.image}')
+
+    def test_image_path_follows_the_contract(self):
+        """`awards/<contest>/<award>.png` — растр, не SVG.
+
+        SVG из `/media/` открывается в origin сайта и может нести скрипт;
+        загрузка эмблем идёт через админку, но правило одно для всех.
+        """
+        for c in stub_data.CONTESTS:
+            for a in c.awards:
+                if not a.image:
+                    continue
+                with self.subTest(award=a.slug):
+                    self.assertTrue(a.image.startswith(f'awards/{c.slug}/'), a.image)
+                    self.assertTrue(a.image.endswith(('.png', '.webp')), a.image)
+
+    def test_award_without_image_still_renders(self):
+        """Админ не загрузил файл — типографическая заглушка, не дыра."""
+        c = stub_data.CONTESTS_BY_SLUG['bolashak-mektebi']
+        self.assertTrue(any(not a.image for a in c.awards),
+                        'фикстура сломана: нужна номинация без эмблемы')
+        r = self.client.get(reverse('core:contest_detail', args=[c.slug]))
+        self.assertEqual(r.status_code, 200)
+        for a in c.awards:
+            with self.subTest(award=a.slug):
+                self.assertContains(r, a.title)
+
+
+class ContestAwardsOnDetail(TestCase):
+
+    def test_nominations_are_shown_before_the_results(self):
+        r = self.client.get(reverse('core:contest_detail', args=['bolashak-mektebi']))
+        self.assertContains(r, 'Марапаттар')
+        self.assertContains(r, 'Бас жүлде')
+
+    def test_nominations_are_not_repeated_after_the_results(self):
+        """У завершённого конкурса номинации уже перечислены победителями."""
+        r = self.client.get(reverse('core:contest_detail', args=['zhas-aldym-2023']))
+        self.assertNotContains(r, 'Марапаттар')
+
+    def test_winner_row_names_the_nomination(self):
+        c = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        r = self.client.get(reverse('core:contest_detail', args=[c.slug]))
+        for g in c.grants:
+            with self.subTest(award=g.award_slug):
+                self.assertContains(r, g.award.title)
+
+    def test_winner_emblem_is_rendered(self):
+        c = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        r = self.client.get(reverse('core:contest_detail', args=[c.slug]))
+        for g in c.grants:
+            if g.award.image:
+                with self.subTest(award=g.award_slug):
+                    self.assertContains(r, f'/media/{g.award.image}')
+
+
+class SystemWinnerAwardIsRetired(TestCase):
+    """DEC-46 снял общий «Байқау жеңімпазы» — его вытеснила награда конкурса."""
+
+    def test_registry_has_no_generic_winner_award(self):
+        self.assertNotIn('contest_winner', {a.key for a in stub_data.AWARDS})
+
+    def test_participation_awards_stay(self):
+        keys = {a.key for a in stub_data.AWARDS}
+        self.assertIn('contest_participant', keys)
+        self.assertIn('contest_accepted', keys)
+
+
+# ════════════════════════════ CONT-5 · подача ══════════════════════════════
+
+class EligibilityReasons(TestCase):
+    """BR-24 + BR-23a: почему работу нельзя подать — говорится, а не молчится."""
+
+    def _items(self, username, slug='bolashak-mektebi'):
+        return {i['story'].slug: i for i in stub_data.eligible_for_contest(username, slug)}
+
+    def test_too_short_work_is_blocked_with_a_reason(self):
+        item = self._items('aidana')['aidana-koshe']
+        self.assertFalse(item['eligible'])
+        self.assertEqual(item['reason'], 'too_short')
+        self.assertIn(stub_data.INELIGIBLE_REASONS['too_short'], item['hint'])
+
+    def test_work_in_another_open_contest_is_blocked(self):
+        """Одним текстом нельзя идти в двух конкурсах разом (BR-23a)."""
+        item = self._items('aidana')['aidana-tan']
+        self.assertEqual(item['reason'], 'busy')
+        self.assertIn('Алтын қалам', item['hint'])
+
+    def test_finished_contest_does_not_block_a_work(self):
+        """Работа своё отучаствовала — она снова свободна."""
+        self.assertIsNone(
+            stub_data.busy_contest_of('bekzhan_t', 'temniy-lord'))
+
+    def test_the_same_contest_does_not_block_itself(self):
+        busy = stub_data.busy_contest_of('aidana', 'aidana-tan', besides='altyn-qalam')
+        self.assertIsNone(busy)
+
+    def test_eligible_work_carries_no_reason(self):
+        item = self._items('bekzhan_t')['tunge-deiin']
+        self.assertTrue(item['eligible'])
+        self.assertEqual(item['reason'], '')
+
+
+class ChecklistFollowsTheChoice(TestCase):
+    """FR-CONT-04: чек-лист пересчитывается при смене работы, не застывает."""
+
+    def setUp(self):
+        _login_as(self.client, 'bekzhan_t')
+        self.response = self.client.get(
+            reverse('core:contest_submit', args=['bolashak-mektebi']))
+
+    def test_view_ships_volume_data_for_every_candidate(self):
+        vols = self.response.context['volumes']
+        candidates = {i['story'].slug
+                      for i in self.response.context['eligible']}
+        self.assertEqual(set(vols), candidates)
+        for slug, v in vols.items():
+            with self.subTest(story=slug):
+                self.assertEqual(set(v), {'passed', 'hint', 'eligible', 'reason'})
+
+    def test_data_is_embedded_for_the_browser(self):
+        self.assertContains(self.response, 'id="submit-volumes"')
+        self.assertContains(self.response, 'x-model="picked"')
+
+    def test_initial_choice_is_an_eligible_work(self):
+        slug = self.response.context['initial_slug']
+        self.assertTrue(self.response.context['volumes'][slug]['eligible'])
+        self.assertFalse(self.response.context['submit_blocked'])
+
+
+class ChecklistSurvivesWithoutAnEligibleWork(TestCase):
+    """Раньше при отсутствии подходящей работы исчезали AI-декларация и оба
+    согласия: чек-лист считался только для подходящей, а форма без него
+    выглядела обрубленной."""
+
+    def setUp(self):
+        _login_as(self.client, 'rudazov')   # все работы короче порога
+        self.response = self.client.get(
+            reverse('core:contest_submit', args=['bolashak-mektebi']))
+
+    def test_no_work_passes(self):
+        self.assertFalse(any(i['eligible']
+                             for i in self.response.context['eligible']))
+
+    def test_checklist_is_still_rendered(self):
+        self.assertContains(self.response, 'Сәйкестік чек-листі')
+
+    def test_declaration_and_consents_are_still_rendered(self):
+        self.assertContains(self.response, 'name="ai_used"')
+        self.assertContains(self.response, 'name="confirm_age"')
+        self.assertContains(self.response, 'name="confirm_rules"')
+
+    def test_submit_starts_blocked(self):
+        self.assertTrue(self.response.context['submit_blocked'])
+
+
+class WithdrawSubmission(TestCase):
+    """BR-23b: одна работа на конкурс — но заявку можно забрать назад."""
+
+    def test_allowed_while_the_contest_still_accepts(self):
+        self.assertTrue(stub_data.can_withdraw('dina_books', 'bolashak-mektebi'))
+
+    def test_denied_once_judging_started(self):
+        self.assertFalse(stub_data.can_withdraw('aidana', 'altyn-qalam'))
+
+    def test_denied_for_a_finished_contest(self):
+        self.assertFalse(stub_data.can_withdraw('bekzhan_t', 'zhas-aldym-2023'))
+
+    def test_denied_without_a_submission(self):
+        self.assertFalse(stub_data.can_withdraw('bekzhan_t', 'bolashak-mektebi'))
+
+    def test_button_and_modal_are_on_the_submissions_page(self):
+        _login_as(self.client, 'dina_books')
+        r = self.client.get(reverse('core:my_submissions'))
+        self.assertContains(r, 'Қайтарып алу')
+        self.assertContains(r, 'open-withdraw-confirm')
+
+    def test_button_absent_when_withdrawal_is_closed(self):
+        _login_as_aidana(self.client)
+        r = self.client.get(reverse('core:my_submissions'))
+        self.assertNotContains(r, 'open-withdraw-confirm')
+
+
+class SubmissionsPageNamesTheDates(TestCase):
+    """«Қаралуда» без даты не отвечает на «а когда узнаю»."""
+
+    def test_accepting_contest_shows_both_dates(self):
+        _login_as(self.client, 'dina_books')
+        r = self.client.get(reverse('core:my_submissions'))
+        c = stub_data.CONTESTS_BY_SLUG['bolashak-mektebi']
+        self.assertContains(r, c.closes_on_label)
+        self.assertContains(r, c.results_on_label)
+
+    def test_judging_contest_shows_the_results_date(self):
+        _login_as_aidana(self.client)
+        r = self.client.get(reverse('core:my_submissions'))
+        self.assertContains(r,
+                            stub_data.CONTESTS_BY_SLUG['altyn-qalam'].results_on_label)
+
+
+class BlockedSubmitExplainsItself(TestCase):
+    """Заблокированная кнопка без объяснения — тупик."""
+
+    def test_reason_is_rendered_when_nothing_fits(self):
+        _login_as(self.client, 'rudazov')
+        r = self.client.get(reverse('core:contest_submit', args=['bolashak-mektebi']))
+        self.assertTrue(r.context['submit_blocked'])
+        self.assertTrue(r.context['initial_reason'])
+        self.assertContains(r, r.context['initial_reason'])
+
+    def test_reason_is_empty_when_the_choice_fits(self):
+        _login_as(self.client, 'bekzhan_t')
+        r = self.client.get(reverse('core:contest_submit', args=['bolashak-mektebi']))
+        self.assertFalse(r.context['submit_blocked'])
+        self.assertEqual(r.context['initial_reason'], '')

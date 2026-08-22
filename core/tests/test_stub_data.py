@@ -138,13 +138,15 @@ class BookOfWeekAndProgressResolve(unittest.TestCase):
 
 class ContestsAreClassified(unittest.TestCase):
 
-    def test_active_contests_subset_correct(self):
-        for c in stub_data.ACTIVE_CONTESTS:
-            self.assertEqual(c.status, 'active')
-            self.assertIsNotNone(c.days_left, msg='active должен иметь days_left')
+    def test_accepting_contests_subset_correct(self):
+        for c in stub_data.ACCEPTING_CONTESTS:
+            self.assertEqual(c.phase, 'accepting')
+            self.assertIsNotNone(c.days_left, msg='у идущего приёма есть отсчёт')
 
-    def test_hero_contest_is_active(self):
-        self.assertEqual(stub_data.HERO_CONTEST.status, 'active')
+    def test_hero_contest_accepts_work(self):
+        """Баннер главной зовёт «Қатысу» — значит, подавать можно прямо сейчас.
+        «Активный» этого не гарантировал: в судействе конкурс тоже активен."""
+        self.assertTrue(stub_data.HERO_CONTEST.is_accepting)
 
 
 class SchoolLinksHaveAllRequiredFields(unittest.TestCase):
@@ -438,8 +440,10 @@ class Achievements(unittest.TestCase):
         # Верхнюю ступень оқылым в стабе пока не взял никто, поэтому
         # включение, а не равенство: тест про «золота не больше», а не про
         # конкретный состав фикстуры.
-        self.assertTrue(gold <= {"contest_winner", "editorial_choice", "reads"}, gold)
-        self.assertIn("contest_winner", gold)
+        # «Байқау жеңімпазы» из системного реестра убран (DEC-46): победу
+        # называет награда конкретного конкурса, и металла у неё нет.
+        self.assertTrue(gold <= {"editorial_choice", "reads"}, gold)
+        self.assertIn("editorial_choice", gold)
         # У «reads» золото положено только верхней ступени.
         golden_reads = {ach["label"] for _, ach in self._all()
                         if ach["key"] == "reads" and ach["tier"] == "gold"}
@@ -468,10 +472,11 @@ class Achievements(unittest.TestCase):
         self.assertTrue(any(s.is_single for s in stub_data.my_stories_of("aygerim_k")))
 
     def test_winner_implies_participant_and_accepted(self):
+        """Награда конкурса не берётся без заявки, прошедшей жюри (DEC-46)."""
         for a in stub_data.AUTHORS:
             keys = {x["key"] for x in stub_data.achievements_of(a.username)}
             with self.subTest(author=a.username):
-                if "contest_winner" in keys:
+                if stub_data.contest_awards_of(a.username):
                     self.assertIn("contest_participant", keys)
                     self.assertIn("contest_accepted", keys)
 

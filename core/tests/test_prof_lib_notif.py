@@ -626,7 +626,7 @@ class ProfileAchievementsRender(TestCase):
 class ContestHistoryPrivacy(TestCase):
     """FR-PROF-07 / BR-74a: публично — участие, не приговор."""
 
-    JURY_NOTE = 'Көлемі шарттан асып кеткен'
+    JURY_NOTE = 'Көлемі шарттан аз'
 
     def test_helper_hides_note_from_strangers(self):
         public = stub_data.contest_history('aidana')
@@ -690,8 +690,11 @@ class ContestHistoryPrivacy(TestCase):
         self.assertContains(r, 'Қаралуда')
 
     def test_page_shows_winner_badge(self):
+        """Строка называет номинацию, а не общее «Жеңімпаз» (DEC-46):
+        «Оқырман таңдауы» и «Бас жүлде» — разные вещи, и одинаковая
+        подпись у обеих скрывала бы, что именно взял автор."""
         r = self.client.get(reverse('core:profile_other', kwargs={'username': 'dina_books'}) + '?tab=about')
-        self.assertContains(r, 'Жеңімпаз')
+        self.assertContains(r, 'Оқырман таңдауы')
         self.assertContains(r, '2023')
 
     def test_history_empty_for_author_without_submissions(self):
@@ -814,7 +817,7 @@ class ProfileStatsTab(TestCase):
 class AwardSpriteIsIncludedOnce(TestCase):
     """Два спрайта на странице — дублирующиеся id символов."""
 
-    MARKER = '<symbol id="award-contest-winner"'
+    MARKER = '<symbol id="award-first-publication"'
 
     def test_row_only(self):
         r = self.client.get(reverse('core:profile_other', kwargs={'username': 'rudazov'}))
@@ -1025,3 +1028,55 @@ class HeaderUnreadBadge(TestCase):
     def test_guest_no_bell_at_all(self):
         r = self.client.get(reverse('core:home'))
         self.assertNotContains(r, 'Хабарламалар (')
+
+
+class ContestAwardsInProfile(TestCase):
+    """DEC-46: награды конкурсов стоят тем же рядом, что и системные знаки."""
+
+    def test_helper_returns_awards_for_a_winner(self):
+        awards = stub_data.contest_awards_of('bekzhan_t')
+        self.assertEqual([a['title'] for a in awards], ['Бас жүлде'])
+        self.assertEqual(awards[0]['year'], 2023)
+
+    def test_helper_is_empty_for_an_author_without_awards(self):
+        self.assertEqual(stub_data.contest_awards_of('aidana'), [])
+        self.assertEqual(stub_data.contest_awards_of('ghost'), [])
+
+    def test_shape_is_complete(self):
+        for a in stub_data.AUTHORS:
+            for item in stub_data.contest_awards_of(a.username):
+                with self.subTest(author=a.username, key=item['key']):
+                    self.assertEqual(
+                        set(item),
+                        {'key', 'title', 'image', 'contest', 'story', 'year', 'note'})
+                    self.assertTrue(item['title'])
+
+    def test_row_renders_the_emblem(self):
+        r = self.client.get(reverse('core:profile_other',
+                                    kwargs={'username': 'bekzhan_t'}))
+        award = stub_data.contest_awards_of('bekzhan_t')[0]
+        self.assertContains(r, f"/media/{award['image']}")
+
+    def test_tooltip_names_both_nomination_and_contest(self):
+        """Медальон без подписи; смысл несёт тултип (BR-ACH-06), и одной
+        номинации мало — «Бас жүлде» бывает у каждого конкурса."""
+        r = self.client.get(reverse('core:profile_other',
+                                    kwargs={'username': 'bekzhan_t'}))
+        self.assertContains(r, 'Бас жүлде · Жас алдым — 2023')
+
+    def test_award_survives_the_work_being_unpublished(self):
+        """Работа скрыта — награда остаётся: она принадлежит автору, а не
+        видимости текста (BR-73)."""
+        for a in stub_data.AUTHORS:
+            for item in stub_data.contest_awards_of(a.username):
+                with self.subTest(author=a.username, key=item['key']):
+                    self.assertTrue(item['title'])
+                    if item['story'] is not None:
+                        self.assertTrue(item['story'].is_public)
+
+    def test_author_without_contest_awards_shows_no_medallion(self):
+        """Системные знаки у неё есть, конкурсных нет — и медальона тоже."""
+        self.assertFalse(stub_data.contest_awards_of('aidana'))
+        r = self.client.get(reverse('core:profile_other',
+                                    kwargs={'username': 'aidana'}))
+        self.assertNotContains(r, '/media/awards/')

@@ -64,7 +64,7 @@
         </section>
     {% endif %}
 
-    {% if hero_contest and hero_contest.status == 'active' %}
+    {% if hero_contest and hero_contest.is_accepting %}
         <a href="{% url 'core:contest_detail' slug=hero_contest.slug %}"
            class="group block overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-card-hover">
             <div class="flex flex-col gap-4 p-5">
@@ -72,7 +72,7 @@
                     <span class="inline-flex w-fit items-center rounded-chip bg-promo-bg px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-[0.1em] text-[rgb(33,11,11)]">
                         Белсенді байқау
                     </span>
-                    {% include "components/contest_status.html" with status=hero_contest.status days_left=hero_contest.days_left %}
+                    {% include "components/contest_status.html" with contest=hero_contest %}
                 </div>
 
                 <div class="flex flex-col gap-1">

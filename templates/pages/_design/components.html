@@ -167,8 +167,7 @@
         </div>
 
         <div class="mt-4 flex flex-wrap items-center gap-6">
-            {% include "components/contest_status.html" with status="active" days_left=12 %}
-            {% include "components/contest_status.html" with status="finished" %}
+            {% for c in contests %}{% include "components/contest_status.html" with contest=c %}{% endfor %}
         </div>
 
         <div class="mt-6">

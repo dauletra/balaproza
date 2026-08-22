@@ -700,6 +700,7 @@ def profile_me(request):
         'lib_saved':       stub_data.library_of(username, 'saved') if username else [],
         'stats':           stub_data.reader_stats(username) if username else None,
         'achievements':    stub_data.achievements_of(username) if username else [],
+        'contest_awards':  stub_data.contest_awards_of(username) if username else [],
         'contests_n':      len(stub_data.submissions_of(username)) if username else 0,
         'contest_history': stub_data.contest_history(username, is_self=True) if username else [],
         # FR-PROF-08 — своя статистика. Ничего из этого посторонний не видит.
@@ -768,6 +769,7 @@ def profile_other(request, username):
         # без статуса, поэтому совпадает с длиной публичного списка и не
         # выдаёт вычитанием, что какая-то заявка отклонена (BR-74a).
         'achievements':  stub_data.achievements_of(username),
+        'contest_awards': stub_data.contest_awards_of(username),
         'contests_n':    len(stub_data.submissions_of(username)),
         # is_self=False режет результат и комментарий жюри (BR-74a)
         'contest_history': stub_data.contest_history(username),
@@ -877,47 +879,118 @@ def notifications(request):
 # ───────────────────────── CONT — конкурсы ───────────────────────────────
 def contest_list(request):
     return render(request, 'pages/contests/contest_list.html', {
-        'active_contests':   [c for c in stub_data.CONTESTS if c.status == 'active'],
-        'finished_contests': [c for c in stub_data.CONTESTS if c.status == 'finished'],
+        # Секций по-прежнему две, но «идущий» больше не значит «принимает
+        # заявки»: точную фазу называет бейдж на карточке (DEC-45).
+        'active_contests':   stub_data.OPEN_CONTESTS,
+        'finished_contests': stub_data.FINISHED_CONTESTS,
     })
+
+
+def _contest_rail_has_content(contest, *, submitted: bool, hide_cta: bool) -> bool:
+    """Есть ли что показать в правом рейле конкурса (DEC-25).
+
+    Флаг ставится по наличию данных, а не безусловно: `partials/right_rail/
+    contest.html` пуст у неизвестного слага и у завершённого конкурса, все
+    этапы которого уже позади, — а пустая колонка в 300px не пустует, она
+    сдвигает контент от центра. Ровно эту ошибку в кабинете закрывал
+    `test_write.MyStoriesGuestHasNoEmptyRail`.
+    """
+    if not contest:
+        return False
+    if contest.current_stage or contest.next_stage:
+        return True
+    # Блок «моя заявка» живёт только у активного конкурса, а на самой
+    # странице подачи от него остаётся лишь строка об уже поданной работе.
+    return contest.is_accepting and (submitted or not hide_cta)
 
 
 def contest_detail(request, slug):
     contest = stub_data.CONTESTS_BY_SLUG.get(slug)
     username = _current_username(request)
+    submitted = stub_data.has_submission(username, slug) if username else False
     return render(request, 'pages/contests/contest_detail.html', {
-        'has_right_rail': True,
+        'has_right_rail': _contest_rail_has_content(contest, submitted=submitted,
+                                                    hide_cta=False),
         'slug':           slug,
         'contest':        contest,
-        'already_submitted': stub_data.has_submission(username, slug) if username else False,
+        # Присуждения, а не просто работы: строка победителя называет
+        # номинацию, а её знает только грант (DEC-46).
+        'grants':         contest.grants if contest else [],
+        'already_submitted': submitted,
     })
 
 
 def contest_submit(request, slug):
     contest = stub_data.CONTESTS_BY_SLUG.get(slug)
     username = _current_username(request)
+    submitted = stub_data.has_submission(username, slug) if username else False
     eligible = stub_data.eligible_for_contest(username, slug) if (username and contest) else []
-    # Чек-лист считаем для первого подходящего произведения (превью).
-    preview_story = next((e['story'] for e in eligible if e['eligible']), None)
+
+    # Выбранная по умолчанию работа: первая подходящая, иначе первая в списке.
+    # Вторая ветка нужна, чтобы чек-лист не исчезал целиком, когда ни одна
+    # работа не проходит: без него пропадали и AI-декларация, и оба согласия,
+    # и форма выглядела обрубленной.
+    preview_story = next((e['story'] for e in eligible if e['eligible']),
+                         eligible[0]['story'] if eligible else None)
     checklist = (
         stub_data.submission_checklist(preview_story, contest)
         if preview_story and contest else []
     )
+    # Чек-лист зависит от выбранной работы, а выбор меняется в браузере.
+    # Раньше он считался один раз для превью и застывал: автор переключал
+    # радио, а объём под ним оставался чужим. Пересчёт — на стороне
+    # клиента, из этой таблицы (FR-CONT-04).
+    volumes = {}
+    for item in eligible:
+        vol = next(c for c in stub_data.submission_checklist(item['story'], contest)
+                   if c['key'] == 'volume')
+        volumes[item['story'].slug] = {
+            'passed':   vol['passed'],
+            'hint':     vol['hint'],
+            'eligible': item['eligible'],
+            'reason':   item['hint'],
+        }
     return render(request, 'pages/contests/contest_submit.html', {
-        'has_right_rail':    True,
+        'has_right_rail':    _contest_rail_has_content(contest, submitted=submitted,
+                                                       hide_cta=True),
+        # Кнопка «Қатысу» в рейле вела бы на страницу, которая уже открыта.
+        'hide_submit_cta':   True,
         'slug':              slug,
         'contest':           contest,
         'eligible':          eligible,
         'preview_story':     preview_story,
+        'initial_slug':      preview_story.slug if preview_story else '',
+        'volumes':           volumes,
+        # Начальное состояние кнопки и объяснение к нему; дальше ими
+        # управляет Alpine по выбранной работе.
+        'submit_blocked':    not (preview_story
+                                  and volumes.get(preview_story.slug, {}).get('eligible')),
+        'initial_reason':    (volumes.get(preview_story.slug, {}).get('reason', '')
+                              if preview_story else ''),
         'checklist':         checklist,
-        'already_submitted': stub_data.has_submission(username, slug) if username else False,
+        'can_withdraw':      stub_data.can_withdraw(username, slug) if username else False,
+        'already_submitted': submitted,
     })
 
 
 def my_submissions(request):
     username = _current_username(request)
+    # «Когда узнаю?» — первый вопрос после подачи, и до CONT-5 страница на
+    # него не отвечала вовсе: статус «Қаралуда» стоял без единой даты.
+    items = [
+        {
+            'sub':          sub,
+            'contest':      sub.contest,
+            'can_withdraw': stub_data.can_withdraw(username, sub.contest_slug),
+        }
+        for sub in (stub_data.submissions_of(username) if username else [])
+    ]
     return render(request, 'pages/contests/my_submissions.html', {
-        'submissions': stub_data.submissions_of(username) if username else [],
+        'items': items,
+        # Модалка подключается только когда ей есть что подтверждать:
+        # иначе на странице висел бы слушатель события, которое некому
+        # послать.
+        'any_withdrawable': any(i['can_withdraw'] for i in items),
     })
 
 
@@ -1024,6 +1097,10 @@ def design_components(request):
         'genres':    stub_data.GENRES,
         'stories':   stub_data.STORIES,
         'authors':   stub_data.AUTHORS,
+        # Стаб-набор покрывает все четыре фазы (DEC-45), поэтому showcase
+        # бейджа — это просто перебор конкурсов, а не четыре ручных вызова
+        # с выдуманными аргументами, которые разойдутся с компонентом.
+        'contests':  stub_data.CONTESTS,
         # docs/11 — showcase тегов
         'showcase_tags_accepted': accepted[:8],
         'showcase_tags_pending':  pending,

@@ -7,6 +7,8 @@
 
 from django import template
 
+from core.stub_data import spaced_number
+
 register = template.Library()
 
 
@@ -43,13 +45,12 @@ def spaced(value):
     """Разряды через неразрывный пробел: 500000 → 500 000.
 
     Нужен для сумм в тенге: `stringformat:"d"` выводил «500000» сплошняком.
-    """
-    try:
-        n = int(value)
-    except (TypeError, ValueError):
-        return value
 
-    return f"{n:,}".replace(',', ' ')
+    Сама разрядка живёт в `stub_data.spaced_number`: те же числа собираются
+    и на стороне данных — в подсказках чек-листа подачи, — а два места,
+    описывающих одну форму записи, однажды разойдутся.
+    """
+    return spaced_number(value)
 
 
 @register.filter(name="belongs_to")

@@ -40,7 +40,7 @@ What the table carries instead is the part `stub_data.py` cannot state: what mus
 | **Story** | `Story` | `OnProcess` is a continuation state, **not** a moderation state. Public catalog carries only `Published` and explicitly allowed public states. `format` is chosen by the author, never inferred from chapter count (DEC-28). Status labels — `components/status_badge.html`, see [16 §16.3](16-content-voice.md) |
 | **Chapter** | `Chapter`, `CHAPTERS_BY_STORY` | One-based numbers. Bodies live **outside** `stub_data.py` in `core/story_texts/<slug>/<n>.txt`; `_chapter()` loads them and derives `char_count`. Keep long prose out of the data module. Read via `?chapter=N` — no separate route (DEC-30). **`Story.chapters` не может обещать больше, чем есть записей**: запись главы обязана нести текст, поэтому произведение без текста несёт `chapters=0`, а не пустые главы. Закрыто `test_stub_data.DeclaredChapterCountMatchesLoadedChapters`, там же заморожен список каталожных сериалов, которым текст ещё не написан |
 | **Collection** | `Collection` | Ordered many-to-many with `Story`. Editorial curation by a moderator, not a smart auto-filter, and separate from contests (DEC-27). **Admin-authored only** — there is no user-created collection (DEC-31); `count` and `covers` are derived from `story_slugs`, never stored alongside it |
-| **Contest** | `Contest` | `status`: `active` / `finished`. Separate from collections. Admin UI is Django admin for MVP (DEC-23) |
+| **Contest** | `Contest` | Хранятся три даты (`opens_on` / `closes_on` / `results_on`); фаза, отсчёт, год и число заявок **выводятся** (DEC-45, BR-40a). Хранимого `status` нет и заводить его нельзя — это тот же класс поля, что `Author.works`. Separate from collections. Admin UI is Django admin for MVP (DEC-23) |
 | **Submission** | `Submission` | One story per author per contest (BR-23). Eligibility is a query/service concern, never template logic (BR-22, BR-24) |
 | **LibraryEntry** | `LibraryEntry` | `kind`: `saved` / `reading` / `done`, non-overlapping (BR-60/61). Continue-reading is a first-class reader workflow — it drives both the hero and the mobile nav |
 | **Comment** | `StoryComment` | One reply level only (BR-30). Anchored to a chapter via `chapter_number`; `None` means the whole work. Reply form and comment-like persistence can wait |
@@ -95,7 +95,8 @@ Author workspace, library, social:
 - `reads_total(username: str) -> int` — прочтения по публичным работам
 - `tier_for(total: int) -> tuple | None`, `next_tier_for(total: int) -> tuple | None` — чистые функции над `READ_TIERS`, чтобы границы проверялись напрямую
 - `read_tier(username: str)`, `next_read_tier(username: str)` — они же для автора
-- `winning_stories_of(username: str) -> list[Story]` — победы по `Contest.winners`
+- `winning_stories_of(username: str) -> list[Story]` — работы автора, отмеченные наградой конкурса (по `AWARD_GRANTS`)
+- `contest_awards_of(username: str) -> list[dict]` — награды конкурсов автора (DEC-46), свежие сверху: `key` / `title` / `image` / `contest` / `story` / `year` / `note`. Работа названа только пока публична (BR-73); сама награда остаётся — она принадлежит автору, а не видимости текста
 - `is_following(me: str, them: str) -> bool`
 - `following_of(username: str) -> list[Author]` — оба списка публичны (BR-75), страницу собирает `profile_people`
 - `followers_of(username: str) -> list[Author]`
@@ -106,8 +107,11 @@ Contests:
 - `submissions_of(username: str) -> list[Submission]`
 - `has_submission(username: str, contest_slug: str) -> bool`
 - `contest_history(username: str, *, is_self: bool = False) -> list[dict]` — конкурсная биография (FR-PROF-07). Правило видимости живёт здесь, а не в шаблоне (BR-74a): при `is_self=False` результат режется до победы/принятия, `note` приходит пустым, непубличная работа не называется. Второе место с тем же правилом однажды разошлось бы с первым
-- `submission_checklist(story: Story, contest: Contest) -> list`
-- `eligible_for_contest(username: str, contest_slug: str) -> list[Story]`
+- `submission_checklist(story: Story, contest: Contest) -> list` — пороги объёма берутся у конкурса, а не вписаны в подпись литералом (FR-CONT-07); числа в подписях и подсказках проходят через `spaced_number`
+- `spaced_number(value) -> str` — разряды через неразрывный пробел, канонический вид числа для автора. Живёт в слое данных, а не в фильтре `balaproza.spaced`: те же числа собираются и в подсказках чек-листа. Фильтр вызывает эту функцию — двух реализаций одной формы записи быть не должно
+- `eligible_for_contest(username: str, contest_slug: str) -> list[dict]` — кандидаты на подачу: `{story, chars, eligible, reason, hint}`. Только публичные работы (BR-24); `reason` — ключ из `INELIGIBLE_REASONS` (`too_short` · `too_long` · `busy`), пустой у проходящей
+- `busy_contest_of(username, story_slug, *, besides='') -> Contest | None` — незавершённый конкурс, который уже держит эту работу (BR-23a)
+- `can_withdraw(username, contest_slug) -> bool` — можно ли отозвать заявку (BR-23b): идёт приём и статус `reviewing`
 
 Tags (module 11):
 - `tag_by_slug(slug: str) -> Tag | None`
@@ -142,10 +146,31 @@ Author:
 - `joined_year` — год прихода на платформу («2024 жылдан бері»). Единственный факт профиля, который нельзя вывести из данных. Год, а не полная дата: подростку важно «давно или недавно», а точная дата — лишние персональные данные
 - `works` — **производное**, как `Collection.count`: число публичных работ автора. Было хранимым литералом и врало у всех шести авторов сразу, а рендерится в шести местах, включая карточку автора на странице произведения. Черновики в него не входят (BR-10: публично не видны)
 
-Contest:
-- `year: int` — год проведения, без значения по умолчанию. Нужен конкурсной биографии: «1 жыл бұрын» из `Submission.submitted_relative` устаревает каждый день
-- `winners: tuple[str]` — слаги **произведений**-победителей, не имена авторов; автор выводится через `Story.author_username`. Второй литерал с именем разошёлся бы с первым ровно так же, как хранимый `Author.works` разошёлся с числом произведений. У active-конкурса пусто
+Contest — **хранятся три даты, остальное выводится** (DEC-45, BR-40a):
+- `opens_on` / `closes_on` / `results_on: date` — открытие приёма, дедлайн, объявление итогов. Всё, что заводит админ по срокам. Инвариант: `opens_on <= closes_on < results_on`
+- `phase` — производное: `upcoming` · `accepting` · `judging` · `finished`. Полей `status` нет
+- `is_accepting` / `is_finished` — производные-предикаты. **Кнопку «Қатысу», баннер главной и доступ к форме подачи решает `is_accepting`**, бейдж работы «Байқауға қатысады» — `not is_finished`; смешивать их в одном «активен» нельзя
+- `days_left` / `days_until_open` — производные, каждое не `None` ровно в своей фазе
+- `year` — производное: год `results_on`. Нужен конкурсной биографии (FR-PROF-07): «1 жыл бұрын» из `Submission.submitted_relative` устаревает каждый день
+- `submissions` — производное: число заявок по `SUBMISSIONS_BY_USER`. Было хранимым литералом и показывало «87» при одной настоящей заявке
+- `opens_on_label` / `closes_on_label` / `results_on_label` — производные: дата в казахской короткой форме («9 қыр»). Своё форматирование, а не Django-фильтр `date`, который берёт месяцы из локали
+- `winners: tuple[str]` — слаги **произведений**-победителей, не имена авторов; автор выводится через `Story.author_username`. Второй литерал с именем разошёлся бы с первым ровно так же, как хранимый `Author.works` разошёлся с числом произведений. У незавершённого конкурса пусто
+- `awards: tuple[ContestAward]` — номинации конкурса, произвольный набор (BR-44)
+- `grants` — производное: присуждения этого конкурса в порядке номинаций
+- `winners` — производное **от присуждений**, а не хранимый кортеж
 - `winner_stories` — производное: `Story` по слагам, неизвестные молча отбрасываются
+- `current_stage` / `next_stage` — производные: этап, идущий сейчас, и ближайший будущий. Нужны правому рейлу (FR-CONT-09) — «что идёт сейчас» единственное, чего нет в хиро
+
+ContestAward (BR-44, BR-46):
+- `slug`, `title`, `image` (файл в `MEDIA_ROOT`, пусто — типографическая заглушка), `description`
+
+AwardGrant (BR-45) — **хранится**, в отличие от системных знаков:
+- `contest_slug`, `award_slug`, `story_slug`, `note`; автор выводится из работы
+
+TimelineStage:
+- `label`, `starts: date`, `ends: date` — однодневный этап задаётся равными датами
+- `period` — производное: «1 қыр — 1 жел» либо «15 жел»
+- `state` — производное от календаря: `done` · `active` · `upcoming`. Хранимое значение уже разошлось с данными — этап «Өтінім қабылдау» конкурса 2024 года стоял `active` в 2026-м
 
 Genre:
 - `slug`, `name`, `hue`, `icon`, `count`

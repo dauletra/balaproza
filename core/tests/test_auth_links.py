@@ -181,7 +181,7 @@ class AuthGateIsOneComponent(TestCase):
     """
 
     def _gated(self):
-        contest = stub_data.ACTIVE_CONTESTS[0].slug
+        contest = stub_data.ACCEPTING_CONTESTS[0].slug
         return [
             ('core:my_stories',     {},                  'Шығармаларыңды басқару үшін'),
             ('core:new_story',      {},                  'Жаңа шығарма жариялау үшін'),

@@ -1,0 +1,39 @@
+{% comment %}
+    Этапы конкурса — только список, без заголовка и рамки секции.
+
+    Вынесен из `contest_detail.html`, потому что у завершённого конкурса тот
+    же список живёт свёрнутым: когда победители уже названы, календарь
+    прошедших дат — справка, а не содержание страницы. Второй копией
+    разметки это делать нельзя — две копии одного блока в проекте уже
+    расходились (вкладка «Туралы» в двух профилях).
+
+    Контекст:
+      contest — Contest
+{% endcomment %}
+<ol class="flex flex-col gap-3">
+    {% for t in contest.timeline %}
+        <li class="flex items-start gap-3">
+            <span class="mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-pill
+                {% if t.state == 'done' %}bg-status-published-bg text-status-published-fg
+                {% elif t.state == 'active' %}bg-status-attention-bg text-status-attention-fg
+                {% else %}bg-slate-100 text-slate-500{% endif %}">
+                {% if t.state == 'done' %}
+                    {% include "components/icon.html" with name="check" size=12 only %}
+                {% elif t.state == 'active' %}
+                    <span class="h-2 w-2 rounded-pill bg-status-attention-fg"></span>
+                {% else %}
+                    <span class="h-2 w-2 rounded-pill bg-slate-400"></span>
+                {% endif %}
+            </span>
+            <div class="min-w-0 flex-1">
+                <p class="font-sans text-sm font-semibold text-slate-900">{{ t.label }}</p>
+                <p class="font-sans text-xs text-slate-500">{{ t.period }}</p>
+            </div>
+            {% if t.state == 'active' %}
+                <span class="inline-flex h-6 items-center rounded-pill bg-status-attention-bg px-2.5 font-sans text-[11px] font-bold text-status-attention-fg">
+                    Қазір
+                </span>
+            {% endif %}
+        </li>
+    {% endfor %}
+</ol>

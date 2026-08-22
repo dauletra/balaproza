@@ -21,9 +21,9 @@
 | Маршруты | `core/urls.py`, `app_name='core'` | Все URL проекта, кроме `/admin/` |
 | Общий контекст | `core/context_processors.py` | `auth_state`, `nav_state`, `site_links` |
 | Фильтры | `core/templatetags/balaproza.py` | `compact_count`, `spaced`, `page_range`, `belongs_to` |
-| Шаблоны | корневая `templates/` (127 файлов) | 57 компонентов · 37 партиалов · 28 страниц · спрайт иконок · `base.html` · `404/500` |
+| Шаблоны | корневая `templates/` (131 файлов) | 59 компонентов · 40 партиалов · 28 страниц · спрайт иконок · `base.html` · `404/500` |
 | Токены | `static_src/input.css`, блок `@theme` | Единственный источник цветов, радиусов, теней ([02](02-design-system.md)) |
-| Тесты | `core/tests/` (16 файлов, 730 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
+| Тесты | `core/tests/` (16 файлов, 821 тест) | Контракт поведения, описан в [15](15-testing-contract.md) |
 
 **Шаблоны — не в `core/templates/`, а в корневой `templates/`.** Это задано `TEMPLATES.DIRS` в `config/settings.py`.
 
@@ -47,6 +47,7 @@
 | `open-report` | `{target: 'story:slug'}` | `report_modal` |
 | `open-catalog-filters` | — | `catalog/_filter_sheet` |
 | `open-delete-confirm` | `{name, confirm_url}` | `delete_confirm_modal` |
+| `open-withdraw-confirm` | `{contest, story}` | `withdraw_confirm_modal` |
 
 ---
 
@@ -206,7 +207,7 @@
 | FR-PROF-07 / BR-74a | `stub_data.contest_history` → `partials/profile/_contest_history.html` | `ContestHistoryPrivacy` |
 | `Contest.year` | `stub_data.CONTESTS` | `test_contests.ContestYear` |
 | FR-PROF-05 | `profile_me_edit` → `/me/edit/` | `ProfileMeAuthed` |
-| FR-PROF-06 / BR-ACH-01…05 | `stub_data.achievements_of` (+ `READ_TIERS`, `tier_for`, `winning_stories_of`) | `test_stub_data.Achievements`, `ReadTiers` |
+| FR-PROF-06 / BR-ACH-01…05 | `stub_data.achievements_of` (+ `READ_TIERS`, `tier_for`, `winning_stories_of`) и `contest_awards_of` — два класса знаков в одном ряду (DEC-46) | `test_stub_data.Achievements`, `ReadTiers`, `test_prof_lib_notif.ContestAwardsInProfile` |
 | FR-PROF-06 (рендер) | `partials/profile/_achievements.html` + строка фактов в `_header.html` | `ProfileAchievementsRender` |
 | FR-PROF-09 (рейл по зрителю) | `stub_data.top_stories_of` → `partials/right_rail/profile.html` | `TopStoriesHelper`, `ProfileRailByViewer` |
 | FR-PROF-10 (люди) | `profile_people` → `pages/profile/profile_people.html`, `components/author_row.html` | `ProfilePeoplePages` |
@@ -224,12 +225,18 @@
 
 | Требование | View | Тест |
 |-----------|------|------|
-| FR-CONT-01, 02 / BR-40 | `contest_list` | `test_contests.ContestList`, `ContestModel` |
-| FR-CONT-03 / BR-42, BR-43 | `contest_detail` | `ContestDetailKnown`, `ContestDetailFinished` |
-| FR-CONT-04 / BR-22 | `contest_submit` + `submission_checklist` | `ChecklistHelpers`, `ContestSubmitForm` |
-| FR-CONT-05 / BR-23, BR-25 | `has_submission`, `eligible_for_contest` | `ContestSubmitAlreadyDone`, `ContestSubmitGuest` |
-| FR-CONT-06 / BR-41 | `my_submissions` | `MySubmissionsAuthed`, `MySubmissionsEmpty` |
-| FR-CONT-07 / BR-24 | порог объёма 5 000–15 000 знаков | `EligibleForContest` |
+| FR-CONT-01, 02 / BR-40, BR-40a / DEC-45 | `contest_list`, `OPEN_CONTESTS` / `FINISHED_CONTESTS` | `ContestList`, `ContestModel`, `ContestDatesAreTheSource`, `ContestListOrdersByWhatYouCanDo` |
+| FR-CONT-03 / BR-42, BR-43 | `contest_detail`, `components/contest_status.html` (4 фазы) | `ContestDetailKnown`, `ContestDetailFinished`, `DetailHeroSpeaksByPhase`, `PhaseLabelsAreOneRegistry` |
+| FR-CONT-04 / BR-22, BR-24 | `contest_submit` + `submission_checklist`, `eligible_for_contest`, живой пересчёт объёма на Alpine | `ChecklistHelpers`, `ContestSubmitForm`, `ChecklistFollowsTheChoice`, `ChecklistSurvivesWithoutAnEligibleWork`, `EligibilityReasons` |
+| FR-CONT-05 / BR-23, BR-25 | `has_submission`, `eligible_for_contest`, `Contest.is_accepting` | `ContestSubmitAlreadyDone`, `ContestSubmitGuest`, `SubmitIsGatedByPhase` |
+| FR-CONT-06 / BR-41, BR-23b | `my_submissions`, `can_withdraw`, `components/withdraw_confirm_modal.html` | `MySubmissionsAuthed`, `MySubmissionsEmpty`, `WithdrawSubmission`, `SubmissionsPageNamesTheDates` |
+| FR-CONT-07 / BR-24 | порог объёма из `Contest.min_chars`/`max_chars` | `EligibleForContest`, `ChecklistNumbers` |
+| FR-CONT-08 / BR-45 | `partials/contest/_winners.html`, `_timeline.html`, `contest_card` | `ContestWinnersOnDetail`, `ContestWinnersOnCard`, `ContestAwardsOnDetail` |
+| FR-CONT-10 / BR-44, BR-46 / DEC-46 | `partials/contest/_awards.html`, `ContestAward`, `AwardGrant`, `components/award_art.html` | `ContestAwardsData`, `ContestAwardImages`, `SystemWinnerAwardIsRetired` |
+| FR-CONT-09 / DEC-25 | `partials/right_rail/contest.html`, `_contest_rail_has_content` | `ContestRail`, `ContestStages` |
+| Словарь: «байқау», не «конкурс» ([16 §16.4](16-content-voice.md)) | шаблоны CONT + подсказка возраста в регистрации | `ContestVocabulary` |
+| Подписи фаз ([16 §16.3a](16-content-voice.md)) | `CONTEST_PHASE_LABELS` / `CONTEST_PHASE_BADGE` | `PhaseLabelsAreOneRegistry` |
+| Даты по-казахски | `kk_date` / `kk_period` | `KazakhDateFormatting` |
 | DEC-21 (AI-декларация) | радио + `<details>` в `contest_submit.html` | `ContestSubmitForm` |
 | DEC-24 (возраст) | чекбокс `confirm_age` | `ContestSubmitForm` |
 | BR-42 (₸) | фильтр `spaced` | `test_desktop_layout.MoneyFormatting` |
@@ -270,11 +277,14 @@ Showcase-маршруты `/_design/tokens/`, `/_design/components/`, `/_design/
 | `_render_catalog`, `filter_catalog` | [05](05-functional-spec.md) FR-CAT-07 (таблица параметров), [12 §12.3](12-domain-model-contract.md) |
 | Сигнатура хелпера в `stub_data.py` | [12 §12.3](12-domain-model-contract.md) |
 | Поле/property на `Story` | [12 §12.4](12-domain-model-contract.md) |
+| Даты или фаза `Contest` | [08 BR-40/40a](08-business-rules.md), [12 §12.4](12-domain-model-contract.md), [05](05-functional-spec.md) FR-CONT-01…03 |
+| Номинация, присуждение или эмблема награды | [08 BR-44…46](08-business-rules.md), [12 §12.4](12-domain-model-contract.md), [05](05-functional-spec.md) FR-CONT-10 / FR-PROF-06, [03 §3.6](03-genre-color-system.md) |
 | Новый маршрут в `core/urls.py` | [05 §5.13](05-functional-spec.md) (карта переходов), эта карта, `PUBLIC_URLS` в `test_urls_smoke.py` |
 | Новый компонент в `templates/components/` | [04](04-component-library.md), счётчик в `CLAUDE.md` |
 | Новый тест-файл | [15](15-testing-contract.md), счётчики в `README.md`, `CLAUDE.md` и `AGENTS.md` |
 | Новые тесты в существующем файле | счётчики в `README.md`, `CLAUDE.md` и `AGENTS.md` (их держит `test_docs_sync.TestCounters`) |
-| Строка интерфейса | [16](16-content-voice.md) — тон, обращение на «сен» |
+| Строка интерфейса | [16](16-content-voice.md) — тон, обращение на «сен», одно слово на одну сущность |
+| `partials/right_rail/*.html` | FR-раздела в [05](05-functional-spec.md) + флаг `has_right_rail` во view: рейл ставится по наличию данных, а не безусловно (DEC-25) |
 | `config/settings.py` | [17](17-deployment.md), [09 §9.7](09-nonfunctional.md) |
 | Отмена/пересмотр решения | [10](10-resolved-decisions.md) — **новым DEC**, не правкой старого |
 

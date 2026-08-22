@@ -1,0 +1,36 @@
+{% comment %}
+    Номинации конкурса (FR-CONT-10, DEC-46) — что именно можно выиграть.
+
+    Показывается **до** итогов, и в этом весь смысл блока: страница
+    конкурса не отвечала на вопрос «зачем участвовать» ничем, кроме суммы
+    в тенге, а для подростка знак в профиле — мотиватор сильнее денег.
+    Когда победители названы, набор номинаций уже перечислен в секции
+    «Жеңімпаздар» выше, и повторять его здесь незачем.
+
+    Награды немые (`interactive=False`): название и условие написаны
+    рядом, тултип повторял бы видимый текст.
+
+    Контекст:
+      contest — Contest
+{% endcomment %}
+{% if contest.awards and not contest.is_finished %}
+    <section class="mb-8 rounded-lg border border-slate-200 bg-white p-6">
+        <h2 class="font-display text-lg font-bold text-slate-900">Марапаттар</h2>
+        <p class="mt-1 font-sans text-sm text-slate-600">
+            Жеңімпаздар белгісі профиліңде қалады.
+        </p>
+        <ul class="mt-4 grid gap-4 sm:grid-cols-2">
+            {% for a in contest.awards %}
+                <li class="flex items-start gap-3">
+                    {% include "components/award.html" with image=a.image label=a.title size=48 interactive=False only %}
+                    <div class="min-w-0 flex-1">
+                        <p class="font-sans text-sm font-semibold text-slate-900">{{ a.title }}</p>
+                        {% if a.description %}
+                            <p class="mt-0.5 font-sans text-xs leading-snug text-slate-600">{{ a.description }}</p>
+                        {% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+{% endif %}

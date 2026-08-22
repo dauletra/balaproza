@@ -1,6 +1,22 @@
 {% comment %}
-    Ряд наград автора (FR-PROF-06, DEC-43). Общий для своего и чужого
-    профиля: достижение публично по определению.
+    Ряд наград автора (FR-PROF-06, DEC-43, DEC-46). Общий для своего и
+    чужого профиля: достижение публично по определению.
+
+    Два класса знаков в одном ряду. Сначала системные — их порядок
+    стабилен и идёт от первого шага к редкому (BR-ACH-02). Потом награды
+    конкурсов, свежие первыми: набор у каждого конкурса свой, и общего
+    порядка между ними быть не может — есть только время.
+
+    Силуэт различает классы без подписи: системный знак стоит на
+    постаменте, конкурсная награда — медальон. Поэтому золото на
+    постаменте остаётся редким знаком трёх системных наград, даже когда
+    рядом висит десяток конкурсных.
+
+    Конкурсных показывается не больше трёх: системных знаков у активного
+    автора уже пять, и вместе это полный ряд на телефоне. Остальные —
+    счётчиком «+N» во вкладку «Туралы», где та же награда названа словами
+    в конкурсной биографии (FR-PROF-07). Награды копятся годами, а ряд в
+    шапке профиля не резиновый.
 
     Стоит выше четырёх чисел сознательно. Награда отвечает «что этот
     человек сделал», число — «сколько накопилось»; для решения «читать ли
@@ -13,16 +29,30 @@
     завёл профиль, а тон упрёка запрещён (docs/13 §13.8.6, docs/16).
 
     Спрайт подключается здесь, а не в base.html: иллюстрации нужны одной
-    странице, и класть их в глобальный инлайн ради неё нельзя.
+    странице, и класть их в глобальный инлайн ради неё нельзя. Медальону
+    спрайт не нужен — эмблема приходит файлом.
 
     Контекст:
-      achievements — stub_data.achievements_of(username)
+      achievements   — stub_data.achievements_of(username)
+      contest_awards — stub_data.contest_awards_of(username)
+      username       — чей профиль (для ссылки «+N»)
 {% endcomment %}
-{% if achievements %}
+{% if achievements or contest_awards %}
     {% include "components/awards/_sprite.html" %}
     <ul class="mb-6 flex flex-wrap items-end gap-1" aria-label="Автордың марапаттары">
         {% for a in achievements %}
             <li>{% include "components/award.html" with art=a.art label=a.label only %}</li>
         {% endfor %}
+        {% for a in contest_awards|slice:":3" %}
+            <li>{% include "components/award.html" with image=a.image label=a.title|add:" · "|add:a.contest.name only %}</li>
+        {% endfor %}
+        {% if contest_awards|length > 3 %}
+            <li>
+                <a href="?tab=about"
+                   class="inline-flex h-[38px] items-center rounded-pill bg-slate-100 px-3 font-sans text-xs font-semibold text-slate-600 hover:bg-slate-200">
+                    +{{ contest_awards|length|add:"-3" }}
+                </a>
+            </li>
+        {% endif %}
     </ul>
 {% endif %}

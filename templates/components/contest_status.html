@@ -1,17 +1,32 @@
 {% comment %}
-    ContestStatus (docs/04.7 + BR-40). Бейдж + опц. countdown.
+    ContestStatus (docs/04.7, BR-40, DEC-45) — бейдж фазы конкурса
+    и опциональный отсчёт.
+
+    Фаз четыре, а не два статуса. Между дедлайном и объявлением итогов
+    конкурс раньше либо врал «Белсенді, 0 күн қалды», либо резко становился
+    «Аяқталды» без единого победителя: состояния «приём закрыт, жюри
+    читает» в данных не существовало.
+
+    Отсчёт показывается только там, где ему есть что считать: до дедлайна
+    у идущего приёма и до открытия у ещё не начавшегося.
 
     Параметры:
-      status     — 'active' | 'finished'
-      days_left  — int (для active)
+      contest — Contest (phase, phase_label, days_left, days_until_open)
 {% endcomment %}
 <div class="inline-flex items-center gap-2">
-    {% if status == "active" %}
-        {% include "components/badge.html" with kind="published" label="Белсенді" icon="check" %}
-        {% if days_left %}
-            {% include "components/countdown.html" with days=days_left %}
+    {% if contest.phase == "upcoming" %}
+        {% include "components/badge.html" with kind="info" label=contest.phase_label %}
+        {% if contest.days_until_open %}
+            {% include "components/countdown.html" with days=contest.days_until_open muted=True suffix="күннен кейін басталады" %}
         {% endif %}
-    {% elif status == "finished" %}
-        {% include "components/badge.html" with kind="neutral" label="Аяқталды" %}
+    {% elif contest.phase == "accepting" %}
+        {% include "components/badge.html" with kind="published" label=contest.phase_label icon="check" %}
+        {% if contest.days_left %}
+            {% include "components/countdown.html" with days=contest.days_left %}
+        {% endif %}
+    {% elif contest.phase == "judging" %}
+        {% include "components/badge.html" with kind="attention" label=contest.phase_label %}
+    {% else %}
+        {% include "components/badge.html" with kind="neutral" label=contest.phase_label %}
     {% endif %}
 </div>
