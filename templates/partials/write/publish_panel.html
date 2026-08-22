@@ -1,0 +1,122 @@
+{% comment %}
+    Панель готовности произведения (FR-WRITE-09, BR-11).
+
+    Контекст: story, checklist (из views._checklist_links), can_submit, missing.
+
+    Заменяет чек-лист-опись. Прежний список отвечал на вопрос «что у меня
+    заполнено» и не отвечал на единственный, с которым автор сюда заходит:
+    «что осталось сделать». Отсюда три правила разметки:
+
+      1. Недоделанное — сверху и со ссылкой в своё поле. Пункт, который
+         показывает недостачу и никуда не ведёт, заставляет искать поле самому.
+      2. Обязательное отделено от совета. Обложка и теги улучшают карточку,
+         аннотация, текст и жас белгісі — условие публикации (BR-10b).
+      3. Сделанное свёрнуто. Оно уже не требует внимания, но исчезнуть не
+         может: список из одного пункта не читается как прогресс.
+
+    Кнопка отправки — только у черновика (`can_submit_for_review`): у работы
+    на модерации она означала бы повторную заявку, у публичной — откат
+    в непубличное, чего автор этой кнопкой не просит.
+{% endcomment %}
+<section class="mb-8 rounded-lg border border-slate-200 bg-white p-5">
+    <div class="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+            <h2 class="font-display text-lg font-bold text-slate-900">Жариялауға дайындық</h2>
+            <p class="mt-1 font-sans text-xs leading-relaxed text-slate-500">
+                {% if story.status == "NotPublished" %}
+                    Модерацияға жіберер алдында осылар керек.
+                {% else %}
+                    Оқырманға түсінікті карточка және дайын мәтін.
+                {% endif %}
+            </p>
+        </div>
+        <span class="rounded-chip bg-slate-100 px-2.5 py-1 font-sans text-xs font-bold text-slate-600">{{ story.reading_meta_label }}</span>
+    </div>
+
+    {# ── Незакрытые пункты ── #}
+    <ul class="flex flex-col gap-2">
+        {% for item in checklist %}{% if not item.ok %}
+            <li>
+                <a href="{{ item.href }}"
+                   class="flex items-start gap-2.5 rounded-md border px-3 py-2.5 transition-colors
+                          {% if item.required %}border-status-attention-fg/30 bg-status-attention-bg/40 hover:bg-status-attention-bg{% else %}border-slate-200 bg-slate-50 hover:bg-slate-100{% endif %}">
+                    <span class="mt-0.5 shrink-0 {% if item.required %}text-status-attention-fg{% else %}text-slate-400{% endif %}">
+                        {% include "components/icon.html" with name="plus" size=14 only %}
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block font-sans text-sm font-semibold text-slate-900">
+                            {% if item.key == "text" %}{% if story.is_single %}Мәтін жаз{% else %}Алғашқы бөлімді жаз{% endif %}
+                            {% elif item.key == "annotation" %}Аннотация жаз
+                            {% elif item.key == "audience" %}Жас белгісін қой
+                            {% elif item.key == "cover" %}Мұқаба қос
+                            {% elif item.key == "tags" %}Тег таңда{% endif %}
+                        </span>
+                        <span class="block font-sans text-xs leading-relaxed text-slate-600">
+                            {% if item.key == "text" %}Оқырманға көрсететін нәрсе — осы.
+                            {% elif item.key == "annotation" %}Оқырман каталогта осыдан таңдау жасайды.
+                            {% elif item.key == "audience" %}Қай жастан оқуға болатынын өзің шешесің.
+                            {% elif item.key == "cover" %}Міндетті емес: онсыз әріп плашкасы тұрады.
+                            {% elif item.key == "tags" %}Міндетті емес: тегпен табу оңайырақ.{% endif %}
+                        </span>
+                    </span>
+                    <span class="shrink-0 self-center text-slate-400">{% include "components/icon.html" with name="chevron-right" size=14 only %}</span>
+                </a>
+            </li>
+        {% endif %}{% endfor %}
+    </ul>
+
+    {# ── Закрытые пункты — свёрнуто ── #}
+    {% if checklist %}
+        <details class="group mt-3">
+            <summary class="flex min-h-11 cursor-pointer list-none items-center gap-2 font-sans text-xs font-semibold text-slate-500 hover:text-slate-700">
+                <span class="transition-transform group-open:rotate-180">{% include "components/icon.html" with name="chevron-down" size=14 only %}</span>
+                Дайын тармақтар
+            </summary>
+            <ul class="mt-2 flex flex-col gap-1.5">
+                {% for item in checklist %}{% if item.ok %}
+                    <li class="flex items-start gap-2 rounded-md bg-slate-50 px-3 py-2">
+                        <span class="mt-0.5 text-status-published-fg">{% include "components/icon.html" with name="check" size=14 only %}</span>
+                        <span class="font-sans text-xs text-slate-700">
+                            {% if item.key == "text" %}{% if story.is_single %}Мәтін қосылған{% else %}Кемінде бір бөлім бар{% endif %}
+                            {% elif item.key == "annotation" %}Аннотация жазылған
+                            {% elif item.key == "audience" %}Жас белгісі: {{ story.audience }}
+                            {% elif item.key == "cover" %}Мұқаба қойылған
+                            {% elif item.key == "tags" %}Тегтер таңдалған{% endif %}
+                        </span>
+                    </li>
+                {% endif %}{% endfor %}
+            </ul>
+        </details>
+    {% endif %}
+
+    {% comment %}
+        Отправка на модерацию (BR-11) — то, ради чего список существует.
+        До этого перехода в интерфейсе не было вовсе: единственная кнопка
+        «Жариялау» жила в редакторе главы и относилась к главе, а работа
+        целиком уходила на модерацию неизвестно как.
+    {% endcomment %}
+    {% if story.status == "NotPublished" %}
+        <div class="mt-5 border-t border-slate-100 pt-5">
+            {% if can_submit %}
+                <button type="button" x-data
+                        @click="$dispatch('toast', { kind:'success', text:'Шығарма модерацияға жіберілді (демо)' })"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-5 font-sans text-sm font-bold text-white hover:bg-brand-dark">
+                    {% include "components/icon.html" with name="paper-plane" size=16 only %}
+                    Модерацияға жіберу
+                </button>
+                <p class="mt-2 font-sans text-xs leading-relaxed text-slate-500">
+                    Модератор оқып шығады. Жарияланған соң шығарма каталогта көрінеді.
+                </p>
+            {% else %}
+                <button type="button" disabled
+                        class="inline-flex h-9 cursor-not-allowed items-center gap-2 rounded-md bg-slate-200 px-5 font-sans text-sm font-bold text-slate-500">
+                    {% include "components/icon.html" with name="paper-plane" size=16 only %}
+                    Модерацияға жіберу
+                </button>
+                <p class="mt-2 font-sans text-xs leading-relaxed text-slate-600">
+                    Жоғарыда {{ missing|length }} міндетті тармақ ашық тұр — соларды жапқан соң жіберуге болады.
+                </p>
+            {% endif %}
+        </div>
+    {% endif %}
+</section>

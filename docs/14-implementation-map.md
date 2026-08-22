@@ -171,15 +171,18 @@
 
 | Требование | View | Шаблон | Тест |
 |-----------|------|--------|------|
-| FR-WRITE-01 | `new_story` | `pages/write/new_story.html` | `test_write.NewStoryForm`, `TagInputOnNewStory` |
+| FR-WRITE-01 (три поля) | `new_story` | `pages/write/new_story.html`, `components/format_card.html` | `test_write.NewStoryForm`, `TagInputMovedOffCreation` |
+| FR-WRITE-02a (агрегатов в кабинете нет, DEC-48) | `my_stories` / `manage_story` / `story_settings` / `chapter_editor` / `new_story` — без `has_right_rail` | — (партиал `writer.html` удалён) | `test_write.WriteHasNoAuthorStatsRail` |
 | FR-WRITE-02 | `my_stories` | `pages/write/my_stories.html` | `test_write.MyStoriesAuthedHasItems`, `MyStoriesAuthedEmpty` |
 | FR-WRITE-03 | `manage_story` | `pages/write/manage_story.html` | `test_write.ManageStoryKnown`, `ManageStoryEmptyChapters` |
-| FR-WRITE-04 | `story_settings` | `pages/write/story_settings.html` | `test_write.StorySettingsForm`, `TagInputOnStorySettings` |
+| FR-WRITE-04 | `story_settings` | `pages/write/story_settings.html`, `components/format_card.html` | `test_write.StorySettingsForm`, `TagInputOnStorySettings`, `StorySettingsStatusIsOnlyForPublicSerials` |
+| BR-10b (жас белгісі) | `Story.audience`, `STORY_AUDIENCES` | `pages/write/story_settings.html` | `test_write.AudienceIsChosenNotDefaulted` |
 | FR-WRITE-05 | `chapter_editor` | `pages/write/chapter_editor.html` | `test_write.ChapterEditorNew`, `ChapterEditorEdit` |
 | FR-WRITE-05 (вход в текст `single`) | `Story.text_chapter` | `components/my_story_row.html`, `pages/write/manage_story.html` | `test_write.SingleStoryTextButtonOpensExistingText` |
 | FR-WRITE-06 | `components/delete_confirm_modal.html` | — | — |
 | FR-WRITE-07 / BR-10, BR-11 | `Story.status` | `components/status_badge.html` | `test_write.MyStoriesAuthedHasItems`, `DraftBadgeIsNotAnError` |
 | FR-WRITE-08 (полоса внимания, DEC-40) | `writer_attention` + `_attention_links` | `components/attention_item.html` | `test_write.AttentionStripAnswersWhatToDoNext` |
+| FR-WRITE-09 (панель готовности) | `publish_checklist` / `can_submit_for_review` + `_checklist_links` | `partials/write/publish_panel.html` | `test_write.PublishChecklistIsActionable`, `SubmitForReviewIsOnlyForReadyDrafts` |
 | Порядок и меню строки (DEC-40) | `my_stories_of` (сортировка), `Story.updated_label`, `Story.is_public` | `components/my_story_row.html`, `my_story_menu.html` | `test_write.MyStoriesAreOrderedByLastTouch`, `MyStoryMenuOffersTheMissingActions`, `NonPublicRowsReplaceZeroesWithProgress` |
 
 Все страницы раздела требуют авторизации и для гостя отдают gate — закрыто `MyStoriesGuest`, `NewStoryGuestSeesGate`.

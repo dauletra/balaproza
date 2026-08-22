@@ -11,7 +11,7 @@
         <div>
             <h1 class="font-display text-3xl font-bold text-slate-900">Менің шығармаларым</h1>
             <p class="mt-2 font-sans text-sm text-slate-600">
-                {{ stories|length }} шығарма · {{ stats.published }} жарияланған
+                {{ stories|length }} шығарма
             </p>
         </div>
         {% url 'core:new_story' as new_href %}
@@ -19,21 +19,15 @@
     </header>
 
     {% comment %}
-        Статистика писателя живёт в правом рейле, а он появляется только с xl —
-        до этой ширины автор не видел ни подписчиков, ни прочтений, ни лайков.
-
-        Полоса стоит ВНУТРИ веток состояния (DEC-17): раньше она рендерилась
-        выше проверки, и в режиме loading готовые цифры соседствовали со
-        скелетонами списка — страница выглядела наполовину загруженной.
-
-        Числа через `spaced`, как и в строках списка с рейлом: это один и тот
-        же счётчик, и показывать его тут «2,1 мың», а в рейле точным — значит
-        заставлять автора сверять два числа.
+        Полосы агрегатов здесь больше нет — DEC-48. Она повторяла четыре
+        плитки `partials/profile/_stats.html` (там они ещё и кликабельны),
+        а её напарник в правом рейле стоял на страницах одного произведения
+        и читался как статистика этого произведения: в шапке «1 042 оқылым»,
+        в рейле «Оқылым 2 117», и нигде не сказано, что второе — про весь
+        портфель. Кабинет отвечает на «что делать», профиль — на «как идёт»;
+        ссылка вниз страницы связывает одно с другим.
     {% endcomment %}
     {% if page_state == 'loading' %}
-        <div class="mb-8 xl:hidden">
-            {% include "components/skeleton_box.html" with h="h-[62px]" radius="lg" %}
-        </div>
         <div class="flex flex-col gap-4">
             {% for _ in '1234'|make_list %}
                 {% include "components/skeleton_my_story_row.html" %}
@@ -67,23 +61,27 @@
             </div>
         {% endif %}
 
-        {% if stats %}
-            <div class="mb-8 xl:hidden">
-                {% include "components/stat_strip.html" with l1="Шығарма" v1=stats.total l2="Жазылушы" v2=stats.followers l3="Оқылым" v3=stats.views|spaced l4="Ұнатулар" v4=stats.likes|spaced %}
-            </div>
-        {% endif %}
         <div class="flex flex-col gap-4">
             {% for s in stories %}
                 {% include "components/my_story_row.html" with story=s %}
             {% endfor %}
         </div>
+
+        {% comment %}
+            Единственный вход в агрегаты — и он ведёт туда, где они живут
+            (FR-PROF-08). Тихая строка, а не блок: «как идёт» — вопрос,
+            который задают раз в неделю, а не на каждом заходе в кабинет.
+        {% endcomment %}
+        <p class="mt-6 text-center font-sans text-sm">
+            <a href="{% url 'core:profile_me' %}?tab=stats"
+               class="inline-flex items-center gap-1.5 font-semibold text-slate-500 hover:text-brand">
+                Оқылым, жазылушы, марапаттар — толық статистика
+                {% include "components/icon.html" with name="arrow-right" size=14 only %}
+            </a>
+        </p>
     {% else %}
         {# Empty state — FR-WRITE-02 (MyStoriesEmpty), через общий компонент DEC-17 #}
         {% include "components/empty_state.html" with icon="pen" title="Әлі шығарма жоқ" text="Алғашқы шығармаңды бастамас бұрын — тек идея керек. Жариялау тегін, авторлық сақталады." cta_label="Жаңа шығарма жазу" cta_href=new_href %}
     {% endif %}
 {% endif %}
-{% endblock %}
-
-{% block right_rail %}
-    {% include "partials/right_rail/writer.html" %}
 {% endblock %}

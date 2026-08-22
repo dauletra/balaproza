@@ -13,25 +13,44 @@
 
     <h1 class="mb-2 font-display text-3xl font-bold text-slate-900">Жаңа шығарма</h1>
     <p class="mb-8 font-sans text-sm text-slate-600">
-        Атау мен аннотация — міндетті. Әңгімені бір мәтінмен немесе бөлімдермен жаза аласың.
+        Үш нәрсе — сосын бірден жазуға кірісесің. Қалғанын кейін толтырасың.
     </p>
 
+    {% comment %}
+        Форма — три поля (FR-WRITE-01). Было восемь: аннотация, доп. жанр,
+        теги, статус и чекбокс согласия стояли между человеком и первой
+        строкой текста. Все они отвечают на вопросы о работе, которой ещё
+        нет: тег к ненаписанному рассказу не выбирается, аннотация к нему
+        не пишется, а «Аяқталды» у нуля бөлім — невозможное состояние
+        (BR-10).
+
+        Обязательность аннотации никуда не делась — она проверяется при
+        отправке на модерацию (FR-WRITE-09), а не при создании черновика.
+        Черновику быть неполным можно, публичной работе нельзя.
+    {% endcomment %}
     <form method="post" action="{% url 'core:new_story' %}" x-data
-          @submit.prevent="$dispatch('toast', { kind:'success', text:'Шығарма құрылды (демо)' })"
-          class="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
+          @submit.prevent="$dispatch('toast', { kind:'success', text:'Шығарма құрылды — енді мәтін (демо)' })"
+          class="flex flex-col gap-7 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
         {% csrf_token %}
 
-        {% include "components/input_field.html" with name="title" label="Атауы" placeholder="Шығарманың атауын жаз" required=True autofocus=True maxlength=120 %}
+        {% include "components/input_field.html" with name="title" label="Атауы" placeholder="Шығарманың атауын жаз" required=True autofocus=True maxlength=120 hint="Кейін өзгертуге болады." %}
 
-        {% include "components/textarea.html" with name="annotation" label="Аннотация" placeholder="Не туралы, кімдерге арналған" rows=4 maxlength=500 required=True hint="Қысқа да түсінікті — оқырман осыдан таңдау жасайды." %}
-
-        <fieldset class="flex flex-col gap-2">
-            <legend class="mb-1 font-sans text-sm font-semibold text-slate-800">
+        {% comment %}
+            Формат — первым из выборов и карточками (docs/13 §13.11).
+            Он перестраивает читательскую страницу целиком, а лежал парой
+            радио между аннотацией и жанром, то есть подавался слабее жанра.
+        {% endcomment %}
+        <fieldset>
+            <legend class="mb-2 font-sans text-sm font-semibold text-slate-800">
                 Формат <span class="text-status-error-fg" aria-hidden="true">*</span>
             </legend>
-            {% include "components/radio_option.html" with name="format" value="single" label="Бір бөлімді шығарма — рассказ, ертегі, эссе, новелла" checked=True %}
-            {% include "components/radio_option.html" with name="format" value="serial" label="Көп бөлімді шығарма — повесть, роман, серия" %}
-            <p class="font-sans text-xs leading-relaxed text-slate-500">Форматты кейін өзгертуге болады, бірақ оқырманға көрсетілуі осы таңдауға байланысты.</p>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {% include "components/format_card.html" with value="single" icon="book" label="Бір бөлімді" hint="Оқырман цельный мәтін көреді: әңгіме, ертегі, эссе, новелла." checked=True %}
+                {% include "components/format_card.html" with value="serial" icon="list" label="Көп бөлімді" hint="Оқырман бөлімдер тізімін және бөлімнен бөлімге өтуді көреді." %}
+            </div>
+            <p class="mt-2 font-sans text-xs leading-relaxed text-slate-500">
+                Форматты баптауларда өзгертуге болады.
+            </p>
         </fieldset>
 
         {# Основной жанр — <select>, чтобы 12 опций нормально влазили. #}
@@ -46,44 +65,39 @@
                     <option value="{{ g.slug }}">{{ g.name }}</option>
                 {% endfor %}
             </select>
+            <span class="font-sans text-xs text-slate-500">Қосымша жанр мен тегтерді баптауларда қосасың.</span>
         </label>
 
-        <label class="flex flex-col gap-1.5">
-            <span class="font-sans text-sm font-semibold text-slate-800">Қосымша жанр</span>
-            <select name="genre_secondary"
-                    class="h-9 rounded-md border border-slate-300 bg-slate-50 px-3 font-sans text-sm text-slate-900 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30">
-                <option value="">— жоқ —</option>
-                {% for g in genres %}
-                    <option value="{{ g.slug }}">{{ g.name }}</option>
-                {% endfor %}
-            </select>
-            <span class="font-sans text-xs text-slate-500">Опциональды (BR-12).</span>
-        </label>
-
-        {# docs/11: UGC-теги, до 10. Новые попадают в pending — модератор пост-фактум. #}
-        {% include "components/tag_input.html" with tags=initial_tags %}
-
-        <fieldset class="flex flex-col gap-2">
-            <legend class="mb-1 font-sans text-sm font-semibold text-slate-800">
-                Мәртебесі <span class="text-status-error-fg" aria-hidden="true">*</span>
-            </legend>
-            {% include "components/radio_option.html" with name="status" value="OnProcess" label="Жазылып жатыр (жалғасы шығады)" checked=True %}
-            {% include "components/radio_option.html" with name="status" value="Completed" label="Аяқталды (барлық бөлімдер дайын)" %}
-        </fieldset>
-
-        {% include "components/checkbox.html" with name="agree" label="Жариялау ережелерімен таныстым және келісемін" required=True %}
+        {% comment %}
+            Мәртебесі здесь стоять не может (BR-10). Новое произведение всегда
+            создаётся черновиком, и форма предлагала выбрать между «Жазылып
+            жатыр» и «Аяқталды» — оба публичные, оба означают работу, которую
+            ещё никто не написал.
+        {% endcomment %}
+        <p class="flex items-start gap-2 rounded-md bg-slate-50 px-3 py-2.5 font-sans text-xs leading-relaxed text-slate-600">
+            <span class="mt-px shrink-0 text-slate-400">{% include "components/icon.html" with name="pen" size=14 only %}</span>
+            <span>Шығарма <b class="font-semibold text-slate-800">жоба</b> болып құрылады — оны әзірге сен ғана көресің. Дайын болғанда модерацияға жібересің.</span>
+        </p>
 
         <div class="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-5">
             <a href="{% url 'core:my_stories' %}"
                class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
                 Болдырмау
             </a>
-            {% include "components/button.html" with kind="primary" size="md" label="Шығарманы жасау" icon="check" type="submit" %}
+            {% include "components/button.html" with kind="primary" size="md" label="Жазуға кірісу" icon="pen" type="submit" %}
         </div>
+
+        {% comment %}
+            Согласие было отдельным чекбоксом — девятым шагом формы, который
+            ничего не добавляет: согласие на детской платформе даёт законный
+            представитель при регистрации, а здесь оно работало трением.
+            Строкой под кнопкой оно остаётся на виду и остаётся ссылкой.
+        {% endcomment %}
+        <p class="text-right font-sans text-xs leading-relaxed text-slate-500">
+            «Жазуға кірісу» дегенде
+            <a href="{% url 'core:legal_publishing' %}" class="font-semibold text-brand hover:underline">жариялау ережелерімен</a>
+            келісесің.
+        </p>
     </form>
 {% endif %}
-{% endblock %}
-
-{% block right_rail %}
-    {% include "partials/right_rail/writer.html" %}
 {% endblock %}

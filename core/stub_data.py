@@ -236,7 +236,14 @@ class Story:
     # UGC-теги (docs/11, BR-TAG-01): до 10 slug-ов на произведение.
     # Pending фильтруются в шаблоне tag_list.html по viewer_is_author (BR-TAG-07).
     tags: tuple = ()
-    audience: str = "10+"
+    # Возрастная отметка работы (BR-10b). Пустая строка — «автор ещё не
+    # выбрал», и это отдельное состояние, а не синоним «10+». Дефолт «10+»
+    # проставлял отметку молча за автора: чеклист кабинета рисовал за неё
+    # зелёную галку, хотя автор её не ставил, а каталожная ось «Жасың»
+    # (DEC-38) раскладывала работу по чужому решению. На детской платформе
+    # это самое дорогое поле карточки — оно выбирается, а не достаётся.
+    # Работа выходит из черновика только с заполненной отметкой.
+    audience: str = ""
     badges: tuple = ()
     format: str = "serial"  # single | serial
     # Сколько дней назад автор трогал работу в последний раз. None — не задано:
@@ -360,9 +367,9 @@ STORIES = [
     Story("dalney-berega",  "Алыс жағалауларда",     "sayyn",      "ipad_19b0bc4bcd9c1a1dc4c3cc12cf20dce5.webp", ("fantastika",  None),         12, 12482, 4821, 312, status="Completed", recent_views=2980, annotation="Үш дос жоғалған жолды іздеп шығады. Таудағы сапар оларды өз қорқынышымен, достықпен және белгісіз ауылдың құпиясымен беттестіреді.", tags=("arman", "sayahat", "jasospirim"), audience="10+", badges=("Редакция таңдауы",)),
     Story("temniy-lord",    "Күңгірт мырза",         "bekzhan_t",  "ipad_42f033cf1b9a2bcad744d05b9d429609.webp", ("fantezi",     "horror"),      3,  8920, 2440, 156, status="OnProcess", recent_views=1810, annotation="Қараңғы патшалыққа түскен жас кейіпкер биліктің бағасын түсіне бастайды. Сиқыр, қорқыныш және таңдау туралы фэнтези.", tags=("mistika", "arman", "basqa-alem"), audience="14+"),
     Story("igra-kuklovoda", "Қуыршақшының ойыны",    "dina_books", "ipad_499539963221e0fe36b0888bf8601067.webp", ("triller",     "drama"),       3, 18102, 6230, 421, status="OnProcess", recent_views=4120, annotation="Мектептегі тыныш күндер бір жұмбақ ойыннан кейін өзгереді. Әр белгі жаңа күдікке апарады, ал шындық жақын жерде жасырынып тұр.", tags=("mistika", "jasospirim", "detektiv-jas"), audience="14+", badges=("Байқауға қатысады",)),
-    Story("kronchessii",    "Тас уәделер",           "rudazov",    "ipad_5916b4e19c616e74d008125ba9a1be8e.webp", ("shyttyrman",  "fantezi"),     3, 32540, 11200, 890, status="Completed", recent_views=890, annotation="Ескі қала қабырғаларындағы тасқа қашалған уәделер оянады. Кейіпкерлер өткеннің шартын бұзбай, болашақты сақтауға тырысады.", tags=("sayahat", "arman", "syikyr-akademiya")),
-    Story("arhimag",        "Сиқыршы: бөтен әлемдер","rudazov",    "ipad_940e074d12d6c3657199601ca568f1b3.jpg",  ("fantezi",     "shyttyrman"),  3, 12482, 4821, 312, status="OnProcess", recent_views=740, annotation="Жас сиқыршы бөтен әлемдердің есігін ашқанда, әр әлем өз ережесін ұсынады. Үйге қайту үшін ол күштен бұрын жауапкершілікті үйренеді.", tags=("syikyr-akademiya", "arman", "dostyk", "jasospirim", "mektep")),
-    Story("sila-imperii",   "Империя құдіреті",      "aygerim_k",  "ipad_992f1631a421d74ed5e1aa72717df374.webp", ("tarih",       "drama"),       1, 14200, 3890, 245, status="Published", recent_views=610, annotation="Көне империяның шетінде өскен жас батыр тарихтың үлкен толқынына түседі. Бұл шығарма билік, адалдық және ел алдындағы таңдау туралы.", tags=("arman", "jasospirim"), format="single"),
+    Story("kronchessii",    "Тас уәделер",           "rudazov",    "ipad_5916b4e19c616e74d008125ba9a1be8e.webp", ("shyttyrman",  "fantezi"),     3, 32540, 11200, 890, status="Completed", recent_views=890, annotation="Ескі қала қабырғаларындағы тасқа қашалған уәделер оянады. Кейіпкерлер өткеннің шартын бұзбай, болашақты сақтауға тырысады.", tags=("sayahat", "arman", "syikyr-akademiya"), audience="10+"),
+    Story("arhimag",        "Сиқыршы: бөтен әлемдер","rudazov",    "ipad_940e074d12d6c3657199601ca568f1b3.jpg",  ("fantezi",     "shyttyrman"),  3, 12482, 4821, 312, status="OnProcess", recent_views=740, annotation="Жас сиқыршы бөтен әлемдердің есігін ашқанда, әр әлем өз ережесін ұсынады. Үйге қайту үшін ол күштен бұрын жауапкершілікті үйренеді.", tags=("syikyr-akademiya", "arman", "dostyk", "jasospirim", "mektep"), audience="10+"),
+    Story("sila-imperii",   "Империя құдіреті",      "aygerim_k",  "ipad_992f1631a421d74ed5e1aa72717df374.webp", ("tarih",       "drama"),       1, 14200, 3890, 245, status="Published", recent_views=610, annotation="Көне империяның шетінде өскен жас батыр тарихтың үлкен толқынына түседі. Бұл шығарма билік, адалдық және ел алдындағы таңдау туралы.", tags=("arman", "jasospirim"), audience="10+", format="single"),
 
     # ─ Витринный слой: заполняет ряды главной и покрывает пустые жанры ─
     # Без него «Қысқа оқылатын әңгімелер» рендерился одной карточкой, а половина
@@ -473,7 +480,7 @@ STORIES = [
         cover="ipad_c9217632f98051fd88ca5763f218a9e3.webp", genres=("drama", None),
         chapters=8, views=1042, likes=87, comments=12,
         status="OnProcess", recent_views=310, annotation="Жас қыздың Алматыдан Таразға қайту туралы әңгімесі. Сегіз бөлімде, әр бөлім — жаңа қала.",
-        tags=("sayahat", "jasospirim", "arman", "experimental"),
+        tags=("sayahat", "jasospirim", "arman", "experimental"), audience="14+",
         updated_days_ago=2,
         # Заявка на активный «Алтын қалам — 2024» лежала в SUBMISSIONS_BY_USER,
         # а бейджа на работе не было: каталог по оси badge=contest её не находил,
@@ -487,7 +494,7 @@ STORIES = [
         chapters=1, views=203, likes=18, comments=4,
         status="Published", recent_views=203, annotation="Қаладағы бес адамның бір күні. Әрқайсысының өз әні.",
         secondary_genre="komediya",
-        tags=("aua-ralighi", "dostyk", "mektep"),
+        tags=("aua-ralighi", "dostyk", "mektep"), audience="10+",
         format="single",
         updated_days_ago=12,
     ),
@@ -502,6 +509,7 @@ STORIES = [
         # честное здесь — ноль, а не три пустые главы.
         chapters=0, views=0, likes=0, comments=0,
         status="OnModeration", recent_views=0, annotation="Дәстүрлі ертегі формасында жазылған заманауи тарих.",
+        audience="10+",
         updated_days_ago=4,
     ),
     Story(
@@ -509,6 +517,7 @@ STORIES = [
         cover="ipad_f0e918b204613b38cc0e04ba74e3e3ab.webp", genres=("drama", None),
         chapters=1, views=872, likes=64, comments=9,
         status="Published", recent_views=190, annotation="Қыстағы ауылда қалған әжемен өткізген бір ай. Аяқталған кітап.",
+        audience="10+",
         format="single",
         updated_days_ago=45,
     ),
@@ -1071,6 +1080,16 @@ CATALOG_AUDIENCE_FILTERS = (
     ("14+", "14+"),
 )
 
+# Те же ключи, но для автора, а не для читателя (BR-10b). Подписи в каталоге
+# называют вилку читателя («10-13»), потому что ось накопительная (DEC-38);
+# в форме автор ставит отметку своей работе, и там вилка читателя врала бы:
+# «10-13» звучит как «старше не читают». Список закрыт AUDIENCE_ORDER — новая
+# отметка означает новую ось каталога, а не новую строку в форме.
+STORY_AUDIENCES = (
+    ("10+", "10+", "Кез келген оқырманға жарайды"),
+    ("14+", "14+", "Жасөспірімге арналған: ауыр тақырып, күрделі көрініс"),
+)
+
 # Границы — в Story.length_bucket, там же и обоснование.
 CATALOG_LENGTH_FILTERS = (
     ("",       "Барлығы"),
@@ -1365,6 +1384,72 @@ def writer_attention(username: str) -> list:
                    if s.status == "NotPublished" and not chapters_of(s.slug)])
 
     return items
+
+
+# Чек-лист готовности произведения (FR-WRITE-09).
+#
+# Порядок пунктов — порядок работы автора, а не порядок полей формы.
+# `required` отделяет то, без чего работу нельзя показать читателю, от того,
+# что её улучшает: обложка и теги остаются советом, аннотация, текст и
+# возрастная отметка — условием. Раньше все шесть пунктов были одинаковыми
+# серо-зелёными строками, и «Мұқаба дайын» весила столько же, сколько
+# «Жас белгісі», которое к тому же было проставлено дефолтом (BR-10b).
+#
+# `target` — куда вести; ссылку строит view (`_checklist_links`), как и в
+# writer_attention. URL-ы в слой данных не спускаются.
+PUBLISH_CHECKLIST = (
+    ("text",       "text",     True),
+    ("annotation", "settings", True),
+    ("audience",   "settings", True),
+    ("cover",      "settings", False),
+    ("tags",       "settings", False),
+)
+
+
+def publish_checklist(story: Story) -> list:
+    """Состояние подготовки работы к модерации (FR-WRITE-09, BR-11).
+
+    Чек-лист в кабинете показывал готовность и никуда не вёл: шесть строк
+    мёртвого текста, из которых одна («Жас белгісі») была зелёной за
+    несделанное, а другая («Мәртебе тексеруге дайын») загоралась уже после
+    отправки — то есть отчитывалась о прошлом, а не о следующем шаге.
+
+    Отдаёт `key`/`ok`/`required`/`target`. Тексты — в шаблоне (docs/16),
+    ссылки — во view.
+    """
+    if story is None:
+        return []
+    has_text = bool(chapters_of(story.slug))
+    done = {
+        "text":       has_text,
+        "annotation": bool(story.annotation),
+        "audience":   bool(story.audience),
+        "cover":      bool(story.cover),
+        "tags":       bool(story.tags),
+    }
+    return [
+        {"key": key, "ok": done[key], "required": required, "target": target}
+        for key, target, required in PUBLISH_CHECKLIST
+    ]
+
+
+def missing_for_review(story: Story) -> list:
+    """Обязательные пункты, которые ещё не закрыты (BR-11)."""
+    return [i["key"] for i in publish_checklist(story)
+            if i["required"] and not i["ok"]]
+
+
+def can_submit_for_review(story: Story) -> bool:
+    """Можно ли отправить работу на модерацию.
+
+    Два разных вопроса, которые кабинет раньше не различал: «работа готова»
+    и «работа уже ушла». Отправлять можно только черновик — у работы на
+    модерации кнопка означала бы повторную заявку, у публичной — откат
+    в непубличное состояние, чего автор этой кнопкой не просит.
+    """
+    return (story is not None
+            and story.status == "NotPublished"
+            and not missing_for_review(story))
 
 
 def writer_stats(username: str) -> dict:

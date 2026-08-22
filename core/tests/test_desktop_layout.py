@@ -150,7 +150,6 @@ class RailContentHasMobileEquivalent(TestCase):
     PAGES = [
         ('/me/',                        ['Шығарма', 'Ұнатулар', 'Оқылым']),
         ('/u/rudazov/',                 ['Шығарма', 'Жазылушы', 'Ұнатулар', 'Оқылым']),
-        ('/write/',                     ['Шығарма', 'Жазылушы', 'Оқылым', 'Ұнатулар']),
         ('/contests/bolashak-mektebi/', ['Сыйақы', 'Өтінім', 'Қазылар']),
         ('/story/dalney-berega/',       ['Автор', 'Бөлім']),
         ('/catalog/',                   ['Сүзгілер']),

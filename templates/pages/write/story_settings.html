@@ -48,18 +48,20 @@
 
         {% include "components/textarea.html" with name="annotation" label="Аннотация" value=story.annotation rows=4 maxlength=500 required=True %}
 
-        <fieldset class="flex flex-col gap-2">
-            <legend class="mb-1 font-sans text-sm font-semibold text-slate-800">
+        {# Формат — теми же карточками, что в форме создания (docs/13 §13.11). #}
+        <fieldset>
+            <legend class="mb-2 font-sans text-sm font-semibold text-slate-800">
                 Формат <span class="text-status-error-fg" aria-hidden="true">*</span>
             </legend>
-            {% if story.is_single %}
-                {% include "components/radio_option.html" with name="format" value="single" label="Бір бөлімді шығарма" checked=True %}
-                {% include "components/radio_option.html" with name="format" value="serial" label="Көп бөлімді шығарма" %}
-            {% else %}
-                {% include "components/radio_option.html" with name="format" value="single" label="Бір бөлімді шығарма" %}
-                {% include "components/radio_option.html" with name="format" value="serial" label="Көп бөлімді шығарма" checked=True %}
-            {% endif %}
-            <p class="font-sans text-xs leading-relaxed text-slate-500">Бір бөлімді форматта оқырман бір цельный мәтін көреді; көп бөлімді форматта бөлімдер тізімі көрсетіледі.</p>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {% if story.is_single %}
+                    {% include "components/format_card.html" with value="single" icon="book" label="Бір бөлімді" hint="Оқырман цельный мәтін көреді: әңгіме, ертегі, эссе, новелла." checked=True %}
+                    {% include "components/format_card.html" with value="serial" icon="list" label="Көп бөлімді" hint="Оқырман бөлімдер тізімін және бөлімнен бөлімге өтуді көреді." %}
+                {% else %}
+                    {% include "components/format_card.html" with value="single" icon="book" label="Бір бөлімді" hint="Оқырман цельный мәтін көреді: әңгіме, ертегі, эссе, новелла." %}
+                    {% include "components/format_card.html" with value="serial" icon="list" label="Көп бөлімді" hint="Оқырман бөлімдер тізімін және бөлімнен бөлімге өтуді көреді." checked=True %}
+                {% endif %}
+            </div>
         </fieldset>
 
         <label class="flex flex-col gap-1.5">
@@ -88,18 +90,53 @@
         {# docs/11: UGC-теги, до 10. Текущие теги стори передаются initial-списком. #}
         {% include "components/tag_input.html" with tags=initial_tags %}
 
+        {% comment %}
+            Возрастная отметка (BR-10b). Поле хранилось с дефолтом «10+» и не
+            спрашивалось нигде: ось «Жасың» каталога (DEC-38) раскладывала
+            работы по решению, которого автор не принимал, а чеклист кабинета
+            рисовал за него зелёную галку. Пустое значение — отдельное
+            состояние «әлі таңдалмаған», из черновика с ним не выйти.
+        {% endcomment %}
         <fieldset class="flex flex-col gap-2">
             <legend class="mb-1 font-sans text-sm font-semibold text-slate-800">
-                Мәртебесі <span class="text-status-error-fg" aria-hidden="true">*</span>
+                Жас белгісі <span class="text-status-error-fg" aria-hidden="true">*</span>
             </legend>
-            {% if story.status == "OnProcess" %}
-                {% include "components/radio_option.html" with name="status" value="OnProcess" label="Жазылып жатыр" checked=True %}
-                {% include "components/radio_option.html" with name="status" value="Completed" label="Аяқталды" %}
-            {% else %}
-                {% include "components/radio_option.html" with name="status" value="OnProcess" label="Жазылып жатыр" %}
-                {% include "components/radio_option.html" with name="status" value="Completed" label="Аяқталды" checked=True %}
-            {% endif %}
+            {% for key, mark, hint in story_audiences %}
+                {% if key == story.audience %}
+                    {% include "components/radio_option.html" with name="audience" value=key label=mark|add:" — "|add:hint checked=True %}
+                {% else %}
+                    {% include "components/radio_option.html" with name="audience" value=key label=mark|add:" — "|add:hint %}
+                {% endif %}
+            {% endfor %}
+            <p class="font-sans text-xs leading-relaxed text-slate-500">
+                Оқырман каталогта осы белгі бойынша сүзеді. Күмәндансаң — жоғарысын ал.
+            </p>
         </fieldset>
+
+        {% comment %}
+            Мәртебесі — только у публичного сериала (BR-10a, BR-11).
+
+            У single допустимый статус один — `Published`, и выбор «жазылып
+            жатыр / аяқталды» для цельного текста не значит ничего. У черновика
+            и работы на модерации статус вообще не авторское поле: перевести
+            в публичный может только модератор, а форма предлагала это радио
+            всем и черновику подставляла «Аяқталды» отмеченным — прямо тот
+            статус, которого у него быть не может.
+        {% endcomment %}
+        {% if story.is_public and not story.is_single %}
+            <fieldset class="flex flex-col gap-2">
+                <legend class="mb-1 font-sans text-sm font-semibold text-slate-800">
+                    Мәртебесі <span class="text-status-error-fg" aria-hidden="true">*</span>
+                </legend>
+                {% if story.status == "OnProcess" %}
+                    {% include "components/radio_option.html" with name="status" value="OnProcess" label="Жазылып жатыр — жалғасы шығады" checked=True %}
+                    {% include "components/radio_option.html" with name="status" value="Completed" label="Аяқталды — барлық бөлім жарияланды" %}
+                {% else %}
+                    {% include "components/radio_option.html" with name="status" value="OnProcess" label="Жазылып жатыр — жалғасы шығады" %}
+                    {% include "components/radio_option.html" with name="status" value="Completed" label="Аяқталды — барлық бөлім жарияланды" checked=True %}
+                {% endif %}
+            </fieldset>
+        {% endif %}
 
         <div class="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-5">
             <a href="{% url 'core:manage_story' slug=story.slug %}"
@@ -110,24 +147,12 @@
         </div>
     </form>
 
-    {# ── Опасная зона ── #}
-    <section class="mt-8 rounded-lg border border-status-error-fg/30 bg-status-error-bg/30 p-5">
-        <h2 class="font-display text-sm font-bold text-status-error-fg">Қауіпті аймақ</h2>
-        <p class="mt-1 font-sans text-xs leading-relaxed text-slate-700">
-            Шығарманы өшіру — қайтарылмайтын әрекет.
-        </p>
-        <button type="button" x-data
-                @click="$dispatch('open-delete-confirm', { name: '{{ story.title|escapejs }}', confirm_url: '#' })"
-                class="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-status-error-fg bg-white px-5 font-sans text-sm font-bold text-status-error-fg hover:bg-status-error-bg">
-            {% include "components/icon.html" with name="trash" size=14 only %}
-            Шығарманы өшіру
-        </button>
-    </section>
-
-    {% include "components/delete_confirm_modal.html" %}
+    {% comment %}
+        Опасной зоны здесь больше нет — она осталась одна, на странице
+        управления. Две одинаковые красные секции на соседних экранах делают
+        удаление фоном: то, что встречается на каждом шагу, перестаёт читаться
+        как необратимое. Ссылка «Шығарманы өшіру» доступна оттуда же, откуда
+        автор сюда пришёл, и из меню строки в списке (my_story_menu).
+    {% endcomment %}
 {% endif %}
-{% endblock %}
-
-{% block right_rail %}
-    {% include "partials/right_rail/writer.html" %}
 {% endblock %}

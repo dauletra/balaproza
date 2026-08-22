@@ -69,6 +69,9 @@ balaproza_v1/
 │   │                             # знаки ВЫВОДЯТСЯ, хранить их нельзя; рейтинга нет),
 │   │                             # following_of, followers_of, notifications_for_user,
 │   │                             # unread_count_for_user, collections_of, trending_tags,
+│   │                             # publish_checklist / missing_for_review /
+│   │                             # can_submit_for_review (FR-WRITE-09 — готовность
+│   │                             # к модерации; «готова» и «уже ушла» — разные вопросы),
 │   │                             # submissions_of, has_submission,
 │   │                             # contest_history (FR-PROF-07 — правило приватности
 │   │                             # BR-74a живёт ЗДЕСЬ, не в шаблоне),
@@ -85,11 +88,16 @@ balaproza_v1/
 │   │                             # CATALOG_STATUS_FILTERS, CATALOG_BADGE_FILTERS,
 │   │                             # CATALOG_PRESETS, STORY_BADGES, PUBLIC_STATUSES,
 │   │                             # CATALOG_AUTHOR_FILTERS, NEW_AUTHOR_FOLLOWERS,
-│   │                             # TAGS, TAGS_BY_SLUG, BLOCKED_TAG_PATTERNS
+│   │                             # TAGS, TAGS_BY_SLUG, BLOCKED_TAG_PATTERNS,
+│   │                             # AUDIENCE_ORDER (ось каталога) / STORY_AUDIENCES
+│   │                             # (та же пара ключей для формы автора — BR-10b)
 │   │                             # Story.recent_views — просмотры за 14 дней (DEC-36),
 │   │                             # ось «Қазір танымал»; инвариант recent_views <= views
 │   │                             # Story.updated_days_ago — когда трогали (DEC-40), None = не задано
 │   │                             # Story.is_public — по PUBLIC_STATUSES, не по литералу
+│   │                             # Story.audience — БЕЗ дефолта (BR-10b): "" = не выбрана.
+│   │                             # Дефолт «10+» ставил отметку за автора, а чеклист
+│   │                             # кабинета рисовал за неё зелёную галку
 │   │                             # Author.works — производное, только публичные работы
 │   ├── views.py                  # все view (тонкие, читают из stub_data)
 │   │                             # + legal_* (5 stub-страниц), profile_me_edit (stub-форма),
@@ -107,7 +115,7 @@ balaproza_v1/
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
 │   │                             # stub_data.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 883 тестов в 16 файлах (см. ниже)
+│   └── tests/                    # 911 тестов в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -133,7 +141,12 @@ balaproza_v1/
 │   │                             # NB: catalog_controls.html устарел — заменён
 │   │                             # _filter_panel в каталоге (DEC-27)
 │   ├── partials/                 # header, footer (карта сайта), mobile_nav, page_header,
-│   │                             # right_rail/{home,story,writer,profile,contest,catalog}.html
+│   │                             # right_rail/{home,story,profile,contest,catalog}.html
+│   │                             # (writer.html удалён — DEC-48: агрегаты автора
+│   │                             #  живут в профиле, кабинет отвечает на «что делать»)
+│   │                             # write/publish_panel.html — чек-лист готовности +
+│   │                             # «Модерацияға жіберу» (FR-WRITE-09). Кнопка только
+│   │                             # у черновика; незакрытые пункты ведут в своё поле
 │   │                             # contest/{_winners,_timeline}.html — победители
 │   │                             # (FR-CONT-08) и этапы; таймлайн вынесен, потому что у
 │   │                             # завершённого конкурса он живёт свёрнутым в <details>
@@ -223,7 +236,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 883 тестов
+uv run python manage.py test core       # все 911 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 
@@ -253,8 +266,9 @@ def _login_as_aidana(client):
 - **Все шаблоны в корневой `templates/`** (не в `core/templates/`)
 - `base.html` определяет блоки `title`, `content`, `right_rail` — каждая страница может переопределить рейл
 - `base.html` глобально подключает: sprite, alpine/htmx, toast_host, **search_popup** (Cmd+K), favicon, theme-color
-- **`has_right_rail` флаг** (DEC-25): `<aside>` правого рейла рендерится только если view передал `'has_right_rail': True` в контекст. Иначе контент тянется на всю ширину контейнера. См. `home`, `story_detail`, `profile_me/other`, `contest_detail/submit`, `manage_story`, `chapter_editor`, `my_stories`, `new_story`, `story_settings`.
-  **Флаг ставится по наличию данных рейла, а не безусловно.** `my_stories` и `manage_story` слали `True` всегда, а `right_rail/writer.html` пуст без `stats` — гость и неизвестный slug получали пустую колонку в 300px, которая просто сдвигала контент от центра. Закрыто `test_write.MyStoriesGuestHasNoEmptyRail`. Та же ошибка была у конкурсов: `contest_detail` и `contest_submit` слали `True` даже на неизвестный slug — теперь считает `_contest_rail_has_content` (FR-CONT-09), закрыто `test_contests.ContestRail`
+- **`has_right_rail` флаг** (DEC-25): `<aside>` правого рейла рендерится только если view передал `'has_right_rail': True` в контекст. Иначе контент тянется на всю ширину контейнера. См. `home`, `story_detail`, `profile_me/other`, `contest_detail/submit`.
+  **Флаг ставится по наличию данных рейла, а не безусловно.** `contest_detail` и `contest_submit` слали `True` даже на неизвестный slug — теперь считает `_contest_rail_has_content` (FR-CONT-09), закрыто `test_contests.ContestRail`.
+  **У WRITE-страниц рейла нет вовсе** (DEC-48). Статистика писателя повторяла `partials/profile/_stats.html`, а на страницах одного произведения читалась как статистика этого произведения: в шапке «1 042 оқылым» работы, в рейле «Оқылым 2 117» по портфелю. Агрегаты живут в профиле (`/me/?tab=stats`), кабинет отвечает на «что делать». Закрыто `test_write.WriteHasNoAuthorStatsRail`
 - **Container**: `max-w-[1280px]` (после удаления sidebar) с padding `lg:px-12`
 - В компонентах используем `{% comment %}…{% endcomment %}` для документации параметров (НЕ многострочный `{# … #}` — Django парсит его как single-line)
 - В именах template-переменных нельзя начинать с `_` (Django блокирует) — использовать `rid`, `id` и т.п.

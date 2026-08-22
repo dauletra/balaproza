@@ -1,7 +1,10 @@
 """WRITE: авторский кабинет — my_stories, new, manage, settings, chapter_editor."""
 
+import re
+from dataclasses import replace
+
 from django.template.loader import render_to_string
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 
 from core import stub_data
@@ -216,54 +219,59 @@ class MyStoryRowMetricsAreAnnounced(TestCase):
         self.assertNotContains(self.response, '1,0 мың')
 
 
-class MyStoriesGuestHasNoEmptyRail(TestCase):
-    """Гость не должен получать пустую колонку рейла в 300px.
+class WriteHasNoAuthorStatsRail(TestCase):
+    """DEC-48: агрегаты автора живут в профиле, а не в кабинете.
 
-    `has_right_rail` стоял безусловно, а `right_rail/writer.html` пуст без
-    stats — на xl рядом с гейтом висел пустой <aside>, сдвигавший его от центра.
+    Рейл `right_rail/writer.html` повторял четыре плитки
+    `partials/profile/_stats.html` — и на страницах одного произведения
+    читался как статистика этого произведения: в шапке «1 042 оқылым»,
+    в рейле «Оқылым 2 117», без единого слова о том, что второе про весь
+    портфель. Кнопку «Жаңа шығарма» он дублировал из шапки списка, а его
+    разбивка по статусам роняла черновик (2+1+1 под «Шығарма 5») вопреки
+    BR-ACH-07.
     """
 
+    WRITE_URLS = (
+        ('core:my_stories',    {}),
+        ('core:new_story',     {}),
+        ('core:manage_story',  {'slug': 'aidana-tan'}),
+        ('core:story_settings', {'slug': 'aidana-tan'}),
+        ('core:chapter_new',   {'slug': 'aidana-tan'}),
+    )
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+
+    def test_no_rail_on_any_write_page(self):
+        for name, kwargs in self.WRITE_URLS:
+            with self.subTest(url=name):
+                r = self.client.get(reverse(name, kwargs=kwargs))
+                self.assertNotContains(r, '<aside')
+
+    def test_no_author_totals_leak_onto_a_single_story_page(self):
+        """Числа автора не стоят рядом с числами произведения."""
+        stats = stub_data.writer_stats('aidana')
+        story = stub_data.STORIES_BY_SLUG['aidana-tan']
+        self.assertNotEqual(stats['views'], story.views)   # иначе тест пуст
+        body = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': 'aidana-tan'})
+        ).content.decode()
+        self.assertIn(spaced(story.views), body)
+        self.assertNotIn(spaced(stats['views']), body)
+
     def test_no_aside_for_guest(self):
-        response = self.client.get(reverse('core:my_stories'))
+        response = Client().get(reverse('core:my_stories'))
         self.assertNotContains(response, '<aside')
 
-    def test_author_still_gets_the_rail(self):
-        _login_as_aidana(self.client)
-        response = self.client.get(reverse('core:my_stories'))
-        self.assertContains(response, '<aside')
-
     def test_unknown_story_has_no_rail(self):
-        _login_as_aidana(self.client)
         response = self.client.get(
             reverse('core:manage_story', kwargs={'slug': 'no-such-story'}))
         self.assertContains(response, 'Шығарма табылмады')
         self.assertNotContains(response, '<aside')
 
-
-class MyStoriesLoadingHidesRealNumbers(TestCase):
-    """DEC-17: в loading полоса статистики уступает место скелетону.
-
-    Она рендерилась выше проверки page_state, и рядом со скелетонами списка
-    стояли настоящие агрегаты — страница выглядела наполовину загруженной.
-    Считаем вхождения подписи: «Жазылушы» стоит и в полосе (xl:hidden), и в
-    правом рейле, поэтому проверяем именно исчезновение второго экземпляра.
-    """
-
-    LABEL = 'Жазылушы'
-
-    def setUp(self):
-        _login_as_aidana(self.client)
-
-    def _count(self, url):
-        return self.client.get(url).content.decode().count(self.LABEL)
-
-    def test_stat_strip_is_replaced_by_a_skeleton(self):
-        loading = reverse('core:my_stories') + '?state=loading'
-        self.assertEqual(self._count(loading), 1)          # остался только рейл
-        self.assertContains(self.client.get(loading), 'animate-pulse')
-
-    def test_strip_returns_when_loaded(self):
-        self.assertEqual(self._count(reverse('core:my_stories')), 2)
+    def test_the_only_way_to_totals_is_the_profile(self):
+        r = self.client.get(reverse('core:my_stories'))
+        self.assertContains(r, reverse('core:profile_me') + '?tab=stats')
 
 
 # ───────────────────────── New story ─────────────────────────
@@ -278,23 +286,59 @@ class NewStoryForm(TestCase):
         self.assertEqual(self.response.status_code, 200)
 
     def test_has_required_fields(self):
+        """FR-WRITE-01: три поля — атау, формат, негізгі жанр."""
         self.assertContains(self.response, 'name="title"')
-        self.assertContains(self.response, 'name="annotation"')
+        self.assertContains(self.response, 'name="format"')
         self.assertContains(self.response, 'name="genre_primary"')
-        self.assertContains(self.response, 'name="genre_secondary"')
-        self.assertContains(self.response, 'name="status"')
+
+    def test_asks_nothing_about_a_story_that_does_not_exist_yet(self):
+        """Аннотация, доп. жанр, теги и согласие уехали дальше по пути.
+
+        Форма из восьми полей стояла между автором и первой строкой текста
+        и спрашивала о работе, которой ещё нет: тег к ненаписанному рассказу
+        не выбирается, аннотация к нему не пишется. Обязательность аннотации
+        не отменена — она проверяется при отправке на модерацию
+        (FR-WRITE-09), а не при создании черновика.
+        """
+        for field in ('annotation', 'genre_secondary', 'tags', 'agree'):
+            with self.subTest(field=field):
+                self.assertNotContains(self.response, f'name="{field}"')
+
+    def test_consent_is_stated_not_ticked(self):
+        # Чекбокса нет, но правила остаются на виду и остаются ссылкой.
+        self.assertContains(self.response, reverse('core:legal_publishing'))
+
+    def test_format_is_offered_as_cards(self):
+        # docs/13 §13.11: формат перестраивает читательскую страницу целиком,
+        # парой радио между аннотацией и жанром он подавался слабее жанра.
+        self.assertContains(self.response, 'id="format-single"')
+        self.assertContains(self.response, 'id="format-serial"')
+
+    def test_primary_action_leads_to_writing(self):
+        self.assertContains(self.response, 'Жазуға кірісу')
 
     def test_genre_select_lists_all_12(self):
         for g in stub_data.GENRES:
             with self.subTest(genre=g.slug):
                 self.assertContains(self.response, f'value="{g.slug}"')
 
-    def test_status_radios_present(self):
-        self.assertContains(self.response, 'value="OnProcess"')
-        self.assertContains(self.response, 'value="Completed"')
+    def test_status_is_not_asked_at_creation(self):
+        """BR-10: новое произведение — всегда черновик, выбирать нечего.
 
-    def test_consent_checkbox_required(self):
-        self.assertContains(self.response, 'name="agree"')
+        Форма предлагала `OnProcess` и `Completed` — оба публичные. «Аяқталды»
+        стояло вариантом для произведения с нулём бөлім, а у `single` статус
+        вообще один (BR-10a). Дефолт при создании — `NotPublished`, и он не
+        выбирается, а сообщается.
+        """
+        self.assertNotContains(self.response, 'name="status"')
+        self.assertNotContains(self.response, 'value="OnProcess"')
+        self.assertNotContains(self.response, 'value="Completed"')
+
+    def test_says_the_work_starts_as_a_draft(self):
+        # Убрать выбор мало: автор должен понимать, в каком состоянии
+        # окажется работа. Слово — каноническое из status_badge (BR-10).
+        self.assertContains(self.response, 'жоба')
+
 
 
 class NewStoryGuestSeesGate(TestCase):
@@ -321,10 +365,18 @@ class ManageStoryKnown(TestCase):
         self.assertEqual(self.response.status_code, 200)
 
     def test_shows_title_and_status(self):
+        """Бейдж показывает статус ЭТОЙ работы.
+
+        Проверка искала «Жарияланды» и проходила по слову из разбивки
+        в правом рейле, а не по бейджу: у `aidana-tan` статус `OnProcess`,
+        и бейдж всё это время говорил «Жазылып жатыр». Ровно та подмена,
+        из-за которой рейл и убрали (DEC-48) — слово про портфель автора
+        читалось как слово про произведение.
+        """
         story = stub_data.STORIES_BY_SLUG[self.SLUG]
+        self.assertEqual(story.status, 'OnProcess')
         self.assertContains(self.response, story.title)
-        # У aidana-tan статус Published → бейдж «Жарияланды»
-        self.assertContains(self.response, 'Жарияланды')
+        self.assertContains(self.response, 'Жазылып жатыр')
 
     def test_lists_each_chapter_with_edit_link(self):
         chapters = stub_data.chapters_of(self.SLUG)
@@ -390,13 +442,226 @@ class StorySettingsForm(TestCase):
         self.assertContains(self.response, f'value="{story.primary_genre.slug}" selected')
 
     def test_status_radio_preselected(self):
-        # У 'aidana-tan' статус Published; ветка else → "Аяқталды" checked
-        # (мы упростили: или OnProcess, или Completed). По коду текущему — Published уходит в else.
-        # Проверим, что один из radio'в имеет checked.
+        # 'aidana-tan' — публичный сериал (OnProcess), радио «Мәртебесі»
+        # для него рендерится и отмечает текущий статус.
         self.assertContains(self.response, 'checked')
 
-    def test_has_delete_trigger(self):
-        self.assertContains(self.response, 'open-delete-confirm')
+    def test_no_second_danger_zone(self):
+        """Опасная зона осталась одна — на странице управления.
+
+        Две одинаковые красные секции на соседних экранах делают удаление
+        фоном: то, что встречается на каждом шагу, перестаёт читаться как
+        необратимое. Вход в удаление остаётся из manage_story и из меню
+        строки списка (my_story_menu).
+        """
+        self.assertNotContains(self.response, 'open-delete-confirm')
+        manage = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.SLUG}))
+        self.assertContains(manage, 'open-delete-confirm')
+
+    def test_audience_radios_are_offered(self):
+        """BR-10b: отметку выбирает автор, и выбирает он её здесь."""
+        self.assertContains(self.response, 'name="audience"')
+        for key, _mark, _hint in stub_data.STORY_AUDIENCES:
+            with self.subTest(audience=key):
+                self.assertContains(self.response, f'value="{key}"')
+
+    def test_current_audience_is_preselected(self):
+        story = stub_data.STORIES_BY_SLUG[self.SLUG]
+        body = self.response.content.decode()
+        # Ровно один радио группы отмечен, и это текущая отметка работы.
+        checked = re.findall(
+            r'id="audience-([^"]+)"[^>]*?\bchecked\b', body, flags=re.S)
+        self.assertEqual(checked, [story.audience])
+
+
+class StorySettingsStatusIsOnlyForPublicSerials(TestCase):
+    """BR-10a/BR-11: радио «Мәртебесі» — не всем.
+
+    Оно рендерилось всегда и в ветке `else` подставляло черновику отмеченным
+    «Аяқталды» — статус, которого у произведения с нулём бөлім быть не может.
+    У `single` допустимый статус один, а перевести работу в публичный может
+    только модератор, не автор.
+    """
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+
+    def _get(self, slug):
+        return self.client.get(reverse('core:story_settings', kwargs={'slug': slug}))
+
+    def test_draft_gets_no_status_radio(self):
+        story = stub_data.STORIES_BY_SLUG['aidana-kus']
+        self.assertEqual(story.status, 'NotPublished')
+        self.assertNotContains(self._get('aidana-kus'), 'name="status"')
+
+    def test_moderation_gets_no_status_radio(self):
+        story = stub_data.STORIES_BY_SLUG['aidana-erteg']
+        self.assertEqual(story.status, 'OnModeration')
+        self.assertNotContains(self._get('aidana-erteg'), 'name="status"')
+
+    def test_single_gets_no_status_radio(self):
+        story = stub_data.STORIES_BY_SLUG['aidana-koshe']
+        self.assertTrue(story.is_single and story.is_public)
+        self.assertNotContains(self._get('aidana-koshe'), 'name="status"')
+
+    def test_public_serial_keeps_it(self):
+        story = stub_data.STORIES_BY_SLUG['aidana-tan']
+        self.assertTrue(story.is_public and not story.is_single)
+        self.assertContains(self._get('aidana-tan'), 'name="status"')
+
+    def test_audience_is_offered_even_where_status_is_not(self):
+        # Отметка нужна именно черновику — без неё он из черновика не выйдет.
+        self.assertContains(self._get('aidana-kus'), 'name="audience"')
+
+
+class AudienceIsChosenNotDefaulted(TestCase):
+    """BR-10b: у `Story.audience` нет значения по умолчанию.
+
+    Поле хранилось с дефолтом «10+», не спрашивалось ни в одной форме, и при
+    этом раскладывало работы по оси «Жасың» каталога (DEC-38). Чек-лист
+    кабинета рисовал за это решение зелёную галку — галку за несделанное.
+    """
+
+    def test_dataclass_has_no_default_mark(self):
+        blank = stub_data.Story('x', 'X', 'aidana', '', ('drama', None), 0, 0, 0, 0)
+        self.assertEqual(blank.audience, '')
+
+    def test_every_non_draft_story_carries_a_mark(self):
+        for s in stub_data.STORIES:
+            if s.status == 'NotPublished':
+                continue
+            with self.subTest(story=s.slug):
+                self.assertIn(
+                    s.audience, stub_data.AUDIENCE_ORDER,
+                    f'{s.slug} вышла из черновика без возрастной отметки',
+                )
+
+    def test_form_labels_differ_from_catalog_labels(self):
+        # В каталоге подпись называет вилку читателя («10-13»), в форме —
+        # отметку работы. Одна константа на оба места означала бы, что автор
+        # ставит работе метку «10-13», то есть «старше не читают».
+        form = {mark for _k, mark, _h in stub_data.STORY_AUDIENCES}
+        catalog = {label for key, label in stub_data.CATALOG_AUDIENCE_FILTERS if key}
+        self.assertNotEqual(form, catalog)
+        self.assertEqual(
+            [k for k, _m, _h in stub_data.STORY_AUDIENCES],
+            list(stub_data.AUDIENCE_ORDER),
+        )
+
+
+class ManageStoryChecklistIsHonestAboutAudience(TestCase):
+    """Пункт чек-листа не может быть зелёным за несделанное (BR-10b)."""
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+
+    def test_draft_without_a_mark_shows_it_as_missing(self):
+        self.assertEqual(stub_data.STORIES_BY_SLUG['aidana-kus'].audience, '')
+        r = self.client.get(reverse('core:manage_story', kwargs={'slug': 'aidana-kus'}))
+        self.assertContains(r, 'Жас белгісін қой')
+
+    def test_marked_story_shows_the_mark(self):
+        story = stub_data.STORIES_BY_SLUG['aidana-tan']
+        r = self.client.get(reverse('core:manage_story', kwargs={'slug': 'aidana-tan'}))
+        self.assertContains(r, f'Жас белгісі: {story.audience}')
+
+
+class PublishChecklistIsActionable(TestCase):
+    """FR-WRITE-09: чек-лист ведёт к полю, а не отчитывается о прошлом.
+
+    Прежний список был описью: шесть строк, ни одна не кликалась, и над
+    ними не было перехода, ради которого список вообще нужен.
+    """
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+
+    def test_every_unfinished_item_carries_a_link(self):
+        story = stub_data.STORIES_BY_SLUG['aidana-kus']
+        for item in stub_data.publish_checklist(story):
+            with self.subTest(item=item['key']):
+                self.assertIn(item['target'], ('settings', 'text'))
+        r = self.client.get(reverse('core:manage_story', kwargs={'slug': 'aidana-kus'}))
+        for item in r.context['checklist']:
+            with self.subTest(item=item['key']):
+                self.assertTrue(item['href'], f'{item["key"]} ведёт в никуда')
+
+    def test_text_item_points_at_the_editor(self):
+        r = self.client.get(reverse('core:manage_story', kwargs={'slug': 'aidana-kus'}))
+        text = next(i for i in r.context['checklist'] if i['key'] == 'text')
+        self.assertEqual(
+            text['href'],
+            reverse('core:chapter_new', kwargs={'slug': 'aidana-kus'}),
+        )
+
+    def test_single_text_item_opens_the_existing_text(self):
+        # У одночастного «дописать текст» — это правка существующей главы,
+        # а не создание второй: тот же разбор, что в my_story_row.
+        slug = 'aidana-koshe'
+        story = stub_data.STORIES_BY_SLUG[slug]
+        self.assertTrue(story.is_single and story.text_chapter)
+        r = self.client.get(reverse('core:manage_story', kwargs={'slug': slug}))
+        text = next(i for i in r.context['checklist'] if i['key'] == 'text')
+        self.assertEqual(text['href'], reverse(
+            'core:chapter_edit',
+            kwargs={'slug': slug, 'chapter': story.text_chapter}))
+
+    def test_optional_items_are_marked_optional(self):
+        # Обложка и теги улучшают карточку, но не держат публикацию.
+        required = {i['key'] for i in stub_data.publish_checklist(
+            stub_data.STORIES_BY_SLUG['aidana-kus']) if i['required']}
+        self.assertEqual(required, {'text', 'annotation', 'audience'})
+
+
+class SubmitForReviewIsOnlyForReadyDrafts(TestCase):
+    """BR-11: перевод в публичный статус начинается здесь и только отсюда."""
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+
+    def _get(self, slug):
+        return self.client.get(reverse('core:manage_story', kwargs={'slug': slug}))
+
+    def test_draft_missing_required_items_cannot_submit(self):
+        story = stub_data.STORIES_BY_SLUG['aidana-kus']
+        # Черновик без единого бөлім и без возрастной отметки.
+        self.assertFalse(stub_data.can_submit_for_review(story))
+        r = self._get('aidana-kus')
+        self.assertFalse(r.context['can_submit'])
+        self.assertContains(r, 'disabled')
+        self.assertContains(r, 'Модерацияға жіберу')
+
+    def test_public_story_gets_no_submit_button(self):
+        story = stub_data.STORIES_BY_SLUG['aidana-tan']
+        self.assertTrue(story.is_public)
+        self.assertFalse(stub_data.can_submit_for_review(story))
+        self.assertNotContains(self._get('aidana-tan'), 'Модерацияға жіберу')
+
+    def test_story_already_on_moderation_gets_no_submit_button(self):
+        story = stub_data.STORIES_BY_SLUG['aidana-erteg']
+        self.assertEqual(story.status, 'OnModeration')
+        self.assertFalse(stub_data.can_submit_for_review(story))
+        self.assertNotContains(self._get('aidana-erteg'), 'Модерацияға жіберу')
+
+    def test_a_complete_draft_can_submit(self):
+        draft = stub_data.STORIES_BY_SLUG['aidana-kus']
+        self.assertEqual(
+            stub_data.missing_for_review(draft), ['text', 'audience'])
+        # Тот же черновик с закрытыми обязательными пунктами. `slug` подменён
+        # на работу с загруженным текстом: chapters_of ходит по slug, а не
+        # по объекту, так что «текст есть» иначе не смоделировать.
+        ready = replace(draft, audience='10+', slug='aidana-tan',
+                        status='NotPublished')
+        self.assertEqual(stub_data.missing_for_review(ready), [])
+        self.assertTrue(stub_data.can_submit_for_review(ready))
+
+    def test_readiness_and_status_are_different_questions(self):
+        # Готовая, но уже отправленная работа отправляться повторно не должна.
+        ready = replace(stub_data.STORIES_BY_SLUG['aidana-tan'],
+                        status='OnModeration')
+        self.assertEqual(stub_data.missing_for_review(ready), [])
+        self.assertFalse(stub_data.can_submit_for_review(ready))
 
 
 # ───────────────────────── Chapter editor ─────────────────────────
@@ -421,9 +686,57 @@ class ChapterEditorNew(TestCase):
         self.assertContains(self.response, 'name="body"')
 
     def test_has_both_save_buttons(self):
-        # Сохранить как черновик / Опубликовать
+        # Сохранить как черновик / отправить на модерацию
         self.assertContains(self.response, 'Жоба ретінде сақтау')
-        self.assertContains(self.response, 'Жариялау')
+        self.assertContains(self.response, 'Модерацияға жіберу')
+
+    def test_submit_button_does_not_promise_publication(self):
+        """BR-11: автор не публикует, публикует модератор.
+
+        Кнопка называлась «Жариялау», а тост рядом говорил «модерацияға
+        жіберілді». Тост говорил правду. Слово «тексеруге» тоже не годится —
+        docs/16 §16.3 отводит ему оттенок экзамена.
+        """
+        body = self.response.content.decode()
+        self.assertNotIn('>\n                    Жариялау', body)
+        self.assertNotIn('Тексеруге жіберу', body)
+        self.assertIn('Модерацияға жіберу', body)
+
+    def test_char_counter_is_live(self):
+        """Счётчик знаков считает набираемое, а не сохранённое.
+
+        Статичное `{{ current.char_count }}` не двигалось при вводе, хотя
+        соседняя аннотация через components/textarea.html считала живьём:
+        две механики одного и того же на одном экране.
+        """
+        body = self.response.content.decode()
+        self.assertIn('x-text="count"', body)
+        self.assertIn('count = $event.target.value.length', body)
+
+    def test_actions_stay_in_view(self):
+        """FR-WRITE-05: панель действий липкая.
+
+        Textarea в 20 строк уводит кнопки за нижний край, и автор, дописав
+        абзац, не видит ни одного способа сохранить. `bottom-24` разводит
+        панель с плавающей пилюлей mobile_nav (docs/07 §7.6).
+        """
+        body = self.response.content.decode()
+        self.assertIn('sticky bottom-24', body)
+        self.assertIn('md:bottom-0', body)
+
+    def test_unsaved_state_is_reported_not_faked(self):
+        """Индикатор отчитывается о вводе, а не изображает автосохранение.
+
+        Реального запроса до Ф14 нет; таймер, сам рисующий «Жоба сақталды»,
+        обещал бы сохранность текста, которой сейчас нет.
+        """
+        body = self.response.content.decode()
+        self.assertIn('dirty: false', body)
+        self.assertIn('@input="dirty = true"', body)
+        self.assertIn('Сақталмаған өзгеріс бар', body)
+        self.assertIn('Жоба сақталды', body)
+        # Ничего похожего на таймер, который «сохраняет» сам.
+        self.assertNotIn('setInterval', body)
 
 
 class ChapterEditorEdit(TestCase):
@@ -458,8 +771,14 @@ class ChapterEditorUnknownStory(TestCase):
         self.assertContains(r, 'Шығарма табылмады')
 
 
-class TagInputOnNewStory(TestCase):
-    """docs/11 · Фаза 2: tag_input на форме нового произведения."""
+class TagInputMovedOffCreation(TestCase):
+    """docs/11 · Фаза 2 не отменена — `tag_input` переехал в баптаулар.
+
+    Компонент остался ровно тем же и живёт на story_settings (покрыт
+    `TagInputOnStorySettings`). С формы создания он ушёл вместе с аннотацией
+    и доп. жанром: тег к ненаписанному рассказу не выбирается, а автокомплит
+    с блок-листом был самым тяжёлым элементом первого экрана автора.
+    """
 
     def setUp(self):
         _login_as_aidana(self.client)
@@ -468,25 +787,20 @@ class TagInputOnNewStory(TestCase):
     def test_renders(self):
         self.assertEqual(self.response.status_code, 200)
 
-    def test_hidden_field_named_tags(self):
-        """В форму попадает скрытое поле name='tags' — для submit."""
-        self.assertContains(self.response, 'name="tags"')
+    def test_no_tag_input_on_the_creation_form(self):
+        self.assertNotContains(self.response, 'id="tag-input-accepted"')
+        self.assertNotContains(self.response, 'id="tag-input-blocked"')
 
-    def test_accepted_tags_embedded_as_json(self):
-        """Alpine читает accepted-теги через json_script с id='tag-input-accepted'."""
-        self.assertContains(self.response, 'id="tag-input-accepted"')
-        # Хотя бы один accepted-тег попал в JSON
-        self.assertContains(self.response, 'мектеп')
+    def test_creation_form_does_not_ship_the_tag_dictionary(self):
+        # Словарь тегов и блок-лист — заметный кусок разметки; на экране,
+        # где теги не выбираются, он ехал бы вхолостую.
+        self.assertNotIn('accepted_tags', self.response.context)
+        self.assertNotIn('blocked_patterns', self.response.context)
 
-    def test_blocklist_embedded_as_json(self):
-        self.assertContains(self.response, 'id="tag-input-blocked"')
-        # Django json_script экранирует non-ASCII как \uXXXX, поэтому 'политика'
-        # в bytes отсутствует. Проверяем латинский 'spam' из блок-листа.
-        self.assertContains(self.response, 'spam')
-
-    def test_no_initial_tags_for_new_story(self):
-        """У новой стори чипов нет — initial пустой."""
-        self.assertContains(self.response, 'initial: []')
+    def test_settings_still_offers_it(self):
+        r = self.client.get(
+            reverse('core:story_settings', kwargs={'slug': 'aidana-tan'}))
+        self.assertContains(r, 'id="tag-input-accepted"')
 
 
 class TagInputOnStorySettings(TestCase):

@@ -567,54 +567,73 @@ def _attention_links(username: str) -> list:
 
 def my_stories(request):
     username = _current_username(request)
-    stories = stub_data.my_stories_of(username) if username else []
-    stats = stub_data.writer_stats(username) if username else None
+    # Агрегатов автора здесь больше нет — DEC-48. Они жили в правом рейле и
+    # в полосе под шапкой, повторяя `partials/profile/_stats.html` слово
+    # в слово, а на страницах одного произведения тот же рейл читался как
+    # статистика этого произведения. Кабинет отвечает на «что делать»,
+    # профиль — на «как идёт».
     return render(request, 'pages/write/my_stories.html', {
         # FR-WRITE-08: что требует внимания — модерация, новые пікір, пустой
         # черновик. Страница перечисляла имущество и молчала о том, что делать.
         'attention': _attention_links(username) if username else [],
-        # Рейл писателя целиком построен на stats: без них
-        # partials/right_rail/writer.html не рендерит ничего, и гость получал
-        # пустую колонку в 300px, которая просто сдвигала гейт от центра.
-        'has_right_rail': bool(stats),
         'page_state': _page_state(request),
-        'stories':    stories,
-        'stats':      stats,
+        'stories':    stub_data.my_stories_of(username) if username else [],
+        'username':   username,
     })
 
 
 def new_story(request):
     return render(request, 'pages/write/new_story.html', {
-        'has_right_rail': True,
-        'genres':           stub_data.GENRES,
-        # docs/11: данные для tag_input
-        'accepted_tags':    stub_data.accepted_tags_json(),
-        'blocked_patterns': stub_data.blocked_tag_patterns_list(),
-        'initial_tags':     [],   # новая стори — без тегов
+        # Форма — три поля (FR-WRITE-01): атау, формат, негізгі жанр. Теги
+        # переехали в баптаулар вместе с аннотацией и доп. жанром: тег к
+        # ненаписанному рассказу не выбирается, а `tag_input` со своим
+        # автокомплитом был самым тяжёлым элементом формы создания.
+        'genres': stub_data.GENRES,
     })
+
+
+def _checklist_links(story) -> list:
+    """Пункты чек-листа с готовыми ссылками (FR-WRITE-09).
+
+    `publish_checklist` отдаёт только состояние — ссылку строит view, как и
+    в `_attention_links`. Пункт без адреса — пункт, который автор не может
+    закрыть: чек-лист, показывающий недостачу и не ведущий к полю, заставляет
+    искать это поле самому.
+    """
+    if story is None:
+        return []
+    settings_href = reverse('core:story_settings', kwargs={'slug': story.slug})
+    if story.is_single and story.text_chapter:
+        text_href = reverse('core:chapter_edit',
+                            kwargs={'slug': story.slug, 'chapter': story.text_chapter})
+    else:
+        text_href = reverse('core:chapter_new', kwargs={'slug': story.slug})
+    hrefs = {'settings': settings_href, 'text': text_href}
+    return [{**item, 'href': hrefs[item['target']]}
+            for item in stub_data.publish_checklist(story)]
 
 
 def manage_story(request, slug):
     story = stub_data.STORIES_BY_SLUG.get(slug)
-    stats = stub_data.writer_stats(story.author_username) if story else None
     return render(request, 'pages/write/manage_story.html', {
-        # То же, что в my_stories: неизвестный slug отдаёт «Шығарма табылмады»,
-        # и рядом с ним не должно висеть пустого рейла.
-        'has_right_rail': bool(stats),
         'slug':     slug,
         'story':    story,
         'chapters': stub_data.chapters_of(slug),
-        'stats':    stats,
+        # FR-WRITE-09: чек-лист как следующий шаг, а не как опись.
+        'checklist':  _checklist_links(story),
+        'can_submit': stub_data.can_submit_for_review(story),
+        'missing':    stub_data.missing_for_review(story) if story else [],
     })
 
 
 def story_settings(request, slug):
     story = stub_data.STORIES_BY_SLUG.get(slug)
     return render(request, 'pages/write/story_settings.html', {
-        'has_right_rail': True,
         'slug':   slug,
         'story':  story,
         'genres': stub_data.GENRES,
+        # BR-10b: отметка выбирается автором, а не достаётся дефолтом.
+        'story_audiences': stub_data.STORY_AUDIENCES,
         # docs/11: данные для tag_input + текущие теги стори для edit-режима
         'accepted_tags':    stub_data.accepted_tags_json(),
         'blocked_patterns': stub_data.blocked_tag_patterns_list(),
@@ -626,7 +645,6 @@ def chapter_editor(request, slug, chapter=None):
     story = stub_data.STORIES_BY_SLUG.get(slug)
     current = stub_data.chapter_of(slug, chapter) if chapter else None
     return render(request, 'pages/write/chapter_editor.html', {
-        'has_right_rail': True,
         'slug':    slug,
         'story':   story,
         'chapter': chapter,

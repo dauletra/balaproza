@@ -1,0 +1,45 @@
+{% comment %}
+    FormatCard (docs/04.5) — выбор формата произведения карточкой.
+
+    Параметры:
+      value    — single | serial
+      label    — заголовок карточки
+      hint     — что увидит читатель при таком выборе
+      icon     — имя иконки из спрайта
+      checked  — boolean
+      name     — имя группы (default "format")
+
+    Почему карточка, а не RadioOption. Формат — самое дорогое решение автора:
+    он определяет читательскую страницу целиком — оглавление и переходы между
+    бөлімдер против цельного текста (docs/13 §13.11). Парой радио между
+    аннотацией и жанром оно было подано слабее, чем выбор жанра, хотя жанр
+    меняется одним кликом, а формат перестраивает страницу.
+
+    Подпись говорит, что увидит **читатель**, а не как называется поле:
+    «Көп бөлімді шығарма» описывает работу, а выбирать автору проще по
+    последствию.
+{% endcomment %}
+{% with rid="format-"|add:value nm=name|default:"format" %}
+<label for="{{ rid }}" class="group relative flex cursor-pointer">
+    <input id="{{ rid }}" type="radio" name="{{ nm }}" value="{{ value }}"
+           {% if checked %}checked{% endif %}
+           class="peer sr-only">
+    <span class="flex w-full flex-col gap-1.5 rounded-lg border-2 border-slate-200 bg-white p-4
+                 hover:border-slate-300
+                 peer-checked:border-brand peer-checked:bg-brand/5
+                 peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40 peer-focus-visible:ring-offset-2">
+        <span class="flex items-center gap-2">
+            {% comment %}
+                `peer-checked:` здесь не сработал бы: он действует на СЛЕДУЮЩИХ
+                братьев input, а иконка лежит внутри соседнего span. Цвет ведёт
+                `group-has-[:checked]` от label.
+            {% endcomment %}
+            <span class="text-slate-400 group-has-[:checked]:text-brand">
+                {% include "components/icon.html" with name=icon size=18 only %}
+            </span>
+            <span class="font-sans text-sm font-bold text-slate-900">{{ label }}</span>
+        </span>
+        <span class="font-sans text-xs leading-relaxed text-slate-600">{{ hint }}</span>
+    </span>
+</label>
+{% endwith %}

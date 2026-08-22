@@ -27,9 +27,9 @@
             </h1>
             <p class="mt-1 font-sans text-sm text-slate-600">
                 {% if story.is_single %}
-                    Толық мәтін. Сақтап жарияласаң — модерациядан өтеді.
+                    Толық мәтін. Жіберген соң модерациядан өтеді.
                 {% elif is_new %}
-                    Атау + мәтін. Сақтап жариялайсың — модерациядан өтеді.
+                    Атау + мәтін. Жіберген соң модерациядан өтеді.
                 {% else %}
                     {{ chapter }}-бөлім · «{{ current.title|default:"" }}»
                 {% endif %}
@@ -37,8 +37,21 @@
         </div>
     </header>
 
-    <form method="post" x-data
-          @submit.prevent="$dispatch('toast', { kind:'success', text: $event.submitter?.dataset.toast || 'Сақталды (демо)' })"
+    {% comment %}
+        `dirty` / `saved` — состояние черновика в редакторе (FR-WRITE-05).
+
+        Индикатор отчитывается о **настоящем** состоянии ввода, а не изображает
+        автосохранение: реального запроса до Ф14 нет, и таймер, рисующий
+        «Жоба сақталды» сам по себе, обещал бы сохранность текста, которой
+        сейчас нет. Для подростка, который пишет с телефона, потеря набранного
+        — самый вероятный провал этой страницы, и врать здесь дороже всего.
+
+        В Ф14 сюда встаёт debounce-запрос: `dirty` гасится ответом сервера,
+        `saved` получает его время. Разметка индикатора не меняется.
+    {% endcomment %}
+    <form method="post" x-data="{ dirty: false, saved: false }"
+          @input="dirty = true"
+          @submit.prevent="dirty = false; saved = true; $dispatch('toast', { kind:'success', text: $event.submitter?.dataset.toast || 'Сақталды (демо)' })"
           class="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
         {% csrf_token %}
 
@@ -48,14 +61,23 @@
             {% include "components/input_field.html" with name="title" label="Бөлім атауы" value=current.title placeholder="Мысалы: Алматыдан шығу" required=True autofocus=is_new maxlength=120 %}
         {% endif %}
 
-        <label class="flex flex-col gap-1.5">
+        {% comment %}
+            Счётчик живой (`@input`), как у аннотации в components/textarea.html.
+            Раньше здесь стояло статичное `{{ current.char_count }} таңба`:
+            цифра показывала сохранённое и не двигалась при наборе, так что
+            на одном экране работали две разные механики одного и того же.
+        {% endcomment %}
+        <label class="flex flex-col gap-1.5" x-data="{ count: {{ current.char_count|default:0 }} }">
             <span class="flex items-baseline justify-between">
                 <span class="font-sans text-sm font-semibold text-slate-800">
                     Мәтін <span class="text-status-error-fg" aria-hidden="true">*</span>
                 </span>
-                <span class="font-sans text-xs text-slate-500">{{ current.char_count|default:0 }} таңба</span>
+                <span class="font-sans text-xs text-slate-500">
+                    <span x-text="count">{{ current.char_count|default:0 }}</span> таңба
+                </span>
             </span>
             <textarea name="body" rows="20" required
+                      @input="count = $event.target.value.length"
                       placeholder="{% if story.is_single %}Шығарманың толық мәтінін осында жаз. Абзацтар екі жол ауысумен бөлінеді.{% else %}Бөлімнің толық мәтінін осында жаз. Абзацтар екі жол ауысумен бөлінеді.{% endif %}"
                       class="w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-4 py-3 font-sans text-[17px] leading-[1.75] text-slate-900 placeholder:text-slate-500 placeholder:font-sans placeholder:text-sm focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30">{{ current.body|default:"" }}</textarea>
             <span class="font-sans text-xs text-slate-500">
@@ -107,11 +129,40 @@
             <p class="mt-2 font-sans text-xs text-slate-500">Кемінде 2, ең көбі 4 нұсқа.</p>
         </details>
 
-        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
-            <a href="{% url 'core:manage_story' slug=story.slug %}"
-               class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
-                Болдырмау
-            </a>
+        {% comment %}
+            Панель действий липкая (FR-WRITE-05). Textarea в 20 строк уводит
+            кнопки за нижний край экрана, и автор, дописав абзац, не видит ни
+            одного способа сохранить — на телефоне до них пролистывать весь
+            набранный текст.
+
+            `bottom-24` на мобильном разводит панель с плавающей пилюлей
+            mobile_nav (она `bottom-4` + `h-16`, docs/07 §7.6); с `md` пилюли
+            нет и панель садится на низ кадра.
+        {% endcomment %}
+        <div class="sticky bottom-24 z-20 -mx-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-6 py-4 backdrop-blur sm:-mx-8 sm:px-8 md:bottom-0">
+            <div class="flex items-center gap-3">
+                <a href="{% url 'core:manage_story' slug=story.slug %}"
+                   class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                    Болдырмау
+                </a>
+
+                {% comment %}
+                    Статус черновика: несохранённое важнее сохранённого, поэтому
+                    первое видно всегда, а второе — только после сохранения.
+                    До первой правки не говорится ничего: «өзгеріс жоқ» на
+                    свежеоткрытой странице — сообщение ни о чём.
+                {% endcomment %}
+                <span class="font-sans text-xs text-slate-500" aria-live="polite">
+                    <span x-show="dirty" x-cloak class="inline-flex items-center gap-1.5">
+                        <span class="h-1.5 w-1.5 shrink-0 rounded-pill bg-status-warning-fg" aria-hidden="true"></span>
+                        Сақталмаған өзгеріс бар
+                    </span>
+                    <span x-show="saved && !dirty" x-cloak class="inline-flex items-center gap-1.5 text-status-published-fg">
+                        {% include "components/icon.html" with name="check" size=12 only %}
+                        Жоба сақталды
+                    </span>
+                </span>
+            </div>
 
             <div class="flex flex-wrap items-center gap-2.5">
                 <button type="submit" data-toast="Жоба сақталды"
@@ -119,17 +170,25 @@
                     {% include "components/icon.html" with name="check" size=14 only %}
                     Жоба ретінде сақтау
                 </button>
+                {% comment %}
+                    Кнопка называлась «Жариялау», а тост рядом говорил
+                    «модерацияға жіберілді» — правду говорил тост. По BR-11
+                    автор не публикует: в публичный статус переводит модератор.
+                    Обещание, которого интерфейс не исполняет, — худший вид
+                    ошибки в тексте, потому что ошибка обнаруживается уже после
+                    нажатия.
+
+                    Слово — «модерацияға», не «тексеруге»: docs/16 §16.3
+                    отводит второму оттенок экзамена и держит статус
+                    нейтральной констатацией.
+                {% endcomment %}
                 <button type="submit" data-toast="{% if story.is_single %}Мәтін модерацияға жіберілді{% else %}Бөлім модерацияға жіберілді{% endif %}"
                         class="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-5 font-sans text-sm font-bold text-white hover:bg-brand-dark">
                     {% include "components/icon.html" with name="paper-plane" size=14 only %}
-                    Жариялау
+                    Модерацияға жіберу
                 </button>
             </div>
         </div>
     </form>
 {% endif %}
-{% endblock %}
-
-{% block right_rail %}
-    {% include "partials/right_rail/writer.html" %}
 {% endblock %}
