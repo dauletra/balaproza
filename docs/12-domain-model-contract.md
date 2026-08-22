@@ -1,6 +1,6 @@
 # 12. Domain model contract for F14
 
-> `Обновлён: 2026-08-22` · `Сверен с кодом: 72aee26`
+> `Обновлён: 2026-08-22` · `Сверен с кодом: 98696de`
 
 This document is the implementation contract for replacing `core/stub_data.py` with real Django models. It does not introduce models yet; it fixes the fields, relationships, computed values, and query helpers that the current templates already depend on.
 
@@ -111,7 +111,7 @@ Contests:
 - `common_rules(contest: Contest) -> list[dict]` — правила, действующие на любом конкурсе: `{key, label, hint, per_work}`. Один источник для списка «Шарттар» на странице конкурса и для чек-листа подачи (BR-48a). `per_work=False` у правил про автора, а не про текст («Бір автор — бір өтінім»)
 - `submission_checklist(story: Story, contest: Contest) -> list` — общая часть из `common_rules`, возрастной пункт только при непустом `eligibility_line` (BR-48). Пороги объёма берутся у конкурса, а не вписаны в подпись литералом (FR-CONT-07); числа проходят через `spaced_number`
 - `spaced_number(value) -> str` — разряды через неразрывный пробел, канонический вид числа для автора. Живёт в слое данных, а не в фильтре `balaproza.spaced`: те же числа собираются и в подсказках чек-листа. Фильтр вызывает эту функцию — двух реализаций одной формы записи быть не должно
-- `eligible_for_contest(username: str, contest_slug: str) -> list[dict]` — кандидаты на подачу: `{story, chars, eligible, reason, hint}`. Только публичные работы (BR-24); `reason` — ключ из `INELIGIBLE_REASONS` (`too_short` · `too_long` · `busy`), пустой у проходящей
+- `submission_candidates(username: str, contest_slug: str) -> list[dict]` — работы автора как кандидаты и что о них стоит знать: `{story, chars, notes}`, где `notes` — `[{key, text}, …]`, ключи из `SUBMISSION_NOTES` (`too_short` · `too_long` · `busy`). **Заметки, не запреты** (BR-24): форма ничего не отклоняет, решение принимает человек. Заметок бывает несколько сразу — прежняя цепочка `elif` называла первую и молчала об остальных. Кандидатами остаются только публичные работы: черновик на конкурс не выставляется (BR-10, DEC-23)
 - `busy_contest_of(username, story_slug, *, besides='') -> Contest | None` — незавершённый конкурс, который уже держит эту работу (BR-23a)
 - `can_withdraw(username, contest_slug) -> bool` — можно ли отозвать заявку (BR-23b): идёт приём и статус `reviewing`
 

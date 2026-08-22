@@ -889,6 +889,13 @@ def contest_list(request):
     })
 
 
+# С какого числа работ в выборе появляется поиск по ним. Ниже порога поле
+# только отнимает строку: список и так виден целиком. Выше — выбор
+# превращается в прокрутку, и работа, которую автор ищет, может быть
+# сороковой. Порог, а не «всегда»: у большинства авторов работ единицы.
+PICKER_SEARCH_FROM = 8
+
+
 def _contest_rail_has_content(contest, *, submitted: bool, hide_cta: bool) -> bool:
     """Есть ли что показать в правом рейле конкурса (DEC-25).
 
@@ -931,14 +938,14 @@ def contest_submit(request, slug):
     contest = stub_data.CONTESTS_BY_SLUG.get(slug)
     username = _current_username(request)
     submitted = stub_data.has_submission(username, slug) if username else False
-    eligible = stub_data.eligible_for_contest(username, slug) if (username and contest) else []
+    candidates = (stub_data.submission_candidates(username, slug)
+                  if (username and contest) else [])
 
-    # Выбранная по умолчанию работа: первая подходящая, иначе первая в списке.
-    # Вторая ветка нужна, чтобы чек-лист не исчезал целиком, когда ни одна
-    # работа не проходит: без него пропадали и AI-декларация, и оба согласия,
-    # и форма выглядела обрубленной.
-    preview_story = next((e['story'] for e in eligible if e['eligible']),
-                         eligible[0]['story'] if eligible else None)
+    # Выбранная по умолчанию — первая без заметок, иначе просто первая.
+    # Отклонять форма ничего не отклоняет (BR-24), но начинать выбор с
+    # работы, о которой есть что сказать, незачем.
+    preview_story = next((c['story'] for c in candidates if not c['notes']),
+                         candidates[0]['story'] if candidates else None)
     checklist = (
         stub_data.submission_checklist(preview_story, contest)
         if preview_story and contest else []
@@ -948,14 +955,15 @@ def contest_submit(request, slug):
     # радио, а объём под ним оставался чужим. Пересчёт — на стороне
     # клиента, из этой таблицы (FR-CONT-04).
     volumes = {}
-    for item in eligible:
+    for item in candidates:
         vol = next(c for c in stub_data.submission_checklist(item['story'], contest)
                    if c['key'] == 'volume')
         volumes[item['story'].slug] = {
-            'passed':   vol['passed'],
-            'hint':     vol['hint'],
-            'eligible': item['eligible'],
-            'reason':   item['hint'],
+            'passed': vol['passed'],
+            'hint':   vol['hint'],
+            # Название нужно поиску по списку: фильтровать по DOM-тексту
+            # значит зависеть от вёрстки метки.
+            'title':  item['story'].title,
         }
     return render(request, 'pages/contests/contest_submit.html', {
         'has_right_rail':    _contest_rail_has_content(contest, submitted=submitted,
@@ -964,16 +972,13 @@ def contest_submit(request, slug):
         'hide_submit_cta':   True,
         'slug':              slug,
         'contest':           contest,
-        'eligible':          eligible,
+        'candidates':        candidates,
         'preview_story':     preview_story,
         'initial_slug':      preview_story.slug if preview_story else '',
         'volumes':           volumes,
-        # Начальное состояние кнопки и объяснение к нему; дальше ими
-        # управляет Alpine по выбранной работе.
-        'submit_blocked':    not (preview_story
-                                  and volumes.get(preview_story.slug, {}).get('eligible')),
-        'initial_reason':    (volumes.get(preview_story.slug, {}).get('reason', '')
-                              if preview_story else ''),
+        # Поиск по своим работам появляется, только когда список длинный:
+        # у автора с тремя работами поле над ними — лишний элемент.
+        'picker_search':     len(candidates) > PICKER_SEARCH_FROM,
         'checklist':         checklist,
         'can_withdraw':      stub_data.can_withdraw(username, slug) if username else False,
         'already_submitted': submitted,

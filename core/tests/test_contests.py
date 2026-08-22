@@ -1,5 +1,6 @@
 """CONT · конкурсы: список / детальная / подача / мои заявки."""
 
+import contextlib
 import re
 from dataclasses import replace
 from datetime import date
@@ -9,7 +10,7 @@ from unittest import mock
 from django.test import TestCase
 from django.urls import reverse
 
-from core import stub_data
+from core import stub_data, views
 
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
 
@@ -173,34 +174,33 @@ class ChecklistHelpers(TestCase):
         self.assertTrue(ai.get('required'))
 
 
-class EligibleForContest(TestCase):
+class SubmissionCandidates(TestCase):
 
     def test_only_public_works_are_candidates(self):
-        """Черновик и работа на модерации кандидатами не являются (DEC-23).
+        """Черновик и работа на модерации на конкурс не выставляются (DEC-23).
 
-        Раньше они попадали в выбор, и от подачи черновика спасал только
-        нулевой объём — работа на 6 000 знаков со статусом `NotPublished`
-        подавалась бы. Порог объёма, наоборот, остаётся видимым
-        заблокированным пунктом (BR-24): его автор может исправить.
+        Их нельзя ни дать прочитать жюри, ни показать читателю рядом
+        с победителями. Это единственное, что список кандидатов сужает:
+        всё остальное — заметки, не запреты (BR-24).
         """
-        items = stub_data.eligible_for_contest('aidana', 'altyn-qalam')
+        items = stub_data.submission_candidates('aidana', 'altyn-qalam')
         self.assertEqual([i['story'].slug for i in items],
                          [s.slug for s in stub_data.public_stories_of('aidana')])
         self.assertTrue(all(i['story'].is_public for i in items))
 
     def test_shape_is_complete(self):
-        for it in stub_data.eligible_for_contest('aidana', 'altyn-qalam'):
+        for it in stub_data.submission_candidates('aidana', 'altyn-qalam'):
             with self.subTest(story=it['story'].slug):
-                self.assertEqual(set(it),
-                                 {'story', 'chars', 'eligible', 'reason', 'hint'})
-                self.assertEqual(bool(it['reason']), not it['eligible'])
-                self.assertEqual(bool(it['hint']), not it['eligible'])
+                self.assertEqual(set(it), {'story', 'chars', 'notes'})
+                for note in it['notes']:
+                    self.assertEqual(set(note), {'key', 'text'})
+                    self.assertIn(note['key'], stub_data.SUBMISSION_NOTES)
 
-    def test_eligible_unknown_contest(self):
-        self.assertEqual(stub_data.eligible_for_contest('aidana', 'no-such'), [])
+    def test_candidates_unknown_contest(self):
+        self.assertEqual(stub_data.submission_candidates('aidana', 'no-such'), [])
 
-    def test_eligible_unknown_user(self):
-        self.assertEqual(stub_data.eligible_for_contest('ghost', 'altyn-qalam'), [])
+    def test_candidates_unknown_user(self):
+        self.assertEqual(stub_data.submission_candidates('ghost', 'altyn-qalam'), [])
 
 
 # ════════════════════════════ Contest list ═════════════════════════════════
@@ -349,9 +349,10 @@ class ContestSubmitForm(TestCase):
             with self.subTest(slug=s.slug):
                 self.assertNotContains(self.response, f'value="{s.slug}"')
 
-    def test_disables_too_short_story(self):
-        # aidana-koshe: 4750 < 5000 → disabled
-        self.assertContains(self.response, 'Көлемі тым аз')
+    def test_notes_a_too_short_story_without_disabling_it(self):
+        # aidana-koshe: 2 482 < 5 000 — заметка есть, запрета нет (BR-24)
+        self.assertContains(self.response, stub_data.SUBMISSION_NOTES['too_short'])
+        self.assertContains(self.response, 'value="aidana-koshe"')
 
     def test_shows_checklist(self):
         self.assertContains(self.response, 'Сәйкестік чек-листі')
@@ -965,37 +966,68 @@ class SystemWinnerAwardIsRetired(TestCase):
 
 # ════════════════════════════ CONT-5 · подача ══════════════════════════════
 
-class EligibilityReasons(TestCase):
-    """BR-24 + BR-23a: почему работу нельзя подать — говорится, а не молчится."""
+class SubmissionNotesInformButDoNotBlock(TestCase):
+    """Форма ничего не отклоняет — она сообщает (BR-24).
+
+    Раньше работа короче порога или занятая другим конкурсом приходила
+    с `disabled`, а кнопка отправки гасла: отказ от имени конкурса,
+    вынесенный до жюри и без права возразить. Заметка осталась, запрет
+    ушёл — её видит автор здесь и админ в заявке.
+    """
 
     def _items(self, username, slug='bolashak-mektebi'):
-        return {i['story'].slug: i for i in stub_data.eligible_for_contest(username, slug)}
+        return {i['story'].slug: i
+                for i in stub_data.submission_candidates(username, slug)}
 
-    def test_too_short_work_is_blocked_with_a_reason(self):
+    def _keys(self, item):
+        return {n['key'] for n in item['notes']}
+
+    def test_short_work_is_noted_not_removed(self):
         item = self._items('aidana')['aidana-koshe']
-        self.assertFalse(item['eligible'])
-        self.assertEqual(item['reason'], 'too_short')
-        self.assertIn(stub_data.INELIGIBLE_REASONS['too_short'], item['hint'])
+        self.assertIn('too_short', self._keys(item))
+        self.assertIn(stub_data.SUBMISSION_NOTES['too_short'],
+                      item['notes'][0]['text'])
 
-    def test_work_in_another_open_contest_is_blocked(self):
-        """Одним текстом нельзя идти в двух конкурсах разом (BR-23a)."""
+    def test_work_in_another_open_contest_is_noted(self):
+        """Одним текстом идти в двух конкурсах — повод для разговора,
+        а не для молча закрытой двери (BR-23a)."""
         item = self._items('aidana')['aidana-tan']
-        self.assertEqual(item['reason'], 'busy')
-        self.assertIn('Алтын қалам', item['hint'])
+        self.assertIn('busy', self._keys(item))
+        self.assertIn('Алтын қалам',
+                      next(n['text'] for n in item['notes'] if n['key'] == 'busy'))
 
-    def test_finished_contest_does_not_block_a_work(self):
-        """Работа своё отучаствовала — она снова свободна."""
+    def test_all_notes_are_named_not_just_the_first(self):
+        """Прежняя цепочка `elif` называла одну причину и молчала об остальных.
+
+        Работа и короткая, и занятая другим конкурсом сообщала только про
+        объём — второе всплывало бы уже у админа.
+        """
+        contest = stub_data.CONTESTS_BY_SLUG['bolashak-mektebi']
+        tall = replace(contest, min_chars=10_000)
+        with mock.patch.dict(stub_data.CONTESTS_BY_SLUG,
+                             {'bolashak-mektebi': tall}):
+            item = self._items('aidana')['aidana-tan']
+        self.assertEqual(self._keys(item), {'too_short', 'busy'})
+
+    def test_finished_contest_does_not_hold_a_work(self):
+        """Работа своё отучаствовала — заметки о ней больше нет."""
         self.assertIsNone(
             stub_data.busy_contest_of('bekzhan_t', 'temniy-lord'))
 
-    def test_the_same_contest_does_not_block_itself(self):
+    def test_the_same_contest_is_not_a_note_about_itself(self):
         busy = stub_data.busy_contest_of('aidana', 'aidana-tan', besides='altyn-qalam')
         self.assertIsNone(busy)
 
-    def test_eligible_work_carries_no_reason(self):
-        item = self._items('bekzhan_t')['tunge-deiin']
-        self.assertTrue(item['eligible'])
-        self.assertEqual(item['reason'], '')
+    def test_clean_work_carries_no_notes(self):
+        self.assertEqual(self._items('bekzhan_t')['tunge-deiin']['notes'], [])
+
+    def test_no_radio_is_disabled_and_the_button_stays_live(self):
+        _login_as(self.client, 'rudazov')   # все работы короче порога
+        html = self.client.get(
+            reverse('core:contest_submit', args=['bolashak-mektebi'])).content.decode()
+        picker = html[html.index('name="story_slug"'):html.index('Сәйкестік чек-листі')]
+        self.assertNotIn('disabled', picker)
+        self.assertIn('Өтінім беру', html)
 
 
 class ChecklistFollowsTheChoice(TestCase):
@@ -1009,20 +1041,23 @@ class ChecklistFollowsTheChoice(TestCase):
     def test_view_ships_volume_data_for_every_candidate(self):
         vols = self.response.context['volumes']
         candidates = {i['story'].slug
-                      for i in self.response.context['eligible']}
+                      for i in self.response.context['candidates']}
         self.assertEqual(set(vols), candidates)
         for slug, v in vols.items():
             with self.subTest(story=slug):
-                self.assertEqual(set(v), {'passed', 'hint', 'eligible', 'reason'})
+                self.assertEqual(set(v), {'passed', 'hint', 'title'})
 
     def test_data_is_embedded_for_the_browser(self):
         self.assertContains(self.response, 'id="submit-volumes"')
         self.assertContains(self.response, 'x-model="picked"')
 
-    def test_initial_choice_is_an_eligible_work(self):
+    def test_initial_choice_is_a_work_without_notes(self):
+        """Отклонять форма ничего не отклоняет, но начинать выбор с работы,
+        о которой есть что сказать, незачем."""
         slug = self.response.context['initial_slug']
-        self.assertTrue(self.response.context['volumes'][slug]['eligible'])
-        self.assertFalse(self.response.context['submit_blocked'])
+        item = next(i for i in self.response.context['candidates']
+                    if i['story'].slug == slug)
+        self.assertEqual(item['notes'], [])
 
 
 class ChecklistSurvivesWithoutAnEligibleWork(TestCase):
@@ -1035,9 +1070,9 @@ class ChecklistSurvivesWithoutAnEligibleWork(TestCase):
         self.response = self.client.get(
             reverse('core:contest_submit', args=['bolashak-mektebi']))
 
-    def test_no_work_passes(self):
-        self.assertFalse(any(i['eligible']
-                             for i in self.response.context['eligible']))
+    def test_every_work_carries_a_note(self):
+        self.assertTrue(all(i['notes']
+                            for i in self.response.context['candidates']))
 
     def test_checklist_is_still_rendered(self):
         self.assertContains(self.response, 'Сәйкестік чек-листі')
@@ -1047,8 +1082,9 @@ class ChecklistSurvivesWithoutAnEligibleWork(TestCase):
         self.assertContains(self.response, 'name="confirm_age"')
         self.assertContains(self.response, 'name="confirm_rules"')
 
-    def test_submit_starts_blocked(self):
-        self.assertTrue(self.response.context['submit_blocked'])
+    def test_submit_is_not_blocked_by_the_notes(self):
+        """Ни одна заметка не гасит отправку (BR-24)."""
+        self.assertContains(self.response, 'Өтінім беру')
 
 
 class WithdrawSubmission(TestCase):
@@ -1501,18 +1537,82 @@ class ContestVocabularyInEmptyState(TestCase):
         self.assertIn('Әзірге байқау жоқ', html)
 
 
-class BlockedSubmitExplainsItself(TestCase):
-    """Заблокированная кнопка без объяснения — тупик."""
+class NotesStandNextToTheirWork(TestCase):
+    """Заметка стоит у работы, а не внизу формы.
 
-    def test_reason_is_rendered_when_nothing_fits(self):
+    Отдельный блок внизу объяснял, почему гаснет кнопка. Кнопка больше не
+    гаснет (BR-24), а заметка внизу формы относилась неизвестно к какой из
+    работ — к моменту, когда автор до неё дочитывал, выбор был уже сделан.
+    """
+
+    def test_every_note_is_rendered_inside_the_picker(self):
         _login_as(self.client, 'rudazov')
-        r = self.client.get(reverse('core:contest_submit', args=['bolashak-mektebi']))
-        self.assertTrue(r.context['submit_blocked'])
-        self.assertTrue(r.context['initial_reason'])
-        self.assertContains(r, r.context['initial_reason'])
+        html = self.client.get(
+            reverse('core:contest_submit', args=['bolashak-mektebi'])).content.decode()
+        picker = html[html.index('name="story_slug"'):html.index('Сәйкестік чек-листі')]
+        items = stub_data.submission_candidates('rudazov', 'bolashak-mektebi')
+        self.assertTrue(any(i['notes'] for i in items), 'стаб потерял работы с заметками')
+        for item in items:
+            for note in item['notes']:
+                with self.subTest(story=item['story'].slug, note=note['key']):
+                    self.assertIn(note['text'], picker)
 
-    def test_reason_is_empty_when_the_choice_fits(self):
+    def test_a_clean_choice_shows_no_note(self):
         _login_as(self.client, 'bekzhan_t')
         r = self.client.get(reverse('core:contest_submit', args=['bolashak-mektebi']))
-        self.assertFalse(r.context['submit_blocked'])
-        self.assertEqual(r.context['initial_reason'], '')
+        slug = r.context['initial_slug']
+        item = next(i for i in r.context['candidates'] if i['story'].slug == slug)
+        self.assertEqual(item['notes'], [])
+
+
+class WorkPickerScalesToManyWorks(TestCase):
+    """Поиск по своим работам — только когда список длинный.
+
+    У автора с тремя работами поле над ними отнимает строку и не решает
+    ничего: список виден целиком. У автора с сорока выбор превращается в
+    прокрутку, и нужная работа может быть сороковой.
+    """
+
+    @staticmethod
+    def _picker(html):
+        """Только блок выбора работы.
+
+        Проверять по всей странице нельзя: `type="search"` есть у Cmd+K
+        popup в `base.html`, а `style="display:none"` — у значков
+        чек-листа. Оба ответили бы за поиск по работам, которого нет.
+        """
+        return html[html.index('Шығарманы таңдау'):html.index('Сәйкестік чек-листі')]
+
+    def _submit_html(self, username='aidana', stories=None):
+        _login_as(self.client, username)
+        ctx = (mock.patch.object(stub_data, 'public_stories_of', lambda u: stories)
+               if stories is not None else contextlib.nullcontext())
+        with ctx:
+            r = self.client.get(reverse('core:contest_submit', args=['bolashak-mektebi']))
+        return r, r.content.decode()
+
+    def test_short_list_has_no_search(self):
+        r, html = self._submit_html()
+        self.assertLessEqual(len(r.context['candidates']), views.PICKER_SEARCH_FROM)
+        self.assertFalse(r.context['picker_search'])
+        self.assertNotIn('type="search"', self._picker(html))
+
+    def test_long_list_gets_a_search(self):
+        many = stub_data.public_stories_of('aidana') * 4   # > порога
+        r, html = self._submit_html(stories=many)
+        self.assertTrue(r.context['picker_search'])
+        picker = self._picker(html)
+        self.assertIn('type="search"', picker)
+        # Фильтрация — по данным, а не по тексту разметки метки.
+        self.assertIn('x-show="match(', picker)
+        for v in r.context['volumes'].values():
+            self.assertTrue(v['title'])
+
+    def test_search_does_not_hide_anything_without_js(self):
+        """Без JS `x-show` не срабатывает, и список остаётся целым."""
+        many = stub_data.public_stories_of('aidana') * 4
+        _, html = self._submit_html(stories=many)
+        picker = self._picker(html)
+        for s in stub_data.public_stories_of('aidana'):
+            self.assertIn(s.title, picker)
+        self.assertNotIn('style="display:none"', picker)

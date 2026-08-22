@@ -84,41 +84,70 @@
         <form method="post" action="{% url 'core:contest_submit' slug=contest.slug %}"
               x-data="{
                   picked: '{{ initial_slug }}',
+                  q: '',
                   vols: JSON.parse(document.getElementById('submit-volumes').textContent),
-                  get vol() { return this.vols[this.picked] || {}; }
+                  get vol() { return this.vols[this.picked] || {}; },
+                  match(t) { return !this.q || t.toLowerCase().includes(this.q.toLowerCase()); },
+                  shown() { return Object.values(this.vols).some(v => this.match(v.title)); }
               }"
               @submit.prevent="$dispatch('toast', { kind:'success', text:'Өтінім жіберілді (демо)' })"
               class="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
             {% csrf_token %}
 
-            {# ── Выбор произведения (BR-24: показываем все, дисэйблим короткие) ── #}
+            {% comment %}
+                Выбор без запретов (BR-24). Раньше работа короче порога или
+                занятая другим конкурсом приходила с `disabled` — форма
+                отказывала от имени конкурса до всякого жюри и без права
+                возразить. Заметка осталась, запрет ушёл: её видит автор
+                здесь и админ в заявке, а решение принимает человек.
+
+                Поэтому и цвет заметки — warning, а не error: это сведение,
+                а не ошибка ввода.
+            {% endcomment %}
             <fieldset class="flex flex-col gap-3">
                 <legend class="font-sans text-sm font-semibold text-slate-800">
                     Шығарманы таңдау <span class="text-status-error-fg" aria-hidden="true">*</span>
                 </legend>
 
-                {% if eligible %}
-                    {% for item in eligible %}
-                        {% with s=item.story ok=item.eligible %}
-                            <label class="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 p-3
-                                          {% if not ok %}opacity-60 cursor-not-allowed{% else %}hover:bg-slate-50{% endif %}">
+                {% if candidates %}
+                    {% if picker_search %}
+                        {% comment %}
+                            Поиск появляется только на длинном списке. Без JS
+                            поле просто не фильтрует, а весь список остаётся
+                            на месте — выбор не ломается.
+                        {% endcomment %}
+                        <input type="search" x-model="q" placeholder="Шығарма атауын жаз"
+                               aria-label="Шығармаларды сүзу"
+                               class="h-9 w-full rounded-md border border-slate-300 px-3 font-sans text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none">
+                    {% endif %}
+
+                    {% for item in candidates %}
+                        {% with s=item.story %}
+                            <label {% if picker_search %}x-show="match('{{ s.title|escapejs }}')"{% endif %}
+                                   class="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 p-3 hover:bg-slate-50">
                                 <input type="radio" name="story_slug" value="{{ s.slug }}"
                                        x-model="picked"
                                        class="mt-1 h-4 w-4 accent-brand"
-                                       {% if not ok %}disabled{% endif %}
                                        {% if s.slug == initial_slug %}checked{% endif %}>
                                 <div class="min-w-0 flex-1">
                                     <p class="font-sans text-sm font-semibold text-slate-900">{{ s.title }}</p>
                                     <p class="mt-0.5 font-sans text-xs text-slate-500">
                                         {{ item.chars|spaced }} таңба · {% if s.is_single %}бір бөлімді{% else %}{{ s.chapters }} бөлім{% endif %}
                                     </p>
-                                    {% if not ok %}
-                                        <p class="mt-1 font-sans text-xs font-semibold text-status-error-fg">{{ item.hint }}</p>
-                                    {% endif %}
+                                    {% for note in item.notes %}
+                                        <p class="mt-1 font-sans text-xs font-semibold text-status-warning-fg">{{ note.text }}</p>
+                                    {% endfor %}
                                 </div>
                             </label>
                         {% endwith %}
                     {% endfor %}
+
+                    {% if picker_search %}
+                        <p x-show="!shown()" x-cloak
+                           class="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-center font-sans text-sm text-slate-600">
+                            Ондай атаумен шығарма табылмады.
+                        </p>
+                    {% endif %}
                 {% else %}
                     <p class="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center font-sans text-sm text-slate-600">
                         Сенде әлі жарияланған шығарма жоқ.
@@ -219,21 +248,17 @@
             {% endif %}
 
             {% comment %}
-                Почему кнопка гаснет. Ситуация реальна: когда ни одна работа
-                не проходит, сервер всё равно выбирает первую — иначе
-                чек-лист и декларация исчезали бы целиком, — и автор видит
-                заблокированную отправку без единого слова о причине.
+                Отдельного объяснения «почему кнопка гаснет» больше нет —
+                она не гаснет (BR-24). Заметки о работе стоят там, где
+                делается выбор, у самой работы, а не внизу формы, где
+                автор уже не помнит, к какой из них они относятся.
             {% endcomment %}
-            <p x-show="!vol.eligible" x-text="vol.reason"
-               {% if not submit_blocked %}style="display:none"{% endif %}
-               class="rounded-md bg-status-warning-bg px-3 py-2 font-sans text-xs font-semibold text-status-warning-fg">{{ initial_reason }}</p>
-
             <div class="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-5">
                 <a href="{% url 'core:contest_detail' slug=contest.slug %}"
                    class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
                     Болдырмау
                 </a>
-                {% include "components/button.html" with kind="primary" label="Өтінім беру" icon="paper-plane" type="submit" disabled=submit_blocked x_disabled="!vol.eligible" %}
+                {% include "components/button.html" with kind="primary" label="Өтінім беру" icon="paper-plane" type="submit" %}
             </div>
         </form>
     {% endif %}

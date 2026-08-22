@@ -1,6 +1,6 @@
 # 14 · Карта реализации: требование → код
 
-> `Обновлён: 2026-08-22` · `Сверен с кодом: 72aee26`
+> `Обновлён: 2026-08-22` · `Сверен с кодом: 98696de`
 
 Этот документ отвечает на два вопроса, на которые остальное ТЗ не отвечает: **где живёт то, что описано требованием**, и **что придётся обновить, если это изменить**.
 
@@ -23,7 +23,7 @@
 | Фильтры | `core/templatetags/balaproza.py` | `compact_count`, `spaced`, `page_range`, `belongs_to` |
 | Шаблоны | корневая `templates/` (135 файлов) | 61 компонент · 41 партиал · 28 страниц · два спрайта · `base.html` · `404/500` |
 | Токены | `static_src/input.css`, блок `@theme` | Единственный источник цветов, радиусов, теней ([02](02-design-system.md)) |
-| Тесты | `core/tests/` (16 файлов, 878 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
+| Тесты | `core/tests/` (16 файлов, 883 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
 
 **Шаблоны — не в `core/templates/`, а в корневой `templates/`.** Это задано `TEMPLATES.DIRS` в `config/settings.py`.
 
@@ -229,10 +229,12 @@
 |-----------|------|------|
 | FR-CONT-01, 02 / BR-40, BR-40a / DEC-45 | `contest_list`, `OPEN_CONTESTS` / `FINISHED_CONTESTS` | `ContestList`, `ContestModel`, `ContestDatesAreTheSource`, `ContestListOrdersByWhatYouCanDo` |
 | FR-CONT-03 / BR-42, BR-43 | `contest_detail`, `components/contest_status.html` (4 фазы) | `ContestDetailKnown`, `ContestDetailFinished`, `DetailHeroSpeaksByPhase`, `PhaseLabelsAreOneRegistry` |
-| FR-CONT-04 / BR-22, BR-24 | `contest_submit` + `submission_checklist`, `eligible_for_contest`, живой пересчёт объёма на Alpine | `ChecklistHelpers`, `ContestSubmitForm`, `ChecklistFollowsTheChoice`, `ChecklistSurvivesWithoutAnEligibleWork`, `EligibilityReasons` |
+| FR-CONT-04 / BR-22, BR-24 | `contest_submit` + `submission_checklist`, `submission_candidates`, живой пересчёт объёма на Alpine | `ChecklistHelpers`, `ContestSubmitForm`, `ChecklistFollowsTheChoice`, `ChecklistSurvivesWithoutAnEligibleWork` |
+| BR-24 (заметки, не запреты) | `stub_data.SUBMISSION_NOTES`, радио без `disabled` | `SubmissionNotesInformButDoNotBlock`, `NotesStandNextToTheirWork` |
+| Выбор работы на длинном списке | `views.PICKER_SEARCH_FROM` → поиск в `contest_submit.html` | `WorkPickerScalesToManyWorks` |
 | FR-CONT-05 / BR-23, BR-25 | `has_submission`, `eligible_for_contest`, `Contest.is_accepting` | `ContestSubmitAlreadyDone`, `ContestSubmitGuest`, `SubmitIsGatedByPhase` |
 | FR-CONT-06 / BR-41, BR-41a, BR-23b | `my_submissions`, `can_withdraw`, `Submission.submitted_on`, `Contest.timing_line`, `components/withdraw_confirm_modal.html` | `MySubmissionsAuthed`, `MySubmissionsEmpty`, `WithdrawSubmission`, `SubmissionsPageNamesTheDates`, `SubmissionDatesAreReal`, `ContestTimingLineIsOneImplementation` |
-| FR-CONT-07 / BR-24 | порог объёма из `Contest.min_chars`/`max_chars` | `EligibleForContest`, `ChecklistNumbers` |
+| FR-CONT-07 / BR-24 | порог объёма из `Contest.min_chars`/`max_chars` | `SubmissionCandidates`, `ChecklistNumbers` |
 | FR-CONT-08 / BR-45 | `partials/contest/_winners.html`, `_timeline.html`, `contest_card` | `ContestWinnersOnDetail`, `ContestWinnersOnCard`, `ContestAwardsOnDetail` |
 | FR-CONT-10 / BR-44, BR-46 / DEC-46 | `partials/contest/_awards.html`, `ContestAward`, `AwardGrant`, `components/award_art.html` | `ContestAwardsData`, `ContestAwardImages`, `SystemWinnerAwardIsRetired` |
 | FR-CONT-09 / DEC-25 | `partials/right_rail/contest.html`, `_contest_rail_has_content` | `ContestRail`, `ContestStages` |

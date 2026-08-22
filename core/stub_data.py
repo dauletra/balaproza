@@ -2418,10 +2418,17 @@ def submission_checklist(story: "Story", contest: "Contest") -> list:
     return items
 
 
-# Почему работу нельзя подать. Пустая строка — можно (BR-24, BR-23a).
-INELIGIBLE_REASONS = {
-    "too_short": "Көлемі тым аз",
-    "too_long":  "Көлемі тым үлкен",
+# Что стоит знать автору о работе перед подачей (BR-24). Это **заметки,
+# а не запреты**: форма ничего не отклоняет.
+#
+# Раньше эти же ключи гасили радио и кнопку отправки, то есть отказывали
+# от имени конкурса до всякого жюри. Решение о работе принимает человек,
+# а не чек в браузере: короткий текст может быть намеренно короткой
+# формой, а работа, уже поданная в другой конкурс, — предметом
+# разбирательства, а не поводом молча закрыть дверь.
+SUBMISSION_NOTES = {
+    "too_short": "Көлемі шарттан аз",
+    "too_long":  "Көлемі шарттан үлкен",
     "busy":      "Бұл шығарма басқа байқауда тұр",
 }
 
@@ -2442,20 +2449,26 @@ def busy_contest_of(username: str, story_slug: str, *, besides: str = "") -> Opt
     return None
 
 
-def eligible_for_contest(username: str, contest_slug: str) -> list:
-    """Работы автора как кандидаты на подачу (BR-24, BR-23a).
+def submission_candidates(username: str, contest_slug: str) -> list:
+    """Работы автора как кандидаты на подачу и что о них стоит знать (BR-24).
+
+    **Форма ничего не отклоняет.** Прежняя версия гасила радио и кнопку
+    отправки: работа короче порога или занятая другим конкурсом просто не
+    выбиралась. Это был отказ от имени конкурса, вынесенный до жюри и без
+    права возразить, — а короткий текст бывает намеренно короткой формой,
+    и одна работа в двух конкурсах бывает предметом разговора, а не
+    поводом молча закрыть дверь. Заметки остаются: их видит и автор
+    перед отправкой, и админ в заявке, и решение принимает человек.
 
     В список идут **только публичные** работы: черновик и работа на
-    модерации кандидатами не являются вовсе, а показывать их
-    заблокированными значит предлагать выбрать то, что нельзя выбрать
-    в принципе. Раньше они попадали в выбор, и от подачи черновика
-    спасал только нулевой объём — работа на 6 000 знаков со статусом
-    `NotPublished` подавалась бы (DEC-23).
+    модерации на конкурс не выставляются вовсе — их нельзя ни прочитать
+    жюри, ни показать читателю рядом с победителями (BR-10, DEC-23).
 
-    Порог объёма, наоборот, показывается заблокированным с причиной:
-    это про эту работу и этот конкурс, и автор может её дописать.
+    Заметок может быть несколько сразу. Прежняя цепочка `elif` называла
+    первую и молчала об остальных: работа и короткая, и занятая другим
+    конкурсом сообщала только про объём.
 
-    Возвращает [{story, chars, eligible, reason, hint}, ...] — UI решает рендер.
+    Возвращает [{story, chars, notes}, ...]; `notes` — [{key, text}, …].
     """
     contest = CONTESTS_BY_SLUG.get(contest_slug)
     if not contest:
@@ -2463,17 +2476,18 @@ def eligible_for_contest(username: str, contest_slug: str) -> list:
     result = []
     for s in public_stories_of(username):
         total = sum(c.char_count for c in chapters_of(s.slug))
-        busy = busy_contest_of(username, s.slug, besides=contest_slug)
+        notes = []
         if total < contest.min_chars:
-            reason, hint = "too_short", f"{INELIGIBLE_REASONS['too_short']} — мин. {spaced_number(contest.min_chars)}"
+            notes.append({"key": "too_short",
+                          "text": f"{SUBMISSION_NOTES['too_short']} — мин. {spaced_number(contest.min_chars)}"})
         elif total > contest.max_chars:
-            reason, hint = "too_long", f"{INELIGIBLE_REASONS['too_long']} — макс. {spaced_number(contest.max_chars)}"
-        elif busy:
-            reason, hint = "busy", f"{INELIGIBLE_REASONS['busy']}: «{busy.name}»"
-        else:
-            reason, hint = "", ""
-        result.append({"story": s, "chars": total,
-                       "eligible": not reason, "reason": reason, "hint": hint})
+            notes.append({"key": "too_long",
+                          "text": f"{SUBMISSION_NOTES['too_long']} — макс. {spaced_number(contest.max_chars)}"})
+        busy = busy_contest_of(username, s.slug, besides=contest_slug)
+        if busy:
+            notes.append({"key": "busy",
+                          "text": f"{SUBMISSION_NOTES['busy']}: «{busy.name}»"})
+        result.append({"story": s, "chars": total, "notes": notes})
     return result
 
 
