@@ -1,6 +1,8 @@
 # AGENTS.md
 
-Заметки для Codex по проекту `balaproza_v1`. Платформа — Balaproza, казахоязычный детский литературный портал. Подробное ТЗ — в [`docs/`](docs/) (модули 01-11).
+Заметки для Codex по проекту `balaproza_v1`. Платформа — Balaproza, казахоязычный детский литературный портал. Подробное ТЗ — в [`docs/`](docs/) (модули 00-18, 06 выведен из обращения).
+
+**Этот файл — копия [`CLAUDE.md`](CLAUDE.md) слово в слово, кроме шапки.** Правила у агентов общие, а две редакции одного текста расходятся молча: предыдущая копия отстала на девять DEC, а её счётчик показывал 315 при фактических 730. Правишь один — переписывай второй тем же коммитом; совпадение держит `test_docs_sync.TestCounters.test_agents_md_still_mirrors_claude_md`.
 
 ## Текущий фокус
 
@@ -22,7 +24,7 @@
 ### Frontend
 - **Tailwind CSS v4** через npm-пакет `@tailwindcss/cli` (`package.json`)
 - **Alpine.js 3.14.9** + **htmx 2.0.4** — self-hosted (`static/vendor/*.min.js`)
-- **Self-hosted variable WOFF2 fonts** (`static/fonts/`): Montserrat (display), Open Sans (sans), Inter (ui), Georgia (serif — системный)
+- **Self-hosted variable WOFF2 fonts** (`static/fonts/`): Montserrat (display), Open Sans (sans), Inter (ui). Серифной гарнитуры нет — токен удалён (DEC-35)
 - Исходный CSS: `static_src/input.css` (содержит `@theme` с токенами, см. ниже)
 - Скомпилированный CSS: `static/css/output.css`
 - **Команды Tailwind запускает пользователь сам**:
@@ -39,59 +41,103 @@ balaproza_v1/
 ├── config/                       # Django project (settings, urls)
 ├── core/
 │   ├── stub_data.py              # ВСЕ «данные» проекта (Genre, Tag, Author, Story, Chapter,
-│   │                             # Collection, Contest, Submission, LibraryEntry,
+│   │                             # Collection (только редакция, count/covers — производные),
+│   │                             # Contest, Submission, LibraryEntry,
 │   │                             # Notification, ReadingProgress, FOLLOWING, etc.)
 │   │                             # Story.status дефолт = "NotPublished" (Draft) — см. BR-10
 │   │                             # Story.tags: tuple = () — UGC-теги, до 10 (docs/11, BR-TAG-*)
 │   │                             # Genre.icon — slug SVG-иконки для тайла жанра на главной
-│   │                             # + helpers: my_stories_of, chapters_of, comments_of,
+│   │                             # + helpers: my_stories_of (свежие сверху), writer_attention,
+│   │                             # chapters_of, comments_of,
 │   │                             # stories_by_genre, search_stories, search_authors,
 │   │                             # related_stories, apply_catalog_filters, filter_catalog,
-│   │                             # library_of, reader_stats, writer_stats, is_following,
+│   │                             # reactions_of, reaction_breakdown, poll_of,
+│   │                             # library_of, in_library, public_stories_of, public_stats,
+│   │                             # reader_stats, writer_stats, is_following,
+│   │                             # AWARDS (реестр: условие рядом с наградой) / award_catalog /
+│   │                             # read_ladder (FR-PROF-08 — «что дальше»),
+│   │                             # achievements_of / reads_total / tier_for / read_tier /
+│   │                             # next_read_tier / winning_stories_of (FR-PROF-06, DEC-41 —
+│   │                             # знаки ВЫВОДЯТСЯ, хранить их нельзя; рейтинга нет),
 │   │                             # following_of, followers_of, notifications_for_user,
-│   │                             # unread_count_for_user, submissions_of, has_submission,
+│   │                             # unread_count_for_user, collections_of, trending_tags,
+│   │                             # submissions_of, has_submission,
+│   │                             # contest_history (FR-PROF-07 — правило приватности
+│   │                             # BR-74a живёт ЗДЕСЬ, не в шаблоне),
 │   │                             # submission_checklist (BR-22), eligible_for_contest,
 │   │                             # tag_by_slug, tags_of, is_blocked, popular_tags,
 │   │                             # accepted_tags_json, blocked_tag_patterns_list
-│   │                             # + константы: CATALOG_SORTS, CATALOG_STATUS_FILTERS,
+│   │                             # + константы: READ_TIERS, CATALOG_SORTS, CATALOG_DEFAULT_SORT,
+│   │                             # CATALOG_STATUS_FILTERS, CATALOG_BADGE_FILTERS,
+│   │                             # CATALOG_PRESETS, STORY_BADGES, PUBLIC_STATUSES,
+│   │                             # CATALOG_AUTHOR_FILTERS, NEW_AUTHOR_FOLLOWERS,
 │   │                             # TAGS, TAGS_BY_SLUG, BLOCKED_TAG_PATTERNS
+│   │                             # Story.recent_views — просмотры за 14 дней (DEC-36),
+│   │                             # ось «Қазір танымал»; инвариант recent_views <= views
+│   │                             # Story.updated_days_ago — когда трогали (DEC-40), None = не задано
+│   │                             # Story.is_public — по PUBLIC_STATUSES, не по литералу
+│   │                             # Author.works — производное, только публичные работы
 │   ├── views.py                  # все view (тонкие, читают из stub_data)
 │   │                             # + legal_* (5 stub-страниц), profile_me_edit (stub-форма),
 │   │                             # search_index_json (lazy-fetch для popup, включает теги),
 │   │                             # _render_catalog (общий движок DEC-27) + тонкие обёртки
+│   │                             # + _catalog_href / _catalog_links (FR-CAT-08 — URL
+│   │                             #   с сохранением состояния, чипы активных осей)
+│   │                             # + _catalog_presets (FR-CAT-10), _catalog_default_sort
 │   │                             # search_results / catalog / genre_detail / tag_detail
 │   ├── urls.py                   # все маршруты, app_name='core'
 │   │                             # + /catalog/, /tag/<slug>/, /api/search-index.json,
-│   │                             # /me/edit/, 5 legal routes
+│   │                             # /me/edit/, /u/<username>/{followers,following}/,
+│   │                             # 5 legal routes
 │   ├── context_processors.py     # auth_state, nav_state, site_links
-│   ├── templatetags/balaproza.py # filter page_range (для pagination)
-│   └── tests/                    # 315 тестов в 12 файлах (см. ниже)
+│   ├── templatetags/balaproza.py # filters: compact_count, spaced, page_range,
+│   │                             # belongs_to (свой ли комментарий — BR-33)
+│   └── tests/                    # 730 тестов в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
 │   ├── 404.html / 500.html       # branded error pages (500 — standalone, без base.html)
-│   ├── components/               # ~55 атомов и composites (см. docs/04)
+│   ├── components/               # 57 атомов и composites (см. docs/04)
 │   │                             # включая cover_placeholder (двухрежимный: <img> если
 │   │                             # story.cover задан, иначе типографическая плашка OKLCH +
 │   │                             # буква по primary genre.hue),
 │   │                             # avatar (буквенные инициалы + OKLCH-фон),
+│   │                             # author_row (строка автора в списке — рейл «Жазылулар»
+│   │                             # и страницы подписчиков/подписок, FR-PROF-10),
 │   │                             # tag_chip / tag_list / tag_input (docs/11 — UGC-теги),
 │   │                             # extras §4.10: skeleton_*, error_state, empty_state,
 │   │                             # segmented_control, delete_confirm_modal, toast_host,
 │   │                             # share_button, search_popup (Cmd+K — теги тоже в group),
-│   │                             # chapter_like (FR-STORY-12), school_links.
+│   │                             # reaction_bar (FR-STORY-12, DEC-32 — 5 реакций
+│   │                             # вместо лайка), chapter_poll (FR-STORY-13,
+│   │                             # DEC-33 — необязательный опрос), school_links.
+│   │                             # award (DEC-43 — иллюстрация на постаменте, НЕ пилюля)
+│   │                             # + tooltip (без своего x-data, живёт в предке с `open`)
+│   │                             # awards/_sprite.html — 10 наград, подключается ТОЛЬКО
+│   │                             # в partials/profile/_achievements.html, не в base.html
 │   │                             # NB: catalog_controls.html устарел — заменён
 │   │                             # _filter_panel в каталоге (DEC-27)
 │   ├── partials/                 # header, footer (карта сайта), mobile_nav, page_header,
 │   │                             # right_rail/{home,story,writer,profile,contest,catalog}.html
+│   │                             # story/{author_card,chapter_list,whats_next}.html — общие
+│   │                             # для рейла и мобильных вставок; whats_next меняет позицию
+│   │                             # в зависимости от has_next (FR-STORY-02)
 │   │                             # home/*.html (hero_guest, hero_returning, book_of_week,
 │   │                             # book_row, collections, new_authors, become_author,
-│   │                             # contest_banner, genres_section),
-│   │                             # catalog/_*.html (DEC-27): _book_list, _filter_panel,
+│   │                             # contest_banner, genre_strip, popular_tags),
+│   │                             # catalog/_*.html (DEC-27): _book_list, _filter_panel
+│   │                             # (variant='rail'|'sheet' — в листе черновик, не автосабмит),
 │   │                             # _filter_sheet (mobile bottom-sheet), _hero_search,
 │   │                             # _hero_genre, _hero_tag, _hero_catalog.
-│   │                             # NB: sidebar.html удалён — DEC-25; genre_grid удалён —
-│   │                             # жанры теперь отдельная секция (genres_section).
+│   │                             # right_rail/profile.html — РАЗНЫЙ по зрителю (FR-PROF-09):
+│   │                             # владельцу «Жазылулар», постороннему «Ең көп оқылғаны».
+│   │                             # profile/_{header,achievements,stats,about}.html — общие для своего и
+│   │                             # чужого профиля. Были скопированы в оба шаблона и уже
+│   │                             # разошлись; в копии «Туралы» лежало настоящее имя автора
+│   │                             # без пометки приватности. Держит
+│   │                             # test_prof_lib_notif.ProfileTemplatesShareParts
+│   │                             # NB: sidebar.html удалён — DEC-25; genres_section удалён —
+│   │                             # жанры теперь полоса-вывеска genre_strip под hero (DEC-31).
 │   └── pages/                    # все страницы по модулям (home, auth, catalog, story,
 │                                 # write, profile, library, notifications, contests, _design)
 │                                 # + legal.html (универсальный шаблон для 5 правовых стабов)
@@ -107,7 +153,7 @@ balaproza_v1/
 │   ├── fonts/                    # 4 variable woff2
 │   └── vendor/{alpine,htmx}.min.js
 ├── static_src/input.css          # Tailwind v4 @import + @theme c токенами
-├── docs/                         # ТЗ модулями 00-11 (приоритет над прототипом)
+├── docs/                         # ТЗ модулями 00-18 (приоритет над прототипом)
 ├── package.json                  # @tailwindcss/cli + npm-скрипты dev/build
 ├── pyproject.toml + uv.lock
 └── manage.py
@@ -116,7 +162,7 @@ balaproza_v1/
 ## Дизайн-токены (в `static_src/input.css`, секция `@theme`)
 
 - **Цвета**: `--color-brand` (бирюзовый), `--color-brand-dark`, slate-50…900, status-пары (`--color-status-published-bg`/`-fg`, и т.д. для `info`/`warning`/`attention`/`error`), `--color-notif`, `--color-promo-bg`/`-cta`, `--color-tg-1`/`-tg-2` (Telegram-градиент)
-- **Шрифты**: `--font-display` (Montserrat), `--font-sans` (Open Sans), `--font-ui` (Inter), `--font-serif` (Georgia)
+- **Шрифты**: `--font-display` (Montserrat), `--font-sans` (Open Sans), `--font-ui` (Inter)
 - **Радиусы**: `--radius-{xs(2),sm(4),chip(6),md(8),lg(12),hero(16),search(24),pill(9999)}`
 - **Тени**: `--shadow-{card-hover,bottom-nav,tg-btn,modal}`
 - **Цвета жанров** — OKLCH через inline-style `oklch(0.96 0.04 {{ hue }})` (см. `components/genre_chip.html`)
@@ -130,9 +176,17 @@ balaproza_v1/
 - **DEC-22**: «Авторлар мектебі» как страница исключена. Только блок ссылок (`components/school_links.html` в 3 layout: list/grid/inline). Финальное решение — в footer заголовок не кликабельный, ссылки inline
 - **DEC-23**: Инструмент модерации = стандартный **Django admin** (кастомный UI отложен на V2). Story.status дефолт = `NotPublished` (Draft) — в публичный каталог попадает только после явной модерации
 - **DEC-24**: Верификация возраста 14-18 = **самодекларация** (поле в регистрации + чекбокс в contest_submit). Никаких документов в MVP
-- **DEC-25**: Левый sidebar на десктопе исключён. В хедере одна контент-ссылка («Байқаулар» — единственный раздел без альтернативного входа с главной), остальные разделы — секции главной и колонка «Контент» в footer. Личные разделы авторизованного — через avatar-dropdown. Правый рейл рендерится только если view передал `has_right_rail=True`. Контейнер `max-w-[1280px]`, правый рейл 300px (расширен с 234px ради осмысленных виджетов)
+- **DEC-25**: Левый sidebar на десктопе исключён. В хедере одна контент-ссылка («Байқаулар» — единственный раздел без альтернативного входа с главной), остальные разделы — секции главной и колонка «Контент» в footer. Личные разделы авторизованного — через avatar-dropdown. Правый рейл рендерится только если view передал `has_right_rail=True`. Контейнер `max-w-[1280px]`, правый рейл 300px (расширен с 234px ради осмысленных виджетов). **Колонка контента зафиксирована на `max-w-[860px]` + `mx-auto`** (= 1184 − 300 − 24): без рейла она центрируется, а не растягивается — иначе на экране `<xl` контент становился шире, чем на большом. Держит `test_desktop_layout.ContentColumnWidth`; свой `max-w-[Npx]` больше 860 в шаблоне страницы запрещён
 - **DEC-26**: Введена **UGC-таксономия тегов** параллельно жанрам. До 10 на произведение, free-form input. Новые попадают в `pending`, модератор переводит в `accepted` (через Django admin, BR-TAG-*). Часть паттернов в блок-листе — `is_blocked()`. Pending-теги скрыты от публики (BR-TAG-07). См. `docs/11`
-- **DEC-27**: Каталог унифицирован — **один движок** `_render_catalog` обслуживает search/genre/tag/catalog. Canonical URLs сохранены (`/search/?q=`, `/genres/<slug>/`, `/tag/<slug>/`, `/catalog/`), комбинации через query (`/genres/triller/?tag=mektep`). Общий filter_panel в правом рейле / mobile bottom-sheet. **Коллекции (Жинақтар) НЕ объединены** — это editorial curation, отдельный content type
+- **DEC-31**: Первичный вход в чтение — **жинақтар** (`/collections/`): «зачем читать сейчас». Стоят в первом фолде главной и заменяют каталог во втором слоте mobile nav у гостя. Создаёт их **только редакция** — пользовательских подборок нет (личное хранение — «Кітапхана»). **Жанр понижен до вывески**: полоса чипов под hero, `genres_section` и `?genre=` на главной удалены; цветовая система по `Genre.hue` не меняется. **Теги показывают актуальное**: `weekly_count` → «Осы аптада», `/tag/<slug>/` открывается сортировкой `recent`. Новых таксономий не вводится — связь «настроение → произведения» это `Collection.story_slugs`
+- **DEC-37**: Оси «Формат» и «Мәртебесі» в каталоге заменены одной — **«Түрі»** (`kind`): `single` · `done` · `ongoing`. Правило данных (BR-10a): публичный `single` носит `Published`, публичный `serial` — `Completed` или `OnProcess`; `Published` у сериала невалиден. `status` и `format` остаются полями модели и legacy-параметрами. **Сравнивать статус с литералом `'Published'` запрещено** — берётся `stub_data.PUBLIC_STATUSES`, иначе из выдачи молча пропадают все сериалы
+- **DEC-38**: Ось «Жасың» в каталоге **накопительная**, не точное совпадение: выбравшему `14+` доступно и то, что помечено `10+`. Безопасное направление не меняется — младшая вилка старших отметок не показывает. Ключи остались отметками работы, подписи называют вилку читателя («10-13», «14+»)
+- **DEC-36**: Каталог отвечает на вопрос читателя, а не описывает атрибуты. **Дефолт сортировки — «Қазір танымал»**: окно в 14 дней по `Story.recent_views`; накопленный `views` остался отдельным пунктом «Ең көп оқылған». Тег по-прежнему открывается `recent` — DEC-31 не отменён. Ось **`badge`** (`editorial` / `contest`) — единственная, где качество заявлено отдельно от просмотров. **Пресеты** `CATALOG_PRESETS` («Бір отырыста» = `single+short` по docs/13 §13.11) стоят в контенте, а не в панели: ниже `xl` панель за модалкой. Счётчик пресета настоящий, пустые не рендерятся, активный поглощает чипы своих осей. Жинақтар — в рейле каталога и в пустом состоянии. Попутно восстановлен DEC-23: `filter_catalog` режет по `PUBLIC_STATUSES`, до этого «Модерацияда» лежала в публичном каталоге
+- **DEC-27**: Каталог унифицирован — **один движок** `_render_catalog` обслуживает search/genre/tag/catalog. Canonical URLs сохранены (`/search/?q=`, `/genres/<slug>/`, `/tag/<slug>/`, `/catalog/`), комбинации через query (`/genres/triller/?tag=mektep`). Общий `_filter_panel` в правом рейле / mobile bottom-sheet, `variant` переключает автосабмит. **Коллекции (Жинақтар) НЕ объединены** — это editorial curation, отдельный content type.
+
+  **Состояние сүзгі живёт в URL** (FR-CAT-08): ссылки строит `_catalog_href`, набор для контекста — `_catalog_links`. Путь занимает главную ось, остальное — query; путь сильнее query; `sort` едет в ссылку только когда выбран явно. Не собирать URL каталога в шаблоне руками — жанровый чип так и терял уже выставленные оси.
+
+  **На mobile**: липкая панель `sticky top-16` с сортировкой снаружи модалки, бейдж числа активных осей на кнопке, ряд чипов для снятия одной оси (docs/07 §7.9)
 
 ## Стаб-авторизация
 
@@ -145,7 +199,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 315 тестов
+uv run python manage.py test core       # все 730 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 
@@ -154,6 +208,11 @@ uv run python manage.py test core.tests.test_<file>
 - `test_auth.py`, `test_context.py`, `test_filters.py`, `test_stub_data.py`
 - `test_home.py`, `test_story.py`, `test_catalog.py`, `test_write.py`
 - `test_prof_lib_notif.py`, `test_contests.py`, `test_auth_links.py`, `test_states.py`
+- `test_desktop_layout.py` — регрессии каркаса: рейл только на `xl`, колонка контента 860px
+  с рейлом и без него, ряды по 5 карточек,
+  контейнер шапки = контейнер страницы, скелетон повторяет сетку контента, деньги через `spaced`
+- `test_template_lint.py` — статический лint шаблонов: запрещает многострочные `{# … #}`
+  и `{% … %}` (Django молча выводит их как текст)
 
 Логин в тестах:
 ```python
@@ -170,7 +229,8 @@ def _login_as_aidana(client):
 - **Все шаблоны в корневой `templates/`** (не в `core/templates/`)
 - `base.html` определяет блоки `title`, `content`, `right_rail` — каждая страница может переопределить рейл
 - `base.html` глобально подключает: sprite, alpine/htmx, toast_host, **search_popup** (Cmd+K), favicon, theme-color
-- **`has_right_rail` флаг** (DEC-25): `<aside>` правого рейла рендерится только если view передал `'has_right_rail': True` в контекст. Иначе контент тянется на всю ширину контейнера. См. `home`, `story_detail`, `profile_me/other`, `contest_detail/submit`, `manage_story`, `chapter_editor`, `my_stories`, `new_story`, `story_settings`
+- **`has_right_rail` флаг** (DEC-25): `<aside>` правого рейла рендерится только если view передал `'has_right_rail': True` в контекст. Иначе контент тянется на всю ширину контейнера. См. `home`, `story_detail`, `profile_me/other`, `contest_detail/submit`, `manage_story`, `chapter_editor`, `my_stories`, `new_story`, `story_settings`.
+  **Флаг ставится по наличию данных рейла, а не безусловно.** `my_stories` и `manage_story` слали `True` всегда, а `right_rail/writer.html` пуст без `stats` — гость и неизвестный slug получали пустую колонку в 300px, которая просто сдвигала контент от центра. Закрыто `test_write.MyStoriesGuestHasNoEmptyRail`
 - **Container**: `max-w-[1280px]` (после удаления sidebar) с padding `lg:px-12`
 - В компонентах используем `{% comment %}…{% endcomment %}` для документации параметров (НЕ многострочный `{# … #}` — Django парсит его как single-line)
 - В именах template-переменных нельзя начинать с `_` (Django блокирует) — использовать `rid`, `id` и т.п.
@@ -180,25 +240,50 @@ def _login_as_aidana(client):
 - `open-search` — открывает search_popup (Cmd+K). Используется в кнопках поиска header
 - `open-report` — открывает report_modal с целью `{target: 'story:slug'}`
 - `open-catalog-filters` — открывает mobile bottom-sheet с фильтр-панелью каталога (DEC-27)
+- `reading-mode` — `{on: bool}`, шлёт страница произведения при входе/выходе текста главы из кадра. `mobile_nav` прячет пилюлю, её место занимает панель чтения (docs/07 §7.6)
 - `open-delete-confirm` — открывает delete_confirm_modal с целью `{name, confirm_url}`
 
+**`@click`/`@submit` требуют `x-data` в предках — иначе директива мёртвая.** Alpine 3 обходит только поддеревья, найденные по `x-data`; элемент вне такого корня он не инициализирует вовсе. Ошибки в консоли нет, вид не меняется — кнопка просто ничего не делает. Так молча не работали кнопка сүзгі каталога, «Іздеу ашу» на 404, обе кнопки удаления произведения и семь форм с `@submit.prevent` (последние вдобавок уходили настоящим POST вместо демо-тоста). Лечение — пустой `x-data` на самом элементе:
+```django
+<button type="button" x-data @click="$dispatch('open-catalog-filters')">
+```
+Закрыто тестом `test_template_lint.AlpineDirectivesAreInScope` — он рендерит все `PUBLIC_URLS` и обходит DOM, потому что предок с `x-data` часто лежит за `{% include %}` в другом файле.
+
 ### Mobile bottom nav (5 слотов)
-- **Гость:** home / genres / login (FAB) / contests / search
-- **Авторизованный:** home / **contests** / new_story (FAB) / notifications / profile
-- Library и my_submissions у авторизованных доступны через avatar-dropdown в хедере (на десктопе) и через profile (на mobile). Sidebar исключён — DEC-25.
+- **Гость:** Басты / Оқу (catalog) / **Іздеу (FAB)** / Байқау / Кіру
+- **Авторизованный:** Басты / Кітапхана / **Жазу (FAB)** / Байқау / Профиль
+- У всех пунктов, кроме FAB, есть видимая подпись 10px — иконки без подписей опираются на неочевидные метафоры. У FAB подписи нет, только `aria-label`.
+- Гостевой FAB — поиск (открывает quick-search popup, href на `/search/` как no-JS fallback). Логин в FAB не ставить: самый заметный слот не должен требовать регистрации до получения ценности.
+- Конкурсы — иконка `trophy` (как в хедере), не `adjustments`.
+- Notifications у авторизованных — в хедере (колокольчик с бейджем), в нижнее меню не выносим. Library и my_submissions доступны через avatar-dropdown в хедере (на десктопе) и через profile (на mobile). Sidebar исключён — DEC-25.
 
 ## Стилистические правила для шаблонов
 
 - **Радиусы — только токены**: `rounded-{xs,sm,chip,md,lg,hero,search,pill}`. НЕ `rounded-2xl`/`3xl`/etc.
 - **Произвольные значения** — через arbitrary syntax: `h-[26px]` (не `h-6.5`), `px-[52px]` (не `px-13`), `bg-white/10` (не `bg-white/8`)
-- **Иконки** — только через `components/icon.html` + спрайт (`templates/components/icons/_sprite.html`). Если нужной иконки нет — добавить новый `<symbol>` в спрайт
+- **Иконки** — только через `components/icon.html` + спрайт (`templates/components/icons/_sprite.html`). Если нужной иконки нет — добавить новый `<symbol>` в спрайт, а не брать похожую по наличию.
+  **Подключать всегда с `only`**: `{% include "components/icon.html" with name="pen" size=16 only %}`. Без него include наследует родительский контекст, и `label` кнопки/бейджа/пилюли утекает в иконку — та получает `role="img"` с той же подписью, что и текст рядом, и скринридер читает её дважды («Жаңа шығарма Жаңа шығарма»). Осознанно `label` иконке не передаёт ни один вызов в проекте. Закрыто `test_template_lint.IconIncludesAreIsolated` + `IconLabelsDoNotDuplicateText`
+- **Метрики в `stat_pill`** — всегда с `label` (полная озвучка с числом: `story.views|spaced|add:" оқылым"`). Значение под `aria-hidden`, иконка декоративная — без подписи цифры пропадают из озвучки целиком. Подпись рендерится в `sr-only`, а не в `aria-label`: у `<span>` с role=generic имя не выставляется
+- **Числа: `compact_count` — читателю, `spaced` — автору.** Узкие карточки каталога сжимают («2,1 мың»), авторский кабинет показывает точное с разрядами («1 042»). `stringformat:"d"` не форматирует ничего и запрещён
+- **Три точки (`dots-*`) — только на кнопке, открывающей меню.** Они значат «ещё варианты», то есть помечают контейнер, а не действие. На пункте меню или на самостоятельной кнопке они не значат ничего. Жалоба — `flag`, защита/модерация — `shield` (docs/04 §4.2)
 - **Эмодзи запрещены** в шаблонах, stub_data и любом контенте проекта. Стандартные emoji-символы (☀️ 📖 😢 🎒 👽 🌆 🇰🇿 🕯️ ✍️ 🎄 🧟 😄 и т.п.) выглядят дёшево и роняют уровень дизайна. Альтернативы: SVG-иконка через `components/icon.html`, типографический акцент (крупная буква), абстрактный геометрический паттерн OKLCH, либо ничего. Это правило касается и текстового контента — приветствий, заголовков, описаний
 - **Обложки произведений** — `components/cover_placeholder.html` (двухрежимный): если `story.cover` непустой → рендерит `<img src="/media/{cover}">` с object-cover; иначе — типографическая плашка OKLCH + буква + «корешок» по hue primary жанра. Не использовать `{% static story.cover %}` напрямую — путь к файлу инкапсулирован в компоненте
 - **Аватары** — `components/avatar.html` (буквенные инициалы на OKLCH-фоне по длине seed=username+name). Передавать `username` для стабильного цвета
 - **Статусы произведения** — только через `components/status_badge.html` с key из 5: `Published|NotPublished|OnProcess|Completed|OnModeration` (BR-10/11)
-- **Жанры** — только через `components/genre_chip.html` (DEC-14: `GenrePill` запрещён). У жанра есть `icon` (slug из спрайта) — используется в `genres_section` на главной для тайла «книжной полки»
+- **Награды автора** — только через `components/award.html` + спрайт `components/awards/_sprite.html` (DEC-43). Это **не иконки**: иконка монохромна и читается при 16px, награда цветная и ниже 48px рассыпается — в иконочный спрайт их не класть, он подключён глобально. Слаги иллюстраций приходят из `stub_data.achievements_of`; новую награду без нового `<symbol>` не добавлять (ловит `test_template_lint.IconNamesExistInSprite`). Палитра металлов закрыта — `docs/03 §3.6`, новых оттенков без внесения в таблицу нет. Подпись рядом с наградой не ставить: её несёт тултип, и открываться он обязан по наведению, фокусу **и тапу** — на телефоне ховера нет (BR-ACH-06)
+- **Реакции на главу** — закрытый словарь из 5 (`stub_data.REACTIONS`, BR-REACT-01), рендер только через `components/reaction_bar.html`. Каждая реакция обязана иметь подпись словом: эмодзи запрещены, а монохромная иконка 20px без подписи неразличима. Новых реакций не добавлять без нового DEC
+- **Жанры** — только через `components/genre_chip.html` (DEC-14: `GenrePill` запрещён). На главной жанр — полоса-вывеска `partials/home/genre_strip.html` (DEC-31), а не навигация: заголовка, «барлығы →» и скроллера у неё нет. `Genre.icon` используется на карточках `/genres/`
 - **Теги (UGC)** — `components/tag_chip.html` (slate-style + `#`-префикс, отличается от цветного `genre_chip`). Pending-теги автоматически с пунктирной рамкой + бейдж «проверкада». Группа тегов на стори — через `components/tag_list.html` (фильтрует pending для не-автора, BR-TAG-07). Ввод тегов в формах — `components/tag_input.html` (Alpine, автокомплит, лимит 10, blocklist-валидация)
 - **Внешние ссылки** — `target="_blank" rel="noopener noreferrer"` (FR-LINKS-03)
+- **Абсолютное позиционирование внутри горизонтальных скроллеров — только с `relative`-предком.** В рядах вида `overflow-x-auto` + `flex w-max` (book_row, new_authors, любые карусели) каждая карточка обязана иметь `relative`. Иначе у любого потомка с `position:absolute` — включая **`sr-only`** (это `position:absolute` + `clip-path`), `absolute inset-y-0`, бейджи, оверлеи — containing block становится initial containing block. Такой элемент **не клипается скроллером** и уезжает в координаты документа на всю ширину ряда (в реальном баге — до x≈653 при вьюпорте 376).
+
+  Симптом на мобильном: `html.scrollWidth` сильно больше `clientWidth`, при этом `body.scrollWidth` в норме — верный признак именно этой ошибки. Chrome пересчитывает page-scale, ICB для `position:fixed` раздувается (653×1413 вместо 376×812), и **всё фиксированное улетает за экран**: mobile bottom nav, `toast_host`, `search_popup`, `delete_confirm_modal`, mobile-фильтры каталога. Страница при этом выглядит «почти нормально» — просто без нижнего меню, поэтому баг легко пропустить.
+
+  Проверка в консоли на 375px:
+  ```js
+  document.documentElement.scrollWidth === document.documentElement.clientWidth
+  ```
+  Если `false`, а `body.scrollWidth` совпадает с `clientWidth` — ищи абсолютный элемент без позиционированного предка.
 - **`{% include … with … %}` — ВСЕГДА в одну строку.** Django не парсит перенос строк внутри тега и выводит конструкцию как plain-текст. Если параметров много — пиши длинную строку, не разбивай:
   ```django
   {# ❌ ЛОМАЕТСЯ — рендерится как текст #}
@@ -209,6 +294,32 @@ def _login_as_aidana(client):
   {% include "components/comment.html" with author_name=cm.author.name text=cm.text %}
   ```
   То же правило для других тегов: `{% url %}`, `{% if %}` — без переносов внутри.
+
+## Документация — обязательна к обновлению
+
+**Изменение, затрагивающее FR / BR / DEC, обновляет соответствующий модуль ТЗ в том же коммите.** Не «потом» и не отдельной задачей: за три августовских коммита ТЗ разошлось с кодом в 26 местах именно потому, что такого правила не было.
+
+Куда смотреть — [`docs/14-implementation-map.md`](docs/14-implementation-map.md):
+- **§14.2-14.9** — карта «требование → view → шаблон → тест»;
+- **§14.10** — обратная карта «меняешь файл X → обнови документ Y». Начинать отсюда.
+
+Частые случаи:
+
+| Меняешь | Обнови |
+|---------|--------|
+| Токен в `@theme` | `docs/02` |
+| Новое OKLCH-значение в шаблоне | `docs/03 §3.3` — реестр ролей; новые пары `L C` без внесения запрещены |
+| `mobile_nav.html` | `docs/07 §7.6` — единственный авторитет |
+| Состав секций главной | `docs/05` FR-HOME-*, `docs/14 §14.3` |
+| Сигнатуру хелпера в `stub_data.py` | `docs/12 §12.3` |
+| Строку интерфейса | сверить с `docs/16` (обращение на «сен», словарь статусов) |
+| Новый компонент или тест-файл | `docs/04` / `docs/15` + счётчики в `README.md`, `CLAUDE.md` и `AGENTS.md` |
+
+**Решение не правится — оно отменяется новым.** Передумал насчёт DEC-NN — добавляй новый DEC со ссылкой «отменяет DEC-NN», старый помечай перечёркнутым. История решений и есть ценность реестра. Аннулированные номера FR/BR/DEC не переиспользуются.
+
+**Невыполненное помечается явно** (⛔ + объяснение), иначе документ выглядит описанием факта. Так помечены NFR-30, NFR-41, DEC-12.
+
+Проверяемая часть этого правила закрыта тестом `core/tests/test_docs_sync.py`: счётчики, пути к файлам, имена токенов и хелперов, тексты статусов, наличие шапки со сверкой, совпадение `AGENTS.md` с `CLAUDE.md`. Он не проверяет смысл — только имена и числа.
 
 ## Что НЕ делать
 

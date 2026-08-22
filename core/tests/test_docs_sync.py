@@ -38,11 +38,18 @@ def _code_spans(text):
 
 
 class TestCounters(unittest.TestCase):
-    """Счётчики в README.md и CLAUDE.md — цифры, которые устаревают тише всего.
+    """Счётчики в README.md, CLAUDE.md и AGENTS.md — цифры, которые устаревают тише всего.
 
     Они устарели дважды: «315 тестов в 12 файлах» при фактических 397 в 15,
     и «~55 компонентов» при 50.
+
+    `AGENTS.md` — дословная копия `CLAUDE.md` для другого агента, и как
+    ручная копия он и отстал: девять DEC и «315 тестов в 12 файлах» при
+    фактических 729 в 16. Проверка одна на оба файла ровно потому, что
+    расходятся они молча.
     """
+
+    MIRRORS = ('CLAUDE.md', 'AGENTS.md')
 
     def _actual_tests(self):
         files = sorted((BASE / 'core' / 'tests').glob('test_*.py'))
@@ -51,7 +58,7 @@ class TestCounters(unittest.TestCase):
 
     def test_test_counts_match_readme_and_claude_md(self):
         total, files = self._actual_tests()
-        for name in ('README.md', 'CLAUDE.md'):
+        for name in ('README.md',) + self.MIRRORS:
             body = _text(BASE / name)
             claimed = re.findall(r'(\d+)\s+тест\w*\s+в\s+(\d+)\s+файл', body)
             claimed += [(m[0], m[1]) for m in re.findall(r'все\s+(\d+)\s+тест\w*()', body)]
@@ -74,13 +81,34 @@ class TestCounters(unittest.TestCase):
 
     def test_component_count_matches_claude_md(self):
         actual = len(list((TEMPLATES / 'components').glob('*.html')))
-        body = _text(BASE / 'CLAUDE.md')
-        claimed = re.search(r'(\d+)\s+атом\w*\s+и\s+composites', body)
-        self.assertIsNotNone(
-            claimed, 'CLAUDE.md: не нашёл счётчик компонентов «N атомов и composites»')
+        for name in self.MIRRORS:
+            body = _text(BASE / name)
+            claimed = re.search(r'(\d+)\s+атом\w*\s+и\s+composites', body)
+            self.assertIsNotNone(
+                claimed, f'{name}: не нашёл счётчик компонентов «N атомов и composites»')
+            self.assertEqual(
+                int(claimed.group(1)), actual,
+                f'{name}: заявлено {claimed.group(1)} компонентов, фактически {actual}.',
+            )
+
+    def test_agents_md_still_mirrors_claude_md(self):
+        """Две редакции одного текста расходятся молча — здесь они сверяются.
+
+        Отличаться разрешено ровно шапке: заголовок, имя агента и абзац
+        о том, что файл — копия. Всё, что ниже «## Текущий фокус», обязано
+        совпадать символ в символ.
+        """
+        marker = '## Текущий фокус'
+        bodies = []
+        for name in self.MIRRORS:
+            text = _text(BASE / name)
+            self.assertIn(marker, text, f'{name}: не нашёл «{marker}»')
+            bodies.append(text[text.index(marker):])
         self.assertEqual(
-            int(claimed.group(1)), actual,
-            f'CLAUDE.md: заявлено {claimed.group(1)} компонентов, фактически {actual}.',
+            bodies[0], bodies[1],
+            'CLAUDE.md и AGENTS.md разошлись ниже шапки. Правишь один — '
+            'переписывай второй тем же коммитом: правила у агентов общие, '
+            'а прошлая копия отстала на девять DEC незамеченной.',
         )
 
 

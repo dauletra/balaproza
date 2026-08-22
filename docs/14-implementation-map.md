@@ -1,6 +1,6 @@
 # 14 · Карта реализации: требование → код
 
-> `Обновлён: 2026-08-22` · `Сверен с кодом: 3908480`
+> `Обновлён: 2026-08-22` · `Сверен с кодом: d119b85`
 
 Этот документ отвечает на два вопроса, на которые остальное ТЗ не отвечает: **где живёт то, что описано требованием**, и **что придётся обновить, если это изменить**.
 
@@ -23,7 +23,7 @@
 | Фильтры | `core/templatetags/balaproza.py` | `compact_count`, `spaced`, `page_range`, `belongs_to` |
 | Шаблоны | корневая `templates/` (127 файлов) | 57 компонентов · 37 партиалов · 28 страниц · спрайт иконок · `base.html` · `404/500` |
 | Токены | `static_src/input.css`, блок `@theme` | Единственный источник цветов, радиусов, теней ([02](02-design-system.md)) |
-| Тесты | `core/tests/` (16 файлов, 729 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
+| Тесты | `core/tests/` (16 файлов, 730 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
 
 **Шаблоны — не в `core/templates/`, а в корневой `templates/`.** Это задано `TEMPLATES.DIRS` в `config/settings.py`.
 
@@ -272,8 +272,8 @@ Showcase-маршруты `/_design/tokens/`, `/_design/components/`, `/_design/
 | Поле/property на `Story` | [12 §12.4](12-domain-model-contract.md) |
 | Новый маршрут в `core/urls.py` | [05 §5.13](05-functional-spec.md) (карта переходов), эта карта, `PUBLIC_URLS` в `test_urls_smoke.py` |
 | Новый компонент в `templates/components/` | [04](04-component-library.md), счётчик в `CLAUDE.md` |
-| Новый тест-файл | [15](15-testing-contract.md), счётчики в `README.md` и `CLAUDE.md` |
-| Новые тесты в существующем файле | счётчики в `README.md` и `CLAUDE.md` (их держит `test_docs_sync.TestCounters`) |
+| Новый тест-файл | [15](15-testing-contract.md), счётчики в `README.md`, `CLAUDE.md` и `AGENTS.md` |
+| Новые тесты в существующем файле | счётчики в `README.md`, `CLAUDE.md` и `AGENTS.md` (их держит `test_docs_sync.TestCounters`) |
 | Строка интерфейса | [16](16-content-voice.md) — тон, обращение на «сен» |
 | `config/settings.py` | [17](17-deployment.md), [09 §9.7](09-nonfunctional.md) |
 | Отмена/пересмотр решения | [10](10-resolved-decisions.md) — **новым DEC**, не правкой старого |
