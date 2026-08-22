@@ -1270,6 +1270,40 @@ class CommonRulesAreWrittenOnce(TestCase):
                 with self.subTest(contest=slug, rule=rule['key']):
                     self.assertContains(r, rule['label'])
 
+    def test_conditions_do_not_restate_a_common_rule(self):
+        """Свои условия и общие правила лежат в одном списке (FR-CONT-15).
+
+        Разделён был показ, а не источник: соблазн вписать общее правило
+        себе в `conditions` от слияния только вырос, а расходиться копия
+        начнёт так же — с AI-декларации, названной у одного конкурса.
+        """
+        for c in stub_data.CONTESTS:
+            labels = {r['label'] for r in stub_data.common_rules(c)}
+            for cond in c.conditions:
+                with self.subTest(contest=c.slug, cond=cond):
+                    self.assertNotIn(cond, labels)
+                    # Пороги объёма живут в min_chars/max_chars и приходят
+                    # готовой строкой; переписанные руками, они разойдутся.
+                    self.assertNotIn(stub_data.spaced_number(c.min_chars), cond)
+                    self.assertNotIn(stub_data.spaced_number(c.max_chars), cond)
+
+    def test_conditions_may_be_any_length(self):
+        """Список свободный: и пустой, и длинный рендерятся одинаково."""
+        slug = 'qys-ertegisi'
+        base = stub_data.CONTESTS_BY_SLUG[slug]
+        many = tuple(f"Қосымша шарт {n}" for n in range(1, 13))
+        for conds in ((), many):
+            with self.subTest(count=len(conds)):
+                with mock.patch.dict(stub_data.CONTESTS_BY_SLUG,
+                                     {slug: replace(base, conditions=conds)}):
+                    r = self.client.get(reverse('core:contest_detail', args=[slug]))
+                self.assertEqual(r.status_code, 200)
+                # Секция стоит и у конкурса без единого своего условия:
+                # общие правила есть всегда.
+                self.assertContains(r, 'Шарттар')
+                for cond in conds:
+                    self.assertContains(r, cond)
+
     def test_checklist_is_built_from_the_same_registry(self):
         c = stub_data.CONTESTS_BY_SLUG['altyn-qalam']
         story = stub_data.STORIES_BY_SLUG['aidana-tan']
