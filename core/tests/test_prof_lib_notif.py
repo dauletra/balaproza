@@ -237,6 +237,14 @@ class ProfileMeAuthed(TestCase):
                 self.assertContains(r, f'?tab={slug}')
         self.assertEqual(len(r.context['prof_items']), 4)
 
+    def test_active_segment_is_marked_for_screen_readers(self):
+        # `role="tab"` убран (обещал панель, которой нет) — состояние
+        # активного сегмента несёт aria-current, и оно обязано быть ровно одно.
+        r = self.client.get(reverse('core:profile_me') + '?tab=about')
+        html = r.content.decode()
+        self.assertEqual(html.count('aria-current="page"'), 1)
+        self.assertNotIn('aria-selected', html)
+
     def test_library_tab_shows_library_rows(self):
         r = self.client.get(reverse('core:profile_me') + '?tab=library')
         # Заголовки секций

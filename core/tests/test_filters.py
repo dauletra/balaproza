@@ -15,11 +15,18 @@ class CompactCount(unittest.TestCase):
     def test_thousands_get_one_decimal_with_comma(self):
         self.assertEqual(compact_count(1000), '1,0 мың')
         self.assertEqual(compact_count(8920), '8,9 мың')
-        self.assertEqual(compact_count(9999), '10,0 мың')
+        self.assertEqual(compact_count(9949), '9,9 мың')
 
     def test_ten_thousand_and_above_drops_decimal(self):
         self.assertEqual(compact_count(10000), '10 мың')
         self.assertEqual(compact_count(12482), '12 мың')
+
+    def test_values_rounding_up_to_ten_use_the_integer_form(self):
+        # Ветка выбирается по округлённому значению: раньше 9970 попадало в
+        # десятичную ветку и печаталось «10,0 мың» рядом с «10 мың» у 10000.
+        # Усечение здесь тоже не годится — оно вернуло бы «9 мың».
+        self.assertEqual(compact_count(9970), '10 мың')
+        self.assertEqual(compact_count(9999), '10 мың')
 
     def test_invalid_input_passes_through(self):
         self.assertEqual(compact_count(None), None)

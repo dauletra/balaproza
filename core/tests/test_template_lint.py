@@ -144,6 +144,43 @@ class AlpineDirectivesAreInScope(TestCase):
         )
 
 
+class TabRolesPromiseAPanel(TestCase):
+    """`role="tab"` без `role="tabpanel"` на той же странице — сломанное обещание.
+
+    Роль `tab` говорит скринридеру: рядом есть панель, связанная через
+    `aria-controls`, и сегменты переключаются стрелками без перезагрузки.
+    `components/segmented_control.html` носил `role="tablist"` и `role="tab"`,
+    а был обычной навигацией по `?tab=` с полным перезапросом страницы:
+    NVDA объявлял «вкладка 1 из 4», стрелка не делала ничего.
+
+    Лint общий, а не про профиль: настоящий `tablist` в проекте появиться
+    может — но только вместе с панелью.
+    """
+
+    def test_no_tab_role_without_a_tabpanel(self):
+        from django.urls import reverse
+        from core.tests.test_urls_smoke import PUBLIC_URLS
+
+        session = self.client.session
+        session['signed_in'] = True
+        session['user_name'] = 'Айдана'
+        session['user_username'] = 'aidana'
+        session.save()
+
+        offenders = []
+        for name, kwargs, label in PUBLIC_URLS:
+            html = self.client.get(reverse(name, kwargs=kwargs)).content.decode()
+            if 'role="tab"' in html and 'role="tabpanel"' not in html:
+                offenders.append(label)
+
+        self.assertFalse(
+            offenders,
+            'role="tab" обещает панель, которой на странице нет. Для навигации '
+            'по URL нужен <nav> + aria-current="page", а не роли табов:\n  '
+            + '\n  '.join(offenders),
+        )
+
+
 class IconIncludesAreIsolated(unittest.TestCase):
     """`components/icon.html` подключается только с `only`.
 

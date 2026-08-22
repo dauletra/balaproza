@@ -84,7 +84,7 @@
 | `search_popup.html` | Quick-search по Cmd+K или событию `open-search`. Индекс — lazy-fetch с `/api/search-index.json` при первом открытии, чтобы не утяжелять каждый HTML |
 | `toast_host.html` | Глобальный приёмник: `$dispatch('toast', {kind, text})`. Подключён раз в `base.html` |
 | `share_button.html` | `navigator.share()` на mobile, dropdown Telegram / WhatsApp / copy на десктопе |
-| `segmented_control.html` | Реальное переключение через `?tab=`, не псевдо-табы (DEC-15) |
+| `segmented_control.html` | Реальное переключение через `?tab=`, не псевдо-табы (DEC-15). Разметка — `<nav>` + список ссылок + `aria-current="page"`; ролей `tablist`/`tab` тут нет и быть не должно: они обещают скринридеру `role="tabpanel"` и переключение стрелками без перезагрузки, а это навигация по URL. Закрыто `test_template_lint.TabRolesPromiseAPanel` |
 | `school_links.html` | Блок внешних ссылок, 3 layout: list / grid / inline (DEC-22) |
 
 Все модалки: затемнённый бэкдроп, закрытие по `Esc` и клику вне, `aria-label="Жабу"` на крестике, focus-trap (NFR-05).
