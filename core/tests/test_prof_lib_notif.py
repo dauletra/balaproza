@@ -207,8 +207,9 @@ class ProfileMeAuthed(TestCase):
     def test_default_tab_is_works(self):
         r = self.client.get(reverse('core:profile_me'))
         self.assertEqual(r.status_code, 200)
-        # На вкладке «Шығармалар» видим все 4 рассказа Айданы
-        for s in stub_data.my_stories_of('aidana'):
+        # DEC-44: вкладка показывает публичные работы — то же, что видит
+        # читатель. Черновик и работа на модерации сюда не попадают.
+        for s in stub_data.public_stories_of('aidana'):
             with self.subTest(story=s.slug):
                 self.assertContains(r, s.title)
 
@@ -365,6 +366,65 @@ class ProfileOtherKnown(TestCase):
         r = self.client.get(reverse('core:profile_other', kwargs={'username': self.USERNAME}))
         # У чужого профиля segment library — НЕ показываем
         self.assertNotContains(r, '?tab=library')
+
+
+class ProfileIsNotASecondCabinet(TestCase):
+    """DEC-44: профиль — публичный вид на автора, кабинет — рабочее место.
+
+    `/me/?tab=works` рендерил `my_stories_of` строками `my_story_row`, то
+    есть ровно список из `/my-stories/` минус полоса внимания. Две страницы
+    с одним содержимым, и ни одна не отвечала, зачем она.
+    """
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+
+    def test_owner_sees_what_a_reader_sees(self):
+        r = self.client.get(reverse('core:profile_me'))
+        self.assertEqual(
+            [s.slug for s in r.context['works']],
+            [s.slug for s in stub_data.public_stories_of('aidana')],
+        )
+
+    def test_drafts_and_moderation_stay_in_the_cabinet(self):
+        r = self.client.get(reverse('core:profile_me'))
+        for slug in ('aidana-kus', 'aidana-erteg'):
+            with self.subTest(story=slug):
+                self.assertNotContains(r, stub_data.STORIES_BY_SLUG[slug].title)
+
+    def test_the_hidden_ones_are_counted_and_linked(self):
+        # Молча спрятать работы нельзя: автор должен видеть, что их не
+        # потеряли, и знать, где они лежат.
+        r = self.client.get(reverse('core:profile_me'))
+        self.assertEqual(r.context['hidden_n'], 2)
+        self.assertContains(r, reverse('core:my_stories'))
+
+    def test_the_status_rows_are_gone(self):
+        # `my_story_row` — строка кабинета: статус, «когда трогали», меню.
+        r = self.client.get(reverse('core:profile_me'))
+        self.assertNotContains(r, 'Сайтта қарау')
+
+    def test_segment_count_matches_the_visible_list(self):
+        r = self.client.get(reverse('core:profile_me'))
+        item = next(i for i in r.context['prof_items'] if i['slug'] == 'works')
+        self.assertEqual(item['count'], len(r.context['works']))
+
+    def test_owner_and_stranger_count_works_the_same_way(self):
+        mine = self.client.get(reverse('core:profile_me')).context['prof_items']
+        theirs = self.client.get(
+            reverse('core:profile_other', kwargs={'username': 'aidana'})).context['prof_items']
+        self.assertEqual(
+            next(i['count'] for i in mine if i['slug'] == 'works'),
+            next(i['count'] for i in theirs if i['slug'] == 'works'),
+        )
+
+    def test_the_private_breakdown_is_still_reachable(self):
+        # Информация о черновиках не потеряна — она во вкладке «Статистика»,
+        # помеченной «Тек саған көрінеді» (FR-PROF-08).
+        r = self.client.get(reverse('core:profile_me') + '?tab=stats')
+        self.assertContains(r, 'Тек саған көрінеді')
+        self.assertEqual(r.context['writer']['total'],
+                         len(stub_data.my_stories_of('aidana')))
 
 
 class TopStoriesHelper(TestCase):

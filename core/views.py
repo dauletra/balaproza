@@ -650,13 +650,12 @@ def _resolve_prof_tab(request, allowed) -> str:
 def _prof_items(username: str, allowed: tuple, is_self: bool) -> list:
     """Сегменты PROF (label + count).
 
-    Счётчик работ у постороннего считался по `my_stories_of` — вместе с
-    черновиками. Сегмент обещал «Шығармалар 5» и открывал список из трёх.
+    Счётчик работ считается по `public_stories_of` **для обоих** — DEC-44.
+    Пока владелец видел здесь ещё и черновики, у сегмента было две
+    арифметики, и «Шығармалар 5» открывало список из трёх у постороннего.
+    Одно правило, посчитанное один раз, разойтись не может.
     """
-    works_n = len(
-        stub_data.my_stories_of(username) if is_self
-        else stub_data.public_stories_of(username)
-    )
+    works_n = len(stub_data.public_stories_of(username))
     lib_n   = len(stub_data.library_of(username)) if is_self else 0
     labels = {
         "works":   ("Шығармалар", works_n),
@@ -687,7 +686,16 @@ def profile_me(request):
         'is_self':         True,
         'tab':             tab,
         'prof_items':      _prof_items(username, _PROF_TABS_ME, True) if username else [],
-        'works':           stub_data.my_stories_of(username) if username else [],
+        # DEC-44: профиль — публичный вид на автора, а не второй кабинет.
+        # `?tab=works` показывал `my_stories_of` строками `my_story_row` —
+        # то есть ровно список из `/my-stories/` минус полоса внимания.
+        # Теперь здесь то же, что видит читатель; черновики и модерация
+        # живут только в кабинете, а их количество автор видит во вкладке
+        # «Статистика» под пометкой «Тек саған көрінеді» (FR-PROF-08).
+        'works':           stub_data.public_stories_of(username) if username else [],
+        'hidden_n':        (len(stub_data.my_stories_of(username))
+                            - len(stub_data.public_stories_of(username))) if username else 0,
+        'my_stories_href': reverse('core:my_stories'),
         'lib_reading':     stub_data.library_of(username, 'reading') if username else [],
         'lib_saved':       stub_data.library_of(username, 'saved') if username else [],
         'stats':           stub_data.reader_stats(username) if username else None,

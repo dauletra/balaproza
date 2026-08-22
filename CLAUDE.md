@@ -90,7 +90,7 @@ balaproza_v1/
 │   ├── context_processors.py     # auth_state, nav_state, site_links
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced, page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 722 теста в 16 файлах (см. ниже)
+│   └── tests/                    # 729 тестов в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -197,7 +197,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 722 теста
+uv run python manage.py test core       # все 729 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 

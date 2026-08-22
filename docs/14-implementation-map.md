@@ -1,6 +1,6 @@
 # 14 · Карта реализации: требование → код
 
-> `Обновлён: 2026-08-22` · `Сверен с кодом: b43b190`
+> `Обновлён: 2026-08-22` · `Сверен с кодом: 3908480`
 
 Этот документ отвечает на два вопроса, на которые остальное ТЗ не отвечает: **где живёт то, что описано требованием**, и **что придётся обновить, если это изменить**.
 
@@ -23,7 +23,7 @@
 | Фильтры | `core/templatetags/balaproza.py` | `compact_count`, `spaced`, `page_range`, `belongs_to` |
 | Шаблоны | корневая `templates/` (127 файлов) | 57 компонентов · 37 партиалов · 28 страниц · спрайт иконок · `base.html` · `404/500` |
 | Токены | `static_src/input.css`, блок `@theme` | Единственный источник цветов, радиусов, теней ([02](02-design-system.md)) |
-| Тесты | `core/tests/` (16 файлов, 722 теста) | Контракт поведения, описан в [15](15-testing-contract.md) |
+| Тесты | `core/tests/` (16 файлов, 729 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
 
 **Шаблоны — не в `core/templates/`, а в корневой `templates/`.** Это задано `TEMPLATES.DIRS` в `config/settings.py`.
 
@@ -194,6 +194,7 @@
 | Требование | View | Тест |
 |-----------|------|------|
 | FR-PROF-01, 03 | `profile_me` (+ `_resolve_prof_tab`, `_prof_items`) | `test_prof_lib_notif.ProfileMeAuthed` |
+| DEC-44 (профиль ≠ кабинет) | `profile_me` → `public_stories_of`, `_prof_items` без ветки `is_self` | `ProfileIsNotASecondCabinet` |
 | FR-PROF-01 (числа) | `stub_data.public_stats` / `reader_stats` | `PublicStatsHelper`, `ReaderStatsHelper` |
 | FR-PROF-02, 04 | `profile_other` | `ProfileOtherKnown`, `FollowGraph` |
 | BR-73 (черновики скрыты) | `stub_data.public_stories_of` → `profile_other` | `PublicStoriesHelper`, `ProfileOtherKnown.test_hides_drafts_and_moderation` |

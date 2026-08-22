@@ -17,14 +17,28 @@
 
     {# ── Контент в зависимости от вкладки ── #}
     {% if tab == "works" %}
+        {% comment %}
+            DEC-44: здесь публичные работы теми же карточками, что видит
+            читатель. Строки `my_story_row` со статусами и черновиками
+            вернулись в кабинет — на профиле они делали второй его экземпляр.
+        {% endcomment %}
         {% if works %}
-            <div class="flex flex-col gap-3">
+            <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {% for s in works %}
-                    {% include "components/my_story_row.html" with story=s %}
+                    {% include "components/book_card_small.html" with story=s %}
                 {% endfor %}
             </div>
+        {% elif hidden_n %}
+            {% include "components/empty_state.html" with icon="pen" title="Әлі жарияланған шығарма жоқ" text="Жазғаның бар, бірақ оқырманға әзірге көрінбейді. Жариялауды кабинетте бастайсың." cta_label="Менің шығармаларым" cta_href=my_stories_href %}
         {% else %}
             {% include "components/empty_state.html" with icon="pen" title="Әлі шығарма жоқ" text="Алғашқы шығармаңды жазып, оқырмандармен бөліс." cta_label="Жаңа шығарма" cta_href=new_story_href %}
+        {% endif %}
+
+        {% if hidden_n and works %}
+            <p class="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 font-sans text-sm text-slate-600">
+                Тағы {{ hidden_n }} жұмыс оқырманға көрінбейді — жоба және тексерудегі.
+                <a href="{{ my_stories_href }}" class="font-semibold text-brand hover:underline">Кабинетте қарау</a>
+            </p>
         {% endif %}
 
     {% elif tab == "library" %}
