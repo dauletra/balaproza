@@ -1315,6 +1315,19 @@ def public_stories_of(username: str) -> list:
     return [s for s in my_stories_of(username) if s.is_public]
 
 
+def top_stories_of(username: str, limit: int = 3) -> list:
+    """Самые читаемые работы автора — для рейла чужого профиля (FR-PROF-09).
+
+    Сортировка по накопленному `views`, а не по `recent_views`: рейл отвечает
+    «с чего начать знакомство с автором», а не «что у него сейчас в моде».
+    Ось «Қазір танымал» из DEC-36 живёт в каталоге и на профиле не к месту —
+    автор с одной старой сильной работой оказался бы без ответа.
+
+    Не `related_stories`: тот, наоборот, исключает того же автора.
+    """
+    return sorted(public_stories_of(username), key=lambda s: s.views, reverse=True)[:limit]
+
+
 def writer_attention(username: str) -> list:
     """Что ждёт автора — короткая строка над списком (FR-WRITE-08).
 

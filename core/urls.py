@@ -38,6 +38,11 @@ urlpatterns = [
     path('me/', views.profile_me, name='profile_me'),
     path('me/edit/', views.profile_me_edit, name='profile_me_edit'),
     path('u/<str:username>/', views.profile_other, name='profile_other'),
+    # Люди автора (FR-PROF-10). Один маршрут на оба списка: страницы
+    # различаются набором, а не устройством. Неизвестный `kind` — 404 во
+    # view, а не молчаливый фолбэк: `/u/aidana/garbage/` не должен отдавать
+    # подписчиков под чужим заголовком.
+    path('u/<str:username>/<str:kind>/', views.profile_people, name='profile_people'),
 
     # LIB — библиотека
     path('library/', views.library, name='library'),

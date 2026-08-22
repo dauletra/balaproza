@@ -11,31 +11,39 @@
     то, что происходит. Вид не меняется — правка только семантическая.
 
     Параметры:
-      items    — список dict'ов: [{slug, label, count?}, ...]
+      items    — список dict'ов: [{slug, label, count?, href?}, ...]
       current  — слаг активного сегмента
       base_url — куда вешать ссылки (полный путь без query). Обычно request.path
       param    — имя query-параметра (default 'tab')
       label    — подпись навигации для скринридера (default «Бөлімдер»)
+
+    `href` у элемента перебивает пару base_url/param. Нужен там, где разделы
+    различаются путём, а не состоянием одной страницы — списки подписчиков и
+    подписок (FR-PROF-10). Собирать такой URL здесь строками нельзя: ровно
+    так жанровый чип каталога терял уже выставленные оси (DEC-27).
 {% endcomment %}
 {% with p=param|default:"tab" %}
 <nav aria-label="{{ label|default:'Бөлімдер' }}" class="mb-6 block">
     <ul class="inline-flex flex-wrap gap-1 rounded-pill bg-slate-100 p-1">
         {% for it in items %}
+            {% with fallback=base_url|add:"?"|add:p|add:"="|add:it.slug %}
+            {% firstof it.href fallback as href %}
             <li>
                 {% if it.slug == current %}
-                    <a href="{{ base_url }}?{{ p }}={{ it.slug }}" aria-current="page"
+                    <a href="{{ href }}" aria-current="page"
                        class="inline-flex h-8 items-center gap-1.5 rounded-pill bg-white px-4 font-sans text-sm font-bold text-slate-900 shadow-sm">
                         <span>{{ it.label }}</span>
                         {% if it.count %}<span class="font-semibold text-slate-500">{{ it.count }}</span>{% endif %}
                     </a>
                 {% else %}
-                    <a href="{{ base_url }}?{{ p }}={{ it.slug }}"
+                    <a href="{{ href }}"
                        class="inline-flex h-8 items-center gap-1.5 rounded-pill px-4 font-sans text-sm font-semibold text-slate-600 hover:bg-white/60 hover:text-slate-900">
                         <span>{{ it.label }}</span>
                         {% if it.count %}<span class="text-slate-500">{{ it.count }}</span>{% endif %}
                     </a>
                 {% endif %}
             </li>
+            {% endwith %}
         {% endfor %}
     </ul>
 </nav>

@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    {{ title }} · {{ profile_user.public_name }} — Balaproza
+{% endblock %}
+
+{% block content %}
+    {% comment %}
+        Подписчики и подписки автора (FR-PROF-10). Оба списка публичны — BR-75.
+
+        Кнопки «Жазылу» в строках сознательно нет. Рядом с одним лишь именем
+        она просит решение раньше, чем показано, на основании чего его
+        принимать; сама кнопка живёт в шапке профиля, куда строка и ведёт, —
+        там рядом с ней био, работы и знаки. Заодно не размножается ветвление
+        «гость / подписан / не подписан» из partials/profile/_header.html.
+    {% endcomment %}
+    <nav class="mb-4" aria-label="Артқа">
+        <a href="{% url 'core:profile_other' username=username %}"
+           class="inline-flex items-center gap-1.5 font-sans text-sm font-semibold text-slate-500 hover:text-brand">
+            {% include "components/icon.html" with name="arrow-left" size=15 only %}
+            {{ profile_user.public_name }}
+        </a>
+    </nav>
+
+    <h1 class="mb-6 font-display text-3xl font-bold text-slate-900">{{ title }}</h1>
+
+    {% include "components/segmented_control.html" with items=people_items current=kind label="Тізімдер" %}
+
+    {% if people %}
+        <ul class="flex flex-col divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white px-5">
+            {% for a in people %}
+                {% include "components/author_row.html" with author=a size=44 cls="py-3.5" only %}
+            {% endfor %}
+        </ul>
+    {% elif kind == "followers" %}
+        {% include "components/empty_state.html" with icon="user-circle" title="Әлі жазылушы жоқ" text="Жарияланған шығарма оқырманды өзі әкеледі." %}
+    {% else %}
+        {% include "components/empty_state.html" with icon="user-circle" title="Әлі ешкімге жазылмаған" text="Ұнаған авторға жазылсаң, жаңа бөлімдері хабарламаға түседі." cta_label="Каталогқа" cta_href=catalog_href %}
+    {% endif %}
+{% endblock %}

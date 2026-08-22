@@ -33,6 +33,8 @@ PUBLIC_URLS = [
     ('core:chapter_edit',      {'slug': 'sample', 'chapter': 1},  'chapter-edit'),
     ('core:profile_me',        {},                                'profile-me'),
     ('core:profile_other',     {'username': 'rudazov'},           'profile-other'),
+    ('core:profile_people',    {'username': 'aidana', 'kind': 'followers'},  'profile-followers'),
+    ('core:profile_people',    {'username': 'aidana', 'kind': 'following'},  'profile-following'),
     ('core:library',           {},                                'library'),
     ('core:notifications',     {},                                'notifications'),
     ('core:contest_list',      {},                                'contest-list'),

@@ -1,37 +1,66 @@
-{% comment %}
-    Правый рейл PROF. Контекст:
+{% load balaproza %}{% comment %}
+    Правый рейл PROF. Разный по зрителю (FR-PROF-09).
+
+    Свой профиль — «Жазылулар»: это моя навигация, отсюда я хожу к тем, кого
+    читаю. Чужой профиль показывал ровно то же — на кого подписан **он**, — и
+    это не сообщало читателю ничего, занимая единственный блок колонки.
+    У постороннего вместо него «Ең көп оқылғаны»: с чего начать знакомство.
+
+    Блока «Қысқа сан» здесь нет: те же четыре числа страница уже показывает
+    в теле, и на xl+ они выводились дважды на одном экране.
+
+    Контекст:
       profile_user — Author (None для гостя)
-      stats        — reader_stats(...) dict (опц.)
-      following    — Authors, на кого подписан (опц.)
+      is_self      — свой профиль или чужой
+      following    — Authors, на кого подписан владелец (только свой)
+      rail_top     — top_stories_of(...) (только чужой; порог считает view)
 {% endcomment %}
 {% if profile_user %}
 <div class="flex flex-col gap-6">
-    {% comment %}
-        Блока «Қысқа сан» здесь больше нет: те же четыре числа страница уже
-        показывает в теле (FR-PROF-01, profile_me/profile_other), и на xl+
-        они выводились дважды на одном экране.
-    {% endcomment %}
 
-    {% if following %}
-    <section class="rounded-lg border border-slate-200 bg-white p-5">
-        <h3 class="mb-3 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
-            Жазылулар
-        </h3>
-        <ul class="flex flex-col gap-2.5">
-            {% for a in following %}
-                <li class="flex items-center gap-3">
-                    {% include "components/avatar.html" with size=32 name=a.public_name username=a.username %}
-                    <div class="min-w-0 flex-1">
-                        <a href="{% url 'core:profile_other' username=a.username %}"
-                           class="block truncate font-sans text-sm font-semibold text-slate-900 hover:text-brand">
-                            {{ a.public_name }}
+    {% if is_self %}
+        {% if following %}
+        <section class="rounded-lg border border-slate-200 bg-white p-5">
+            <h3 class="mb-3 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                Жазылулар
+            </h3>
+            <ul class="flex flex-col gap-2.5">
+                {% for a in following %}
+                    {% include "components/author_row.html" with author=a size=32 compact=True only %}
+                {% endfor %}
+            </ul>
+            <a href="{% url 'core:profile_people' username=profile_user.username kind='following' %}"
+               class="mt-4 inline-flex items-center gap-1.5 font-sans text-xs font-semibold text-brand hover:text-brand-dark">
+                Барлығы
+                {% include "components/icon.html" with name="arrow-right" size=13 only %}
+            </a>
+        </section>
+        {% endif %}
+
+    {% elif rail_top %}
+        <section class="rounded-lg border border-slate-200 bg-white p-5">
+            <h3 class="mb-3 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                Ең көп оқылғаны
+            </h3>
+            <ul class="flex flex-col gap-4">
+                {% for s in rail_top %}
+                    <li class="flex gap-3">
+                        <a href="{% url 'core:story_detail' slug=s.slug %}" class="shrink-0">
+                            {% include "components/cover_placeholder.html" with story=s cls="aspect-[2/3] w-[48px] rounded-md shadow-sm" letter_cls="text-2xl" %}
                         </a>
-                        <span class="font-sans text-xs text-slate-500">{{ a.works }} шығарма</span>
-                    </div>
-                </li>
-            {% endfor %}
-        </ul>
-    </section>
+                        <div class="min-w-0 flex-1">
+                            <a href="{% url 'core:story_detail' slug=s.slug %}"
+                               class="block truncate font-sans text-sm font-bold text-slate-900 hover:text-brand">
+                                {{ s.title }}
+                            </a>
+                            <p class="mt-1 font-sans text-xs text-slate-500">
+                                {{ s.views|compact_count }} оқылым
+                            </p>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
     {% endif %}
 </div>
 {% endif %}

@@ -731,15 +731,29 @@ def profile_other(request, username):
         raise Http404(f'Автор @{username} табылмады')
     me = _current_username(request)
     tab = _resolve_prof_tab(request, _PROF_TABS_OTHER)
-    following = stub_data.following_of(username)
+    works = stub_data.public_stories_of(username)
+    # Рейл чужого профиля — «Ең көп оқылғаны», а не «на кого он подписан»
+    # (FR-PROF-09). Список чужих подписок читателю ничего не сообщает, а
+    # занимал единственный блок рейла.
+    #
+    # Порог в четыре работы — против дубля: на вкладке «Шығармалар» тело
+    # показывает те же самые работы целиком, и топ-3 из трёх был бы точной
+    # копией соседней колонки (то же, за что убирали числа —
+    # test_desktop_layout.ProfileStatsNotDuplicated). На «Туралы» работ в
+    # теле нет вовсе, поэтому там блок полезен с первой.
+    rail_top = (
+        stub_data.top_stories_of(username)
+        if tab == 'about' or len(works) >= 4 else []
+    )
     return render(request, 'pages/profile/profile_other.html', {
-        'has_right_rail': bool(following),
+        'has_right_rail': bool(rail_top),
         'profile_user':  author,
         'username':      username,
         'is_self':       False,
         'tab':           tab,
         'prof_items':    _prof_items(username, _PROF_TABS_OTHER, False),
-        'works':         stub_data.public_stories_of(username),
+        'works':         works,
+        'rail_top':      rail_top,
         'stats':         stub_data.public_stats(username),
         # Знаки одинаковы для владельца и для постороннего: достижение
         # публично по определению (FR-PROF-06). Число конкурсов — участие
@@ -749,8 +763,53 @@ def profile_other(request, username):
         'contests_n':    len(stub_data.submissions_of(username)),
         # is_self=False режет результат и комментарий жюри (BR-74a)
         'contest_history': stub_data.contest_history(username),
-        'following':     following,
         'is_followed':   stub_data.is_following(me, username) if me else False,
+    })
+
+
+_PEOPLE_KINDS = {
+    'followers': ('Жазылушылар', stub_data.followers_of),
+    'following': ('Жазылулар',   stub_data.following_of),
+}
+
+
+def profile_people(request, username, kind):
+    """Подписчики и подписки автора (FR-PROF-10).
+
+    Оба списка публичны — BR-75. Число подписчиков и так стоит плиткой в
+    профиле, а подписки показывал рейл; закрывать список, число из которого
+    объявлено, значило бы закрывать не данные, а возможность их прочесть.
+
+    Один view на два набора: страницы отличаются тем, кого показывают, и
+    ничем больше. Неизвестный `kind` и неизвестный автор — 404.
+    """
+    author = stub_data.AUTHORS_BY_USERNAME.get(username)
+    if not author or kind not in _PEOPLE_KINDS:
+        raise Http404(f'@{username}: {kind} табылмады')
+
+    title, fetch = _PEOPLE_KINDS[kind]
+    me = _current_username(request)
+    return render(request, 'pages/profile/profile_people.html', {
+        'profile_user': author,
+        'username':     username,
+        'kind':         kind,
+        'title':        title,
+        'people':       fetch(username),
+        'is_self':      me == username,
+        # Сегменты ведут между двумя списками одного автора. `?tab=` здесь
+        # не годится — список это путь, а не состояние страницы, — поэтому
+        # каждый сегмент несёт готовый `href`.
+        'people_items': [
+            {
+                'slug':  k,
+                'label': lbl,
+                'count': len(f(username)),
+                'href':  reverse('core:profile_people',
+                                 kwargs={'username': username, 'kind': k}),
+            }
+            for k, (lbl, f) in _PEOPLE_KINDS.items()
+        ],
+        'catalog_href': reverse('core:catalog'),
     })
 
 

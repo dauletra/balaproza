@@ -337,9 +337,10 @@ class ProfileOtherKnown(TestCase):
 
     def test_guest_gets_no_empty_rail(self):
         """Рейл только при данных: пустая колонка 300px сдвигает контент."""
-        # sayyn ни на кого не подписан — единственный блок рейла пуст.
+        # У sayyn три публичные работы, и все три уже стоят в теле вкладки —
+        # топ-3 рядом был бы копией соседней колонки, поэтому блока нет.
         r = self.client.get(reverse('core:profile_other', kwargs={'username': 'sayyn'}))
-        self.assertEqual(stub_data.following_of('sayyn'), [])
+        self.assertEqual(len(stub_data.public_stories_of('sayyn')), 3)
         self.assertFalse(r.context['has_right_rail'])
         self.assertNotContains(r, 'w-[300px]')
 
@@ -364,6 +365,140 @@ class ProfileOtherKnown(TestCase):
         r = self.client.get(reverse('core:profile_other', kwargs={'username': self.USERNAME}))
         # У чужого профиля segment library — НЕ показываем
         self.assertNotContains(r, '?tab=library')
+
+
+class TopStoriesHelper(TestCase):
+    """`top_stories_of` — данные для рейла чужого профиля (FR-PROF-09)."""
+
+    def test_sorted_by_views_desc(self):
+        top = stub_data.top_stories_of('aygerim_k')
+        self.assertEqual([s.views for s in top], sorted((s.views for s in top), reverse=True))
+
+    def test_only_public_work_reaches_the_rail(self):
+        # У aidana есть черновик и работа на модерации: рейл — публичная
+        # поверхность, и BR-73 действует здесь ровно так же, как в теле.
+        slugs = {s.slug for s in stub_data.top_stories_of('aidana', limit=99)}
+        self.assertNotIn('aidana-kus', slugs)
+        self.assertNotIn('aidana-erteg', slugs)
+        self.assertTrue(all(s.is_public for s in stub_data.top_stories_of('aidana', limit=99)))
+
+    def test_limit_is_respected(self):
+        self.assertLessEqual(len(stub_data.top_stories_of('aygerim_k')), 3)
+        self.assertEqual(len(stub_data.top_stories_of('aygerim_k', limit=1)), 1)
+
+    def test_unknown_user_is_empty(self):
+        self.assertEqual(stub_data.top_stories_of('no-such-user'), [])
+
+
+class ProfileRailByViewer(TestCase):
+    """Рейл профиля разный по зрителю (FR-PROF-09).
+
+    Чужой профиль показывал «Жазылулар» — на кого подписан **он**. Читателю
+    это не сообщало ничего и занимало единственный блок колонки.
+    """
+
+    def test_stranger_does_not_see_whom_the_author_follows(self):
+        r = self.client.get(reverse('core:profile_other', kwargs={'username': 'aygerim_k'}))
+        self.assertTrue(stub_data.following_of('aygerim_k'))   # подписки есть
+        self.assertNotContains(r, 'Жазылулар')                 # и они не здесь
+
+    def test_stranger_sees_the_most_read_work(self):
+        r = self.client.get(reverse('core:profile_other', kwargs={'username': 'aygerim_k'}))
+        self.assertContains(r, 'Ең көп оқылғаны')
+        self.assertTrue(r.context['has_right_rail'])
+        self.assertContains(r, stub_data.top_stories_of('aygerim_k')[0].title)
+
+    def test_rail_stays_away_when_the_body_already_shows_everything(self):
+        # Три работы: вкладка «Шығармалар» показывает их целиком, топ-3
+        # рядом был бы дублем — тем же, за который убирали числа из рейла.
+        url = reverse('core:profile_other', kwargs={'username': 'rudazov'})
+        self.assertEqual(len(stub_data.public_stories_of('rudazov')), 3)
+        self.assertFalse(self.client.get(url).context['has_right_rail'])
+        # На «Туралы» работ в теле нет вовсе — там блок полезен с первой.
+        self.assertTrue(self.client.get(url + '?tab=about').context['has_right_rail'])
+
+    def test_owner_still_gets_the_list_of_who_he_reads(self):
+        _login_as_aidana(self.client)
+        r = self.client.get(reverse('core:profile_me'))
+        self.assertContains(r, 'Жазылулар')
+        self.assertNotContains(r, 'Ең көп оқылғаны')
+
+
+class ProfilePeoplePages(TestCase):
+    """Подписчики и подписки открываются страницей (FR-PROF-10, BR-75)."""
+
+    def _url(self, username, kind):
+        return reverse('core:profile_people', kwargs={'username': username, 'kind': kind})
+
+    def test_followers_list_names_everyone(self):
+        r = self.client.get(self._url('rudazov', 'followers'))
+        self.assertEqual(r.status_code, 200)
+        for a in stub_data.followers_of('rudazov'):
+            self.assertContains(r, a.public_name)
+
+    def test_following_list_names_everyone(self):
+        r = self.client.get(self._url('aidana', 'following'))
+        for a in stub_data.following_of('aidana'):
+            self.assertContains(r, a.public_name)
+
+    def test_both_lists_are_public(self):
+        # BR-75: число подписчиков и так объявлено плиткой профиля, а
+        # подписки показывал рейл. Гость получает обе страницы.
+        for kind in ('followers', 'following'):
+            with self.subTest(kind=kind):
+                self.assertEqual(self.client.get(self._url('aidana', kind)).status_code, 200)
+
+    def test_segments_carry_real_paths_not_query(self):
+        r = self.client.get(self._url('aidana', 'followers'))
+        self.assertContains(r, self._url('aidana', 'following'))
+        self.assertNotContains(r, '?tab=following')
+
+    def test_segment_counts_match_the_lists(self):
+        r = self.client.get(self._url('aidana', 'followers'))
+        counts = {it['slug']: it['count'] for it in r.context['people_items']}
+        self.assertEqual(counts['followers'], len(stub_data.followers_of('aidana')))
+        self.assertEqual(counts['following'], len(stub_data.following_of('aidana')))
+
+    def test_empty_list_explains_itself(self):
+        # rudazov ни на кого не подписан.
+        self.assertEqual(stub_data.following_of('rudazov'), [])
+        r = self.client.get(self._url('rudazov', 'following'))
+        self.assertContains(r, 'Әлі ешкімге жазылмаған')
+
+    def test_unknown_kind_is_404(self):
+        # Молчаливый фолбэк отдал бы подписчиков под чужим заголовком.
+        self.assertEqual(self.client.get('/u/aidana/garbage/').status_code, 404)
+
+    def test_unknown_author_is_404(self):
+        self.assertEqual(self.client.get(self._url('no-such-user', 'followers')).status_code, 404)
+
+    def test_follow_button_stays_on_the_profile(self):
+        # Кнопка рядом с одним именем просит решение раньше, чем показано,
+        # на основании чего его принимать. Строка ведёт в профиль, где она
+        # стоит рядом с био, работами и знаками.
+        r = self.client.get(self._url('rudazov', 'followers'))
+        self.assertNotContains(r, 'Жазылдың')
+        self.assertContains(r, reverse('core:profile_other', kwargs={'username': 'aidana'}))
+
+
+class ProfileStatTilesLinkToLists(TestCase):
+    """Числа профиля кликабельны там, где за ними стоит список (FR-PROF-10)."""
+
+    def test_followers_tile_opens_the_list(self):
+        r = self.client.get(reverse('core:profile_other', kwargs={'username': 'rudazov'}))
+        self.assertContains(r, reverse('core:profile_people',
+                                       kwargs={'username': 'rudazov', 'kind': 'followers'}))
+
+    def test_works_tile_opens_the_segment(self):
+        _login_as_aidana(self.client)
+        r = self.client.get(reverse('core:profile_me'))
+        self.assertContains(r, '/me/?tab=works')
+
+    def test_sums_get_no_link(self):
+        # «Оқылым» и «Ұнатулар» — суммы, открывать в них нечего. Две ссылки
+        # на четыре плитки, и ни одной лишней.
+        r = self.client.get(reverse('core:profile_other', kwargs={'username': 'rudazov'}))
+        self.assertEqual(r.content.decode().count('class="absolute inset-0 rounded-lg"'), 2)
 
 
 class ProfileOtherUnknown(TestCase):

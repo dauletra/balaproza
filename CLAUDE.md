@@ -85,20 +85,23 @@ balaproza_v1/
 │   │                             # search_results / catalog / genre_detail / tag_detail
 │   ├── urls.py                   # все маршруты, app_name='core'
 │   │                             # + /catalog/, /tag/<slug>/, /api/search-index.json,
-│   │                             # /me/edit/, 5 legal routes
+│   │                             # /me/edit/, /u/<username>/{followers,following}/,
+│   │                             # 5 legal routes
 │   ├── context_processors.py     # auth_state, nav_state, site_links
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced, page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 702 теста в 16 файлах (см. ниже)
+│   └── tests/                    # 722 теста в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
 │   ├── 404.html / 500.html       # branded error pages (500 — standalone, без base.html)
-│   ├── components/               # 56 атомов и composites (см. docs/04)
+│   ├── components/               # 57 атомов и composites (см. docs/04)
 │   │                             # включая cover_placeholder (двухрежимный: <img> если
 │   │                             # story.cover задан, иначе типографическая плашка OKLCH +
 │   │                             # буква по primary genre.hue),
 │   │                             # avatar (буквенные инициалы + OKLCH-фон),
+│   │                             # author_row (строка автора в списке — рейл «Жазылулар»
+│   │                             # и страницы подписчиков/подписок, FR-PROF-10),
 │   │                             # tag_chip / tag_list / tag_input (docs/11 — UGC-теги),
 │   │                             # extras §4.10: skeleton_*, error_state, empty_state,
 │   │                             # segmented_control, delete_confirm_modal, toast_host,
@@ -124,6 +127,8 @@ balaproza_v1/
 │   │                             # (variant='rail'|'sheet' — в листе черновик, не автосабмит),
 │   │                             # _filter_sheet (mobile bottom-sheet), _hero_search,
 │   │                             # _hero_genre, _hero_tag, _hero_catalog.
+│   │                             # right_rail/profile.html — РАЗНЫЙ по зрителю (FR-PROF-09):
+│   │                             # владельцу «Жазылулар», постороннему «Ең көп оқылғаны».
 │   │                             # profile/_{header,achievements,stats,about}.html — общие для своего и
 │   │                             # чужого профиля. Были скопированы в оба шаблона и уже
 │   │                             # разошлись; в копии «Туралы» лежало настоящее имя автора
@@ -192,7 +197,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 702 теста
+uv run python manage.py test core       # все 722 теста
 uv run python manage.py test core.tests.test_<file>
 ```
 

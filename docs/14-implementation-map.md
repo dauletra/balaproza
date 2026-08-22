@@ -1,6 +1,6 @@
 # 14 · Карта реализации: требование → код
 
-> `Обновлён: 2026-08-21` · `Сверен с кодом: fdde268`
+> `Обновлён: 2026-08-22` · `Сверен с кодом: b43b190`
 
 Этот документ отвечает на два вопроса, на которые остальное ТЗ не отвечает: **где живёт то, что описано требованием**, и **что придётся обновить, если это изменить**.
 
@@ -21,9 +21,9 @@
 | Маршруты | `core/urls.py`, `app_name='core'` | Все URL проекта, кроме `/admin/` |
 | Общий контекст | `core/context_processors.py` | `auth_state`, `nav_state`, `site_links` |
 | Фильтры | `core/templatetags/balaproza.py` | `compact_count`, `spaced`, `page_range`, `belongs_to` |
-| Шаблоны | корневая `templates/` (116 файлов) | 54 компонента · 31 партиал · 27 страниц · спрайт иконок · `base.html` · `404/500` |
+| Шаблоны | корневая `templates/` (127 файлов) | 57 компонентов · 37 партиалов · 28 страниц · спрайт иконок · `base.html` · `404/500` |
 | Токены | `static_src/input.css`, блок `@theme` | Единственный источник цветов, радиусов, теней ([02](02-design-system.md)) |
-| Тесты | `core/tests/` (16 файлов, 702 теста) | Контракт поведения, описан в [15](15-testing-contract.md) |
+| Тесты | `core/tests/` (16 файлов, 722 теста) | Контракт поведения, описан в [15](15-testing-contract.md) |
 
 **Шаблоны — не в `core/templates/`, а в корневой `templates/`.** Это задано `TEMPLATES.DIRS` в `config/settings.py`.
 
@@ -207,6 +207,9 @@
 | FR-PROF-05 | `profile_me_edit` → `/me/edit/` | `ProfileMeAuthed` |
 | FR-PROF-06 / BR-ACH-01…05 | `stub_data.achievements_of` (+ `READ_TIERS`, `tier_for`, `winning_stories_of`) | `test_stub_data.Achievements`, `ReadTiers` |
 | FR-PROF-06 (рендер) | `partials/profile/_achievements.html` + строка фактов в `_header.html` | `ProfileAchievementsRender` |
+| FR-PROF-09 (рейл по зрителю) | `stub_data.top_stories_of` → `partials/right_rail/profile.html` | `TopStoriesHelper`, `ProfileRailByViewer` |
+| FR-PROF-10 (люди) | `profile_people` → `pages/profile/profile_people.html`, `components/author_row.html` | `ProfilePeoplePages` |
+| FR-PROF-10 / BR-75 (числа-ссылки) | `partials/profile/_stats.html` | `ProfileStatTilesLinkToLists` |
 | DEC-43 (иллюстрации) | `components/award.html`, `components/tooltip.html`, `components/awards/_sprite.html` | `test_template_lint.IconNamesExistInSprite.test_award_art_exists_in_sprite`, `test_award_sprite_has_no_orphan_symbols` |
 | Имена иконок из данных | `components/icons/_sprite.html` | `test_template_lint.IconNamesExistInSprite` |
 | Инварианты конкурсных данных | `Contest.winners`, `SUBMISSIONS_BY_USER` | `test_contests.ContestWinners`, `SubmissionsMatchContestBadges`, `SubmissionIntegrity` |
@@ -214,7 +217,7 @@
 | FR-NOTIF-01…04 / BR-70…72 | `notifications` | `NotificationsAuthed`, `NotificationsEmpty` |
 | FR-NOTIF-02 (бейдж) | `auth_state.unread_notifications` | `HeaderUnreadBadge` |
 
-Переключение вкладок — реальный `?tab=` через `components/segmented_control.html`, не псевдо-табы (DEC-15).
+Переключение вкладок — реальный `?tab=` через `components/segmented_control.html`, не псевдо-табы (DEC-15). Разметка сегментов навигационная (`<nav>` + `aria-current`), ролей `tablist`/`tab` в них нет — они обещают панель, которой при переходе по URL не бывает (`test_template_lint.TabRolesPromiseAPanel`). Списки людей передают сегментам готовый `href`: они различаются путём, а не состоянием страницы.
 
 ## 14.8 CONT · Конкурсы
 

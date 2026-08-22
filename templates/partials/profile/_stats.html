@@ -6,14 +6,32 @@
     Отличается только формат: автору — точное с разрядами, читателю —
     сжатое (правило проекта «compact_count — читателю, spaced — автору»).
 
+    Кликабельны две плитки из четырёх — те, за которыми стоит список:
+    «Шығарма» ведёт на сегмент работ, «Жазылушы» — на страницу подписчиков
+    (FR-PROF-10). «Оқылым» и «Ұнатулар» — суммы, открывать в них нечего, и
+    ссылку они не получают. Чтобы одинаковые с виду плитки не расходились
+    поведением молча, у кликабельных стоит стрелка.
+
+    Ссылка — растянутая на плитку `absolute inset-0`, а не обёртка: `<a>`
+    прямым ребёнком `<dl>` невалиден. Отсюда обязательный `relative` на
+    самой плитке — без позиционированного предка absolute уезжает в
+    координаты документа (см. CLAUDE.md про горизонтальные скроллеры).
+
     Контекст:
-      stats   — public_stats(...) / reader_stats(...)
-      is_self — свой профиль или чужой
+      stats        — public_stats(...) / reader_stats(...)
+      is_self      — свой профиль или чужой
+      profile_user — Author (для ссылки на подписчиков)
 {% endcomment %}
+{% url 'core:profile_people' username=profile_user.username kind='followers' as followers_href %}
 <dl class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-    <div class="rounded-lg border border-slate-200 bg-white p-4 text-center">
+    <div class="relative rounded-lg border border-slate-200 bg-white p-4 text-center transition-colors hover:border-brand">
         <dt class="font-sans text-xs text-slate-500">Шығарма</dt>
         <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ stats.works }}</dd>
+        <a href="{{ request.path }}?tab=works" class="absolute inset-0 rounded-lg"
+           aria-label="Шығарма: {{ stats.works }} — тізімін ашу"></a>
+        <span aria-hidden="true" class="absolute right-2 top-2 text-slate-300">
+            {% include "components/icon.html" with name="arrow-right" size=13 only %}
+        </span>
     </div>
     <div class="rounded-lg border border-slate-200 bg-white p-4 text-center">
         <dt class="font-sans text-xs text-slate-500">Оқылым</dt>
@@ -23,8 +41,13 @@
         <dt class="font-sans text-xs text-slate-500">Ұнатулар</dt>
         <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{% if is_self %}{{ stats.likes|spaced }}{% else %}{{ stats.likes|compact_count }}{% endif %}</dd>
     </div>
-    <div class="rounded-lg border border-slate-200 bg-white p-4 text-center">
+    <div class="relative rounded-lg border border-slate-200 bg-white p-4 text-center transition-colors hover:border-brand">
         <dt class="font-sans text-xs text-slate-500">Жазылушы</dt>
         <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{% if is_self %}{{ stats.followers|spaced }}{% else %}{{ stats.followers|compact_count }}{% endif %}</dd>
+        <a href="{{ followers_href }}" class="absolute inset-0 rounded-lg"
+           aria-label="Жазылушы: {{ stats.followers }} — тізімін ашу"></a>
+        <span aria-hidden="true" class="absolute right-2 top-2 text-slate-300">
+            {% include "components/icon.html" with name="arrow-right" size=13 only %}
+        </span>
     </div>
 </dl>

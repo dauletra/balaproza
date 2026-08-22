@@ -1,0 +1,32 @@
+{% comment %}
+    Строка автора в списке: аватар, имя, @username, число работ.
+
+    Появилась из двух мест сразу — блока «Жазылулар» в рейле своего профиля
+    и страниц подписчиков/подписок (FR-PROF-10). Разметка там совпадала, и
+    вторая копия разошлась бы с первой на первой же правке — ровно так уже
+    разъехались шапки профилей до `partials/profile/_header.html`.
+
+    Карточку «Жаңа авторлар» на главной сюда не сводим: там вертикальная
+    карточка в скроллере с био и двумя счётчиками — другой объект, а не
+    другой размер этого.
+
+    Параметры:
+      author  — Author
+      size    — сторона аватара, px (default 40)
+      compact — плотный вариант для рейла: мельче шрифт, без @username
+      cls     — дополнительные классы на <li> (отбивка в списке страницы)
+{% endcomment %}
+<li class="flex items-center gap-3 {{ cls }}">
+    <a href="{% url 'core:profile_other' username=author.username %}" class="shrink-0">
+        {% include "components/avatar.html" with size=size|default:40 name=author.public_name username=author.username %}
+    </a>
+    <div class="min-w-0 flex-1">
+        <a href="{% url 'core:profile_other' username=author.username %}"
+           class="block truncate font-sans {% if compact %}text-sm{% else %}text-[15px]{% endif %} font-semibold text-slate-900 hover:text-brand">
+            {{ author.public_name }}
+        </a>
+        <p class="truncate font-sans text-xs text-slate-500">
+            {% if not compact %}@{{ author.username }} · {% endif %}{{ author.works }} шығарма
+        </p>
+    </div>
+</li>

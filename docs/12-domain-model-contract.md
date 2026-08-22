@@ -1,6 +1,6 @@
 # 12. Domain model contract for F14
 
-> `Обновлён: 2026-08-21` · `Сверен с кодом: 855d37c`
+> `Обновлён: 2026-08-22` · `Сверен с кодом: b43b190`
 
 This document is the implementation contract for replacing `core/stub_data.py` with real Django models. It does not introduce models yet; it fixes the fields, relationships, computed values, and query helpers that the current templates already depend on.
 
@@ -81,6 +81,7 @@ Story and chapters:
 Author workspace, library, social:
 - `my_stories_of(username: str) -> list[Story]` — **любой** статус: выдача авторского кабинета, не публичная
 - `public_stories_of(username: str) -> list[Story]` — только `is_public` (BR-73). Публичный профиль строится на ней; на `my_stories_of` он показывал посторонним черновики
+- `top_stories_of(username: str, limit: int = 3) -> list[Story]` — самые читаемые публичные работы автора, для рейла чужого профиля (FR-PROF-09). Сортировка по накопленному `views`, а не по `recent_views`: рейл отвечает «с чего начать», а не «что сейчас в моде». Не `related_stories` — тот, наоборот, исключает того же автора
 - `writer_stats(username: str) -> dict`
 - `library_of(username: str, kind: str = "") -> list[LibraryEntry]`
 - `in_library(username: str, story_slug: str) -> bool`
@@ -96,7 +97,7 @@ Author workspace, library, social:
 - `read_tier(username: str)`, `next_read_tier(username: str)` — они же для автора
 - `winning_stories_of(username: str) -> list[Story]` — победы по `Contest.winners`
 - `is_following(me: str, them: str) -> bool`
-- `following_of(username: str) -> list[Author]`
+- `following_of(username: str) -> list[Author]` — оба списка публичны (BR-75), страницу собирает `profile_people`
 - `followers_of(username: str) -> list[Author]`
 - `notifications_for_user(username: str) -> dict`
 - `unread_count_for_user(username: str) -> int`
