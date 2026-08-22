@@ -1,6 +1,6 @@
 # 14 · Карта реализации: требование → код
 
-> `Обновлён: 2026-08-22` · `Сверен с кодом: b3ba26d`
+> `Обновлён: 2026-08-22` · `Сверен с кодом: f80eca0`
 
 Этот документ отвечает на два вопроса, на которые остальное ТЗ не отвечает: **где живёт то, что описано требованием**, и **что придётся обновить, если это изменить**.
 
@@ -21,9 +21,9 @@
 | Маршруты | `core/urls.py`, `app_name='core'` | Все URL проекта, кроме `/admin/` |
 | Общий контекст | `core/context_processors.py` | `auth_state`, `nav_state`, `site_links` |
 | Фильтры | `core/templatetags/balaproza.py` | `compact_count`, `spaced`, `page_range`, `belongs_to` |
-| Шаблоны | корневая `templates/` (131 файлов) | 59 компонентов · 40 партиалов · 28 страниц · спрайт иконок · `base.html` · `404/500` |
+| Шаблоны | корневая `templates/` (135 файлов) | 61 компонент · 41 партиал · 28 страниц · два спрайта · `base.html` · `404/500` |
 | Токены | `static_src/input.css`, блок `@theme` | Единственный источник цветов, радиусов, теней ([02](02-design-system.md)) |
-| Тесты | `core/tests/` (16 файлов, 840 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
+| Тесты | `core/tests/` (16 файлов, 857 тестов) | Контракт поведения, описан в [15](15-testing-contract.md) |
 
 **Шаблоны — не в `core/templates/`, а в корневой `templates/`.** Это задано `TEMPLATES.DIRS` в `config/settings.py`.
 
@@ -243,6 +243,10 @@
 | «Қабылданды» — только вердикт жюри | тост подачи говорит «жіберілді» | `AcceptedIsTheJuryWord` |
 | DEC-21 (AI-декларация) | радио + `<details>` в `contest_submit.html` | `ContestSubmitForm` |
 | DEC-24 (возраст) | чекбокс `confirm_age` | `ContestSubmitForm` |
+| FR-CONT-11 / BR-47a | `components/contest_poster.html`, `Contest.poster` | `ContestPosterIsItsOwn` |
+| FR-CONT-12 | `components/share_button.html` (`tone='on-dark'`) в хиро детальной | `ContestPageCanBeShared` |
+| FR-CONT-13 / BR-47 | `Contest.series` → `other_editions` → `partials/contest/_editions.html` | `ContestEditionsAreLinked` |
+| FR-CONT-14 / DEC-17 | `page_state` в `contest_list` / `contest_detail` / `my_submissions`, `components/skeleton_contest_card.html` | `test_states.ContestStates` |
 | BR-42 (₸) | фильтр `spaced` | `test_desktop_layout.MoneyFormatting` |
 
 ## 14.9 LINKS, LEGAL, SYS
@@ -285,6 +289,7 @@ Showcase-маршруты `/_design/tokens/`, `/_design/components/`, `/_design/
 | Поле `Notification` или `Submission` | [08 BR-70a / BR-72a / BR-41a](08-business-rules.md), [12 §12.4](12-domain-model-contract.md), [05](05-functional-spec.md) FR-NOTIF-05/06 |
 | Строка с относительным временем | только через `kk_ago()` — [16 §16.4](16-content-voice.md); писать её в данных запрещено |
 | Номинация, присуждение или эмблема награды | [08 BR-44…46](08-business-rules.md), [12 §12.4](12-domain-model-contract.md), [05](05-functional-spec.md) FR-CONT-10 / FR-PROF-06, [03 §3.6](03-genre-color-system.md) |
+| Афиша конкурса или связь выпусков | [08 BR-47/47a](08-business-rules.md), [12 §12.4](12-domain-model-contract.md), [05](05-functional-spec.md) FR-CONT-11/13, [03 §3.3](03-genre-color-system.md) (пары `L C` афиши) |
 | Новый маршрут в `core/urls.py` | [05 §5.13](05-functional-spec.md) (карта переходов), эта карта, `PUBLIC_URLS` в `test_urls_smoke.py` |
 | Новый компонент в `templates/components/` | [04](04-component-library.md), счётчик в `CLAUDE.md` |
 | Новый тест-файл | [15](15-testing-contract.md), счётчики в `README.md`, `CLAUDE.md` и `AGENTS.md` |

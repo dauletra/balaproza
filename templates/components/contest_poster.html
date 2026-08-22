@@ -1,0 +1,45 @@
+{% comment %}
+    ContestPoster (FR-CONT-11, BR-47a) — фон афиши конкурса. Двухрежимный,
+    как `cover_placeholder`:
+      • загружен файл (`contest.poster`, MEDIA_ROOT) — рендерится <img>;
+      • пусто — типографическая афиша: градиент OKLCH по названию плюс
+        первая буква водяным знаком.
+
+    Раньше на этом месте стоял `{% static contest.cover %}` — фотография
+    книжной обложки из `static/img/bookN.jpg`. К конкурсу она не имела
+    отношения ни одним пикселем, и четыре конкурса различались тем, чья
+    книга досталась каждому.
+
+    Hue выводится из длины слага — той же техникой, что у `avatar.html`:
+    справочник жанров тут ни при чём, а выпуски одного конкурса
+    («жас-алдым-2023» и «-2026») получают один цвет, потому что слаги у
+    них одной длины. Пары `L C` — уже объявленные в docs/03 §3.3.
+
+    Слой абсолютный, поэтому родитель ОБЯЗАН быть `relative`: иначе
+    containing block становится initial containing block, и элемент
+    уезжает за экран (см. CLAUDE.md про горизонтальные скроллеры).
+
+    Затемнение рисуется всегда: поверх афиши в обоих вызовах лежит белый
+    текст, и «иногда со скримом» означало бы «иногда нечитаемо» — ровно
+    так фотография книги с белым корешком съедала бейдж фазы.
+
+    Параметры:
+      contest    — Contest (poster, name, slug)
+      letter_cls — размер водяного знака (default text-[120px])
+{% endcomment %}
+{% with hue=contest.slug|length letter=contest.name|cut:"«"|slice:":1" %}
+{% if contest.poster %}
+    <img src="/media/{{ contest.poster }}" alt=""
+         class="absolute inset-0 h-full w-full object-cover" loading="lazy">
+{% else %}
+    <span aria-hidden="true" class="absolute inset-0"
+          style="background: linear-gradient(135deg, oklch(0.32 0.14 {% widthratio hue 1 31 %}), oklch(0.26 0.12 {% widthratio hue 1 31 %}));"></span>
+    <span aria-hidden="true"
+          class="absolute -right-2 -bottom-6 select-none font-display font-bold leading-none tracking-tight text-white/10 {{ letter_cls|default:'text-[120px]' }}">
+        {{ letter|upper }}
+    </span>
+{% endif %}
+
+<span aria-hidden="true" class="absolute inset-0"
+      style="background: linear-gradient(180deg, rgba(15,23,42,0.10) 0%, rgba(15,23,42,0.65) 100%);"></span>
+{% endwith %}

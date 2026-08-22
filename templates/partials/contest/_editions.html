@@ -1,0 +1,31 @@
+{% comment %}
+    Выпуски одного конкурса по годам (FR-CONT-13, BR-47).
+
+    Пока этого блока не было, завершённый конкурс кончался составом жюри.
+    Пришедший из поиска на «Жас алдым — 2023» узнавал, что всё закончилось
+    два с половиной года назад, и уходил — хотя приём в выпуск этого года
+    шёл прямо сейчас, страницей рядом.
+
+    Год берётся из `Contest.year` (дата итогов), а не из имени: имя выпуска
+    задаёт админ, и «Жас алдым» без года разошёлся бы с датой первым же
+    переносом сроков (DEC-45).
+
+    Контекст: contest
+{% endcomment %}
+{% if contest.other_editions %}
+    <section class="mb-8 rounded-lg border border-slate-200 bg-white p-6">
+        <h2 class="font-display text-lg font-bold text-slate-900">Басқа жылдар</h2>
+        <ul class="mt-4 flex flex-col gap-2">
+            {% for e in contest.other_editions %}
+                <li>
+                    <a href="{% url 'core:contest_detail' slug=e.slug %}"
+                       class="flex flex-wrap items-center gap-3 rounded-md border border-slate-200 px-4 py-3 hover:border-brand hover:bg-slate-50">
+                        <span class="font-display text-sm font-bold text-slate-900">{{ e.year }}</span>
+                        <span class="min-w-0 flex-1 truncate font-sans text-sm text-slate-700">{{ e.name }}</span>
+                        {% include "components/contest_status.html" with contest=e %}
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+{% endif %}

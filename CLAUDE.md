@@ -105,12 +105,12 @@ balaproza_v1/
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
 │   │                             # stub_data.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 840 тестов в 16 файлах (см. ниже)
+│   └── tests/                    # 857 тестов в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
 │   ├── 404.html / 500.html       # branded error pages (500 — standalone, без base.html)
-│   ├── components/               # 59 атомов и composites (см. docs/04)
+│   ├── components/               # 61 атомов и composites (см. docs/04)
 │   │                             # включая cover_placeholder (двухрежимный: <img> если
 │   │                             # story.cover задан, иначе типографическая плашка OKLCH +
 │   │                             # буква по primary genre.hue),
@@ -221,7 +221,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 840 тестов
+uv run python manage.py test core       # все 857 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 

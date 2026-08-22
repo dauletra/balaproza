@@ -1,0 +1,14 @@
+{% comment %}
+    Skeleton для ContestCard (DEC-17). Повторяет сетку самой карточки:
+    афиша h-32, заголовок, подзаголовок, строка метрики. Скелетон, не
+    совпадающий с контентом, даёт прыжок раскладки в момент загрузки —
+    это уже ловил `test_desktop_layout` на главной.
+{% endcomment %}
+<div class="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white" aria-hidden="true">
+    {% include "components/skeleton_box.html" with h="h-32" radius="none" only %}
+    <div class="flex flex-col gap-2 p-4">
+        {% include "components/skeleton_box.html" with w="w-3/4" h="h-5" only %}
+        {% include "components/skeleton_box.html" with w="w-1/2" h="h-3" only %}
+        <div class="pt-2">{% include "components/skeleton_box.html" with w="w-20" h="h-3" only %}</div>
+    </div>
+</div>

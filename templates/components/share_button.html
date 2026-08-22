@@ -9,6 +9,11 @@
       label    — текст кнопки (default: "Бөлісу")
       wrap_cls — доп. классы обёртки (опц., напр. "flex-1" в ряду действий)
       btn_cls  — доп. классы кнопки (опц., напр. "w-full justify-center")
+      tone     — 'light' (default, белая кнопка на светлом) | 'on-dark'
+                 (прозрачная на тёмной афише конкурса). Отдельный параметр,
+                 а не приписка в `btn_cls`: `bg-white` и `bg-white/15` —
+                 утилиты одного свойства, и какая победит, решает порядок
+                 в собранном CSS, а не порядок в атрибуте
 
     Использование:
       {% include "components/share_button.html" with url=request.build_absolute_uri title=story.title %}
@@ -47,7 +52,9 @@
      class="relative {{ wrap_cls|default:'' }}">
     <button type="button" @click="share()" @click.outside="open = false"
             aria-label="{{ btn_label }}"
-            class="inline-flex h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-50 {{ btn_cls|default:'' }}">
+            class="inline-flex items-center gap-2 rounded-md border px-4 font-sans text-sm font-semibold
+                   {% if tone == 'on-dark' %}h-10 border-white/40 bg-white/15 text-white hover:bg-white/25
+                   {% else %}h-11 border-slate-300 bg-white text-slate-700 hover:bg-slate-50{% endif %} {{ btn_cls|default:'' }}">
         {% include "components/icon.html" with name="paper-plane" size=16 only %}
         <span>{{ btn_label }}</span>
     </button>

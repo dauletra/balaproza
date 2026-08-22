@@ -97,6 +97,53 @@ class MyStoriesStates(TestCase):
         self.assertNotContains(r, 'Таң алдында')
 
 
+class ContestStates(TestCase):
+    """DEC-17 требует состояний на всех data-зависимых страницах, а раздел
+    конкурсов был единственным, где их не было ни на одной."""
+
+    def test_list_loading_shows_skeletons(self):
+        r = self.client.get(reverse('core:contest_list') + '?state=loading')
+        self.assertContains(r, 'animate-pulse')
+        self.assertNotContains(r, 'Оқушыларға арналған әдеби байқау')
+
+    def test_list_error(self):
+        r = self.client.get(reverse('core:contest_list') + '?state=error')
+        self.assertContains(r, 'Байқаулар тізімін жүктеу мүмкін болмады')
+        self.assertNotContains(r, 'Оқушыларға арналған әдеби байқау')
+
+    def test_detail_loading(self):
+        r = self.client.get(reverse('core:contest_detail', args=['bolashak-mektebi'])
+                            + '?state=loading')
+        self.assertContains(r, 'animate-pulse')
+        self.assertNotContains(r, 'Қазылар алқасы')
+
+    def test_detail_error(self):
+        r = self.client.get(reverse('core:contest_detail', args=['bolashak-mektebi'])
+                            + '?state=error')
+        self.assertContains(r, 'Байқау деректерін жүктеу мүмкін болмады')
+        self.assertNotContains(r, 'Қазылар алқасы')
+
+    def test_unknown_slug_wins_over_state(self):
+        """Несуществующий конкурс не «загружается» — его нет.
+
+        Скелетон на месте несуществующей страницы обещает контент,
+        которого не будет.
+        """
+        r = self.client.get(reverse('core:contest_detail', args=['no-such-contest'])
+                            + '?state=loading')
+        self.assertContains(r, 'Байқау табылмады')
+        self.assertNotContains(r, 'animate-pulse')
+
+    def test_my_submissions_states(self):
+        _login_as_aidana(self.client)
+        loading = self.client.get(reverse('core:my_submissions') + '?state=loading')
+        self.assertContains(loading, 'animate-pulse')
+        self.assertNotContains(loading, 'Қаралуда')
+        error = self.client.get(reverse('core:my_submissions') + '?state=error')
+        self.assertContains(error, 'Өтінімдерді жүктеу мүмкін болмады')
+        self.assertNotContains(error, 'Қаралуда')
+
+
 # ════════════════════════════ Component fixtures ═══════════════════════════
 
 class ErrorStateComponent(TestCase):

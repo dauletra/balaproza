@@ -1,11 +1,15 @@
 """CONT · конкурсы: список / детальная / подача / мои заявки."""
 
 from datetime import date
+from pathlib import Path
+from unittest import mock
 
 from django.test import TestCase
 from django.urls import reverse
 
 from core import stub_data
+
+TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
 
 
 def _login_as_aidana(client):
@@ -1179,6 +1183,98 @@ class AcceptedIsTheJuryWord(TestCase):
         _login_as(self.client, 'dina_books')
         r = self.client.get(reverse('core:my_submissions'))
         self.assertContains(r, stub_data.CONTEST_RESULT_LABELS['accepted'])
+
+
+# ════════════════════════════ CONT-7 · афиша и выходы ══════════════════════
+
+class ContestPosterIsItsOwn(TestCase):
+    """Афиша конкурса — своя, а не фотография чужой книги (FR-CONT-11).
+
+    В `static/img/bookN.jpg` лежат книжные обложки; четыре конкурса
+    различались тем, чья книга досталась каждому.
+    """
+
+    TPL = TEMPLATES / 'components'
+
+    def test_contest_templates_do_not_pull_static_book_photos(self):
+        for name in ('components/contest_card.html',
+                     'pages/contests/contest_detail.html'):
+            with self.subTest(template=name):
+                body = (TEMPLATES / name).read_text(encoding='utf-8')
+                self.assertNotIn('img/book', body)
+                self.assertNotIn('contest.cover', body)
+
+    def test_cover_field_is_gone(self):
+        self.assertNotIn('cover', stub_data.Contest.__dataclass_fields__)
+        self.assertIn('poster', stub_data.Contest.__dataclass_fields__)
+
+    def test_poster_renders_on_list_and_detail(self):
+        for url in ('/contests/', '/contests/bolashak-mektebi/'):
+            with self.subTest(url=url):
+                html = self.client.get(url).content.decode()
+                self.assertIn('oklch(', html,
+                              'типографическая афиша не отрендерилась')
+
+    def test_declared_poster_files_live_in_media(self):
+        """Афишу грузит админ в MEDIA_ROOT, как эмблему награды (BR-46)."""
+        for c in stub_data.CONTESTS:
+            if c.poster:
+                with self.subTest(contest=c.slug):
+                    self.assertTrue(c.poster.startswith('contests/'))
+                    self.assertFalse(c.poster.endswith('.svg'))
+
+
+class ContestEditionsAreLinked(TestCase):
+    """Завершённый конкурс перестал быть тупиком (FR-CONT-13, BR-47)."""
+
+    def test_editions_see_each_other(self):
+        old = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        new = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2026']
+        self.assertEqual([c.slug for c in old.other_editions], [new.slug])
+        self.assertEqual([c.slug for c in new.other_editions], [old.slug])
+
+    def test_a_one_off_contest_has_no_editions(self):
+        self.assertEqual(stub_data.CONTESTS_BY_SLUG['altyn-qalam'].other_editions, [])
+
+    def test_finished_page_links_to_the_open_edition(self):
+        r = self.client.get(reverse('core:contest_detail', args=['zhas-aldym-2023']))
+        self.assertContains(r, reverse('core:contest_detail', args=['zhas-aldym-2026']))
+        self.assertContains(r, 'Басқа жылдар')
+
+    def test_year_comes_from_the_data_not_the_name(self):
+        for c in stub_data.CONTESTS:
+            for e in c.other_editions:
+                with self.subTest(contest=c.slug, edition=e.slug):
+                    self.assertEqual(e.year, e.results_on.year)
+
+
+class ContestPageCanBeShared(TestCase):
+    """FR-CONT-12: конкурс живёт тем, что о нём рассказывают."""
+
+    def test_share_button_in_every_phase(self):
+        for slug in stub_data.CONTESTS_BY_SLUG:
+            with self.subTest(contest=slug):
+                r = self.client.get(reverse('core:contest_detail', args=[slug]))
+                self.assertContains(r, 'Бөлісу')
+
+    def test_unknown_slug_has_nothing_to_share(self):
+        r = self.client.get(reverse('core:contest_detail', args=['no-such-contest']))
+        self.assertNotContains(r, 'Бөлісу')
+
+
+class ContestVocabularyInEmptyState(TestCase):
+    """Ветка, которая не рендерится, всё равно должна говорить по-казахски.
+
+    Пустое состояние списка говорило «Әзірге конкурс жоқ» и пережило
+    чистку CONT-1 только потому, что конкурсы в стабе есть всегда.
+    """
+
+    def test_empty_list_says_baiqau(self):
+        with mock.patch.object(stub_data, 'OPEN_CONTESTS', []), \
+             mock.patch.object(stub_data, 'FINISHED_CONTESTS', []):
+            html = self.client.get(reverse('core:contest_list')).content.decode()
+        self.assertNotIn('онкурс', html)
+        self.assertIn('Әзірге байқау жоқ', html)
 
 
 class BlockedSubmitExplainsItself(TestCase):

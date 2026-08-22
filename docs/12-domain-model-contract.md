@@ -1,6 +1,6 @@
 # 12. Domain model contract for F14
 
-> `Обновлён: 2026-08-22` · `Сверен с кодом: b3ba26d`
+> `Обновлён: 2026-08-22` · `Сверен с кодом: f80eca0`
 
 This document is the implementation contract for replacing `core/stub_data.py` with real Django models. It does not introduce models yet; it fixes the fields, relationships, computed values, and query helpers that the current templates already depend on.
 
@@ -40,7 +40,7 @@ What the table carries instead is the part `stub_data.py` cannot state: what mus
 | **Story** | `Story` | `OnProcess` is a continuation state, **not** a moderation state. Public catalog carries only `Published` and explicitly allowed public states. `format` is chosen by the author, never inferred from chapter count (DEC-28). Status labels — `components/status_badge.html`, see [16 §16.3](16-content-voice.md) |
 | **Chapter** | `Chapter`, `CHAPTERS_BY_STORY` | One-based numbers. Bodies live **outside** `stub_data.py` in `core/story_texts/<slug>/<n>.txt`; `_chapter()` loads them and derives `char_count`. Keep long prose out of the data module. Read via `?chapter=N` — no separate route (DEC-30). **`Story.chapters` не может обещать больше, чем есть записей**: запись главы обязана нести текст, поэтому произведение без текста несёт `chapters=0`, а не пустые главы. Закрыто `test_stub_data.DeclaredChapterCountMatchesLoadedChapters`, там же заморожен список каталожных сериалов, которым текст ещё не написан |
 | **Collection** | `Collection` | Ordered many-to-many with `Story`. Editorial curation by a moderator, not a smart auto-filter, and separate from contests (DEC-27). **Admin-authored only** — there is no user-created collection (DEC-31); `count` and `covers` are derived from `story_slugs`, never stored alongside it |
-| **Contest** | `Contest` | Хранятся три даты (`opens_on` / `closes_on` / `results_on`); фаза, отсчёт, год и число заявок **выводятся** (DEC-45, BR-40a). Хранимого `status` нет и заводить его нельзя — это тот же класс поля, что `Author.works`. Separate from collections. Admin UI is Django admin for MVP (DEC-23) |
+| **Contest** | `Contest` | Хранятся три даты (`opens_on` / `closes_on` / `results_on`); фаза, отсчёт, год и число заявок **выводятся** (DEC-45, BR-40a). Хранимого `status` нет и заводить его нельзя — это тот же класс поля, что `Author.works`. Повторяющийся конкурс — отдельный объект на каждый выпуск, связь через `series` (BR-47): у выпусков расходится всё, чем конкурс является. Separate from collections. Admin UI is Django admin for MVP (DEC-23) |
 | **Submission** | `Submission` | One story per author per contest (BR-23). Eligibility is a query/service concern, never template logic (BR-22, BR-24). `submitted_on` is a date; the relative wording is derived (BR-41a) |
 | **LibraryEntry** | `LibraryEntry` | `kind`: `saved` / `reading` / `done`, non-overlapping (BR-60/61). Continue-reading is a first-class reader workflow — it drives both the hero and the mobile nav |
 | **Comment** | `StoryComment` | One reply level only (BR-30). Anchored to a chapter via `chapter_number`; `None` means the whole work. Reply form and comment-like persistence can wait |
@@ -162,6 +162,9 @@ Contest — **хранятся три даты, остальное выводи�
 - `winners` — производное **от присуждений**, а не хранимый кортеж
 - `winner_stories` — производное: `Story` по слагам, неизвестные молча отбрасываются
 - `current_stage` / `next_stage` — производные: этап, идущий сейчас, и ближайший будущий. Нужны правому рейлу (FR-CONT-09) — «что идёт сейчас» единственное, чего нет в хиро
+- `poster: str` — афиша, файл в `MEDIA_ROOT` (`contests/<slug>.<ext>`), грузит админ; пусто — типографическая афиша (BR-47a). Прежнее `cover` указывало в `static/img/bookN.jpg` — фотографию книжной обложки, к конкурсу отношения не имевшую
+- `series: str` — слаг семейства повторяющегося конкурса (BR-47). Пусто — разовый
+- `other_editions` — производное: другие выпуски того же семейства, свежие сверху. Связь по `series`, не по совпадению имён
 
 ContestAward (BR-44, BR-46):
 - `slug`, `title`, `image` (файл в `MEDIA_ROOT`, пусто — типографическая заглушка), `description`

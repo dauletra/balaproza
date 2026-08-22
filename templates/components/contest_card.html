@@ -1,4 +1,4 @@
-{% load static balaproza %}
+{% load balaproza %}
 {% comment %}
     ContestCard (FR-CONT-01). Карточка конкурса для списка.
     Параметры:
@@ -7,9 +7,9 @@
 <a href="{% url 'core:contest_detail' slug=contest.slug %}"
    class="group flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition-shadow hover:shadow-card-hover">
 
-    {# ── Обложка с тинтом по статусу ── #}
-    <div class="relative h-32 w-full bg-cover bg-center"
-         style="background-image: linear-gradient(180deg, rgba(15,23,42,0.0) 0%, rgba(15,23,42,0.55) 100%), url('{% static contest.cover %}')">
+    {# ── Афиша: своя, а не фотография чужой книги (FR-CONT-11) ── #}
+    <div class="relative h-32 w-full overflow-hidden">
+        {% include "components/contest_poster.html" with contest=contest letter_cls="text-[96px]" only %}
         <div class="absolute left-3 top-3">
             {% include "components/contest_status.html" with contest=contest %}
         </div>

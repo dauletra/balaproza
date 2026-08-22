@@ -19,6 +19,15 @@
         {% endif %}
     </header>
 
+    {% if page_state == 'loading' %}
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {% for _ in '123456'|make_list %}
+                {% include "components/skeleton_contest_card.html" %}
+            {% endfor %}
+        </div>
+    {% elif page_state == 'error' %}
+        {% include "components/error_state.html" with message="Байқаулар тізімін жүктеу мүмкін болмады." %}
+    {% else %}
     {% if active_contests %}
         <section class="mb-10">
             {% comment %}
@@ -48,6 +57,13 @@
     {% endif %}
 
     {% if not active_contests and not finished_contests %}
-        {% include "components/empty_state.html" with icon="paper-plane" title="Әзірге конкурс жоқ" text="Жаңа байқаулар туралы хабарлама аласың — хабарландырулар бөлімінде." %}
+        {% comment %}
+            Пустое состояние говорило «Әзірге конкурс жоқ» — русское слово
+            в казахском интерфейсе, ровно то, что CONT-1 вычистил повсюду
+            (docs/16 §16.4). Уцелело оно потому, что ветка не рендерилась
+            ни на одной странице: конкурсы в стабе есть всегда.
+        {% endcomment %}
+        {% include "components/empty_state.html" with icon="paper-plane" title="Әзірге байқау жоқ" text="Жаңа байқаулар туралы хабарлама аласың — хабарламалар бөлімінде." %}
+    {% endif %}
     {% endif %}
 {% endblock %}

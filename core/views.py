@@ -879,6 +879,9 @@ def notifications(request):
 # ───────────────────────── CONT — конкурсы ───────────────────────────────
 def contest_list(request):
     return render(request, 'pages/contests/contest_list.html', {
+        # DEC-17 требует состояний на всех data-зависимых страницах, и
+        # раздел конкурсов был единственным, где их не было ни на одной.
+        'page_state':        _page_state(request),
         # Секций по-прежнему две, но «идущий» больше не значит «принимает
         # заявки»: точную фазу называет бейдж на карточке (DEC-45).
         'active_contests':   stub_data.OPEN_CONTESTS,
@@ -911,6 +914,7 @@ def contest_detail(request, slug):
     return render(request, 'pages/contests/contest_detail.html', {
         'has_right_rail': _contest_rail_has_content(contest, submitted=submitted,
                                                     hide_cta=False),
+        'page_state':     _page_state(request),
         'slug':           slug,
         'contest':        contest,
         # Присуждения, а не просто работы: строка победителя называет
@@ -986,6 +990,7 @@ def my_submissions(request):
         for sub in (stub_data.submissions_of(username) if username else [])
     ]
     return render(request, 'pages/contests/my_submissions.html', {
+        'page_state': _page_state(request),
         'items': items,
         # Модалка подключается только когда ей есть что подтверждать:
         # иначе на странице висел бы слушатель события, которое некому
