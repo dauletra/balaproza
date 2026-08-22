@@ -115,12 +115,12 @@ balaproza_v1/
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
 │   │                             # stub_data.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 911 тестов в 16 файлах (см. ниже)
+│   └── tests/                    # 931 тестов в 16 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
 │   ├── 404.html / 500.html       # branded error pages (500 — standalone, без base.html)
-│   ├── components/               # 61 атомов и composites (см. docs/04)
+│   ├── components/               # 62 атомов и composites (см. docs/04)
 │   │                             # включая cover_placeholder (двухрежимный: <img> если
 │   │                             # story.cover задан, иначе типографическая плашка OKLCH +
 │   │                             # буква по primary genre.hue),
@@ -236,7 +236,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 911 тестов
+uv run python manage.py test core       # все 931 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 
@@ -303,6 +303,7 @@ def _login_as_aidana(client):
 - **Иконки** — только через `components/icon.html` + спрайт (`templates/components/icons/_sprite.html`). Если нужной иконки нет — добавить новый `<symbol>` в спрайт, а не брать похожую по наличию.
   **Подключать всегда с `only`**: `{% include "components/icon.html" with name="pen" size=16 only %}`. Без него include наследует родительский контекст, и `label` кнопки/бейджа/пилюли утекает в иконку — та получает `role="img"` с той же подписью, что и текст рядом, и скринридер читает её дважды («Жаңа шығарма Жаңа шығарма»). Осознанно `label` иконке не передаёт ни один вызов в проекте. Закрыто `test_template_lint.IconIncludesAreIsolated` + `IconLabelsDoNotDuplicateText`
 - **Метрики в `stat_pill`** — всегда с `label` (полная озвучка с числом: `story.views|spaced|add:" оқылым"`). Значение под `aria-hidden`, иконка декоративная — без подписи цифры пропадают из озвучки целиком. Подпись рендерится в `sr-only`, а не в `aria-label`: у `<span>` с role=generic имя не выставляется
+- **`aria-label` на `<span>`/`<div>` без `role` не озвучивается вовсе** — у обоих роль `generic`, и имя ARIA им не выставляет. Правило было записано выше только для `stat_pill` и не соблюдалось больше нигде: так молча пропали точка «оқылмаған» на уведомлении (единственный признак непрочитанного для незрячего) и счётчик ұнату в списке глав. Подпись идёт `<span class="sr-only">`, сам элемент — под `aria-hidden`. Аватар — декоративен целиком (`aria-hidden`): имя автора во всех вызовах стоит соседним текстом. Закрыто `test_template_lint.GenericElementsCarryNoAriaLabel`
 - **Числа: `compact_count` — читателю, `spaced` — автору.** Узкие карточки каталога сжимают («2,1 мың»), авторский кабинет показывает точное с разрядами («1 042»). `stringformat:"d"` не форматирует ничего и запрещён
 - **Относительное время — только `stub_data.kk_ago()`.** «5 күн бұрын» в данных — хранимое производное: у уведомления оно устаревало назавтра, у заявки врало проверяемо («6 ай бұрын» о конкурсе, закрывшемся два с половиной года назад). Хранится момент (`days_ago`, `submitted_on: date`), подпись выводится (BR-70a, BR-41a)
 - **Уведомление ведёт к своему предмету и не переписывает его имя** (BR-72a). Имя конкурса или работы приходит из объекта (`n.contest.name`, `n.story.title`), в `text` лежит только событие. Исключение — `comment`: там `text` это цитата читателя

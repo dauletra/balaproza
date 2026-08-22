@@ -1,0 +1,29 @@
+{% comment %}
+    NotifBell — колокольчик со счётчиком непрочитанных (FR-NOTIF-02).
+
+    Экземпляра два: десктопный кластер шапки и мобильный. Разметка одна —
+    вторая копия счётчика разошлась бы с первой ровно так, как разошлись
+    профильные партиалы, скопированные в свой и чужой профиль.
+
+    До этого колокольчик существовал только внутри `hidden md:flex`, и на
+    телефоне раздел не открывался ниоткуда: в mobile bottom nav уведомлений
+    нет намеренно (07 §7.6), профиль на них не ссылается. «Единственная
+    точка показа» из FR-NOTIF-02 просто отсутствовала на мобильном.
+
+    `unread_notifications` приходит из контекст-процессора `auth_state`,
+    поэтому include вызывается без `with`.
+
+    Параметры:
+      cls — дополнительные классы на ссылку (компенсация отступов у вызова)
+{% endcomment %}
+<a href="{% url 'core:notifications' %}"
+   aria-label="Хабарламалар{% if unread_notifications %} ({{ unread_notifications }} оқылмаған){% endif %}"
+   class="relative rounded-pill p-2 hover:bg-slate-100 {{ cls }}">
+    {% include "components/icon.html" with name="bell" size=22 cls="text-slate-600" only %}
+    {% if unread_notifications %}
+        <span aria-hidden="true"
+              class="absolute -top-0.5 -right-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-pill bg-notif px-1 font-sans text-[10px] font-bold text-notif-fg">
+            {{ unread_notifications }}
+        </span>
+    {% endif %}
+</a>

@@ -22,9 +22,15 @@
                       {% if c.number == current_chapter_number %}bg-brand-light/30 text-brand{% else %}text-slate-700{% endif %}">
                 <span class="{% if compact == 'sm' %}w-5 text-[10px]{% else %}w-6 text-xs{% endif %} shrink-0 text-right font-mono text-slate-400">{{ c.number }}</span>
                 <span class="min-w-0 flex-1 truncate">{{ c.title }}</span>
+                {% comment %}
+                    Подпись `sr-only`, а не `aria-label`: у `<span>` роль
+                    `generic`, имя ей не выставляется — счётчик пропадал
+                    из озвучки целиком. То же правило, что у `stat_pill`.
+                {% endcomment %}
                 {% if c.likes %}
-                    <span class="inline-flex shrink-0 items-center gap-1 font-sans text-[11px] text-slate-400" aria-label="{{ c.likes }} ұнату">
+                    <span class="relative inline-flex shrink-0 items-center gap-1 font-sans text-[11px] text-slate-400">
                         {% include "components/icon.html" with name="heart" size=11 only %}
+                        <span class="sr-only">{{ c.likes }} ұнату</span>
                         <span aria-hidden="true">{{ c.likes }}</span>
                     </span>
                 {% endif %}

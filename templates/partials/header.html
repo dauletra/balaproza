@@ -32,12 +32,24 @@
             </kbd>
         </form>
 
-        {# Mobile: иконка поиска открывает тот же popup #}
-        <button type="button" aria-label="Іздеу"
-                @click="$dispatch('open-search')"
-                class="ml-auto -m-2 rounded-pill p-2 hover:bg-slate-100 md:hidden">
-            {% include "components/icon.html" with name="search" size=22 cls="text-slate-600" only %}
-        </button>
+        {% comment %}
+            Mobile: иконка поиска открывает тот же popup, рядом — колокольчик.
+
+            Колокольчик до этого жил только в десктопном кластере ниже
+            (`hidden md:flex`), и на телефоне уведомления не открывались
+            ниоткуда. Отступ вынесен на обёртку: `-m-2` на обеих кнопках
+            сразу съедал бы промежуток между ними.
+        {% endcomment %}
+        <div class="ml-auto -mr-2 flex items-center md:hidden">
+            <button type="button" aria-label="Іздеу"
+                    @click="$dispatch('open-search')"
+                    class="rounded-pill p-2 hover:bg-slate-100">
+                {% include "components/icon.html" with name="search" size=22 cls="text-slate-600" only %}
+            </button>
+            {% if signed_in %}
+                {% include "components/notif_bell.html" %}
+            {% endif %}
+        </div>
 
         {# ── Правый кластер (desktop) ── #}
         <nav class="ml-auto hidden items-center gap-6 md:flex" aria-label="Қолданушы әрекеттері">
@@ -60,18 +72,8 @@
             </a>
 
             {% if signed_in %}
-                {# Колокольчик + красный счётчик #}
-                <a href="{% url 'core:notifications' %}"
-                   aria-label="Хабарламалар{% if unread_notifications %} ({{ unread_notifications }} оқылмаған){% endif %}"
-                   class="relative -m-2 rounded-pill p-2 hover:bg-slate-100">
-                    {% include "components/icon.html" with name="bell" size=22 cls="text-slate-600" only %}
-                    {% if unread_notifications %}
-                        <span aria-hidden="true"
-                              class="absolute -top-0.5 -right-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-pill bg-notif px-1 font-sans text-[10px] font-bold text-notif-fg">
-                            {{ unread_notifications }}
-                        </span>
-                    {% endif %}
-                </a>
+                {# Колокольчик + красный счётчик — та же разметка, что на мобильном #}
+                {% include "components/notif_bell.html" with cls="-m-2" %}
 
                 {# Профиль-меню (Alpine: клик → выпадайка) #}
                 <div x-data="{ open: false }" class="relative">

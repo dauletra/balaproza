@@ -4,21 +4,37 @@
 
 {% block content %}
 {% if not signed_in %}
-    {% include "components/auth_gate.html" with reason="Хабарламаларды көру үшін" %}
+    {% comment %}
+        `title` обязателен: страница за гейтом своего `<h1>` не рендерит,
+        и у гостя документ оставался вовсе без заголовка первого уровня.
+    {% endcomment %}
+    {% include "components/auth_gate.html" with title="Хабарламалар" reason="Хабарламаларды көру үшін" %}
 {% else %}
+    {% comment %}
+        Шапка стояла выше ветвления по `page_state` и потому пережёвывала
+        состояния: в `?state=error` страница одновременно сообщала
+        «жүктеу мүмкін болмады» и «4 оқылмаған» — с рабочей кнопкой
+        «барлығын оқылды деп белгілеу». Заголовок остаётся всегда, сводка
+        и кнопка — только когда данные действительно есть (DEC-17).
+
+        «Уақыт бойынша топтастырылған» убрано: строка пересказывала
+        заголовки групп, стоящие двумя сантиметрами ниже.
+    {% endcomment %}
     <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
             <h1 class="font-display text-3xl font-bold text-slate-900">Хабарламалар</h1>
-            <p class="mt-1 font-sans text-sm text-slate-600">
-                {% if unread_total %}
-                    {{ unread_total }} оқылмаған. Уақыт бойынша топтастырылған.
-                {% else %}
-                    Барлық хабарламалар оқылды.
-                {% endif %}
-            </p>
+            {% if has_data %}
+                <p class="mt-1 font-sans text-sm text-slate-600">
+                    {% if unread_total %}
+                        {{ unread_total }} оқылмаған.
+                    {% else %}
+                        Барлық хабарламалар оқылды.
+                    {% endif %}
+                </p>
+            {% endif %}
         </div>
-        {% if has_any %}
-            <form method="post" action="#" x-data
+        {% if has_data and has_any %}
+            <form method="post" action="{{ request.path }}" x-data
                   @submit.prevent="$dispatch('toast', { kind:'success', text:'Барлығы оқылды деп белгіленді (демо)' })">
                 {% csrf_token %}
                 <button type="submit"
@@ -30,40 +46,50 @@
         {% endif %}
     </header>
 
+    {% comment %}
+        Скелетон повторяет сетку контента, а не список вообще: реальная
+        лента — секции с заголовком группы, и плоские пять строк давали
+        рывок при подстановке. То же правило, что держит `HomeRowSize`
+        для рядов главной.
+    {% endcomment %}
     {% if page_state == 'loading' %}
-        <div class="flex flex-col gap-3">
-            {% for _ in '12345'|make_list %}
-                {% include "components/skeleton_notification_item.html" %}
-            {% endfor %}
+        <div class="flex flex-col gap-8">
+            <section>
+                <span aria-hidden="true" class="mb-3 block h-3 w-24 animate-pulse rounded-sm bg-slate-200"></span>
+                <div class="flex flex-col gap-3">
+                    {% for row in '123'|make_list %}{% include "components/skeleton_notification_item.html" %}{% endfor %}
+                </div>
+            </section>
+            <section>
+                <span aria-hidden="true" class="mb-3 block h-3 w-20 animate-pulse rounded-sm bg-slate-200"></span>
+                <div class="flex flex-col gap-3">
+                    {% for row in '12'|make_list %}{% include "components/skeleton_notification_item.html" %}{% endfor %}
+                </div>
+            </section>
         </div>
     {% elif page_state == 'error' %}
         {% include "components/error_state.html" with message="Хабарламаларды жүктеу мүмкін болмады." %}
+    {% comment %}
+        Один цикл по готовым секциям вместо трёх дословных копий блока.
+        View передавал `buckets` с самого начала, а шаблон его не читал:
+        Django не умеет `grouped[b]`, и разметка обходила это копией на
+        каждый бакет с ключом-литералом внутри. Порядок и подписи теперь
+        приходят из реестра `NOTIF_BUCKETS`, пустые группы отсеяны во view.
+
+        Список размечен `<ul>/<li>` — до этого секция была набором
+        `<article>` в `<div>`, и скринридер не называл ни числа событий
+        в группе, ни границ самой группы.
+    {% endcomment %}
     {% elif has_any %}
         <div class="flex flex-col gap-8">
-            {% if grouped.today %}
-                <section>
-                    <h2 class="mb-3 font-display text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ bucket_labels.today }}</h2>
-                    <div class="flex flex-col gap-3">
-                        {% for n in grouped.today %}{% include "components/notification_item.html" with n=n %}{% endfor %}
-                    </div>
+            {% for s in sections %}
+                <section aria-labelledby="notif-{{ s.key }}">
+                    <h2 id="notif-{{ s.key }}" class="mb-3 font-display text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ s.label }}</h2>
+                    <ul class="flex flex-col gap-3">
+                        {% for n in s.items %}<li>{% include "components/notification_item.html" with n=n %}</li>{% endfor %}
+                    </ul>
                 </section>
-            {% endif %}
-            {% if grouped.yesterday %}
-                <section>
-                    <h2 class="mb-3 font-display text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ bucket_labels.yesterday }}</h2>
-                    <div class="flex flex-col gap-3">
-                        {% for n in grouped.yesterday %}{% include "components/notification_item.html" with n=n %}{% endfor %}
-                    </div>
-                </section>
-            {% endif %}
-            {% if grouped.past_week %}
-                <section>
-                    <h2 class="mb-3 font-display text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ bucket_labels.past_week }}</h2>
-                    <div class="flex flex-col gap-3">
-                        {% for n in grouped.past_week %}{% include "components/notification_item.html" with n=n %}{% endfor %}
-                    </div>
-                </section>
-            {% endif %}
+            {% endfor %}
         </div>
     {% else %}
         {% include "components/empty_state.html" with icon="bell" title="Әзірге хабарлама жоқ" text="Саған пікір жазылғанда, ұнатулар келгенде немесе жаңа бөлім шыққанда — осында көрсетіледі." %}

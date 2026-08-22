@@ -5,9 +5,18 @@
 
     В продакшене подставится фото пользователя.
 
+    **Аватар декоративен.** Раньше на нём висел `aria-label` с именем
+    автора — и не работал: у `<span>` роль `generic`, имя ей не
+    выставляется, зато буква инициала озвучивалась как отдельный текст
+    («А» перед именем). Ни один вызов не ставит аватар без имени рядом
+    текстом — во всех тринадцати оно стоит соседним элементом, — поэтому
+    подпись здесь была бы вторым прочтением того же имени. Уходит под
+    `aria-hidden` целиком: то же правило, по которому иконка не повторяет
+    текст рядом с собой (`test_template_lint.IconLabelsDoNotDuplicateText`).
+
     Параметры:
       size      — px (default 36)
-      name      — отображаемое имя (для инициалов и aria-label)
+      name      — отображаемое имя (для инициалов и цвета)
       username  — стабильный идентификатор для выбора цвета (опц.)
 {% endcomment %}
 {% with s=size|default:36 disp=name|default:"" uname=username|default:"" %}
@@ -18,7 +27,7 @@
              background: oklch(0.86 0.08 {% widthratio seed|length 1 31 %});
              color: oklch(0.32 0.14 {% widthratio seed|length 1 31 %});
              font-size: {% widthratio s 5 2 %}px;"
-      {% if disp %}aria-label="{{ disp }}"{% endif %}>
+      aria-hidden="true">
     {{ letter|upper }}
 </span>
 {% endwith %}

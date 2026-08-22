@@ -1,5 +1,7 @@
 """PROF / LIB / NOTIF — три родственных авторизованных раздела."""
 
+import re
+from html.parser import HTMLParser
 from pathlib import Path
 from unittest import mock
 
@@ -1126,6 +1128,241 @@ class NotificationsEmpty(TestCase):
         self.assertContains(r, 'Әзірге хабарлама жоқ')
         # Кнопки «Mark all» не должно быть в пустом стейте
         self.assertNotContains(r, 'Барлығын оқылды')
+
+
+class NotificationsHeaderFollowsTheState(TestCase):
+    """Шапка не говорит о данных, которых на экране нет (DEC-17).
+
+    Она стояла выше ветвления по `page_state`, поэтому в `?state=error`
+    страница одновременно сообщала «жүктеу мүмкін болмады» и «4 оқылмаған»
+    — с рабочей кнопкой «барлығын оқылды деп белгілеу».
+    """
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+
+    def _get(self, state=''):
+        url = reverse('core:notifications') + (f'?state={state}' if state else '')
+        return self.client.get(url).content.decode()
+
+    def test_content_state_keeps_the_summary(self):
+        html = self._get()
+        self.assertIn('оқылмаған', html)
+        self.assertIn('Барлығын оқылды деп белгілеу', html)
+
+    def test_error_state_drops_summary_and_action(self):
+        html = self._get('error')
+        self.assertNotIn('Барлығын оқылды деп белгілеу', html)
+        self.assertNotIn('оқылмаған.', html)
+
+    def test_loading_state_drops_summary_and_action(self):
+        html = self._get('loading')
+        self.assertNotIn('Барлығын оқылды деп белгілеу', html)
+        self.assertNotIn('оқылмаған.', html)
+
+    def test_heading_survives_every_state(self):
+        """Заголовок — часть структуры документа, а не часть данных."""
+        for state in ('', 'loading', 'error'):
+            with self.subTest(state=state or 'content'):
+                self.assertIn('<h1', self._get(state))
+
+    def test_mark_all_posts_somewhere_real(self):
+        """`action="#"` без JS отправлял форму в никуда."""
+        self.assertNotIn('action="#"', self._get())
+
+
+class NotificationsRenderFromTheRegistry(TestCase):
+    """Секции строит реестр `NOTIF_BUCKETS`, а не три копии блока."""
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+        self.response = self.client.get(reverse('core:notifications'))
+
+    def test_sections_follow_the_registry_order(self):
+        keys = [s['key'] for s in self.response.context['sections']]
+        self.assertEqual(keys, [b for b in stub_data.NOTIF_BUCKETS if keys.count(b)])
+        self.assertEqual(keys, sorted(keys, key=stub_data.NOTIF_BUCKETS.index))
+
+    def test_empty_bucket_renders_no_heading(self):
+        grouped = stub_data.notifications_for_user('aidana')
+        lonely = {b: (items if b == 'today' else []) for b, items in grouped.items()}
+        with mock.patch.object(stub_data, 'notifications_for_user', return_value=lonely):
+            r = self.client.get(reverse('core:notifications'))
+        self.assertEqual([s['key'] for s in r.context['sections']], ['today'])
+        self.assertNotContains(r, stub_data.NOTIF_BUCKET_LABELS['yesterday'])
+
+    def test_labels_come_from_the_registry(self):
+        for s in self.response.context['sections']:
+            with self.subTest(bucket=s['key']):
+                self.assertEqual(s['label'], stub_data.NOTIF_BUCKET_LABELS[s['key']])
+
+    def test_group_is_a_list(self):
+        """`<ul>/<li>`: иначе скринридер не называет число событий в группе."""
+        self.assertContains(self.response, '<ul class="flex flex-col gap-3">')
+
+
+class NotificationIconsFollowTheRegistry(TestCase):
+    """Иконку выбирают по значению, а не по наличию формы (docs/04 §4.2).
+
+    Конкурс носил `bookmark-filled` — глиф, который по DEC-09b означает
+    активное «сохранено» и стоит на текущей главе и на кнопке «сақталды».
+    Модерация носила `check`: галка утверждает «одобрено», хотя событие
+    бывает отказом и ожиданием. Лайк носил пару `status-error-*` — токен,
+    подписанный в `@theme` как «Отказ и удаление (DEC-39)».
+    """
+
+    ITEM = TEMPLATES / 'components' / 'notification_item.html'
+
+    def _chip(self):
+        """Блок выбора иконки — без окружающих комментариев.
+
+        Сравнивать с текстом всего файла нельзя: объяснение правки само
+        называет глифы, от которых она уводит.
+        """
+        body = self.ITEM.read_text(encoding='utf-8')
+        return body.split('{% endcomment %}\n    <span class="grid', 1)[1].split('</span>', 1)[0]
+
+    def _rendered(self):
+        _login_as_aidana(self.client)
+        return self.client.get(reverse('core:notifications')).content.decode()
+
+    def test_contest_wears_the_trophy(self):
+        self.assertIn('icon-trophy', self._rendered())
+        self.assertNotIn('bookmark', self._chip(),
+                         'залитая закладка по DEC-09b значит «сохранено»')
+
+    def test_moderation_wears_the_shield(self):
+        self.assertIn('icon-shield', self._rendered())
+        self.assertNotIn('name="check"', self._chip(),
+                         'галка утверждает «одобрено» независимо от исхода')
+
+    def test_like_does_not_borrow_the_error_token(self):
+        like = self._chip().split("n.kind == 'like'", 1)[1].split('{% elif', 1)[0]
+        self.assertNotIn('status-error', like,
+                         'красный на лайке — это «ошибка», а не «сердце»')
+
+    def test_every_kind_still_has_an_icon(self):
+        """Правка иконок не должна оставить тип без глифа."""
+        chip = self._chip()
+        for kind in stub_data.NOTIF_KINDS:
+            with self.subTest(kind=kind):
+                self.assertIn(f"n.kind == '{kind}'", chip)
+
+
+class UnreadIsVisibleAndAnnounced(TestCase):
+    """Непрочитанное отличимо и глазами, и на слух.
+
+    Оба признака были сломаны одновременно, и страница выглядела рабочей.
+    Фон задавался двумя классами на одном элементе — `bg-white` и
+    `bg-slate-50/60`; побеждает та утилита, что стоит позже в собранном
+    CSS, а `.bg-white` идёт после. Подсветка не появлялась никогда.
+    Точка же несла `aria-label` на `<span>` без роли — атрибут, который
+    скринридер игнорирует. Для незрячего непрочитанных не существовало.
+    """
+
+    ITEM = TEMPLATES / 'components' / 'notification_item.html'
+
+    def test_background_is_exclusive_not_layered(self):
+        body = self.ITEM.read_text(encoding='utf-8')
+        opening = body.split('<article', 1)[1].split('>', 1)[0]
+        self.assertNotIn(
+            'bg-white', opening.split('{% if n.read %}')[0],
+            'фон непрочитанного перекрывается безусловным bg-white: две '
+            'bg-утилиты на одном элементе разрешает не порядок в class, '
+            'а порядок в собранном CSS',
+        )
+        self.assertIn('{% if n.read %}bg-white{% else %}', opening)
+
+    def test_unread_dot_is_announced_by_text(self):
+        _login_as_aidana(self.client)
+        html = self.client.get(reverse('core:notifications')).content.decode()
+        self.assertIn('<span class="sr-only">оқылмаған</span>', html)
+        self.assertNotIn('aria-label="оқылмаған"', html)
+
+    def test_read_notification_carries_no_marker(self):
+        """Отметка стоит только у непрочитанного — иначе она ничего не значит."""
+        unread = stub_data.unread_count_for_user('aidana')
+        _login_as_aidana(self.client)
+        html = self.client.get(reverse('core:notifications')).content.decode()
+        self.assertEqual(html.count('<span class="sr-only">оқылмаған</span>'), unread)
+
+
+class NotificationsReachableWithoutDesktopHeader(TestCase):
+    """Раздел открывается с телефона (FR-NOTIF-02).
+
+    Единственная ссылка на уведомления лежала внутри `hidden … md:flex` —
+    десктопного кластера шапки. В mobile bottom nav уведомлений нет
+    намеренно (07 §7.6), профиль на них не ссылается, и на телефоне
+    раздел не открывался ниоткуда: страница существовала, входа не было.
+
+    Проверка идёт обходом DOM, а не поиском подстроки: важно не то, что
+    ссылка есть в разметке, а то, что она лежит вне поддерева, скрытого
+    до `md`. Конкретная вёрстка мобильного кластера при этом не
+    закрепляется — тест утверждает достижимость, а не расположение.
+    """
+
+    VOID = {'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+            'link', 'meta', 'source', 'track', 'wbr'}
+
+    # `hidden` + возврат к display на брейкпоинте = «только с этой ширины».
+    DESKTOP_ONLY = re.compile(r'\bhidden\b')
+    SHOWN_AT = re.compile(r'\b(sm|md|lg|xl|2xl):(flex|block|grid|inline-flex|inline-block|table)\b')
+
+    class _Scan(HTMLParser):
+        def __init__(self, void, is_desktop_only, href):
+            super().__init__(convert_charrefs=True)
+            self.void = void
+            self.is_desktop_only = is_desktop_only
+            self.href = href
+            self.stack = []        # [(tag, скрыт ли до брейкпоинта)]
+            self.reachable = False
+
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            hidden = self.is_desktop_only(attrs.get('class') or '')
+            buried = hidden or any(h for _, h in self.stack)
+            if tag == 'a' and attrs.get('href') == self.href and not buried:
+                self.reachable = True
+            if tag not in self.void:
+                self.stack.append((tag, buried))
+
+        def handle_endtag(self, tag):
+            for i in range(len(self.stack) - 1, -1, -1):
+                if self.stack[i][0] == tag:
+                    del self.stack[i:]
+                    return
+
+    def _desktop_only(self, cls):
+        return bool(self.DESKTOP_ONLY.search(cls) and self.SHOWN_AT.search(cls))
+
+    def _reachable_on(self, url):
+        parser = self._Scan(self.VOID, self._desktop_only,
+                            reverse('core:notifications'))
+        parser.feed(self.client.get(url).content.decode())
+        return parser.reachable
+
+    def test_link_survives_outside_the_desktop_cluster(self):
+        _login_as_aidana(self.client)
+        for name in ('core:home', 'core:library', 'core:profile_me'):
+            with self.subTest(page=name):
+                self.assertTrue(
+                    self._reachable_on(reverse(name)),
+                    'ссылка на уведомления лежит только внутри поддерева, '
+                    'скрытого до брейкпоинта: на телефоне раздел не открыть',
+                )
+
+    def test_the_guard_actually_sees_the_desktop_cluster(self):
+        """Страховка от теста, который проходит по недосмотру.
+
+        Если бы `_desktop_only` не срабатывал ни на чём, предыдущий тест
+        был бы зелёным при любой вёрстке.
+        """
+        self.assertTrue(self._desktop_only('ml-auto hidden items-center gap-6 md:flex'))
+        self.assertFalse(self._desktop_only('ml-auto -mr-2 flex items-center md:hidden'))
+
+    def test_guest_gets_no_bell(self):
+        """Гостю считать нечего — колокольчик без сессии не рендерится."""
+        self.assertFalse(self._reachable_on(reverse('core:home')))
 
 
 # ════════════════════════════ Header / nav badges ═════════════════════════

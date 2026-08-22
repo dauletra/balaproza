@@ -222,7 +222,12 @@
 | FR-NOTIF-01…04 / BR-70…72 | `notifications` | `NotificationsAuthed`, `NotificationsEmpty` |
 | FR-NOTIF-01 / BR-70a (время выводится) | `Notification.days_ago` → `when` / `bucket`, `stub_data.kk_ago` | `test_prof_lib_notif.NotificationTime` |
 | FR-NOTIF-05, 06 / BR-72a | `Notification.contest_slug` → `components/notification_item.html`, `Contest.timing_line` | `test_prof_lib_notif.NotificationsLeadSomewhere` |
-| FR-NOTIF-02 (бейдж) | `auth_state.unread_notifications` | `HeaderUnreadBadge` |
+| FR-NOTIF-02 (бейдж) | `auth_state.unread_notifications` → `components/notif_bell.html` | `HeaderUnreadBadge` |
+| FR-NOTIF-02 (вход с мобильного) | `partials/header.html` — колокольчик вне `hidden md:flex` | `test_prof_lib_notif.NotificationsReachableWithoutDesktopHeader` |
+| FR-NOTIF-01 (секции из реестра) | `views.notifications` → `sections` | `test_prof_lib_notif.NotificationsRenderFromTheRegistry` |
+| FR-NOTIF-03 (иконка по значению) | `components/notification_item.html`, docs/04 §4.2 | `test_prof_lib_notif.NotificationIconsFollowTheRegistry` |
+| DEC-17 на уведомлениях | `views.notifications` → `has_data` | `test_prof_lib_notif.NotificationsHeaderFollowsTheState` |
+| Отметка «непрочитано» видна и озвучена | `components/notification_item.html` | `test_prof_lib_notif.UnreadIsVisibleAndAnnounced`, `test_template_lint.GenericElementsCarryNoAriaLabel` |
 
 Переключение вкладок — реальный `?tab=` через `components/segmented_control.html`, не псевдо-табы (DEC-15). Разметка сегментов навигационная (`<nav>` + `aria-current`), ролей `tablist`/`tab` в них нет — они обещают панель, которой при переходе по URL не бывает (`test_template_lint.TabRolesPromiseAPanel`). Списки людей передают сегментам готовый `href`: они различаются путём, а не состоянием страницы.
 

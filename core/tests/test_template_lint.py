@@ -213,6 +213,63 @@ class IconIncludesAreIsolated(unittest.TestCase):
         )
 
 
+class GenericElementsCarryNoAriaLabel(TestCase):
+    """`aria-label` на `<span>`/`<div>` без роли не озвучивается.
+
+    У обоих роль `generic`, а имя из `aria-label` ARIA разрешает выставлять
+    только элементам с ролью, поддерживающей именование. Скринридеры такой
+    атрибут игнорируют: подпись видна в разметке, в озвучке её нет.
+
+    Так молча пропадали два места. Точка «оқылмаған» на уведомлении —
+    единственный признак непрочитанного для незрячего — и счётчик ұнату в
+    списке глав, где цифра вдобавок стояла под `aria-hidden`, то есть
+    строка не озвучивалась целиком. То же правило уже записано для
+    `stat_pill` в CLAUDE.md: подпись идёт `sr-only`, а не `aria-label`.
+
+    Проверка по отрендеренному DOM: `role` может приезжать из включаемого
+    компонента, а не стоять в том же файле.
+    """
+
+    GENERIC = {'span', 'div'}
+
+    class _Scan(HTMLParser):
+        def __init__(self, generic):
+            super().__init__(convert_charrefs=True)
+            self.generic = generic
+            self.offenders = []
+
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if tag in self.generic and attrs.get('aria-label') and not attrs.get('role'):
+                self.offenders.append((tag, attrs['aria-label']))
+
+    def test_no_aria_label_on_a_roleless_generic(self):
+        from django.urls import reverse
+        from core.tests.test_urls_smoke import PUBLIC_URLS
+
+        session = self.client.session
+        session['signed_in'] = True
+        session['user_name'] = 'Айдана'
+        session['user_username'] = 'aidana'
+        session.save()
+
+        offenders = []
+        for name, kwargs, label in PUBLIC_URLS:
+            response = self.client.get(reverse(name, kwargs=kwargs))
+            parser = self._Scan(self.GENERIC)
+            parser.feed(response.content.decode())
+            for tag, text in parser.offenders:
+                offenders.append(f'{label}: <{tag} aria-label="{text}">')
+
+        self.assertFalse(
+            sorted(set(offenders)),
+            'aria-label на элементе с ролью generic не озвучивается — подпись '
+            'есть в разметке и отсутствует в озвучке. Вынеси её в <span '
+            'class="sr-only">, а сам элемент пометь aria-hidden:\n  '
+            + '\n  '.join(sorted(set(offenders))),
+        )
+
+
 class IconLabelsDoNotDuplicateText(TestCase):
     """Озвученная иконка не должна повторять текст, рядом с которым стоит.
 

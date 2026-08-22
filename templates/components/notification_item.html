@@ -10,13 +10,36 @@
     Параметры:
       n — Notification (kind, when, actor, story, contest, text, read)
 {% endcomment %}
-<article class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-4
-                {% if not n.read %}bg-slate-50/60 ring-1 ring-brand/15{% endif %}">
+{% comment %}
+    Фон задан взаимоисключающе, а не двумя классами подряд. `bg-white` и
+    `bg-slate-50/60` на одном элементе — не «база и переопределение»:
+    побеждает та утилита, что стоит позже в собранном CSS, а там
+    `.bg-white` идёт после `.bg-slate-50\/60`. Подсветка непрочитанного
+    не появлялась никогда, оставалось только кольцо.
+{% endcomment %}
+<article class="relative flex items-start gap-3 rounded-lg border border-slate-200 p-4
+                {% if n.read %}bg-white{% else %}bg-slate-50/60 ring-1 ring-brand/15{% endif %}">
 
-    {# ── Иконка по типу события ── #}
+    {% comment %}
+        Иконка по типу события. Три правки против первой редакции — все
+        три о том, что иконку брали по наличию формы, а не по значению
+        (правило docs/04 §4.2):
+
+        `contest` носил `bookmark-filled`. Конкурс во всём проекте —
+        `trophy` (шапка, mobile bottom nav), а залитая закладка по DEC-09b
+        значит активное «сохранено»: тот же глиф стоит на текущей главе
+        в списке глав и на кнопке «сақталды» страницы произведения.
+
+        `moderation` носил `check`. Галка утверждает «одобрено» — а
+        событие бывает и отказом, и «ещё идёт» (именно это в данных и
+        лежит). Модерация в реестре иконок — `shield`.
+
+        `like` носил пару `status-error-*`. Токен подписан «Отказ и
+        удаление (DEC-39)»: красный здесь значил не «сердце», а «ошибка».
+    {% endcomment %}
     <span class="grid h-9 w-9 shrink-0 place-items-center rounded-pill
         {% if n.kind == 'comment' %}bg-status-info-bg text-status-info-fg
-        {% elif n.kind == 'like' %}bg-status-error-bg text-status-error-fg
+        {% elif n.kind == 'like' %}bg-brand/10 text-brand
         {% elif n.kind == 'new_chapter' %}bg-status-published-bg text-status-published-fg
         {% elif n.kind == 'follower' %}bg-slate-100 text-slate-700
         {% elif n.kind == 'moderation' %}bg-status-attention-bg text-status-attention-fg
@@ -31,9 +54,9 @@
         {% elif n.kind == 'follower' %}
             {% include "components/icon.html" with name="user-circle" size=18 only %}
         {% elif n.kind == 'moderation' %}
-            {% include "components/icon.html" with name="check" size=16 only %}
+            {% include "components/icon.html" with name="shield" size=16 only %}
         {% elif n.kind == 'contest' %}
-            {% include "components/icon.html" with name="bookmark-filled" size=16 only %}
+            {% include "components/icon.html" with name="trophy" size=16 only %}
         {% endif %}
     </span>
 
@@ -47,8 +70,17 @@
                 <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.public_name }}</a>
                 <span class="text-slate-700">«<a href="{% url 'core:story_detail' slug=n.story.slug %}" class="font-semibold hover:text-brand">{{ n.story.title }}</a>» туындысын ұнатты.</span>
             {% elif n.kind == 'new_chapter' and n.story %}
+                {% comment %}
+                    Автор назван и ведёт к себе. `actor_username` лежал в
+                    данных и не рендерился: событие приходит от того, на
+                    кого подписан читатель (BR-72), и без имени строка не
+                    отвечала, почему она вообще пришла.
+                {% endcomment %}
                 <a href="{% url 'core:story_detail' slug=n.story.slug %}" class="font-bold hover:text-brand">{{ n.story.title }}</a>
                 <span class="text-slate-700">— {{ n.text }}</span>
+                {% if n.actor %}
+                    <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-semibold text-slate-600 hover:text-brand">{{ n.actor.public_name }}</a>
+                {% endif %}
             {% elif n.kind == 'follower' and n.actor %}
                 <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.public_name }}</a>
                 <span class="text-slate-700">саған жазылды.</span>
@@ -93,8 +125,14 @@
         <p class="mt-1 font-sans text-xs text-slate-500">{{ n.when }}</p>
     </div>
 
+    {% comment %}
+        Подпись идёт `sr-only`, а не `aria-label`: у `<span>` роль
+        `generic`, и имя ей не выставляется — точка была видна глазами и
+        невидима скринридеру. То же лечение, что у `stat_pill`.
+    {% endcomment %}
     {% if not n.read %}
-        <span aria-label="оқылмаған"
+        <span class="sr-only">оқылмаған</span>
+        <span aria-hidden="true"
               class="mt-1 h-2 w-2 shrink-0 rounded-pill bg-notif"></span>
     {% endif %}
 </article>
