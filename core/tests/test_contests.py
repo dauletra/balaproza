@@ -1,5 +1,6 @@
 """CONT · конкурсы: список / детальная / подача / мои заявки."""
 
+import re
 from datetime import date
 from pathlib import Path
 from unittest import mock
@@ -1222,6 +1223,44 @@ class ContestPosterIsItsOwn(TestCase):
                 with self.subTest(contest=c.slug):
                     self.assertTrue(c.poster.startswith('contests/'))
                     self.assertFalse(c.poster.endswith('.svg'))
+
+
+class PosterStripHasAWidthBudget(TestCase):
+    """Пилюли на афише карточки не наезжают друг на друга.
+
+    Бейдж фазы с отсчётом занимают ~264px, пилюля приза — 78px, а полоса
+    трёхколоночной карточки даёт 252px. Пока это были две абсолютные
+    группы в противоположных углах (`left-3 top-3` и `right-3 top-3`),
+    ширину не считал никто: при двух колонках они перекрывались на 8px,
+    при трёх — на 90.
+
+    Геометрию тест проверить не может — только правило, из которого она
+    следует: одна полоса с распоркой вместо двух углов, и ряд статуса
+    переносится.
+    """
+
+    @staticmethod
+    def _markup(path):
+        """Шаблон без `{% comment %}`-блоков.
+
+        Объяснение в комментарии называет ту самую пару классов, которую
+        правило запрещает, — иначе тест ловил бы собственную документацию.
+        """
+        return re.sub(r'\{%\s*comment\s*%\}.*?\{%\s*endcomment\s*%\}', '',
+                      path.read_text(encoding='utf-8'), flags=re.S)
+
+    def test_card_uses_one_strip_not_two_corners(self):
+        body = self._markup(TEMPLATES / 'components' / 'contest_card.html')
+        self.assertIn('inset-x-3', body)
+        for corner in ('left-3 top-3', 'right-3 top-3'):
+            self.assertNotIn(
+                corner, body,
+                'абсолютный угол вернулся — соседняя пилюля снова окажется под ним')
+
+    def test_status_row_wraps(self):
+        body = self._markup(TEMPLATES / 'components' / 'contest_status.html')
+        self.assertIn('flex-wrap', body,
+                      'без переноса отсчёт не помещается в полосу узкой карточки')
 
 
 class ContestEditionsAreLinked(TestCase):

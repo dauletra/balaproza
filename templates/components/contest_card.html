@@ -10,14 +10,25 @@
     {# ── Афиша: своя, а не фотография чужой книги (FR-CONT-11) ── #}
     <div class="relative h-32 w-full overflow-hidden">
         {% include "components/contest_poster.html" with contest=contest letter_cls="text-[96px]" only %}
-        <div class="absolute left-3 top-3">
-            {% include "components/contest_status.html" with contest=contest %}
+
+        {% comment %}
+            Одна полоса с распоркой, а не две абсолютные группы в
+            противоположных углах. Раньше слева стоял `left-3 top-3`,
+            справа `right-3 top-3`, и ширину никто не считал: бейдж
+            с отсчётом занимают ~264px, пилюля приза — 78px, а полоса
+            трёхколоночной карточки даёт 252px. Пилюли наезжали друг на
+            друга на 8px уже при двух колонках и на 90px при трёх.
+        {% endcomment %}
+        <div class="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
+            <div class="min-w-0">
+                {% include "components/contest_status.html" with contest=contest %}
+            </div>
+            {% if contest.prize_kzt %}
+                <span class="inline-flex h-7 shrink-0 items-center rounded-pill bg-promo-cta px-3 font-sans text-xs font-bold text-white">
+                    {{ contest.prize_kzt|spaced }} ₸
+                </span>
+            {% endif %}
         </div>
-        {% if contest.prize_kzt %}
-            <span class="absolute right-3 top-3 inline-flex h-7 items-center rounded-pill bg-promo-cta px-3 font-sans text-xs font-bold text-white">
-                {{ contest.prize_kzt|spaced }} ₸
-            </span>
-        {% endif %}
     </div>
 
     {# ── Контент ── #}

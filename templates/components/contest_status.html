@@ -12,8 +12,13 @@
 
     Параметры:
       contest — Contest (phase, phase_label, days_left, days_until_open)
+
+    Ряд переносится (`flex-wrap`). Бейдж с отсчётом вместе занимают ~264px,
+    а на трёхколоночной карточке конкурса полоса афиши даёт 252px — без
+    переноса отсчёт вылезал под пилюлю приза в противоположном углу.
+    В хиро, где места много, перенос не срабатывает и вид прежний.
 {% endcomment %}
-<div class="inline-flex items-center gap-2">
+<div class="inline-flex flex-wrap items-center gap-2">
     {% if contest.phase == "upcoming" %}
         {% include "components/badge.html" with kind="info" label=contest.phase_label %}
         {% if contest.days_until_open %}
