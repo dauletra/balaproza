@@ -2971,6 +2971,21 @@ def read_ladder(username: str) -> list:
 #   contest      — статус заявки на конкурс
 NOTIF_KINDS = ("comment", "like", "new_chapter", "follower", "moderation", "contest")
 
+# Исход модерации (BR-11). Хранится, а не выводится из `Story.status`:
+# статус меняется дальше — автор правит работу и отправляет её снова, — а
+# уведомление остаётся записью о том, что решил модератор в тот день.
+# Выведи его из статуса, и вчерашний отказ завтра скажет «Модерацияда».
+# Тот же довод, по которому DEC-46 хранит `AwardGrant`, а не вычисляет
+# победу: акт человека не восстанавливается из состояния объекта.
+#
+# Пустая строка — решения ещё нет: модерация идёт.
+MODERATION_OUTCOMES = ("approved", "rejected")
+MODERATION_OUTCOME_LABELS = {
+    "approved": "Жарияланды",
+    "rejected": "Қабылданбады",
+    "":         "Модерацияда",
+}
+
 # Группы по времени (FR-NOTIF-01).
 NOTIF_BUCKETS = ("today", "yesterday", "past_week")
 NOTIF_BUCKET_LABELS = {
@@ -3003,6 +3018,7 @@ class Notification:
     actor_username: str = ""    # кто инициатор (для comment/like/follower); '' если системное
     story_slug: str = ""        # к чему относится (comment/like/new_chapter/moderation)
     contest_slug: str = ""      # к какому конкурсу относится (kind='contest')
+    outcome: str = ""           # kind='moderation': см. MODERATION_OUTCOMES; '' — решения нет
     text: str = ""              # только событие: имя предмета приходит из объекта
     read: bool = False          # прочитано ли
 
@@ -3021,6 +3037,17 @@ class Notification:
     @property
     def when(self) -> str:
         return kk_ago(self.days_ago, self.hours_ago)
+
+    @property
+    def outcome_label(self) -> str:
+        """Подпись исхода модерации — из реестра, не из шаблона.
+
+        Ровно то же правило, что у статусов работы (BR-10) и фаз конкурса
+        (BR-40): текст, который автор видит на каждом своём произведении,
+        собирается в одном месте. Второй его экземпляр в разметке разошёлся
+        бы с первым.
+        """
+        return MODERATION_OUTCOME_LABELS.get(self.outcome, "")
 
     @property
     def bucket(self) -> str:
@@ -3051,7 +3078,7 @@ NOTIFICATIONS_BY_USER: dict = {
         ),
         Notification(
             kind="moderation", hours_ago=9,
-            story_slug="aidana-erteg",
+            story_slug="aidana-erteg", outcome="",
             # Название работы в тексте не повторяется: его несёт ссылка на
             # саму работу. Раньше строка начиналась с «Ертегі ертеректегі»,
             # и переименование произведения оставило бы уведомление
@@ -3087,6 +3114,18 @@ NOTIFICATIONS_BY_USER: dict = {
         Notification(
             kind="like", days_ago=3,
             actor_username="sayyn", story_slug="aidana-kysh", read=True,
+        ),
+        # Отказ с причиной — BR-11 требует именно её, иначе автор не знает,
+        # что исправлять. Причина лежит в `text`: это собственные слова
+        # модератора, а не пересказ данных, — то же исключение из BR-72a,
+        # по которому у `comment` в `text` стоит цитата читателя.
+        # Работа после отказа вернулась в черновики (`aidana-kus` —
+        # `NotPublished`): данные не должны противоречить статусу.
+        Notification(
+            kind="moderation", days_ago=5,
+            story_slug="aidana-kus", outcome="rejected",
+            text="Бірінші бөлімде диалогтар үзіліп қалған. Толықтырып, қайта жіберші.",
+            read=True,
         ),
         # У aidana в этом конкурсе лежит заявка, и уведомление обязано
         # вести к нему: дата объявления итогов — первый вопрос после

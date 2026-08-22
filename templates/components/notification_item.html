@@ -31,24 +31,32 @@
         в списке глав и на кнопке «сақталды» страницы произведения.
 
         `moderation` носил `check`. Галка утверждает «одобрено» — а
-        событие бывает и отказом, и «ещё идёт» (именно это в данных и
-        лежит). Модерация в реестре иконок — `shield`.
+        событие бывает и отказом, и «ещё идёт». Модерация в реестре
+        иконок — `shield`, а исход несёт цвет и слово рядом: цветом одним
+        различие не передаётся.
 
-        `like` носил пару `status-error-*`. Токен подписан «Отказ и
-        удаление (DEC-39)»: красный здесь значил не «сердце», а «ошибка».
+        `like` носил `heart-filled` и пару `status-error-*`. Токен подписан
+        «Отказ и удаление (DEC-39)» — красный здесь значил не «сердце», а
+        «ошибка»; а залитое сердце после DEC-32 занято реакцией «Жүрегім»,
+        то есть называло одну из пяти. Контурное `heart` — уже принятый в
+        проекте знак совокупной реакции: им подписан `Chapter.likes` в
+        списке глав, а это сумма всех пяти.
     {% endcomment %}
     <span class="grid h-9 w-9 shrink-0 place-items-center rounded-pill
         {% if n.kind == 'comment' %}bg-status-info-bg text-status-info-fg
         {% elif n.kind == 'like' %}bg-brand/10 text-brand
         {% elif n.kind == 'new_chapter' %}bg-status-published-bg text-status-published-fg
         {% elif n.kind == 'follower' %}bg-slate-100 text-slate-700
-        {% elif n.kind == 'moderation' %}bg-status-attention-bg text-status-attention-fg
+        {% elif n.kind == 'moderation' %}
+            {% if n.outcome == 'approved' %}bg-status-published-bg text-status-published-fg
+            {% elif n.outcome == 'rejected' %}bg-status-error-bg text-status-error-fg
+            {% else %}bg-status-attention-bg text-status-attention-fg{% endif %}
         {% elif n.kind == 'contest' %}bg-status-warning-bg text-status-warning-fg
         {% else %}bg-slate-100 text-slate-500{% endif %}">
         {% if n.kind == 'comment' %}
             {% include "components/icon.html" with name="message-caption" size=16 only %}
         {% elif n.kind == 'like' %}
-            {% include "components/icon.html" with name="heart-filled" size=16 only %}
+            {% include "components/icon.html" with name="heart" size=16 only %}
         {% elif n.kind == 'new_chapter' %}
             {% include "components/icon.html" with name="book" size=16 only %}
         {% elif n.kind == 'follower' %}
@@ -67,8 +75,15 @@
                 <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.public_name }}</a>
                 <span class="text-slate-700">«{{ n.story.title }}» туындысына пікір қалдырды.</span>
             {% elif n.kind == 'like' and n.actor and n.story %}
+                {% comment %}
+                    «Ұнатты» описывало действие, которого в интерфейсе нет:
+                    DEC-32 заменил одиночный лайк главы пятью реакциями.
+                    Уведомление говорит о факте отклика, не называя, какой
+                    именно — раскладку «чем зацепило» автор смотрит в самой
+                    главе, как и `Chapter.top_reaction`.
+                {% endcomment %}
                 <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.public_name }}</a>
-                <span class="text-slate-700">«<a href="{% url 'core:story_detail' slug=n.story.slug %}" class="font-semibold hover:text-brand">{{ n.story.title }}</a>» туындысын ұнатты.</span>
+                <span class="text-slate-700">«<a href="{% url 'core:story_detail' slug=n.story.slug %}" class="font-semibold hover:text-brand">{{ n.story.title }}</a>» туындысына реакция қалдырды.</span>
             {% elif n.kind == 'new_chapter' and n.story %}
                 {% comment %}
                     Автор назван и ведёт к себе. `actor_username` лежал в
@@ -85,7 +100,16 @@
                 <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.public_name }}</a>
                 <span class="text-slate-700">саған жазылды.</span>
             {% elif n.kind == 'moderation' %}
-                <span class="font-bold">Модерация:</span>
+                {% comment %}
+                    Подпись называет исход, а не раздел. «Модерация:» перед
+                    любым событием сообщала только то, что уже сказано
+                    иконкой; чем кончилось — приходилось выяснять из текста,
+                    а у отказа там лежит причина, а не вердикт. Слово берётся
+                    из `MODERATION_OUTCOME_LABELS` (BR-11): второй его
+                    экземпляр в шаблоне разошёлся бы с реестром, как это
+                    запрещено для статусов работы (BR-10) и фаз конкурса.
+                {% endcomment %}
+                <span class="font-bold">{{ n.outcome_label }}:</span>
                 {% if n.story %}
                     <a href="{% url 'core:manage_story' slug=n.story.slug %}" class="font-semibold hover:text-brand">«{{ n.story.title }}»</a>
                     <span class="text-slate-700">— {{ n.text }}</span>

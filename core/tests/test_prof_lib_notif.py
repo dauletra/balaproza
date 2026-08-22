@@ -1098,12 +1098,15 @@ class NotificationsAuthed(TestCase):
         self.assertContains(self.response, 'Өткен аптада')
 
     def test_renders_all_notifications(self):
-        # Уникальные тексты по типам
+        # Уникальные тексты по типам. `like` больше не говорит «ұнатты»:
+        # DEC-32 заменил одиночный лайк главы пятью реакциями, и действия
+        # с таким именем в интерфейсе нет. Модерация называет исход
+        # (`MODERATION_OUTCOME_LABELS`), а не раздел.
         self.assertContains(self.response, 'пікір қалдырды')   # comment
-        self.assertContains(self.response, 'ұнатты')           # like
+        self.assertContains(self.response, 'реакция қалдырды')  # like
         self.assertContains(self.response, 'саған жазылды')    # follower
         self.assertContains(self.response, 'жаңа бөлім')       # new_chapter
-        self.assertContains(self.response, 'Модерация')        # moderation
+        self.assertContains(self.response, 'Модерацияда')      # moderation, решения нет
         self.assertContains(self.response, 'Байқау')           # contest
 
     def test_unread_summary_shows_count(self):
@@ -1128,6 +1131,107 @@ class NotificationsEmpty(TestCase):
         self.assertContains(r, 'Әзірге хабарлама жоқ')
         # Кнопки «Mark all» не должно быть в пустом стейте
         self.assertNotContains(r, 'Барлығын оқылды')
+
+
+class ModerationNotificationNamesItsOutcome(TestCase):
+    """Исход модерации хранится и назван словом (BR-11).
+
+    Поля не было вовсе: и одобрение, и отказ, и «ещё идёт» приходили
+    одной строкой с зелёной галкой. Выводить исход из `Story.status`
+    нельзя — статус живёт дальше события: автор правит работу и шлёт её
+    снова, и вчерашний отказ начал бы говорить «Модерацияда». Тот же
+    довод, по которому DEC-46 хранит `AwardGrant`.
+    """
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+        self.response = self.client.get(reverse('core:notifications'))
+
+    def test_outcome_is_stored_not_derived(self):
+        self.assertIn('outcome', stub_data.Notification.__dataclass_fields__)
+
+    def test_label_comes_from_the_registry(self):
+        for outcome, label in stub_data.MODERATION_OUTCOME_LABELS.items():
+            with self.subTest(outcome=outcome or 'pending'):
+                n = stub_data.Notification(kind='moderation', outcome=outcome)
+                self.assertEqual(n.outcome_label, label)
+
+    def test_unknown_outcome_says_nothing(self):
+        """Лучше пусто, чем чужая подпись: реестр — единственный источник."""
+        n = stub_data.Notification(kind='moderation', outcome='whatever')
+        self.assertEqual(n.outcome_label, '')
+
+    def test_both_outcomes_are_rendered(self):
+        for outcome in stub_data.MODERATION_OUTCOMES:
+            grants = [n for n in stub_data.NOTIFICATIONS_BY_USER['aidana']
+                      if n.kind == 'moderation' and n.outcome == outcome]
+            if not grants:
+                continue
+            with self.subTest(outcome=outcome):
+                self.assertContains(
+                    self.response, stub_data.MODERATION_OUTCOME_LABELS[outcome])
+
+    def test_rejection_carries_a_reason(self):
+        """BR-11: при отклонении автор получает уведомление с причиной."""
+        rejected = [n for n in stub_data.NOTIFICATIONS_BY_USER['aidana']
+                    if n.kind == 'moderation' and n.outcome == 'rejected']
+        self.assertTrue(rejected, 'в стабе нет ни одного отказа — ветка не отрендерится')
+        for n in rejected:
+            with self.subTest(story=n.story_slug):
+                self.assertTrue(n.text.strip(), 'отказ без причины ничего не сообщает')
+                self.assertContains(self.response, n.text)
+
+    def test_outcome_does_not_contradict_the_story_status(self):
+        """Отклонённая работа не может лежать опубликованной."""
+        for n in stub_data.NOTIFICATIONS_BY_USER['aidana']:
+            if n.kind != 'moderation' or n.outcome != 'rejected' or not n.story:
+                continue
+            with self.subTest(story=n.story_slug):
+                self.assertFalse(
+                    n.story.is_public,
+                    'отказ модерации и публичная работа — противоречие в данных')
+
+    def test_outcome_only_belongs_to_moderation(self):
+        for n in stub_data.NOTIFICATIONS_BY_USER['aidana']:
+            if n.kind == 'moderation':
+                continue
+            with self.subTest(kind=n.kind):
+                self.assertEqual(n.outcome, '',
+                                 'исход есть только у модерации')
+
+
+class ReactionNotificationDoesNotSayLike(TestCase):
+    """После DEC-32 одиночного лайка главы нет — есть пять реакций.
+
+    Уведомление продолжало говорить «ұнатты», описывая действие, которого
+    в интерфейсе не осталось. Названия конкретной реакции строка не несёт:
+    раскладку «чем зацепило» автор смотрит в самой главе.
+    """
+
+    def setUp(self):
+        _login_as_aidana(self.client)
+        self.response = self.client.get(reverse('core:notifications'))
+
+    def test_wording_is_neutral(self):
+        self.assertContains(self.response, 'реакция қалдырды')
+        self.assertNotContains(self.response, 'ұнатты')
+
+    def test_no_single_reaction_is_named(self):
+        html = self.response.content.decode()
+        for r in stub_data.REACTIONS:
+            with self.subTest(reaction=r.slug):
+                self.assertNotIn(r.label, html)
+
+    def test_icon_is_the_aggregate_heart_not_the_reaction(self):
+        """`heart-filled` после DEC-32 — реакция «Жүрегім», одна из пяти.
+
+        Совокупность в проекте уже подписана контурным `heart`: им
+        помечен `Chapter.likes` в списке глав, а это сумма всех пяти.
+        """
+        chip = NotificationIconsFollowTheRegistry.ITEM.read_text(encoding='utf-8')
+        like = chip.split("{% elif n.kind == 'like' %}", 2)[2].split('{% elif', 1)[0]
+        self.assertIn('name="heart"', like)
+        self.assertNotIn('heart-filled', like)
 
 
 class NotificationsHeaderFollowsTheState(TestCase):
