@@ -1,6 +1,6 @@
 """CAT: search, genre index/detail, collections list/detail."""
 
-from django.test import TestCase
+from core.tests.base import TestCase
 from django.urls import reverse
 
 from core import stub_data
@@ -490,20 +490,20 @@ class CatalogSecondAxisFromQuery(TestCase):
         narrow = self.client.get(base + '?tag=mektep')
         self.assertLess(len(narrow.context['results']), len(wide.context['results']))
         for s in narrow.context['results']:
-            self.assertIn('fantezi', s.genres)
-            self.assertIn('mektep', s.tags)
+            self.assertIn('fantezi', [g.slug for g in s.genres_resolved])
+            self.assertIn('mektep', [t.slug for t in s.tags_resolved])
 
     def test_genre_query_narrows_the_catalog(self):
         r = self.client.get(reverse('core:catalog') + '?genre=triller')
         self.assertGreater(len(r.context['results']), 0)
         for s in r.context['results']:
-            self.assertIn('triller', s.genres)
+            self.assertIn('triller', [g.slug for g in s.genres_resolved])
 
     def test_path_wins_over_query(self):
         r = self.client.get(reverse('core:genre_detail',
                                     kwargs={'slug': 'triller'}) + '?genre=fantezi')
         for s in r.context['results']:
-            self.assertIn('triller', s.genres)
+            self.assertIn('triller', [g.slug for g in s.genres_resolved])
 
     def test_unknown_query_axis_is_ignored(self):
         plain = self.client.get(reverse('core:catalog'))

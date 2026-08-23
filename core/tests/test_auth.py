@@ -4,7 +4,7 @@
 Важно проверить open-redirect защиту и идемпотентность logout.
 """
 
-from django.test import TestCase
+from core.tests.base import TestCase
 from django.urls import reverse
 
 

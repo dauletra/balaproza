@@ -215,17 +215,31 @@ class SeededStoriesMatchTheStub(TestCase):
                 self.assertEqual(Story.objects.get(slug=stub.slug).is_public,
                                  stub.is_public)
 
-    def test_editorial_badge_transferred(self):
-        """Из двух знаков каталога переносится один. «Редакция таңдауы» —
-        акт редакции и хранится; «Байқауға қатысады» выводится из заявки,
-        и до этапа конкурсов его у модели нет намеренно."""
+    def test_editorial_badge_is_stored(self):
+        """«Редакция таңдауы» — акт редакции: из данных он не выводится,
+        как и присуждение награды (DEC-46)."""
         editorial = 'Редакция таңдауы'
         for stub in stub_data.STORIES:
             with self.subTest(story=stub.slug):
                 story = Story.objects.get(slug=stub.slug)
                 self.assertEqual(story.is_editorial_pick, editorial in stub.badges)
-                self.assertEqual(story.badges,
-                                 (editorial,) if editorial in stub.badges else ())
+                self.assertEqual(editorial in story.badges,
+                                 editorial in stub.badges)
+
+    def test_contest_badge_is_derived_and_finds_what_the_stub_missed(self):
+        """Второй знак каталога выводится из заявки в незавершённый конкурс.
+
+        Рукописный список знаков был неполон: у «Таң» заявка на «Алтын
+        қалам» есть, а знака не стояло. Ровно поэтому его и не хранят —
+        второй экземпляр факта расходится с первым.
+        """
+        contest = 'Байқауға қатысады'
+        marked = {s.slug for s in Story.objects.all() if contest in s.badges}
+        self.assertIn('igra-kuklovoda', marked)   # знак стоял и в стабе
+        self.assertIn('aidana-tan', marked)       # заявка есть, знака не было
+        # Работа, чей единственный конкурс завершён, знака не носит:
+        # «участвует» — про идущий конкурс, а не про биографию.
+        self.assertNotIn('temniy-lord', marked)
 
     def test_single_story_points_at_its_own_chapter(self):
         """Кнопка «Мәтін» у одночастного ведёт в существующую главу, а не

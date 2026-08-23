@@ -10,7 +10,7 @@
  - прогресс чтения отображается только если slug совпадает с SAMPLE_PROGRESS.
 """
 
-from django.test import TestCase
+from core.tests.base import TestCase
 from django.urls import reverse
 
 from core import stub_data

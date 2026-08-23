@@ -160,3 +160,8 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Демо-корпус кладётся в тестовую базу один раз за прогон, сразу после
+# миграций: страницы читают базу, и корпус нужен почти каждому тесту.
+# Подробности и цена решения — в `core/tests/runner.py`.
+TEST_RUNNER = 'core.tests.runner.SeededTestRunner'

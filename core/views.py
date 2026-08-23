@@ -53,8 +53,7 @@ def home(request):
 
     # Не литерал 'Published': после DEC-37 опубликованный сериал носит
     # OnProcess или Completed, и по литералу с главной пропали бы все десять.
-    published = [s for s in data.STORIES
-                 if s.status in data.PUBLIC_STATUSES]
+    published = data.public_stories()
 
     # Жанры на главной — полоса-вывеска, а не навигация (DEC-31): 12 цветных слов
     # объясняют, что это литературный портал, и ведут на /genres/<slug>/.
@@ -69,7 +68,7 @@ def home(request):
         'hero_focus':      hero_focus,
         'hero_contest':    data.HERO_CONTEST,
         'collections':     data.COLLECTIONS,
-        'genres':          data.GENRES,
+        'genres':          data.all_genres(),
         'book_of_week':    data.BOOK_OF_WEEK,
         'new_authors':     data.new_authors(4),
         'top_stories':     sorted(published, key=lambda s: s.views, reverse=True)[:5],
@@ -229,7 +228,7 @@ def _catalog_links(state: dict) -> dict:
     if state['query']:
         chips.append({'label': f'«{state["query"]}»', 'href': href(query='')})
     if state['genre']:
-        g = data.GENRES_BY_SLUG[state['genre']]
+        g = data.genre_by_slug(state['genre'])
         chips.append({'label': g.name, 'hue': g.hue, 'href': href(genre='')})
     if state['tag']:
         t = data.tag_by_slug(state['tag'])
@@ -268,7 +267,7 @@ def _catalog_links(state: dict) -> dict:
         'genre_options': [
             {'genre': g, 'active': g.slug == state['genre'],
              'href': href(genre='' if g.slug == state['genre'] else g.slug)}
-            for g in data.GENRES
+            for g in data.all_genres()
         ],
         'tag_options': [
             {'tag': t, 'active': t.slug == state['tag'],
@@ -324,7 +323,7 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
         request, default_sort=_catalog_default_sort(mode),
     )
 
-    genre = data.GENRES_BY_SLUG.get(genre_slug) if genre_slug else None
+    genre = data.genre_by_slug(genre_slug) if genre_slug else None
     tag = data.tag_by_slug(tag_slug) if tag_slug else None
     not_found = ((mode == 'genre' and genre is None)
                  or (mode == 'tag' and (tag is None or tag.status != 'accepted')))
@@ -333,7 +332,7 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
     eff_genre = genre_slug if genre else ''
     if not eff_genre:
         candidate = request.GET.get('genre', '')
-        eff_genre = candidate if candidate in data.GENRES_BY_SLUG else ''
+        eff_genre = candidate if data.genre_by_slug(candidate) else ''
     eff_tag = tag_slug if (tag and tag.status == 'accepted') else ''
     if not eff_tag:
         candidate = data.tag_by_slug(request.GET.get('tag', ''))
@@ -403,7 +402,7 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
             {'name': 'audience', 'legend': 'Жасың',      'options': data.CATALOG_AUDIENCE_FILTERS, 'current': audience},
             {'name': 'length',   'legend': 'Оқу уақыты', 'options': data.CATALOG_LENGTH_FILTERS,   'current': length},
         ],
-        'genres':             data.GENRES,
+        'genres':             data.all_genres(),
         'not_found_slug':     (genre_slug or tag_slug) if not_found else '',
         'current_genre_slug': eff_genre,
         'genre':              genre,
@@ -431,9 +430,12 @@ def catalog(request):
 
 
 def genre_index(request):
+    # Счётчики жанров считаются, а не хранятся, поэтому список берётся
+    # один раз: второй вызов — второй запрос с теми же агрегатами.
+    genres = data.all_genres()
     return render(request, 'pages/catalog/genre_index.html', {
-        'genres':       data.GENRES,
-        'total_stories': sum(g.count for g in data.GENRES),
+        'genres':        genres,
+        'total_stories': sum(g.count for g in genres),
     })
 
 
@@ -588,7 +590,7 @@ def new_story(request):
         # переехали в баптаулар вместе с аннотацией и доп. жанром: тег к
         # ненаписанному рассказу не выбирается, а `tag_input` со своим
         # автокомплитом был самым тяжёлым элементом формы создания.
-        'genres': data.GENRES,
+        'genres': data.all_genres(),
     })
 
 
@@ -631,7 +633,7 @@ def story_settings(request, slug):
     return render(request, 'pages/write/story_settings.html', {
         'slug':   slug,
         'story':  story,
-        'genres': data.GENRES,
+        'genres': data.all_genres(),
         # BR-10b: отметка выбирается автором, а не достаётся дефолтом.
         'story_audiences': data.STORY_AUDIENCES,
         # docs/11: данные для tag_input + текущие теги стори для edit-режима
@@ -1058,14 +1060,14 @@ def search_index_json(request):
                     # Обложки лежат в /media/ (после Фазы интеграции реальных файлов)
                     'cover':  ('/media/' + s.cover) if s.cover else '',
                 }
-                for s in data.STORIES
+                for s in data.public_stories()
                 # Тот же набор, что и в каталоге: по литералу 'Published'
                 # из Cmd+K выпали бы все сериалы (DEC-37).
                 if s.status in data.PUBLIC_STATUSES
             ],
             'authors': [
                 {'username': a.username, 'name': a.public_name}
-                for a in data.AUTHORS
+                for a in data.all_authors()
             ],
             # docs/11 Phase 3: теги в Cmd+K (только accepted)
             'tags': [
@@ -1138,9 +1140,9 @@ def design_components(request):
     # Микс accepted + pending — иллюстрирует фильтрацию tag_list по viewer
     mixed = accepted[:3] + pending[:2]
     return render(request, 'pages/_design/components.html', {
-        'genres':    data.GENRES,
-        'stories':   data.STORIES,
-        'authors':   data.AUTHORS,
+        'genres':    data.all_genres(),
+        'stories':   data.public_stories(),
+        'authors':   data.all_authors(),
         # Стаб-набор покрывает все четыре фазы (DEC-45), поэтому showcase
         # бейджа — это просто перебор конкурсов, а не четыре ручных вызова
         # с выдуманными аргументами, которые разойдутся с компонентом.
@@ -1160,7 +1162,7 @@ def design_states(request):
     if not settings.DEBUG:
         raise Http404
     return render(request, 'pages/_design/states.html', {
-        'sample_story':   data.STORIES[0],
+        'sample_story':   data.public_stories().first(),
         'sample_entry':   data.LIBRARY_BY_USER['aidana'][0],
         'sample_notif':   data.NOTIFICATIONS_BY_USER['aidana'][0],
         'sample_comment': data.COMMENTS_BY_STORY['dalney-berega'][0],

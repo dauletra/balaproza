@@ -1,6 +1,6 @@
 """AUTH-полировка (login/signup/success) + LINKS (Авторлар мектебі)."""
 
-from django.test import TestCase
+from core.tests.base import TestCase
 from django.urls import reverse
 
 from core import stub_data

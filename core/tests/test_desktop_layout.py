@@ -10,7 +10,7 @@ import re
 import unittest
 from pathlib import Path
 
-from django.test import TestCase
+from core.tests.base import TestCase
 from django.urls import reverse
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "templates"

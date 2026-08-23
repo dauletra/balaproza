@@ -4,7 +4,7 @@
 которые специфичны для каждого режима.
 """
 
-from django.test import TestCase
+from core.tests.base import TestCase
 from django.urls import reverse
 
 

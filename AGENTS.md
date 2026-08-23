@@ -53,6 +53,11 @@ balaproza_v1/
 │   │                             # не импортирует stub_data (test_data_facade).
 │   │                             # По мере Ф14 строки переезжают из stub_data в модули
 │   │                             # запросов — список импортов и есть карта прогресса
+│   ├── queries/                  # запросы к моделям: то, чем stub_data был для чтения
+│   │   └── catalog.py            # каталог/поиск/жанры (DEC-27, DEC-36): публичные статусы
+│   │                             # по умолчанию, накопительная ось жаса, объём чтения
+│   │                             # аннотацией (подзапросом, не Sum по join — иначе
+│   │                             # фильтр по тегам размножит строки и раздует сумму)
 │   ├── domain/                   # правила, а не записи: то, что переживёт Ф14
 │   │   ├── catalog.py            # оси каталога, PUBLIC_STATUSES, пресеты, KIND_PREDICATES
 │   │   ├── story.py              # REACTIONS (5, DEC-32), PUBLISH_CHECKLIST
@@ -158,7 +163,7 @@ balaproza_v1/
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
 │   │                             # domain.formatting.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 1036 тестов в 19 файлах (см. ниже)
+│   └── tests/                    # 1037 тестов в 19 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -279,13 +284,16 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 1036 тестов
+uv run python manage.py test core       # все 1037 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 
 Тесты в `core/tests/`:
 - `test_urls_smoke.py` — все маршруты в guest/auth + DEBUG-only design URLs
 - `test_auth.py`, `test_context.py`, `test_filters.py`, `test_stub_data.py`
+- `base.py` / `runner.py` — не тесты: общий `TestCase` для тех, кому нужен корпус,
+  и раннер, который кладёт корпус в тестовую базу **один раз за прогон** (сид на
+  каждом классе стоил трёх минут вместо минуты)
 - `test_data_facade.py` — шов Ф14: `stub_data` импортирует только фасад `core.data`,
   домен не знает о хранилище, каждое доменное имя достаётся через фасад
 - `test_models.py` — модели Ф14: публичное и приватное имя автора, путь тега,

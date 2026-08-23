@@ -1,6 +1,8 @@
 """Ф13 · Loading / Error / Empty states (DEC-17)."""
 
-from django.test import TestCase, override_settings
+from django.test import override_settings
+
+from core.tests.base import TestCase
 from django.urls import reverse
 
 

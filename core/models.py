@@ -349,10 +349,25 @@ class Story(models.Model):
     def badges(self) -> tuple:
         """Подписи знаков на карточке (DEC-36).
 
-        Пока только редакционный: «Байқауға қатысады» выводится из заявки,
-        а заявки приезжают своим этапом (docs/19 §19.4).
+        Редакционный знак хранится — это акт человека. Конкурсный
+        выводится из заявки в **незавершённый** конкурс: работа, ушедшая
+        к жюри, ещё участвует, и снимать с неё знак до объявления итогов
+        рано (DEC-45).
+
+        Выдача каталога подставляет ответ аннотацией `in_open_contest`:
+        без неё двадцать карточек — это двадцать лишних запросов, а с ней
+        свойство остаётся верным и у одиночного объекта.
         """
-        return (BADGE_LABELS['editorial'],) if self.is_editorial_pick else ()
+        out = []
+        if self.is_editorial_pick:
+            out.append(BADGE_LABELS['editorial'])
+        in_contest = getattr(self, 'in_open_contest', None)
+        if in_contest is None:
+            in_contest = self.submissions.filter(
+                contest__results_on__gt=timezone.localdate()).exists()
+        if in_contest:
+            out.append(BADGE_LABELS['contest'])
+        return tuple(out)
 
     # ── Объём чтения ─────────────────────────────────────────────────────
     @property

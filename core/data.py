@@ -78,11 +78,26 @@ from .domain.story import (
 )
 from .domain.tags import TAG_STATUSES
 
-# ── Справочники: жанры и теги ────────────────────────────────────────────
+# ── Каталог, поиск, жанры: уже на моделях ────────────────────────────────
+from .queries.catalog import (
+    all_authors,
+    all_genres,
+    apply_catalog_filters,
+    catalog_base,
+    filter_catalog,
+    genre_by_slug,
+    is_new_author,
+    public_stories,
+    related_stories,
+    search_authors,
+    search_stories,
+    stories_by_genre,
+    story_by_slug,
+)
+
+# ── Справочники: теги (жанры уже выше, из моделей) ───────────────────────
 from .stub_data import (
     BLOCKED_TAG_PATTERNS,
-    GENRES,
-    GENRES_BY_SLUG,
     TAGS,
     TAGS_BY_SLUG,
     accepted_tags_json,
@@ -92,17 +107,6 @@ from .stub_data import (
     tag_by_slug,
     tags_of,
     trending_tags,
-)
-
-# ── Каталог и поиск (DEC-27, DEC-36) ─────────────────────────────────────
-from .stub_data import (
-    apply_catalog_filters,
-    filter_catalog,
-    is_new_author,
-    related_stories,
-    search_authors,
-    search_stories,
-    stories_by_genre,
 )
 
 # ── Произведение, главы, отклик ──────────────────────────────────────────
@@ -122,8 +126,6 @@ from .stub_data import (
 
 # ── Автор: кабинет, профиль, публичные счётчики ──────────────────────────
 from .stub_data import (
-    AUTHORS,
-    AUTHORS_BY_USERNAME,
     can_submit_for_review,
     missing_for_review,
     my_stories_of,
@@ -188,18 +190,20 @@ from .stub_data import (
 # ── Ссылки «Авторлар мектебі» (DEC-22) ───────────────────────────────────
 from .stub_data import SCHOOL_LINKS
 
-# ── Стаб-специфичное: уедет первым ───────────────────────────────────────
-# Прямые обращения к хранилищу, которых после Ф14 не будет. `STORIES` и
-# `STORIES_BY_SLUG` заменяются менеджером на этапе каталога; три словаря
-# ниже нужны только витрине состояний `/_design/states/` — DEBUG-странице,
-# которой требуется по одному экземпляру каждого объекта.
+# ── Стаб-специфичное: источник для сида и остатки непереключённых страниц ─
+# `STORIES_BY_SLUG` ещё держит страницу произведения — она переключается
+# своим шагом. Остальное читает `seed_demo`, раскладывая корпус по
+# моделям, плюс витрина состояний `/_design/states/`, которой нужно по
+# одному экземпляру каждого объекта.
 from .stub_data import (  # noqa: F401
+    AUTHORS,
+    AUTHORS_BY_USERNAME,
     AWARD_GRANTS,
     COMMENTS_BY_STORY,
     FOLLOWING,
-    POLLS_BY_CHAPTER,
     LIBRARY_BY_USER,
     NOTIFICATIONS_BY_USER,
+    POLLS_BY_CHAPTER,
     STORIES,
     STORIES_BY_SLUG,
     SUBMISSIONS_BY_USER,

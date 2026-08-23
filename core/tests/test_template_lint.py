@@ -11,7 +11,7 @@ import unittest
 from html.parser import HTMLParser
 from pathlib import Path
 
-from django.test import TestCase
+from core.tests.base import TestCase
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "templates"
 

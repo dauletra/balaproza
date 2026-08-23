@@ -24,19 +24,23 @@ from core.models import BlockedTagPattern, Genre, Tag, User
 
 
 class UserSaysWhoTheAuthorIs(TestCase):
+    """Свои пользователи, а не корпусные: имена демо-авторов заняты сидом,
+    и тест о поведении модели не должен зависеть от того, кто есть в
+    базе."""
+
 
     def test_pen_name_is_the_public_name(self):
-        u = User.objects.create_user('sayyn', pen_name='sayyn', name='Сайын Нұрбекұлы')
+        u = User.objects.create_user('demo-pen', pen_name='sayyn', name='Сайын Нұрбекұлы')
         self.assertEqual(u.public_name, 'sayyn')
 
     def test_without_pen_name_the_nick_stands_in(self):
         """Ник — запасной вариант, а не второе имя: пустого места на месте
         автора у карточки не бывает."""
-        u = User.objects.create_user('aidana', name='Айдана Серікқызы')
-        self.assertEqual(u.public_name, '@aidana')
+        u = User.objects.create_user('demo-nick', name='Айдана Серікқызы')
+        self.assertEqual(u.public_name, '@demo-nick')
 
     def test_real_name_is_not_the_public_one(self):
-        u = User.objects.create_user('bekzhan_t', pen_name='BekTor',
+        u = User.objects.create_user('demo-real', pen_name='BekTor',
                                      name='Бекжан Тұрсынов')
         self.assertNotIn('Тұрсынов', u.public_name)
         self.assertEqual(u.get_full_name(), 'Бекжан Тұрсынов')
@@ -49,13 +53,13 @@ class UserSaysWhoTheAuthorIs(TestCase):
         self.assertNotIn('last_name', fields)
 
     def test_joined_year_comes_from_the_account(self):
-        u = User.objects.create_user('dina_books')
+        u = User.objects.create_user('demo-joined')
         self.assertEqual(u.joined_year, timezone.localtime(u.date_joined).year)
 
     def test_joined_year_is_almaty_time_not_utc(self):
         """Новогодняя ночь: 1 января, 02:00 по Алматы — это ещё 31 декабря
         по UTC. Профиль обязан говорить «2025 жылдан бері», а не 2024."""
-        u = User.objects.create_user('aygerim_k')
+        u = User.objects.create_user('demo-newyear')
         User.objects.filter(pk=u.pk).update(
             date_joined=datetime(2025, 1, 1, 2, 0, tzinfo=ZoneInfo('Asia/Almaty')))
         u.refresh_from_db()
@@ -94,16 +98,17 @@ class ReferenceDataArrivesWithTheSchema(TestCase):
 
 
 class TagsFollowTheirPath(TestCase):
+    """Свои теги, не корпусные: слаги демо-набора заняты сидом."""
 
     def test_new_tag_waits_for_a_moderator(self):
         """Дефолт — `pending`: тег заводит автор, а публикует модератор
         (BR-TAG-03)."""
-        tag = Tag.objects.create(slug='mektep', name='мектеп')
+        tag = Tag.objects.create(slug='demo-jana', name='жаңа тег')
         self.assertEqual(tag.status, 'pending')
         self.assertFalse(tag.is_public)
 
     def test_accepted_tag_is_public(self):
-        tag = Tag.objects.create(slug='dostyk', name='достық', status='accepted')
+        tag = Tag.objects.create(slug='demo-ashyq', name='ашық тег', status='accepted')
         self.assertTrue(tag.is_public)
 
     def test_rejected_tag_is_not_public(self):

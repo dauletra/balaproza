@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path
 from unittest import mock
 
-from django.test import TestCase
+from core.tests.base import TestCase
 from django.urls import reverse
 
 from core import data, stub_data, views
