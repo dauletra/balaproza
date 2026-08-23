@@ -15,6 +15,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MaxValueValidator
 from django.db import models
+from django.utils import timezone
 
 from .domain.tags import TAG_STATUSES
 
@@ -70,8 +71,14 @@ class User(AbstractUser):
 
         Год, а не полная дата: подростку важно «давно или недавно», а
         точный день — лишние персональные данные на публичной странице.
+
+        Считается по алматинскому времени, а не по UTC. Разница в пять
+        часов значит, что у всех, кто зарегистрировался в новогоднюю ночь
+        до пяти утра, профиль показывал бы прошлый год — ровно тот случай,
+        когда ошибка заметна одному человеку и никогда не воспроизводится
+        у того, кто её ищет.
         """
-        return self.date_joined.year
+        return timezone.localtime(self.date_joined).year
 
 
 class Genre(models.Model):

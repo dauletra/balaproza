@@ -68,6 +68,9 @@ balaproza_v1/
 │   ├── migrations/               # 0001_initial + 0002_reference_data (жанры и блок-лист
 │   │                             # заливает миграция: без них не работает каталог;
 │   │                             # литералы заморожены, stub_data не импортируется)
+│   ├── management/commands/      # seed_demo — демо-корпус в базе, идемпотентно.
+│   │                             # Читает через core.data, растёт по этапам Ф14;
+│   │                             # жанры не трогает — их заливает миграция
 │   ├── admin.py                  # инструмент модерации (DEC-23): пользователь без
 │   │                             # западных полей имени, жанры, путь тега групповым действием
 │   ├── stub_data.py              # ВСЕ «данные» проекта (Genre, Tag, Author, Story, Chapter,
@@ -138,7 +141,7 @@ balaproza_v1/
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
 │   │                             # domain.formatting.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 967 тестов в 18 файлах (см. ниже)
+│   └── tests/                    # 980 тестов в 19 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -259,7 +262,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 967 тестов
+uv run python manage.py test core       # все 980 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 
@@ -270,6 +273,8 @@ uv run python manage.py test core.tests.test_<file>
   домен не знает о хранилище, каждое доменное имя достаётся через фасад
 - `test_models.py` — модели Ф14: публичное и приватное имя автора, путь тега,
   нормализация блок-листа; справочник жанров из миграции совпадает со стабом
+- `test_seed.py` — `seed_demo`: идемпотентность (повтор возвращает изменённое
+  к эталону) и совпадение засеянного корпуса со стабом
 - `test_home.py`, `test_story.py`, `test_catalog.py`, `test_write.py`
 - `test_prof_lib_notif.py`, `test_contests.py`, `test_auth_links.py`, `test_states.py`
 - `test_desktop_layout.py` — регрессии каркаса: рейл только на `xl`, колонка контента 860px

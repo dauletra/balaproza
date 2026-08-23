@@ -13,7 +13,11 @@
 заморожены намеренно, сверять их с живым модулем больше нечем.
 """
 
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
+
 from django.test import TestCase
+from django.utils import timezone
 
 from core import stub_data
 from core.models import BlockedTagPattern, Genre, Tag, User
@@ -46,7 +50,17 @@ class UserSaysWhoTheAuthorIs(TestCase):
 
     def test_joined_year_comes_from_the_account(self):
         u = User.objects.create_user('dina_books')
-        self.assertEqual(u.joined_year, u.date_joined.year)
+        self.assertEqual(u.joined_year, timezone.localtime(u.date_joined).year)
+
+    def test_joined_year_is_almaty_time_not_utc(self):
+        """Новогодняя ночь: 1 января, 02:00 по Алматы — это ещё 31 декабря
+        по UTC. Профиль обязан говорить «2025 жылдан бері», а не 2024."""
+        u = User.objects.create_user('aygerim_k')
+        User.objects.filter(pk=u.pk).update(
+            date_joined=datetime(2025, 1, 1, 2, 0, tzinfo=ZoneInfo('Asia/Almaty')))
+        u.refresh_from_db()
+        self.assertEqual(u.date_joined.astimezone(UTC).year, 2024)
+        self.assertEqual(u.joined_year, 2025)
 
 
 class ReferenceDataArrivesWithTheSchema(TestCase):
