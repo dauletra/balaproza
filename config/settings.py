@@ -10,22 +10,34 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Секреты и адрес БД — из `.env` (в .gitignore). Образец — `.env.example`.
+# Файла может не быть: в CI и в проде те же переменные приходят из окружения.
+load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-wa*es)k#sjqb-j=bl70+0#p_1bm9t0x%sp2s6_hou2wr$!*^6y'
+SECRET_KEY = os.environ.get(
+    'SECRET_KEY',
+    'django-insecure-wa*es)k#sjqb-j=bl70+0#p_1bm9t0x%sp2s6_hou2wr$!*^6y',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', '1') == '1'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [h for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if h]
 
 
 # Application definition
@@ -75,12 +87,26 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+#
+# PostgreSQL, а не SQLite: у SQLite `LIKE` складывает регистр только для ASCII,
+# и поиск по каталогу («Рысқали», «Жағалау») вёл бы себя не так, как поиск в
+# Python. Для казахоязычного портала это не деталь деплоя, а поведение продукта.
+# Одной строкой подключения — чтобы прод отличался от локали только значением
+# переменной, а не веткой в коде.
+
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if not DATABASE_URL:
+    raise ImproperlyConfigured(
+        'Не задан DATABASE_URL. Скопируй `.env.example` в `.env` '
+        'и укажи строку подключения к Postgres.'
+    )
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.parse(
+        DATABASE_URL,
+        conn_max_age=600,        # переиспользуем соединение: у Postgres коннект дорогой
+        conn_health_checks=True,  # но проверяем живость, иначе ловим порванный сокет
+    ),
 }
 
 

@@ -17,13 +17,13 @@
 Оба лежат в git, поэтому данные переезжают между машинами как обычный код —
 дампы, фикстуры и seed-команды не нужны.
 
-`db.sqlite3` держит только служебные таблицы Django (`django_session`, `auth_user`,
-`django_content_type`, `django_admin_log`). Она в `.gitignore` и не пушится:
-терять там нечего, `migrate` создаёт её заново за секунду.
+В базе — только служебные таблицы Django (`django_session`, `auth_user`,
+`django_content_type`, `django_admin_log`). Терять там нечего: `migrate`
+создаёт их заново за секунду.
 
 ## Установка на новой машине
 
-Нужны [uv](https://docs.astral.sh/uv/) и Node.js 20+.
+Нужны [uv](https://docs.astral.sh/uv/), Node.js 20+ и PostgreSQL 14+.
 
 ```bash
 git clone https://github.com/dauletra/balaproza.git
@@ -36,6 +36,26 @@ uv sync
 ```bash
 npm install && npm run build
 ```
+
+Роль и база создаются один раз. `CREATEDB` нужен не для сайта, а для тестов:
+Django поднимает отдельную `test_<имя>` и сносит её после прогона.
+
+```bash
+psql -U postgres -c "CREATE ROLE qnovel_user LOGIN PASSWORD 'сюда-пароль' CREATEDB;"
+```
+
+```bash
+psql -U postgres -c "CREATE DATABASE qnovel_db OWNER qnovel_user;"
+```
+
+Дальше — окружение. `.env` в `.gitignore`, в git лежит только образец:
+
+```bash
+cp .env.example .env
+```
+
+В нём обязателен один ключ — `DATABASE_URL`. Без него настройки падают
+с `ImproperlyConfigured`, а не молча поднимаются на пустой базе.
 
 ```bash
 uv run python manage.py migrate
@@ -54,7 +74,8 @@ uv run python manage.py runserver
 |---|---|---|
 | `media/` — фото-обложки произведений | `/media/` в `.gitignore` | Скопировать папку вручную. Без неё `components/cover_placeholder.html` рисует типографическую плашку OKLCH — страницы не ломаются, но фото-обложек не будет |
 | `static/css/output.css` | gitignored, пересобираемый артефакт | `npm run build` |
-| Суперюзер Django admin | жил в локальной sqlite | `uv run python manage.py createsuperuser` |
+| `.env` | gitignored, там пароль к БД | `cp .env.example .env` и подставить свои значения |
+| Суперюзер Django admin | живёт в локальной БД | `uv run python manage.py createsuperuser` |
 | `.venv/`, `node_modules/` | gitignored | `uv sync`, `npm install` |
 
 ## Ежедневная работа

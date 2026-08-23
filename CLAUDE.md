@@ -15,8 +15,8 @@
 - **Python** 3.13 (см. `.python-version`)
 - **uv** — менеджер зависимостей (`pyproject.toml`, `uv.lock`, `.venv/`)
 - **Django** 6.0.5
-- **SQLite** (`db.sqlite3`) — заглушка, миграций по своим моделям пока нет
-- Группы зависимостей: `dev` (django-debug-toolbar), `prod` (gunicorn)
+- **PostgreSQL** — строка подключения в `DATABASE_URL` (`.env`, образец — `.env.example`). Своих миграций пока нет, в базе только служебные таблицы Django. SQLite выведена из обращения до Ф14 намеренно: её `LIKE` складывает регистр только для ASCII, и поиск по каталогу вёл бы себя не так, как в Python. Роли нужен `CREATEDB` — иначе `manage.py test` падает на создании тестовой базы
+- Группы зависимостей: основная (`django`, `psycopg[binary]`, `dj-database-url`, `python-dotenv`), `dev` (django-debug-toolbar), `prod` (gunicorn)
 - Команды: `uv run python manage.py runserver`, `uv run python manage.py test core`
 
 ### Frontend
