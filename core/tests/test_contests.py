@@ -11,7 +11,15 @@ from core.tests.base import TestCase
 from django.urls import reverse
 
 from core import data, views
-from core.models import Contest, ContestCondition, Submission
+from core.models import AwardGrant, Contest, ContestCondition, Submission
+
+
+def _all_submissions() -> dict:
+    """Заявки по авторам — то, чем раньше был словарь стаба."""
+    out = {}
+    for sub in Submission.objects.select_related('author', 'contest', 'story'):
+        out.setdefault(sub.author.username, []).append(sub)
+    return out
 from core.queries import contests as contest_queries
 
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
@@ -105,7 +113,7 @@ class ContestDatesAreTheSource(TestCase):
     def test_submission_count_matches_real_submissions(self):
         """Хранимое «87 өтінім» стояло при одной настоящей заявке."""
         for c in data.all_contests():
-            real = sum(1 for subs in data.SUBMISSIONS_BY_USER.values()
+            real = sum(1 for subs in _all_submissions().values()
                        for s in subs if s.contest.slug == c.slug)
             with self.subTest(slug=c.slug):
                 self.assertEqual(c.submissions, real)
@@ -461,7 +469,7 @@ class ContestWinners(TestCase):
         for c in data.all_contests():
             for slug in c.winners:
                 with self.subTest(contest=c.slug, story=slug):
-                    self.assertIn(slug, data.STORIES_BY_SLUG)
+                    self.assertIsNotNone(data.story_by_slug(slug))
 
     def test_active_contests_have_no_winners(self):
         for c in data.open_contests():
@@ -496,14 +504,14 @@ class SubmissionsMatchContestBadges(TestCase):
         active = {c.slug for c in data.open_contests()}
         return {
             sub.story.slug
-            for subs in data.SUBMISSIONS_BY_USER.values()
+            for subs in _all_submissions().values()
             for sub in subs
             if sub.contest.slug in active
         }
 
     def test_badge_implies_active_submission(self):
         expected = self._stories_with_active_submission()
-        for s in data.STORIES:
+        for s in data.public_stories():
             if self.LABEL in s.badges:
                 with self.subTest(story=s.slug):
                     self.assertIn(s.slug, expected)
@@ -526,7 +534,7 @@ class SubmissionIntegrity(TestCase):
                     self.assertIsNotNone(data.story_by_slug(sub.story.slug))
 
     def test_submitted_story_belongs_to_submitter(self):
-        for username, subs in data.SUBMISSIONS_BY_USER.items():
+        for username, subs in _all_submissions().items():
             for sub in subs:
                 with self.subTest(user=username, story=sub.story.slug):
                     self.assertEqual(
@@ -536,7 +544,7 @@ class SubmissionIntegrity(TestCase):
 
     def test_one_work_per_contest(self):
         """BR-23: один автор — не больше одной заявки на конкретный конкурс."""
-        for username, subs in data.SUBMISSIONS_BY_USER.items():
+        for username, subs in _all_submissions().items():
             slugs = [s.contest.slug for s in subs]
             with self.subTest(user=username):
                 self.assertEqual(len(slugs), len(set(slugs)))
@@ -844,26 +852,26 @@ class ContestAwardsData(TestCase):
                 self.assertTrue(c.awards)
 
     def test_grants_reference_known_contest_award_and_story(self):
-        for g in data.AWARD_GRANTS:
-            with self.subTest(grant=(g.contest_slug, g.award.slug, g.story.slug)):
+        for g in AwardGrant.objects.all():
+            with self.subTest(grant=(g.contest.slug, g.award.slug, g.story.slug)):
                 self.assertIsNotNone(g.contest)
                 self.assertIsNotNone(g.award)
                 self.assertIsNotNone(g.story)
 
     def test_grant_implies_a_finished_contest(self):
         """Награду нельзя вручить, пока жюри не закончило."""
-        for g in data.AWARD_GRANTS:
+        for g in AwardGrant.objects.all():
             with self.subTest(grant=g.award.slug):
                 self.assertTrue(g.contest.is_finished)
 
     def test_grant_implies_a_submission_by_the_same_author(self):
-        for g in data.AWARD_GRANTS:
+        for g in AwardGrant.objects.all():
             subs = data.submissions_of(g.story.author.username)
             with self.subTest(grant=g.award.slug):
-                self.assertIn(g.contest_slug, {s.contest.slug for s in subs})
+                self.assertIn(g.contest.slug, {s.contest.slug for s in subs})
 
     def test_one_award_is_granted_at_most_once(self):
-        seen = [(g.contest_slug, g.award.slug) for g in data.AWARD_GRANTS]
+        seen = [(g.contest.slug, g.award.slug) for g in AwardGrant.objects.all()]
         self.assertEqual(len(seen), len(set(seen)))
 
     def test_winners_are_derived_from_grants(self):
@@ -1150,7 +1158,7 @@ class SubmissionDatesAreReal(TestCase):
         self.assertIn('submitted_on', stored)
 
     def test_submitted_inside_the_acceptance_window(self):
-        for username, subs in data.SUBMISSIONS_BY_USER.items():
+        for username, subs in _all_submissions().items():
             for sub in subs:
                 with self.subTest(user=username, contest=sub.contest.slug):
                     c = sub.contest
@@ -1158,14 +1166,14 @@ class SubmissionDatesAreReal(TestCase):
                     self.assertLessEqual(sub.submitted_on, c.closes_on)
 
     def test_label_follows_the_date(self):
-        sub = data.SUBMISSIONS_BY_USER['aidana'][0]
+        sub = data.submissions_of('aidana')[0]
         self.assertEqual(
             sub.submitted_label,
             data.kk_ago((date.today() - sub.submitted_on).days))
 
     def test_old_submission_is_not_called_a_year_ago_forever(self):
         """Заявка 2023 года в 2026-м — не «1 жыл бұрын»."""
-        sub = data.SUBMISSIONS_BY_USER['bekzhan_t'][0]
+        sub = data.submissions_of('bekzhan_t')[0]
         years = (date.today() - sub.submitted_on).days // 365
         self.assertEqual(sub.submitted_label, f'{years} жыл бұрын')
 

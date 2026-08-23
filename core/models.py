@@ -86,6 +86,23 @@ class User(AbstractUser):
         return self.pen_name or f'@{self.username}'
 
     @property
+    def works(self) -> int:
+        """Сколько работ автора видит читатель.
+
+        Считается, а не хранится: колонка врала у всех шести авторов сразу
+        и рендерилась в шести местах, включая карточку автора на странице
+        произведения (DEC-40). Черновики сюда не входят — иначе число
+        выдаёт читателю, что у автора есть неопубликованное.
+
+        Списки авторов подставляют готовую аннотацию: без неё ряд «Жаңа
+        авторлар» на главной — это по запросу на каждое имя.
+        """
+        annotated = getattr(self, 'works_count', None)
+        if annotated is not None:
+            return annotated
+        return self.stories.filter(status__in=PUBLIC_STATUSES).count()
+
+    @property
     def joined_year(self) -> int:
         """«2024 жылдан бері» в шапке профиля.
 

@@ -1,6 +1,7 @@
 {% load balaproza %}{% comment %}
     Правый рейл главной (docs/07.4 + FR-HOME-09).
-    Контекст: hero_contest, school_links
+    Контекст: hero_contest, school_links_global (глобальный — тот же список,
+    что в футере; свой запрос ради того же ответа главная не делает)
 {% endcomment %}
 <div class="flex flex-col gap-6">
 
@@ -134,7 +135,7 @@
     {% endif %}
 
     {# ── Авторлар мектебі — блок внешних ссылок (FR-LINKS, DEC-22) ── #}
-    {% if school_links %}
-        {% include "components/school_links.html" with links=school_links layout="list" heading="Авторлар мектебі" hint="Вебинарлар, идеялар, кеңестер — сыртқы арналарда." %}
+    {% if school_links_global %}
+        {% include "components/school_links.html" with links=school_links_global layout="list" heading="Авторлар мектебі" hint="Вебинарлар, идеялар, кеңестер — сыртқы арналарда." %}
     {% endif %}
 </div>

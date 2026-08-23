@@ -15,6 +15,10 @@
 
 Границы — не рекорд, а потолок с запасом. Их можно поднять осознанно,
 когда на странице появится новый блок; нельзя — «чтобы тест прошёл».
+
+Один запрос есть у **каждой** страницы: ссылки «Авторлар мектебі» в
+подвале. Их отдаёт глобальный контекст-процессор, и это цена того, что
+список правится в админке, а не в коде.
 """
 
 from django.urls import reverse
@@ -33,15 +37,15 @@ def _login(client):
 class PagesStayWithinTheirQueryBudget(TestCase):
 
     def test_home_guest(self):
-        """Двенадцать: ряды, жинақтар, книга недели, полоса жанров, две
-        витрины тегов, баннер конкурса."""
-        with self.assertNumQueries(12):
+        """Семнадцать: ряды, жинақтар, книга недели, полоса жанров, две
+        витрины тегов, баннер конкурса, счётчики масштаба и новые имена."""
+        with self.assertNumQueries(17):
             self.client.get(reverse('core:home'))
 
     def test_home_signed_in(self):
-        """Плюс прогресс чтения и работы автора."""
+        """Плюс прогресс чтения, свои работы и бейдж уведомлений."""
         _login(self.client)
-        with self.assertNumQueries(16):
+        with self.assertNumQueries(22):
             self.client.get(reverse('core:home'))
 
     def test_catalog(self):
@@ -51,37 +55,39 @@ class PagesStayWithinTheirQueryBudget(TestCase):
         выдачу. Это осознанно: счётчик пресета обязан быть настоящим
         (DEC-36), а неправдивый счётчик хуже отсутствующего.
         """
-        with self.assertNumQueries(26):
+        with self.assertNumQueries(27):
             self.client.get(reverse('core:catalog'))
 
     def test_genre_page(self):
-        with self.assertNumQueries(23):
+        with self.assertNumQueries(24):
             self.client.get(reverse('core:genre_detail', kwargs={'slug': 'fantezi'}))
 
     def test_search(self):
-        with self.assertNumQueries(23):
+        with self.assertNumQueries(24):
             self.client.get(reverse('core:search_results') + '?q=жағалау')
 
     def test_story_page(self):
-        with self.assertNumQueries(18):
+        """Двадцать один: работа, главы, рекомендации, жинақтар, карточка
+        автора с числом работ и «подписан ли я»."""
+        with self.assertNumQueries(21):
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'dalney-berega'}))
 
     def test_story_chapter_with_comments_and_poll(self):
         """Глава дороже произведения: к ней добавляются комментарии с
         ответами, ряд реакций и опрос."""
-        with self.assertNumQueries(31):
+        with self.assertNumQueries(34):
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'dalney-berega'}) + '?chapter=3')
 
     def test_collections(self):
         """Пять на десять подборок с обложками — потому что состав приходит
         одним `prefetch_related`, а не запросом на карточку."""
-        with self.assertNumQueries(5):
+        with self.assertNumQueries(6):
             self.client.get(reverse('core:collections'))
 
     def test_genre_index(self):
         """Один запрос на двенадцать жанров со счётчиками: счётчик —
         агрегат в том же SELECT, а не отдельный COUNT на строку."""
-        with self.assertNumQueries(1):
+        with self.assertNumQueries(2):
             self.client.get(reverse('core:genre_index'))

@@ -7,13 +7,14 @@
 этап миграции переписывал бы `views.py` заново, и отличить «сломалась
 модель» от «сломался вызов» было бы нечем.
 
-Импорты сгруппированы по разделам продукта и **перечислены поимённо** —
-это не педантизм: по мере Ф14 строки будут переезжать из `stub_data` в
-модули запросов по одной, и список показывает, что уже переведено, а что
-ещё нет. `import *` такой картины не даёт.
+Импорты сгруппированы по разделам продукта и **перечислены поимённо**:
+список — карта того, откуда сейчас берётся каждая часть продукта.
+`import *` такой картины не даёт.
 
-Правило: **никто, кроме этого модуля, не импортирует `stub_data`**.
-Держит `core/tests/test_data_facade.py`.
+**Стаба здесь больше нет.** Все разделы читают модели; `core/stub_data.py`
+остался единственным источником для `seed_demo`, который перекладывает
+корпус в базу, и уйдёт вместе с переездом литералов в саму команду
+(docs/19 §19.4, этап 11). Держит `core/tests/test_data_facade.py`.
 """
 
 # ── Домен: правила, которые переживут замену хранилища ───────────────────
@@ -140,32 +141,25 @@ from .queries.tags import (
     trending_tags,
 )
 
-# ── Ещё на стабе: витрины главной и социальный граф ──────────────────────
-from .stub_data import (
+# ── Награды, подписки, уведомления, витрины портала ──────────────────────
+from .queries.profile import (
+    AWARDS,
+    achievements_of,
+    author_by_username,
+    award_catalog,
+    contest_awards_of,
     followers_of,
     following_of,
     is_following,
     new_authors,
-    portal_stats,
-)
-
-# ── Награды (FR-PROF-06, DEC-41, DEC-46) ─────────────────────────────────
-from .stub_data import (
-    AWARDS,
-    achievements_of,
-    award_catalog,
-    contest_awards_of,
     next_read_tier,
+    notifications_for_user,
+    portal_stats,
     read_ladder,
     read_tier,
     reads_total,
-    winning_stories_of,
-)
-
-# ── Уведомления ──────────────────────────────────────────────────────────
-from .stub_data import (
-    notifications_for_user,
     unread_count_for_user,
+    winning_stories_of,
 )
 
 # ── Конкурсы (DEC-45, DEC-46) ────────────────────────────────────────────
@@ -187,29 +181,4 @@ from .queries.contests import (
 )
 
 # ── Ссылки «Авторлар мектебі» (DEC-22) ───────────────────────────────────
-from .stub_data import SCHOOL_LINKS
-
-# ── Стаб-специфичное: источник для сида и остатки непереключённых страниц ─
-# `STORIES_BY_SLUG` ещё держит страницу произведения — она переключается
-# своим шагом. Остальное читает `seed_demo`, раскладывая корпус по
-# моделям, плюс витрина состояний `/_design/states/`, которой нужно по
-# одному экземпляру каждого объекта.
-from .stub_data import (  # noqa: F401
-    AUTHORS,
-    AUTHORS_BY_USERNAME,
-    BLOCKED_TAG_PATTERNS,
-    AWARD_GRANTS,
-    BOOK_OF_WEEK,
-    COLLECTIONS,
-    COMMENTS_BY_STORY,
-    FOLLOWING,
-    LIBRARY_BY_USER,
-    NOTIFICATIONS_BY_USER,
-    POLLS_BY_CHAPTER,
-    SAMPLE_PROGRESS,
-    STORIES,
-    STORIES_BY_SLUG,
-    SUBMISSIONS_BY_USER,
-    TAGS,
-    TAGS_BY_SLUG,
-)
+from .queries.site import school_links

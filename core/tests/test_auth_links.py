@@ -3,7 +3,7 @@
 from core.tests.base import TestCase
 from django.urls import reverse
 
-from core import stub_data
+from core import data
 
 
 # ════════════════════════════ AUTH · Login ═════════════════════════════════
@@ -116,7 +116,7 @@ class SignupSuccessPage(TestCase):
 class SchoolLinksData(TestCase):
 
     def test_school_links_dataclass_fields(self):
-        for l in stub_data.SCHOOL_LINKS:
+        for l in data.school_links():
             with self.subTest(channel=l.channel):
                 self.assertTrue(l.channel)
                 self.assertTrue(l.title)
@@ -124,7 +124,7 @@ class SchoolLinksData(TestCase):
                 self.assertTrue(l.url)
 
     def test_all_four_channels_present(self):
-        channels = {l.channel for l in stub_data.SCHOOL_LINKS}
+        channels = {l.channel for l in data.school_links()}
         self.assertEqual(channels, {'youtube', 'instagram', 'tiktok', 'telegram'})
 
 
@@ -135,7 +135,7 @@ class SchoolLinksInRightRail(TestCase):
         r = self.client.get(reverse('core:home'))
         self.assertContains(r, 'Авторлар мектебі')
         # все 4 названия каналов
-        for l in stub_data.SCHOOL_LINKS:
+        for l in data.school_links():
             with self.subTest(channel=l.channel):
                 self.assertContains(r, l.title)
 
@@ -176,8 +176,8 @@ class SchoolLinksGlobalContextProcessor(TestCase):
         r = self.client.get(reverse('core:home'))
         # Проверяем что контекст-процессор отдаёт ссылки
         self.assertEqual(
-            list(r.context['school_links_global']),
-            list(stub_data.SCHOOL_LINKS),
+            [l.channel for l in r.context['school_links_global']],
+            [l.channel for l in data.school_links()],
         )
 
 
@@ -191,7 +191,7 @@ class AuthGateIsOneComponent(TestCase):
     """
 
     def _gated(self):
-        contest = stub_data.ACCEPTING_CONTESTS[0].slug
+        contest = data.accepting_contests()[0].slug
         return [
             ('core:my_stories',     {},                  'Шығармаларыңды басқару үшін'),
             ('core:new_story',      {},                  'Жаңа шығарма жариялау үшін'),

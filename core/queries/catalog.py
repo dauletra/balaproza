@@ -150,7 +150,9 @@ def genre_by_slug(slug: str):
 
 
 def all_authors() -> list:
-    return list(User.objects.order_by('username'))
+    from .profile import with_works
+
+    return list(with_works(User.objects.order_by('username')))
 
 
 def is_new_author(username: str) -> bool:
@@ -179,13 +181,15 @@ def search_stories(query: str) -> list:
 
 
 def search_authors(query: str, limit: int = 5) -> list:
+    from .profile import with_works
+
     q = (query or '').strip()
     if not q:
         return []
-    return list(User.objects.filter(
+    return list(with_works(User.objects.filter(
         Q(pen_name__icontains=q) | Q(username__icontains=q)
         | Q(name__icontains=q)
-    ).order_by('username')[:limit])
+    ).order_by('username'))[:limit])
 
 
 def apply_catalog_filters(stories, sort: str = CATALOG_DEFAULT_SORT,

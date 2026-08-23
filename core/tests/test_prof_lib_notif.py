@@ -8,7 +8,30 @@ from unittest import mock
 from core.tests.base import TestCase
 from django.urls import reverse
 
-from core import data, stub_data
+from datetime import timedelta
+
+from django.utils import timezone
+
+from core import data
+from core.models import Notification, Story, User
+
+
+def _aidana_notifications():
+    """Лента демо-автора из базы — то же, что видит страница."""
+    return list(Notification.objects.filter(user__username='aidana')
+                .order_by('-created_at'))
+
+
+def _notification(username='ghost', **fields):
+    """Уведомление для проверки ветки, которой нет в демо-ленте.
+
+    Создаётся в базе, а не подменяется в модуле: транзакция теста откатит
+    его, и следующий тест увидит корпус нетронутым.
+    """
+    days = fields.pop('days_ago', 0)
+    user, _ = User.objects.get_or_create(username=username)
+    return Notification.objects.create(
+        user=user, created_at=timezone.now() - timedelta(days=days), **fields)
 
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
 
@@ -34,24 +57,24 @@ def _login_as(client, username, name='X'):
 class LibraryHelpers(TestCase):
 
     def test_library_of_returns_all_when_no_kind(self):
-        self.assertEqual(len(stub_data.library_of('aidana')), 6)
+        self.assertEqual(len(data.library_of('aidana')), 6)
 
     def test_library_of_filters_by_kind(self):
-        self.assertEqual(len(stub_data.library_of('aidana', 'reading')), 2)
-        self.assertEqual(len(stub_data.library_of('aidana', 'saved')), 3)
-        self.assertEqual(len(stub_data.library_of('aidana', 'done')), 1)
+        self.assertEqual(len(data.library_of('aidana', 'reading')), 2)
+        self.assertEqual(len(data.library_of('aidana', 'saved')), 3)
+        self.assertEqual(len(data.library_of('aidana', 'done')), 1)
 
     def test_library_of_unknown_user_is_empty(self):
-        self.assertEqual(stub_data.library_of('no-such-user'), [])
+        self.assertEqual(data.library_of('no-such-user'), [])
 
     def test_library_entry_resolves_story(self):
-        for e in stub_data.library_of('aidana'):
-            with self.subTest(entry=e.story_slug):
-                self.assertEqual(e.story.slug, e.story_slug)
+        for e in data.library_of('aidana'):
+            with self.subTest(entry=e.story.slug):
+                self.assertEqual(e.story.slug, e.story.slug)
 
     def test_reading_entries_have_valid_progress(self):
-        for e in stub_data.library_of('aidana', 'reading'):
-            with self.subTest(entry=e.story_slug):
+        for e in data.library_of('aidana', 'reading'):
+            with self.subTest(entry=e.story.slug):
                 self.assertGreaterEqual(e.progress_chapter, 1)
                 self.assertLessEqual(e.progress_chapter, e.story.chapters)
 
@@ -63,31 +86,31 @@ class PublicStatsHelper(TestCase):
         # Одно правило публичности, посчитанное один раз: если эти два числа
         # разойдутся, профиль и карточка автора на STORY снова будут врать
         # друг про друга (у aidana было 5 против 3).
-        for a in stub_data.AUTHORS:
+        for a in data.all_authors():
             with self.subTest(author=a.username):
-                self.assertEqual(stub_data.public_stats(a.username)['works'], a.works)
+                self.assertEqual(data.public_stats(a.username)['works'], a.works)
 
     def test_sums_run_over_public_stories_only(self):
         # У черновиков в стабе 0 просмотров и 0 лайков, поэтому сравнение
         # «публичная сумма меньше полной» ничего бы не доказало: сверяем с
         # суммой по public_stories_of напрямую.
-        for a in stub_data.AUTHORS:
-            pub = stub_data.public_stories_of(a.username)
-            stats = stub_data.public_stats(a.username)
+        for a in data.all_authors():
+            pub = data.public_stories_of(a.username)
+            stats = data.public_stats(a.username)
             with self.subTest(author=a.username):
                 self.assertEqual(stats['reads'], sum(s.views for s in pub))
                 self.assertEqual(stats['likes'], sum(s.likes for s in pub))
 
     def test_hidden_work_does_not_reach_works_count(self):
-        hidden = [s for s in stub_data.my_stories_of('aidana') if not s.is_public]
+        hidden = [s for s in data.my_stories_of('aidana') if not s.is_public]
         self.assertTrue(hidden, 'фикстура сломана: у aidana нет непубличных работ')
         self.assertEqual(
-            stub_data.public_stats('aidana')['works'],
-            len(stub_data.my_stories_of('aidana')) - len(hidden),
+            data.public_stats('aidana')['works'],
+            len(data.my_stories_of('aidana')) - len(hidden),
         )
 
     def test_public_stats_unknown_user(self):
-        stats = stub_data.public_stats('no-such-user')
+        stats = data.public_stats('no-such-user')
         self.assertEqual(
             [stats['works'], stats['reads'], stats['likes'], stats['followers']],
             [0, 0, 0, 0],
@@ -97,7 +120,7 @@ class PublicStatsHelper(TestCase):
 class PublicStoriesHelper(TestCase):
 
     def test_excludes_non_public_statuses(self):
-        pub = stub_data.public_stories_of('aidana')
+        pub = data.public_stories_of('aidana')
         self.assertTrue(all(s.is_public for s in pub))
         slugs = {s.slug for s in pub}
         self.assertNotIn('aidana-kus', slugs)     # NotPublished
@@ -106,29 +129,29 @@ class PublicStoriesHelper(TestCase):
     def test_keeps_serials(self):
         # DEC-37: публичный сериал носит OnProcess/Completed. Фильтр по
         # литералу 'Published' молча выкинул бы их все.
-        pub = stub_data.public_stories_of('rudazov')
+        pub = data.public_stories_of('rudazov')
         self.assertEqual(len(pub), 3)
         self.assertIn('arhimag', {s.slug for s in pub})   # OnProcess
 
     def test_unknown_user_is_empty(self):
-        self.assertEqual(stub_data.public_stories_of('no-such-user'), [])
+        self.assertEqual(data.public_stories_of('no-such-user'), [])
 
 
 class ReaderStatsHelper(TestCase):
 
     def test_reader_stats_for_aidana(self):
-        stats = stub_data.reader_stats('aidana')
+        stats = data.reader_stats('aidana')
         # Публичные числа те же, что у постороннего: свой профиль не показывает
         # владельцу другую арифметику, чем читателю.
-        self.assertEqual(stats['works'], stub_data.AUTHORS_BY_USERNAME['aidana'].works)
+        self.assertEqual(stats['works'], data.public_stats('aidana')['works'])
         # Сверх них — приватное
-        self.assertEqual(stats['works_total'], len(stub_data.my_stories_of('aidana')))
+        self.assertEqual(stats['works_total'], len(data.my_stories_of('aidana')))
         self.assertGreater(stats['works_total'], stats['works'])
         self.assertEqual(stats['finished'], 1)
-        self.assertEqual(stats['followers'], stub_data.AUTHORS_BY_USERNAME['aidana'].followers)
+        self.assertEqual(stats['followers'], User.objects.get(username='aidana').followers)
 
     def test_reader_stats_unknown_user(self):
-        stats = stub_data.reader_stats('no-such-user')
+        stats = data.reader_stats('no-such-user')
         self.assertEqual(stats['works'], 0)
         self.assertEqual(stats['works_total'], 0)
         self.assertEqual(stats['finished'], 0)
@@ -138,60 +161,60 @@ class ReaderStatsHelper(TestCase):
 class FollowGraph(TestCase):
 
     def test_is_following_true(self):
-        self.assertTrue(stub_data.is_following('aidana', 'rudazov'))
+        self.assertTrue(data.is_following('aidana', 'rudazov'))
 
     def test_is_following_false(self):
-        self.assertFalse(stub_data.is_following('aidana', 'bekzhan_t'))
+        self.assertFalse(data.is_following('aidana', 'bekzhan_t'))
 
     def test_following_returns_authors(self):
-        f = stub_data.following_of('aidana')
+        f = data.following_of('aidana')
         self.assertEqual(len(f), 3)
         usernames = {a.username for a in f}
         self.assertEqual(usernames, {'rudazov', 'sayyn', 'dina_books'})
 
     def test_followers_returns_authors(self):
         # На aidana подписан только aygerim_k.
-        f = stub_data.followers_of('aidana')
+        f = data.followers_of('aidana')
         self.assertEqual(len(f), 1)
         self.assertEqual(f[0].username, 'aygerim_k')
 
     def test_unknown_user_no_follow(self):
-        self.assertEqual(stub_data.following_of('no-such-user'), [])
-        self.assertEqual(stub_data.followers_of('no-such-user'), [])
+        self.assertEqual(data.following_of('no-such-user'), [])
+        self.assertEqual(data.followers_of('no-such-user'), [])
 
 
 class NotificationsHelpers(TestCase):
 
     def test_groups_into_buckets(self):
-        g = stub_data.notifications_for_user('aidana')
-        for b in stub_data.NOTIF_BUCKETS:
+        g = data.notifications_for_user('aidana')
+        for b in data.NOTIF_BUCKETS:
             self.assertIn(b, g)
         # Раскладка сходится с самими данными: числа-литералы здесь
         # устаревали бы при каждой правке демо-ленты.
-        items = stub_data.NOTIFICATIONS_BY_USER['aidana']
-        for b in stub_data.NOTIF_BUCKETS:
+        items = _aidana_notifications()
+        for b in data.NOTIF_BUCKETS:
             self.assertEqual(len(g[b]), sum(1 for n in items if n.bucket == b))
-        self.assertTrue(all(g[b] for b in stub_data.NOTIF_BUCKETS),
+        self.assertTrue(all(g[b] for b in data.NOTIF_BUCKETS),
                         'у aidana должен быть непустым каждый из трёх бакетов')
 
     def test_unknown_user_empty_buckets(self):
-        g = stub_data.notifications_for_user('no-such-user')
-        for b in stub_data.NOTIF_BUCKETS:
+        g = data.notifications_for_user('no-such-user')
+        for b in data.NOTIF_BUCKETS:
             self.assertEqual(g[b], [])
 
     def test_unread_count(self):
-        items = stub_data.NOTIFICATIONS_BY_USER['aidana']
+        items = _aidana_notifications()
         expected = sum(1 for n in items if not n.read and n.bucket)
-        self.assertEqual(stub_data.unread_count_for_user('aidana'), expected)
+        self.assertEqual(data.unread_count_for_user('aidana'), expected)
         self.assertGreater(expected, 0)
 
     def test_unread_zero_for_unknown(self):
-        self.assertEqual(stub_data.unread_count_for_user('ghost'), 0)
+        self.assertEqual(data.unread_count_for_user('ghost'), 0)
 
     def test_notification_kinds_within_set(self):
-        for n in stub_data.NOTIFICATIONS_BY_USER['aidana']:
+        for n in _aidana_notifications():
             with self.subTest(kind=n.kind):
-                self.assertIn(n.kind, stub_data.NOTIF_KINDS)
+                self.assertIn(n.kind, data.NOTIF_KINDS)
 
 
 class NotificationTime(TestCase):
@@ -203,7 +226,7 @@ class NotificationTime(TestCase):
     """
 
     def test_time_fields_are_not_stored(self):
-        stored = stub_data.Notification.__dataclass_fields__
+        stored = {f.name for f in Notification._meta.get_fields()}
         for gone in ('when', 'bucket'):
             self.assertNotIn(
                 gone, stored,
@@ -214,7 +237,7 @@ class NotificationTime(TestCase):
                  7: 'past_week', 8: '', 400: ''}
         for days, expected in cases.items():
             with self.subTest(days=days):
-                n = stub_data.Notification(kind='like', days_ago=days)
+                n = _notification(kind='like', days_ago=days)
                 self.assertEqual(n.bucket, expected)
 
     def test_older_than_a_week_is_not_shown_and_not_counted(self):
@@ -223,32 +246,31 @@ class NotificationTime(TestCase):
         Значит, событие старше недели в ленту не попадает — и в бейдж
         тоже, иначе шапка звала бы на страницу, где его нет.
         """
-        stale = stub_data.Notification(kind='like', days_ago=30)
-        with mock.patch.dict(stub_data.NOTIFICATIONS_BY_USER, {'ghost': [stale]}):
-            grouped = stub_data.notifications_for_user('ghost')
-            self.assertEqual([], [n for b in grouped.values() for n in b])
-            self.assertEqual(0, stub_data.unread_count_for_user('ghost'))
+        _notification(kind='like', days_ago=30)
+        grouped = data.notifications_for_user('ghost')
+        self.assertEqual([], [n for b in grouped.values() for n in b])
+        self.assertEqual(0, data.unread_count_for_user('ghost'))
 
     def test_wording_of_kk_ago(self):
-        self.assertEqual(stub_data.kk_ago(0, 2), '2 сағат бұрын')
-        self.assertEqual(stub_data.kk_ago(0), 'бүгін')
-        self.assertEqual(stub_data.kk_ago(1), 'кеше')
-        self.assertEqual(stub_data.kk_ago(5), '5 күн бұрын')
-        self.assertEqual(stub_data.kk_ago(60), '2 ай бұрын')
-        self.assertEqual(stub_data.kk_ago(800), '2 жыл бұрын')
+        self.assertEqual(data.kk_ago(0, 2), '2 сағат бұрын')
+        self.assertEqual(data.kk_ago(0), 'бүгін')
+        self.assertEqual(data.kk_ago(1), 'кеше')
+        self.assertEqual(data.kk_ago(5), '5 күн бұрын')
+        self.assertEqual(data.kk_ago(60), '2 ай бұрын')
+        self.assertEqual(data.kk_ago(800), '2 жыл бұрын')
 
     def test_hours_only_refine_today(self):
         """«26 сағат бұрын» человек переводит в дни сам — короче «кеше»."""
-        self.assertEqual(stub_data.kk_ago(1, 26), 'кеше')
+        self.assertEqual(data.kk_ago(1, 26), 'кеше')
 
     def test_freshest_first_inside_a_bucket(self):
         """Порядок объявления в данных — не порядок ленты.
 
         Сегодняшние события шли «2 сағат · 4 сағат · 9 сағат · 6 сағат».
         """
-        for bucket in stub_data.notifications_for_user('aidana').values():
-            keys = [(n.days_ago, n.hours_ago or 0) for n in bucket]
-            self.assertEqual(keys, sorted(keys))
+        for bucket in data.notifications_for_user('aidana').values():
+            moments = [n.created_at for n in bucket]
+            self.assertEqual(moments, sorted(moments, reverse=True))
 
 
 class NotificationsLeadSomewhere(TestCase):
@@ -264,22 +286,22 @@ class NotificationsLeadSomewhere(TestCase):
         self.response = self.client.get(reverse('core:notifications'))
 
     def test_contest_notification_links_to_its_contest(self):
-        contest_notifs = [n for n in stub_data.NOTIFICATIONS_BY_USER['aidana']
+        contest_notifs = [n for n in _aidana_notifications()
                           if n.kind == 'contest']
         self.assertTrue(contest_notifs, 'стаб потерял конкурсные уведомления')
         for n in contest_notifs:
-            with self.subTest(contest=n.contest_slug):
+            with self.subTest(contest=n.contest.slug):
                 self.assertTrue(n.contest, 'конкурсное уведомление без конкурса')
                 self.assertContains(
                     self.response,
                     reverse('core:contest_detail', kwargs={'slug': n.contest.slug}))
 
     def test_moderation_notification_links_to_the_story(self):
-        mods = [n for n in stub_data.NOTIFICATIONS_BY_USER['aidana']
+        mods = [n for n in _aidana_notifications()
                 if n.kind == 'moderation' and n.story]
         self.assertTrue(mods, 'стаб потерял уведомление о модерации')
         for n in mods:
-            with self.subTest(story=n.story_slug):
+            with self.subTest(story=n.story.slug):
                 # Работа на модерации не публична — вести на неё можно
                 # только в авторский кабинет (BR-73).
                 self.assertContains(
@@ -292,7 +314,7 @@ class NotificationsLeadSomewhere(TestCase):
         Второй литерал разошёлся бы с первым ровно так же, как хранимый
         `Author.works` разошёлся с числом произведений (DEC-40).
         """
-        for n in stub_data.NOTIFICATIONS_BY_USER['aidana']:
+        for n in _aidana_notifications():
             if n.kind == 'comment':
                 continue  # у комментария `text` — цитата читателя, чужой UGC
             with self.subTest(kind=n.kind):
@@ -303,7 +325,7 @@ class NotificationsLeadSomewhere(TestCase):
 
     def test_contest_notification_names_the_deadline(self):
         """FR-NOTIF-06: срок считает конкурс, а не текст уведомления."""
-        contest = stub_data.CONTESTS_BY_SLUG['bolashak-mektebi']
+        contest = data.contest_by_slug('bolashak-mektebi')
         self.assertTrue(contest.timing_line)
         self.assertContains(self.response, contest.timing_line)
 
@@ -330,7 +352,7 @@ class ProfileMeAuthed(TestCase):
         self.assertEqual(r.status_code, 200)
         # DEC-44: вкладка показывает публичные работы — то же, что видит
         # читатель. Черновик и работа на модерации сюда не попадают.
-        for s in stub_data.public_stories_of('aidana'):
+        for s in data.public_stories_of('aidana'):
             with self.subTest(story=s.slug):
                 self.assertContains(r, s.title)
 
@@ -390,7 +412,7 @@ class ProfileMeAuthed(TestCase):
         self.assertContains(r, 'Айдана Серікқызы')       # ресми аты-жөні
         self.assertContains(r, '2025 жылдан бері')       # Author.joined_year
         # Полное число работ — с черновиками, и помечено как таковое
-        self.assertContains(r, len(stub_data.my_stories_of('aidana')))
+        self.assertContains(r, len(data.my_stories_of('aidana')))
         self.assertContains(r, 'жобалармен бірге')
 
     def test_unknown_tab_falls_back_to_works(self):
@@ -443,7 +465,7 @@ class ProfileOtherKnown(TestCase):
         кликабельными карточками.
         """
         r = self.client.get(reverse('core:profile_other', kwargs={'username': 'aidana'}))
-        hidden = [s for s in stub_data.my_stories_of('aidana') if not s.is_public]
+        hidden = [s for s in data.my_stories_of('aidana') if not s.is_public]
         self.assertTrue(hidden, 'фикстура сломана: у aidana нет непубличных работ')
         for s in hidden:
             with self.subTest(story=s.slug):
@@ -462,7 +484,7 @@ class ProfileOtherKnown(TestCase):
         # У sayyn три публичные работы, и все три уже стоят в теле вкладки —
         # топ-3 рядом был бы копией соседней колонки, поэтому блока нет.
         r = self.client.get(reverse('core:profile_other', kwargs={'username': 'sayyn'}))
-        self.assertEqual(len(stub_data.public_stories_of('sayyn')), 3)
+        self.assertEqual(len(data.public_stories_of('sayyn')), 3)
         self.assertFalse(r.context['has_right_rail'])
         self.assertNotContains(r, 'w-[300px]')
 
@@ -480,7 +502,7 @@ class ProfileOtherKnown(TestCase):
         """
         r = self.client.get(reverse('core:profile_other', kwargs={'username': self.USERNAME}) + '?tab=about')
         self.assertNotContains(r, 'Тек саған көрінеді')
-        self.assertNotContains(r, stub_data.AUTHORS_BY_USERNAME[self.USERNAME].name)
+        self.assertNotContains(r, User.objects.get(username=self.USERNAME).name)
         self.assertNotContains(r, 'жобалармен бірге')
 
     def test_other_profile_has_no_library_tab(self):
@@ -504,14 +526,14 @@ class ProfileIsNotASecondCabinet(TestCase):
         r = self.client.get(reverse('core:profile_me'))
         self.assertEqual(
             [s.slug for s in r.context['works']],
-            [s.slug for s in stub_data.public_stories_of('aidana')],
+            [s.slug for s in data.public_stories_of('aidana')],
         )
 
     def test_drafts_and_moderation_stay_in_the_cabinet(self):
         r = self.client.get(reverse('core:profile_me'))
         for slug in ('aidana-kus', 'aidana-erteg'):
             with self.subTest(story=slug):
-                self.assertNotContains(r, stub_data.STORIES_BY_SLUG[slug].title)
+                self.assertNotContains(r, data.story_by_slug(slug).title)
 
     def test_the_hidden_ones_are_counted_and_linked(self):
         # Молча спрятать работы нельзя: автор должен видеть, что их не
@@ -545,30 +567,30 @@ class ProfileIsNotASecondCabinet(TestCase):
         r = self.client.get(reverse('core:profile_me') + '?tab=stats')
         self.assertContains(r, 'Тек саған көрінеді')
         self.assertEqual(r.context['writer']['total'],
-                         len(stub_data.my_stories_of('aidana')))
+                         len(data.my_stories_of('aidana')))
 
 
 class TopStoriesHelper(TestCase):
     """`top_stories_of` — данные для рейла чужого профиля (FR-PROF-09)."""
 
     def test_sorted_by_views_desc(self):
-        top = stub_data.top_stories_of('aygerim_k')
+        top = data.top_stories_of('aygerim_k')
         self.assertEqual([s.views for s in top], sorted((s.views for s in top), reverse=True))
 
     def test_only_public_work_reaches_the_rail(self):
         # У aidana есть черновик и работа на модерации: рейл — публичная
         # поверхность, и BR-73 действует здесь ровно так же, как в теле.
-        slugs = {s.slug for s in stub_data.top_stories_of('aidana', limit=99)}
+        slugs = {s.slug for s in data.top_stories_of('aidana', limit=99)}
         self.assertNotIn('aidana-kus', slugs)
         self.assertNotIn('aidana-erteg', slugs)
-        self.assertTrue(all(s.is_public for s in stub_data.top_stories_of('aidana', limit=99)))
+        self.assertTrue(all(s.is_public for s in data.top_stories_of('aidana', limit=99)))
 
     def test_limit_is_respected(self):
-        self.assertLessEqual(len(stub_data.top_stories_of('aygerim_k')), 3)
-        self.assertEqual(len(stub_data.top_stories_of('aygerim_k', limit=1)), 1)
+        self.assertLessEqual(len(data.top_stories_of('aygerim_k')), 3)
+        self.assertEqual(len(data.top_stories_of('aygerim_k', limit=1)), 1)
 
     def test_unknown_user_is_empty(self):
-        self.assertEqual(stub_data.top_stories_of('no-such-user'), [])
+        self.assertEqual(data.top_stories_of('no-such-user'), [])
 
 
 class ProfileRailByViewer(TestCase):
@@ -580,20 +602,20 @@ class ProfileRailByViewer(TestCase):
 
     def test_stranger_does_not_see_whom_the_author_follows(self):
         r = self.client.get(reverse('core:profile_other', kwargs={'username': 'aygerim_k'}))
-        self.assertTrue(stub_data.following_of('aygerim_k'))   # подписки есть
+        self.assertTrue(data.following_of('aygerim_k'))   # подписки есть
         self.assertNotContains(r, 'Жазылулар')                 # и они не здесь
 
     def test_stranger_sees_the_most_read_work(self):
         r = self.client.get(reverse('core:profile_other', kwargs={'username': 'aygerim_k'}))
         self.assertContains(r, 'Ең көп оқылғаны')
         self.assertTrue(r.context['has_right_rail'])
-        self.assertContains(r, stub_data.top_stories_of('aygerim_k')[0].title)
+        self.assertContains(r, data.top_stories_of('aygerim_k')[0].title)
 
     def test_rail_stays_away_when_the_body_already_shows_everything(self):
         # Три работы: вкладка «Шығармалар» показывает их целиком, топ-3
         # рядом был бы дублем — тем же, за который убирали числа из рейла.
         url = reverse('core:profile_other', kwargs={'username': 'rudazov'})
-        self.assertEqual(len(stub_data.public_stories_of('rudazov')), 3)
+        self.assertEqual(len(data.public_stories_of('rudazov')), 3)
         self.assertFalse(self.client.get(url).context['has_right_rail'])
         # На «Туралы» работ в теле нет вовсе — там блок полезен с первой.
         self.assertTrue(self.client.get(url + '?tab=about').context['has_right_rail'])
@@ -614,12 +636,12 @@ class ProfilePeoplePages(TestCase):
     def test_followers_list_names_everyone(self):
         r = self.client.get(self._url('rudazov', 'followers'))
         self.assertEqual(r.status_code, 200)
-        for a in stub_data.followers_of('rudazov'):
+        for a in data.followers_of('rudazov'):
             self.assertContains(r, a.public_name)
 
     def test_following_list_names_everyone(self):
         r = self.client.get(self._url('aidana', 'following'))
-        for a in stub_data.following_of('aidana'):
+        for a in data.following_of('aidana'):
             self.assertContains(r, a.public_name)
 
     def test_both_lists_are_public(self):
@@ -637,12 +659,12 @@ class ProfilePeoplePages(TestCase):
     def test_segment_counts_match_the_lists(self):
         r = self.client.get(self._url('aidana', 'followers'))
         counts = {it['slug']: it['count'] for it in r.context['people_items']}
-        self.assertEqual(counts['followers'], len(stub_data.followers_of('aidana')))
-        self.assertEqual(counts['following'], len(stub_data.following_of('aidana')))
+        self.assertEqual(counts['followers'], len(data.followers_of('aidana')))
+        self.assertEqual(counts['following'], len(data.following_of('aidana')))
 
     def test_empty_list_explains_itself(self):
         # rudazov ни на кого не подписан.
-        self.assertEqual(stub_data.following_of('rudazov'), [])
+        self.assertEqual(data.following_of('rudazov'), [])
         r = self.client.get(self._url('rudazov', 'following'))
         self.assertContains(r, 'Әлі ешкімге жазылмаған')
 
@@ -695,7 +717,7 @@ class ProfileAchievementsRender(TestCase):
 
     def test_badges_render_on_other_profile(self):
         r = self.client.get(reverse('core:profile_other', kwargs={'username': 'dina_books'}))
-        ach = stub_data.achievements_of('dina_books')
+        ach = data.achievements_of('dina_books')
         self.assertTrue(ach)
         for a in ach:
             with self.subTest(key=a['key']):
@@ -706,7 +728,7 @@ class ProfileAchievementsRender(TestCase):
         _login_as_aidana(self.client)
         mine = self.client.get(reverse('core:profile_me'))
         theirs = self.client.get(reverse('core:profile_other', kwargs={'username': 'aidana'}))
-        for a in stub_data.achievements_of('aidana'):
+        for a in data.achievements_of('aidana'):
             with self.subTest(key=a['key']):
                 self.assertContains(mine, a['label'])
                 self.assertContains(theirs, a['label'])
@@ -727,12 +749,12 @@ class ProfileAchievementsRender(TestCase):
         self.assertContains(r, '2025 жылдан бері')
         # Участие без статуса: число совпадает с длиной списка заявок и не
         # выдаёт вычитанием, что одна из них отклонена.
-        self.assertEqual(len(stub_data.submissions_of('aidana')), 2)
+        self.assertEqual(len(data.submissions_of('aidana')), 2)
         self.assertContains(r, '2 байқау')
 
     def test_facts_line_omits_contests_when_none(self):
         r = self.client.get(reverse('core:profile_other', kwargs={'username': 'aygerim_k'}))
-        self.assertEqual(stub_data.submissions_of('aygerim_k'), [])
+        self.assertEqual(data.submissions_of('aygerim_k'), [])
         self.assertEqual(r.context['contests_n'], 0)
         self.assertContains(r, '2024 жылдан бері')
         # Проверяем сам сегмент, а не слово: «Байқаулар» есть в шапке и подвале.
@@ -750,47 +772,47 @@ class ContestHistoryPrivacy(TestCase):
     JURY_NOTE = 'Көлемі шарттан аз'
 
     def test_helper_hides_note_from_strangers(self):
-        public = stub_data.contest_history('aidana')
-        mine = stub_data.contest_history('aidana', is_self=True)
+        public = data.contest_history('aidana')
+        mine = data.contest_history('aidana', is_self=True)
         self.assertEqual([i['note'] for i in public], ['', ''])
         self.assertTrue(any(self.JURY_NOTE in i['note'] for i in mine))
 
     def test_helper_hides_rejection_and_review_from_strangers(self):
         # Публично «қаралуда» и «қабылданбады» одинаково выглядят участием,
         # поэтому отказ нельзя ни увидеть, ни отличить от ожидания.
-        for item in stub_data.contest_history('aidana'):
+        for item in data.contest_history('aidana'):
             with self.subTest(contest=item['contest'].slug):
-                self.assertIn(item['result'], ('', *stub_data.PUBLIC_CONTEST_RESULTS))
-        mine = {i['result'] for i in stub_data.contest_history('aidana', is_self=True)}
+                self.assertIn(item['result'], ('', *data.PUBLIC_CONTEST_RESULTS))
+        mine = {i['result'] for i in data.contest_history('aidana', is_self=True)}
         self.assertEqual(mine, {'reviewing', 'rejected'})
 
     def test_winner_is_derived_from_contest_not_status(self):
         # У dina_books заявка помечена accepted, а победа лежит в
         # Contest.winners: без вывода из данных «Жеңімпаз» не появился бы.
-        hist = stub_data.contest_history('dina_books')
+        hist = data.contest_history('dina_books')
         winners = [i for i in hist if i['result'] == 'winner']
         self.assertEqual(len(winners), 1)
         self.assertEqual(winners[0]['contest'].slug, 'zhas-aldym-2023')
 
     def test_row_count_matches_the_facts_line(self):
         """Строк столько же, сколько подач — иначе отказ считается вычитанием."""
-        for username in stub_data.SUBMISSIONS_BY_USER:
+        for username in ('aidana', 'dina_books', 'bekzhan_t'):
             with self.subTest(user=username):
                 self.assertEqual(
-                    len(stub_data.contest_history(username)),
-                    len(stub_data.submissions_of(username)),
+                    len(data.contest_history(username)),
+                    len(data.submissions_of(username)),
                 )
 
     def test_newest_first(self):
-        years = [i['year'] for i in stub_data.contest_history('aidana')]
+        years = [i['year'] for i in data.contest_history('aidana')]
         self.assertEqual(years, sorted(years, reverse=True))
 
     def test_non_public_work_is_not_named_to_strangers(self):
         # BR-73: подача на конкурс не должна раскрывать снятую с публикации
         # работу. В фикстуре все поданные работы публичны, поэтому проверяем
         # само правило, а не текущее совпадение данных.
-        for username in stub_data.SUBMISSIONS_BY_USER:
-            for item in stub_data.contest_history(username):
+        for username in ('aidana', 'dina_books', 'bekzhan_t'):
+            for item in data.contest_history(username):
                 with self.subTest(user=username, contest=item['contest'].slug):
                     if item['story'] is not None:
                         self.assertTrue(item['story'].is_public)
@@ -819,12 +841,12 @@ class ContestHistoryPrivacy(TestCase):
         self.assertContains(r, '2023')
 
     def test_history_empty_for_author_without_submissions(self):
-        self.assertEqual(stub_data.contest_history('aygerim_k'), [])
+        self.assertEqual(data.contest_history('aygerim_k'), [])
         r = self.client.get(reverse('core:profile_other', kwargs={'username': 'aygerim_k'}) + '?tab=about')
         self.assertEqual(r.context['contest_history'], [])
         # Слово «Байқаулар» само по себе не показатель — оно есть в шапке
         # и в подвале. Проверяем, что нет ни одного названия конкурса.
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             with self.subTest(contest=c.slug):
                 self.assertNotContains(r, c.name)
 
@@ -833,45 +855,45 @@ class AwardRegistry(TestCase):
     """Один реестр на «что получено» и «что можно получить» (FR-PROF-08)."""
 
     def test_catalog_and_row_come_from_the_same_source(self):
-        for a in stub_data.AUTHORS:
-            earned_row = {x['key'] for x in stub_data.achievements_of(a.username)
+        for a in data.all_authors():
+            earned_row = {x['key'] for x in data.achievements_of(a.username)
                           if x['key'] != 'reads'}
-            earned_cat = {x['key'] for x in stub_data.award_catalog(a.username)
+            earned_cat = {x['key'] for x in data.award_catalog(a.username)
                           if x['earned']}
             with self.subTest(author=a.username):
                 self.assertEqual(earned_row, earned_cat)
 
     def test_catalog_lists_every_award_for_everyone(self):
-        keys = [x.key for x in stub_data.AWARDS]
-        for a in stub_data.AUTHORS:
+        keys = [x.key for x in data.AWARDS]
+        for a in data.all_authors():
             with self.subTest(author=a.username):
-                self.assertEqual([x['key'] for x in stub_data.award_catalog(a.username)], keys)
+                self.assertEqual([x['key'] for x in data.award_catalog(a.username)], keys)
 
     def test_every_award_explains_how_to_get_it(self):
-        for a in stub_data.AWARDS:
+        for a in data.AWARDS:
             with self.subTest(award=a.key):
                 self.assertTrue(a.hint.strip())
                 self.assertNotEqual(a.hint, a.label)
 
     def test_dim_is_the_inverse_of_earned(self):
-        for a in stub_data.AUTHORS:
-            for item in stub_data.award_catalog(a.username) + stub_data.read_ladder(a.username):
+        for a in data.all_authors():
+            for item in data.award_catalog(a.username) + data.read_ladder(a.username):
                 with self.subTest(author=a.username, key=item.get('key') or item.get('threshold')):
                     self.assertEqual(item['dim'], not item['earned'])
 
     def test_ladder_marks_exactly_one_next_step(self):
-        for a in stub_data.AUTHORS:
-            ladder = stub_data.read_ladder(a.username)
+        for a in data.all_authors():
+            ladder = data.read_ladder(a.username)
             with self.subTest(author=a.username):
-                self.assertEqual(len(ladder), len(stub_data.READ_TIERS))
+                self.assertEqual(len(ladder), len(data.READ_TIERS))
                 self.assertLessEqual(sum(1 for s in ladder if s['is_next']), 1)
                 # Пройденные идут подряд с начала: ступень нельзя перепрыгнуть.
                 earned = [s['earned'] for s in ladder]
                 self.assertEqual(earned, sorted(earned, reverse=True))
 
     def test_ladder_left_is_zero_once_taken(self):
-        for a in stub_data.AUTHORS:
-            for s in stub_data.read_ladder(a.username):
+        for a in data.all_authors():
+            for s in data.read_ladder(a.username):
                 with self.subTest(author=a.username, step=s['threshold']):
                     if s['earned']:
                         self.assertEqual(s['left'], 0)
@@ -879,8 +901,8 @@ class AwardRegistry(TestCase):
                         self.assertGreater(s['left'], 0)
 
     def test_unknown_user_gets_full_catalog_with_nothing_earned(self):
-        cat = stub_data.award_catalog('ghost')
-        self.assertEqual(len(cat), len(stub_data.AWARDS))
+        cat = data.award_catalog('ghost')
+        self.assertEqual(len(cat), len(data.AWARDS))
         self.assertFalse(any(x['earned'] for x in cat))
 
 
@@ -911,13 +933,13 @@ class ProfileStatsTab(TestCase):
 
     def test_shows_whole_ladder_not_just_the_taken_step(self):
         r = self.client.get(reverse('core:profile_me') + '?tab=stats')
-        for _, label in stub_data.READ_TIERS:
+        for _, label in data.READ_TIERS:
             with self.subTest(tier=label):
                 self.assertContains(r, label)
 
     def test_shows_unearned_awards_with_hints(self):
         r = self.client.get(reverse('core:profile_me') + '?tab=stats')
-        unearned = [a for a in stub_data.award_catalog('aidana') if not a['earned']]
+        unearned = [a for a in data.award_catalog('aidana') if not a['earned']]
         self.assertTrue(unearned, 'фикстура сломана: у aidana все награды взяты')
         for a in unearned:
             with self.subTest(award=a['key']):
@@ -1021,7 +1043,7 @@ class LibraryAuthed(TestCase):
         r = self.client.get(reverse('core:library'))
         self.assertEqual(r.status_code, 200)
         # «Сақталған»: 3 книги
-        for e in stub_data.library_of('aidana', 'saved'):
+        for e in data.library_of('aidana', 'saved'):
             with self.subTest(slug=e.story.slug):
                 self.assertContains(r, e.story.title)
 
@@ -1110,7 +1132,7 @@ class NotificationsAuthed(TestCase):
         self.assertContains(self.response, 'Байқау')           # contest
 
     def test_unread_summary_shows_count(self):
-        unread = stub_data.unread_count_for_user('aidana')
+        unread = data.unread_count_for_user('aidana')
         self.assertContains(self.response, f'{unread} оқылмаған')
 
     def test_mark_all_button_present_when_has_items(self):
@@ -1148,28 +1170,29 @@ class ModerationNotificationNamesItsOutcome(TestCase):
         self.response = self.client.get(reverse('core:notifications'))
 
     def test_outcome_is_stored_not_derived(self):
-        self.assertIn('outcome', stub_data.Notification.__dataclass_fields__)
+        self.assertIn('outcome',
+                      {f.name for f in Notification._meta.get_fields()})
 
     def test_label_comes_from_the_registry(self):
-        for outcome, label in stub_data.MODERATION_OUTCOME_LABELS.items():
+        for outcome, label in data.MODERATION_OUTCOME_LABELS.items():
             with self.subTest(outcome=outcome or 'pending'):
-                n = stub_data.Notification(kind='moderation', outcome=outcome)
+                n = _notification(kind='moderation', outcome=outcome)
                 self.assertEqual(n.outcome_label, label)
 
     def test_unknown_outcome_says_nothing(self):
         """Лучше пусто, чем чужая подпись: реестр — единственный источник."""
-        n = stub_data.Notification(kind='moderation', outcome='whatever')
+        n = _notification(kind='moderation', outcome='whatever')
         self.assertEqual(n.outcome_label, '')
 
     def test_both_outcomes_are_rendered(self):
-        for outcome in stub_data.MODERATION_OUTCOMES:
-            grants = [n for n in stub_data.NOTIFICATIONS_BY_USER['aidana']
+        for outcome in data.MODERATION_OUTCOMES:
+            grants = [n for n in _aidana_notifications()
                       if n.kind == 'moderation' and n.outcome == outcome]
             if not grants:
                 continue
             with self.subTest(outcome=outcome):
                 self.assertContains(
-                    self.response, stub_data.MODERATION_OUTCOME_LABELS[outcome])
+                    self.response, data.MODERATION_OUTCOME_LABELS[outcome])
 
     def test_negative_outcome_carries_a_reason(self):
         """BR-11: автор узнаёт, что именно исправить.
@@ -1177,22 +1200,22 @@ class ModerationNotificationNamesItsOutcome(TestCase):
         Без причины «Толықтыру қажет» сообщает ровно столько же, сколько
         «Қабылданбады», — то есть ничего, кроме факта неудачи.
         """
-        negative = [n for n in stub_data.NOTIFICATIONS_BY_USER['aidana']
+        negative = [n for n in _aidana_notifications()
                     if n.kind == 'moderation' and n.outcome in ('needs_work', 'rejected')]
         self.assertTrue(negative, 'в стабе нет ни одного отрицательного исхода')
         for n in negative:
-            with self.subTest(story=n.story_slug, outcome=n.outcome):
+            with self.subTest(story=n.story.slug, outcome=n.outcome):
                 self.assertTrue(n.text.strip(), 'исход без причины ничего не сообщает')
                 self.assertContains(self.response, n.text)
 
     def test_outcome_does_not_contradict_the_story_status(self):
         """Непринятая работа не может лежать опубликованной."""
-        for n in stub_data.NOTIFICATIONS_BY_USER['aidana']:
+        for n in _aidana_notifications():
             if n.kind != 'moderation' or not n.story:
                 continue
             if n.outcome not in ('needs_work', 'rejected'):
                 continue
-            with self.subTest(story=n.story_slug, outcome=n.outcome):
+            with self.subTest(story=n.story.slug, outcome=n.outcome):
                 self.assertFalse(
                     n.story.is_public,
                     'работа не прошла модерацию и при этом публична — '
@@ -1218,20 +1241,19 @@ class ModerationNotificationNamesItsOutcome(TestCase):
         что попросили доработать, значит противоречить данным. Ветку
         проверяем подменой, как и «событие старше недели».
         """
-        hard = stub_data.Notification(
-            kind='moderation', days_ago=2, story_slug='aidana-kus',
-            outcome='rejected', text='Ережеге қайшы келеді.',
-        )
-        with mock.patch.dict(stub_data.NOTIFICATIONS_BY_USER, {'aidana': [hard]}):
-            r = self.client.get(reverse('core:notifications'))
-        self.assertContains(r, stub_data.MODERATION_OUTCOME_LABELS['rejected'])
-        self.assertNotContains(r, stub_data.MODERATION_OUTCOME_LABELS['needs_work'])
+        Notification.objects.filter(user__username='aidana').delete()
+        _notification(username='aidana', kind='moderation', days_ago=2,
+                      story=Story.objects.get(slug='aidana-kus'),
+                      outcome='rejected', text='Ережеге қайшы келеді.')
+        r = self.client.get(reverse('core:notifications'))
+        self.assertContains(r, data.MODERATION_OUTCOME_LABELS['rejected'])
+        self.assertNotContains(r, data.MODERATION_OUTCOME_LABELS['needs_work'])
         self.assertContains(r, 'status-error')
 
     def test_three_outcomes_are_distinguishable(self):
         """Ни одна пара исходов не совпадает ни словом, ни цветом."""
-        labels = [stub_data.MODERATION_OUTCOME_LABELS[o]
-                  for o in stub_data.MODERATION_OUTCOMES]
+        labels = [data.MODERATION_OUTCOME_LABELS[o]
+                  for o in data.MODERATION_OUTCOMES]
         self.assertEqual(len(labels), len(set(labels)))
 
         chip = NotificationIconsFollowTheRegistry.ITEM.read_text(encoding='utf-8')
@@ -1241,11 +1263,11 @@ class ModerationNotificationNamesItsOutcome(TestCase):
         tokens = re.findall(r'bg-status-([a-z]+)-bg', moderation)
         self.assertEqual(len(tokens), len(set(tokens)),
                          f'два исхода носят один цвет: {tokens}')
-        self.assertEqual(len(tokens), len(stub_data.MODERATION_OUTCOMES) + 1,
+        self.assertEqual(len(tokens), len(data.MODERATION_OUTCOMES) + 1,
                          'у какого-то исхода нет своей ветки цвета')
 
     def test_outcome_only_belongs_to_moderation(self):
-        for n in stub_data.NOTIFICATIONS_BY_USER['aidana']:
+        for n in _aidana_notifications():
             if n.kind == 'moderation':
                 continue
             with self.subTest(kind=n.kind):
@@ -1330,7 +1352,7 @@ class ReactionNotificationDoesNotSayLike(TestCase):
 
     def test_no_single_reaction_is_named(self):
         html = self.response.content.decode()
-        for r in stub_data.REACTIONS:
+        for r in data.REACTIONS:
             with self.subTest(reaction=r.slug):
                 self.assertNotIn(r.label, html)
 
@@ -1396,22 +1418,22 @@ class NotificationsRenderFromTheRegistry(TestCase):
 
     def test_sections_follow_the_registry_order(self):
         keys = [s['key'] for s in self.response.context['sections']]
-        self.assertEqual(keys, [b for b in stub_data.NOTIF_BUCKETS if keys.count(b)])
-        self.assertEqual(keys, sorted(keys, key=stub_data.NOTIF_BUCKETS.index))
+        self.assertEqual(keys, [b for b in data.NOTIF_BUCKETS if keys.count(b)])
+        self.assertEqual(keys, sorted(keys, key=data.NOTIF_BUCKETS.index))
 
     def test_empty_bucket_renders_no_heading(self):
-        grouped = stub_data.notifications_for_user('aidana')
+        grouped = data.notifications_for_user('aidana')
         lonely = {b: (items if b == 'today' else []) for b, items in grouped.items()}
         # Патчится фасад: view ходит через `core.data`, а не в `stub_data`.
         with mock.patch.object(data, 'notifications_for_user', return_value=lonely):
             r = self.client.get(reverse('core:notifications'))
         self.assertEqual([s['key'] for s in r.context['sections']], ['today'])
-        self.assertNotContains(r, stub_data.NOTIF_BUCKET_LABELS['yesterday'])
+        self.assertNotContains(r, data.NOTIF_BUCKET_LABELS['yesterday'])
 
     def test_labels_come_from_the_registry(self):
         for s in self.response.context['sections']:
             with self.subTest(bucket=s['key']):
-                self.assertEqual(s['label'], stub_data.NOTIF_BUCKET_LABELS[s['key']])
+                self.assertEqual(s['label'], data.NOTIF_BUCKET_LABELS[s['key']])
 
     def test_group_is_a_list(self):
         """`<ul>/<li>`: иначе скринридер не называет число событий в группе."""
@@ -1461,7 +1483,7 @@ class NotificationIconsFollowTheRegistry(TestCase):
     def test_every_kind_still_has_an_icon(self):
         """Правка иконок не должна оставить тип без глифа."""
         chip = self._chip()
-        for kind in stub_data.NOTIF_KINDS:
+        for kind in data.NOTIF_KINDS:
             with self.subTest(kind=kind):
                 self.assertIn(f"n.kind == '{kind}'", chip)
 
@@ -1498,7 +1520,7 @@ class UnreadIsVisibleAndAnnounced(TestCase):
 
     def test_read_notification_carries_no_marker(self):
         """Отметка стоит только у непрочитанного — иначе она ничего не значит."""
-        unread = stub_data.unread_count_for_user('aidana')
+        unread = data.unread_count_for_user('aidana')
         _login_as_aidana(self.client)
         html = self.client.get(reverse('core:notifications')).content.decode()
         self.assertEqual(html.count('<span class="sr-only">оқылмаған</span>'), unread)
@@ -1589,7 +1611,7 @@ class HeaderUnreadBadge(TestCase):
     def test_authed_aidana_sees_unread_badge(self):
         _login_as_aidana(self.client)
         r = self.client.get(reverse('core:home'))
-        # Бейдж непрочитанных — из stub_data.unread_count_for_user
+        # Бейдж непрочитанных — из data.unread_count_for_user
         self.assertContains(r, 'оқылмаған')
 
     def test_authed_no_notifs_no_badge_number(self):
@@ -1607,17 +1629,17 @@ class ContestAwardsInProfile(TestCase):
     """DEC-46: награды конкурсов стоят тем же рядом, что и системные знаки."""
 
     def test_helper_returns_awards_for_a_winner(self):
-        awards = stub_data.contest_awards_of('bekzhan_t')
+        awards = data.contest_awards_of('bekzhan_t')
         self.assertEqual([a['title'] for a in awards], ['Бас жүлде'])
         self.assertEqual(awards[0]['year'], 2023)
 
     def test_helper_is_empty_for_an_author_without_awards(self):
-        self.assertEqual(stub_data.contest_awards_of('aidana'), [])
-        self.assertEqual(stub_data.contest_awards_of('ghost'), [])
+        self.assertEqual(data.contest_awards_of('aidana'), [])
+        self.assertEqual(data.contest_awards_of('ghost'), [])
 
     def test_shape_is_complete(self):
-        for a in stub_data.AUTHORS:
-            for item in stub_data.contest_awards_of(a.username):
+        for a in data.all_authors():
+            for item in data.contest_awards_of(a.username):
                 with self.subTest(author=a.username, key=item['key']):
                     self.assertEqual(
                         set(item),
@@ -1627,7 +1649,7 @@ class ContestAwardsInProfile(TestCase):
     def test_row_renders_the_emblem(self):
         r = self.client.get(reverse('core:profile_other',
                                     kwargs={'username': 'bekzhan_t'}))
-        award = stub_data.contest_awards_of('bekzhan_t')[0]
+        award = data.contest_awards_of('bekzhan_t')[0]
         self.assertContains(r, f"/media/{award['image']}")
 
     def test_tooltip_names_both_nomination_and_contest(self):
@@ -1640,8 +1662,8 @@ class ContestAwardsInProfile(TestCase):
     def test_award_survives_the_work_being_unpublished(self):
         """Работа скрыта — награда остаётся: она принадлежит автору, а не
         видимости текста (BR-73)."""
-        for a in stub_data.AUTHORS:
-            for item in stub_data.contest_awards_of(a.username):
+        for a in data.all_authors():
+            for item in data.contest_awards_of(a.username):
                 with self.subTest(author=a.username, key=item['key']):
                     self.assertTrue(item['title'])
                     if item['story'] is not None:
@@ -1649,7 +1671,7 @@ class ContestAwardsInProfile(TestCase):
 
     def test_author_without_contest_awards_shows_no_medallion(self):
         """Системные знаки у неё есть, конкурсных нет — и медальона тоже."""
-        self.assertFalse(stub_data.contest_awards_of('aidana'))
+        self.assertFalse(data.contest_awards_of('aidana'))
         r = self.client.get(reverse('core:profile_other',
                                     kwargs={'username': 'aidana'}))
         self.assertNotContains(r, '/media/awards/')

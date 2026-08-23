@@ -80,7 +80,6 @@ def home(request):
         'portal_stats':    data.portal_stats(),
         'popular_tags':    data.popular_tags(8),
         'trending_tags':   data.trending_tags(6),
-        'school_links':    data.SCHOOL_LINKS,
     })
 
 
@@ -685,7 +684,7 @@ def _prof_items(username: str, allowed: tuple, is_self: bool) -> list:
 def profile_me(request):
     """Свой профиль (FR-PROF-01/03). Реальное переключение секций через ?tab=."""
     username = _current_username(request)
-    author = data.AUTHORS_BY_USERNAME.get(username)
+    author = data.author_by_username(username)
     tab = _resolve_prof_tab(request, _PROF_TABS_ME)
     # Рейл профиля состоит из одного блока «Жазылулар»: без него
     # partials/right_rail/profile.html не рендерит ничего, и гость получал
@@ -733,7 +732,7 @@ def profile_me(request):
 def profile_me_edit(request):
     """Редактирование своего профиля (FR-PROF-01). Stub: рендерит форму, без сабмита."""
     username = _current_username(request)
-    author = data.AUTHORS_BY_USERNAME.get(username) if username else None
+    author = data.author_by_username(username)
     return render(request, 'pages/profile/profile_me_edit.html', {
         'profile_user': author,
         'username':     username,
@@ -749,7 +748,7 @@ def profile_other(request, username):
 
     Данные — только публичные (`public_stories_of` / `public_stats`).
     """
-    author = data.AUTHORS_BY_USERNAME.get(username)
+    author = data.author_by_username(username)
     if not author:
         raise Http404(f'Автор @{username} табылмады')
     me = _current_username(request)
@@ -807,7 +806,7 @@ def profile_people(request, username, kind):
     Один view на два набора: страницы отличаются тем, кого показывают, и
     ничем больше. Неизвестный `kind` и неизвестный автор — 404.
     """
-    author = data.AUTHORS_BY_USERNAME.get(username)
+    author = data.author_by_username(username)
     if not author or kind not in _PEOPLE_KINDS:
         raise Http404(f'@{username}: {kind} табылмады')
 
@@ -1157,9 +1156,13 @@ def design_states(request):
         raise Http404
     return render(request, 'pages/_design/states.html', {
         'sample_story':   data.public_stories().first(),
-        'sample_entry':   data.LIBRARY_BY_USER['aidana'][0],
-        'sample_notif':   data.NOTIFICATIONS_BY_USER['aidana'][0],
-        'sample_comment': data.COMMENTS_BY_STORY['dalney-berega'][0],
+        # По одному настоящему объекту каждого вида: витрина состояний
+        # должна показывать то же, что живые страницы, иначе она
+        # рассказывает про вёрстку, которой нет.
+        'sample_entry':   data.library_of('aidana')[0],
+        'sample_notif':   next(iter(sum(
+            data.notifications_for_user('aidana').values(), [])), None),
+        'sample_comment': data.comments_of('dalney-berega')[0],
     })
 
 

@@ -19,7 +19,7 @@ def site_links(request):
     """Глобально доступные внешние ссылки (FR-LINKS-06): «Авторлар мектебі».
     Используется в footer и любых страницах без явного контекста.
     """
-    return {'school_links_global': data.SCHOOL_LINKS}
+    return {'school_links_global': data.school_links()}
 
 
 def nav_state(request):
