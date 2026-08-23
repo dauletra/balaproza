@@ -64,6 +64,11 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'config.urls'
 
+# Своя модель пользователя заводится до первой миграции `core` и позже не
+# меняется без пересоздания базы. Отдельной модели «автор» нет: читателя как
+# роли не существует (DEC-01), любой зарегистрированный сразу и пишет.
+AUTH_USER_MODEL = 'core.User'
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',

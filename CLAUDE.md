@@ -60,6 +60,16 @@ balaproza_v1/
 │   │   └── formatting.py         # kk_date / kk_period / kk_ago, spaced_number
 │   │                             # Домен НЕ импортирует stub_data, модели и core.data —
 │   │                             # иначе цикл на Ф14 и константы не взять в миграции
+│   ├── models.py                 # модели Ф14. Пока: User (DEC-01 — роли «читатель» нет;
+│   │                             # first_name/last_name убраны, есть name + pen_name),
+│   │                             # Genre (закрытый справочник 12), Tag (путь pending →
+│   │                             # accepted|rejected), BlockedTagPattern.
+│   │                             # Производное не хранится: ни Genre.count, ни usage_count
+│   ├── migrations/               # 0001_initial + 0002_reference_data (жанры и блок-лист
+│   │                             # заливает миграция: без них не работает каталог;
+│   │                             # литералы заморожены, stub_data не импортируется)
+│   ├── admin.py                  # инструмент модерации (DEC-23): пользователь без
+│   │                             # западных полей имени, жанры, путь тега групповым действием
 │   ├── stub_data.py              # ВСЕ «данные» проекта (Genre, Tag, Author, Story, Chapter,
 │   │                             # Collection (только редакция, count/covers — производные),
 │   │                             # Contest (три даты — opens_on/closes_on/results_on;
@@ -128,7 +138,7 @@ balaproza_v1/
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
 │   │                             # domain.formatting.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 952 теста в 17 файлах (см. ниже)
+│   └── tests/                    # 967 тестов в 18 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -249,7 +259,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 952 теста
+uv run python manage.py test core       # все 967 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 
@@ -258,6 +268,8 @@ uv run python manage.py test core.tests.test_<file>
 - `test_auth.py`, `test_context.py`, `test_filters.py`, `test_stub_data.py`
 - `test_data_facade.py` — шов Ф14: `stub_data` импортирует только фасад `core.data`,
   домен не знает о хранилище, каждое доменное имя достаётся через фасад
+- `test_models.py` — модели Ф14: публичное и приватное имя автора, путь тега,
+  нормализация блок-листа; справочник жанров из миграции совпадает со стабом
 - `test_home.py`, `test_story.py`, `test_catalog.py`, `test_write.py`
 - `test_prof_lib_notif.py`, `test_contests.py`, `test_auth_links.py`, `test_states.py`
 - `test_desktop_layout.py` — регрессии каркаса: рейл только на `xl`, колонка контента 860px
