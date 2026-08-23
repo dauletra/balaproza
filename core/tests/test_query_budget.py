@@ -33,32 +33,33 @@ def _login(client):
 class PagesStayWithinTheirQueryBudget(TestCase):
 
     def test_home_guest(self):
-        """Девять: ряды, жинақтар, книга недели, полоса жанров."""
-        with self.assertNumQueries(9):
+        """Одиннадцать: ряды, жинақтар, книга недели, полоса жанров, две
+        витрины тегов."""
+        with self.assertNumQueries(11):
             self.client.get(reverse('core:home'))
 
     def test_home_signed_in(self):
         """Плюс прогресс чтения и работы автора."""
         _login(self.client)
-        with self.assertNumQueries(11):
+        with self.assertNumQueries(15):
             self.client.get(reverse('core:home'))
 
     def test_catalog(self):
-        """Двадцать два: выдача, счётчики шести пресетов, чипы, рейл.
+        """Двадцать шесть: выдача, счётчики шести пресетов, чипы, рейл.
 
         Пресеты и есть основная статья расхода — каждый считает свою
         выдачу. Это осознанно: счётчик пресета обязан быть настоящим
         (DEC-36), а неправдивый счётчик хуже отсутствующего.
         """
-        with self.assertNumQueries(22):
+        with self.assertNumQueries(26):
             self.client.get(reverse('core:catalog'))
 
     def test_genre_page(self):
-        with self.assertNumQueries(19):
+        with self.assertNumQueries(23):
             self.client.get(reverse('core:genre_detail', kwargs={'slug': 'fantezi'}))
 
     def test_search(self):
-        with self.assertNumQueries(19):
+        with self.assertNumQueries(23):
             self.client.get(reverse('core:search_results') + '?q=жағалау')
 
     def test_story_page(self):

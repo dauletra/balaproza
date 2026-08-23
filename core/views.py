@@ -610,7 +610,7 @@ def _checklist_links(story) -> list:
 
 
 def manage_story(request, slug):
-    story = data.STORIES_BY_SLUG.get(slug)
+    story = data.story_by_slug_for_author(slug)
     return render(request, 'pages/write/manage_story.html', {
         'slug':     slug,
         'story':    story,
@@ -623,7 +623,7 @@ def manage_story(request, slug):
 
 
 def story_settings(request, slug):
-    story = data.STORIES_BY_SLUG.get(slug)
+    story = data.story_by_slug_for_author(slug)
     return render(request, 'pages/write/story_settings.html', {
         'slug':   slug,
         'story':  story,
@@ -638,7 +638,7 @@ def story_settings(request, slug):
 
 
 def chapter_editor(request, slug, chapter=None):
-    story = data.STORIES_BY_SLUG.get(slug)
+    story = data.story_by_slug_for_author(slug)
     current = data.chapter_of(slug, chapter) if chapter else None
     return render(request, 'pages/write/chapter_editor.html', {
         'slug':    slug,
@@ -1066,7 +1066,7 @@ def search_index_json(request):
             # docs/11 Phase 3: теги в Cmd+K (только accepted)
             'tags': [
                 {'slug': t.slug, 'name': t.name, 'usage_count': t.usage_count}
-                for t in data.TAGS if t.status == 'accepted'
+                for t in data.all_tags() if t.status == 'accepted'
             ],
         }
     return JsonResponse(_SEARCH_INDEX_CACHE)
@@ -1129,8 +1129,8 @@ def design_components(request):
     """Каталог всех атомов во всех состояниях. Только при DEBUG."""
     if not settings.DEBUG:
         raise Http404
-    accepted = [t for t in data.TAGS if t.status == 'accepted']
-    pending  = [t for t in data.TAGS if t.status == 'pending']
+    accepted = [t for t in data.all_tags() if t.status == 'accepted']
+    pending  = [t for t in data.all_tags() if t.status == 'pending']
     # Микс accepted + pending — иллюстрирует фильтрацию tag_list по viewer
     mixed = accepted[:3] + pending[:2]
     return render(request, 'pages/_design/components.html', {

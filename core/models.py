@@ -144,11 +144,16 @@ class Tag(models.Model):
     закрытого списка, зато есть путь `pending → accepted | rejected`
     (BR-TAG-03) и блок-лист (BR-TAG-05).
 
-    Счётчиков использования в колонках нет: `usage_count` — агрегат по
-    работам, `weekly_count` — тот же агрегат с окном в неделю. Если
-    окно окажется дорогим, оно станет денормализованной колонкой с
-    пересчётом — но тогда рядом будет и пересчёт, как задумано для
-    `Story.recent_views` (DEC-36), а не одинокое число.
+    Оба счётчика — колонки, и это уступка, а не замысел. `usage_count`
+    вычислим (работ с тегом), `weekly_count` — нет: когда тег появился на
+    работе, нигде не записано. А DEC-31 держится ровно на расхождении
+    этих двух чисел: «Осы аптада» имеет смысл, только пока она не копия
+    «Танымал тегтер». Вычислить одно и хранить другое нельзя — недельный
+    счётчик оказался бы больше общего.
+
+    Правильный ответ — дата в связке «работа-тег»; она появится вместе с
+    возможностью проставлять теги (Ф15), и тогда оба числа станут
+    агрегатами. Пока это та же уступка демо-корпусу, что `User.followers`.
     """
 
     STATUS_CHOICES = [(s, s) for s in TAG_STATUSES]
@@ -159,6 +164,8 @@ class Tag(models.Model):
     name = models.CharField('атауы', max_length=48)
     status = models.CharField('күйі', max_length=16, choices=STATUS_CHOICES,
                               default='pending')
+    usage_count = models.PositiveIntegerField('қолданылған саны', default=0)
+    weekly_count = models.PositiveIntegerField('осы аптада', default=0)
     created_at = models.DateTimeField('жасалған', auto_now_add=True)
 
     class Meta:

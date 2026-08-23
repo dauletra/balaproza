@@ -95,6 +95,23 @@ from .queries.catalog import (
     story_by_slug,
 )
 
+# ── Кабинет автора, профиль, библиотека ──────────────────────────────────
+from .queries.author import (
+    can_submit_for_review,
+    in_library,
+    library_of,
+    missing_for_review,
+    my_stories_of,
+    public_stats,
+    public_stories_of,
+    publish_checklist,
+    reader_stats,
+    story_by_slug_for_author,
+    top_stories_of,
+    writer_attention,
+    writer_stats,
+)
+
 # ── Произведение: главы, отклик, комментарии, подборки ───────────────────
 from .queries.library import reading_progress_of
 from .queries.story import (
@@ -111,12 +128,10 @@ from .queries.story import (
     reactions_of,
 )
 
-# ── Справочники: теги (жанры уже выше, из моделей) ───────────────────────
-from .stub_data import (
-    BLOCKED_TAG_PATTERNS,
-    TAGS,
-    TAGS_BY_SLUG,
+# ── Теги (docs/11) ───────────────────────────────────────────────────────
+from .queries.tags import (
     accepted_tags_json,
+    all_tags,
     blocked_tag_patterns_list,
     is_blocked,
     popular_tags,
@@ -125,29 +140,13 @@ from .stub_data import (
     trending_tags,
 )
 
-# ── Автор: кабинет, профиль, публичные счётчики ──────────────────────────
-from .stub_data import (
-    can_submit_for_review,
-    missing_for_review,
-    my_stories_of,
-    new_authors,
-    portal_stats,
-    public_stats,
-    public_stories_of,
-    publish_checklist,
-    reader_stats,
-    top_stories_of,
-    writer_attention,
-    writer_stats,
-)
-
-# ── Библиотека, чтение, подписки ─────────────────────────────────────────
+# ── Ещё на стабе: витрины главной и социальный граф ──────────────────────
 from .stub_data import (
     followers_of,
     following_of,
-    in_library,
     is_following,
-    library_of,
+    new_authors,
+    portal_stats,
 )
 
 # ── Награды (FR-PROF-06, DEC-41, DEC-46) ─────────────────────────────────
@@ -198,6 +197,7 @@ from .stub_data import SCHOOL_LINKS
 from .stub_data import (  # noqa: F401
     AUTHORS,
     AUTHORS_BY_USERNAME,
+    BLOCKED_TAG_PATTERNS,
     AWARD_GRANTS,
     BOOK_OF_WEEK,
     COLLECTIONS,
@@ -210,4 +210,6 @@ from .stub_data import (  # noqa: F401
     STORIES,
     STORIES_BY_SLUG,
     SUBMISSIONS_BY_USER,
+    TAGS,
+    TAGS_BY_SLUG,
 )

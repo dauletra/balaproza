@@ -133,12 +133,22 @@ class SeededTagsMatchTheStub(TestCase):
             with self.subTest(tag=slug):
                 self.assertFalse(Tag.objects.get(slug=slug).is_public)
 
-    def test_usage_counters_are_not_stored(self):
-        """`usage_count` и `weekly_count` — агрегаты по работам, колонок под
-        них нет; сид не должен был их «перенести»."""
-        fields = {f.name for f in Tag._meta.get_fields()}
-        self.assertNotIn('usage_count', fields)
-        self.assertNotIn('weekly_count', fields)
+    def test_showcase_counters_transferred(self):
+        """Счётчики витрин — колонки по необходимости (см. `core.models.Tag`),
+        и потому обязаны совпасть со стабом: на их расхождении держится
+        DEC-31, а вычислить недельный не из чего."""
+        for tag in stub_data.TAGS:
+            with self.subTest(tag=tag.slug):
+                row = Tag.objects.get(slug=tag.slug)
+                self.assertEqual(row.usage_count, tag.usage_count)
+                self.assertEqual(row.weekly_count, tag.weekly_count)
+
+    def test_weekly_list_still_differs_from_all_time(self):
+        """Иначе полоса «Осы аптада» — копия «Танымал тегтер» (DEC-31)."""
+        from core import data
+
+        self.assertNotEqual([t.slug for t in data.trending_tags(6)],
+                            [t.slug for t in data.popular_tags(6)])
 
 
 class SeededStoriesMatchTheStub(TestCase):

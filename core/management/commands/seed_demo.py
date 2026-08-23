@@ -165,13 +165,19 @@ class Command(BaseCommand):
         return added, updated
 
     def _seed_tags(self):
-        """UGC-теги. Счётчики использования не переносятся: колонок под них
-        нет и не будет — это агрегаты по работам (см. `core.models.Tag`)."""
+        """UGC-теги вместе со счётчиками витрин.
+
+        Счётчики — колонки по необходимости: когда тег появился на работе,
+        нигде не записано, а «Осы аптада» держится на расхождении с
+        накопленным (DEC-31). Подробности — в `core.models.Tag`.
+        """
         added = updated = 0
         for tag in stub_data.TAGS:
             _, is_new = Tag.objects.update_or_create(
                 slug=tag.slug,
-                defaults={'name': tag.name, 'status': tag.status},
+                defaults={'name': tag.name, 'status': tag.status,
+                          'usage_count': tag.usage_count,
+                          'weekly_count': tag.weekly_count},
             )
             added += is_new
             updated += not is_new

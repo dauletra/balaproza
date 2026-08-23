@@ -54,6 +54,9 @@ balaproza_v1/
 │   │                             # По мере Ф14 строки переезжают из stub_data в модули
 │   │                             # запросов — список импортов и есть карта прогресса
 │   ├── queries/                  # запросы к моделям: то, чем stub_data был для чтения
+│   │   ├── author.py             # кабинет и профиль: своё против публичного (BR-73),
+│   │   │                         # чек-лист готовности, счётчики; nulls_last в сортировке
+│   │   ├── tags.py               # витрины «Танымал» / «Осы аптада», автокомплит, блок-лист
 │   │   ├── story.py              # главы, реакции, опрос, комментарии, жинақтар работы
 │   │   ├── library.py            # прогресс чтения (FR-HOME-02)
 │   │   └── catalog.py            # каталог/поиск/жанры (DEC-27, DEC-36): публичные статусы
@@ -165,7 +168,7 @@ balaproza_v1/
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
 │   │                             # domain.formatting.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 1046 тестов в 20 файлах (см. ниже)
+│   └── tests/                    # 1047 тестов в 20 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -286,7 +289,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 1046 тестов
+uv run python manage.py test core       # все 1047 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 
