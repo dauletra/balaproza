@@ -12,15 +12,25 @@
 **Совпадение со стабом.** Пока источника два, любое расхождение — это
 молчаливая смена содержимого страниц в тот день, когда чтение
 переключится на базу. Тесты этого файла растут вместе с командой: сейчас
-пользователи, теги, произведения и главы, дальше — конкурсы, библиотека,
-комментарии.
+пользователи, теги, произведения, главы и конкурсы, дальше — библиотека,
+подписки, комментарии.
 """
 
 from django.core.management import call_command
+from django.db.utils import IntegrityError
 from django.test import TestCase
 
 from core import stub_data
-from core.models import Chapter, Genre, Story, Tag, User
+from core.models import (
+    AwardGrant,
+    Chapter,
+    Contest,
+    Genre,
+    Story,
+    Submission,
+    Tag,
+    User,
+)
 
 
 def seed():
@@ -285,3 +295,179 @@ class SeededChaptersCarryTheirText(TestCase):
             with self.subTest(story=story.slug):
                 self.assertEqual(story.likes, sum(c.likes for c in chapters))
         self.assertTrue(checked, 'ни у одной работы нет реакций — тест пуст')
+
+
+class SeededContestsMatchTheStub(TestCase):
+    """Конкурс — самый производный объект проекта: из трёх дат считается
+    почти всё, что видит участник. Сверяются поэтому не колонки, а ответы:
+    фаза, отсчёт, строка «что дальше», возрастная вилка.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        seed()
+
+    def test_every_stub_contest_became_a_row(self):
+        self.assertEqual(Contest.objects.count(), len(stub_data.CONTESTS))
+
+    def test_dates_and_numbers_transferred(self):
+        for stub in stub_data.CONTESTS:
+            with self.subTest(contest=stub.slug):
+                contest = Contest.objects.get(slug=stub.slug)
+                self.assertEqual(contest.name, stub.name)
+                self.assertEqual(contest.subtitle, stub.subtitle)
+                self.assertEqual(contest.opens_on, stub.opens_on)
+                self.assertEqual(contest.closes_on, stub.closes_on)
+                self.assertEqual(contest.results_on, stub.results_on)
+                self.assertEqual(contest.prize_kzt, stub.prize_kzt)
+                self.assertEqual(contest.series, stub.series)
+                self.assertEqual(contest.min_chars, stub.min_chars)
+                self.assertEqual(contest.max_chars, stub.max_chars)
+                self.assertEqual(contest.min_age, stub.min_age)
+                self.assertEqual(contest.max_age, stub.max_age)
+
+    def test_phase_and_countdown_match(self):
+        """Фаза выводится из дат (DEC-45), и обе стороны обязаны вывести
+        одно и то же — иначе в день переключения бейдж конкурса сменится."""
+        for stub in stub_data.CONTESTS:
+            with self.subTest(contest=stub.slug):
+                contest = Contest.objects.get(slug=stub.slug)
+                self.assertEqual(contest.phase, stub.phase)
+                self.assertEqual(contest.is_accepting, stub.is_accepting)
+                self.assertEqual(contest.is_finished, stub.is_finished)
+                self.assertEqual(contest.days_left, stub.days_left)
+                self.assertEqual(contest.days_until_open, stub.days_until_open)
+                self.assertEqual(contest.year, stub.year)
+
+    def test_all_four_phases_are_represented(self):
+        """Иначе предыдущий тест проверяет одну ветку из четырёх."""
+        phases = {c.phase for c in Contest.objects.all()}
+        self.assertEqual(phases, set(stub_data.CONTEST_PHASES))
+
+    def test_sentences_match(self):
+        """`timing_line` и `eligibility_line` собираются в слое данных, а
+        не в шаблоне: их показывают по три поверхности каждую."""
+        for stub in stub_data.CONTESTS:
+            with self.subTest(contest=stub.slug):
+                contest = Contest.objects.get(slug=stub.slug)
+                self.assertEqual(contest.timing_line, stub.timing_line)
+                self.assertEqual(contest.eligibility_line, stub.eligibility_line)
+                self.assertEqual(contest.opens_on_label, stub.opens_on_label)
+                self.assertEqual(contest.closes_on_label, stub.closes_on_label)
+                self.assertEqual(contest.results_on_label, stub.results_on_label)
+
+    def test_composition_transferred(self):
+        for stub in stub_data.CONTESTS:
+            with self.subTest(contest=stub.slug):
+                contest = Contest.objects.get(slug=stub.slug)
+                self.assertEqual(contest.conditions, list(stub.conditions))
+                self.assertEqual([m.name for m in contest.jury],
+                                 [m.name for m in stub.jury])
+                self.assertEqual([m.role for m in contest.jury],
+                                 [m.role for m in stub.jury])
+                self.assertEqual([a.slug for a in contest.awards],
+                                 [a.slug for a in stub.awards])
+                self.assertEqual([a.image for a in contest.awards],
+                                 [a.image for a in stub.awards])
+
+    def test_timeline_states_are_derived_the_same_way(self):
+        """Состояние этапа считается от календаря. Хранимое уже расходилось
+        с данными: «Өтінім қабылдау» конкурса 2023 года стоял активным."""
+        for stub in stub_data.CONTESTS:
+            contest = Contest.objects.get(slug=stub.slug)
+            with self.subTest(contest=stub.slug):
+                self.assertEqual([s.label for s in contest.timeline],
+                                 [s.label for s in stub.timeline])
+                self.assertEqual([s.period for s in contest.timeline],
+                                 [s.period for s in stub.timeline])
+                self.assertEqual([s.state for s in contest.timeline],
+                                 [s.state for s in stub.timeline])
+
+    def test_submission_count_is_counted_not_stored(self):
+        for stub in stub_data.CONTESTS:
+            with self.subTest(contest=stub.slug):
+                self.assertEqual(Contest.objects.get(slug=stub.slug).submissions,
+                                 stub.submissions)
+
+    def test_winners_come_from_grants(self):
+        for stub in stub_data.CONTESTS:
+            with self.subTest(contest=stub.slug):
+                contest = Contest.objects.get(slug=stub.slug)
+                self.assertEqual(contest.winners, stub.winners)
+                self.assertEqual([s.slug for s in contest.winner_stories],
+                                 [s.slug for s in stub.winner_stories])
+
+    def test_finished_contest_actually_has_winners(self):
+        """Иначе предыдущий тест сверяет два пустых кортежа."""
+        finished = Contest.objects.get(slug='zhas-aldym-2023')
+        self.assertTrue(finished.is_finished)
+        self.assertEqual(len(finished.winners), 2)
+
+    def test_editions_link_by_series(self):
+        """Связь выпусков по слагу семейства, а не по совпадению имён
+        (BR-47): без неё завершённый конкурс — тупик."""
+        for stub in stub_data.CONTESTS:
+            with self.subTest(contest=stub.slug):
+                contest = Contest.objects.get(slug=stub.slug)
+                self.assertEqual([c.slug for c in contest.other_editions],
+                                 [c.slug for c in stub.other_editions])
+
+    def test_grant_notes_transferred(self):
+        for stub in stub_data.AWARD_GRANTS:
+            with self.subTest(award=stub.award_slug, contest=stub.contest_slug):
+                grant = AwardGrant.objects.get(contest__slug=stub.contest_slug,
+                                               award__slug=stub.award_slug)
+                self.assertEqual(grant.story.slug, stub.story_slug)
+                self.assertEqual(grant.note, stub.note)
+                self.assertEqual(grant.author.username,
+                                 stub.story.author_username)
+
+
+class SeededSubmissionsMatchTheStub(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        seed()
+
+    def test_every_stub_submission_became_a_row(self):
+        expected = sum(len(v) for v in stub_data.SUBMISSIONS_BY_USER.values())
+        self.assertEqual(Submission.objects.count(), expected)
+
+    def test_fields_transferred(self):
+        for username, subs in stub_data.SUBMISSIONS_BY_USER.items():
+            for stub in subs:
+                with self.subTest(author=username, contest=stub.contest_slug):
+                    row = Submission.objects.get(author__username=username,
+                                                 contest__slug=stub.contest_slug)
+                    self.assertEqual(row.story.slug, stub.story_slug)
+                    self.assertEqual(row.submitted_on, stub.submitted_on)
+                    self.assertEqual(row.status, stub.status)
+                    self.assertEqual(row.note, stub.note)
+
+    def test_relative_label_is_derived(self):
+        """«5 күн бұрын» считается от даты. Хранимая строка не просто
+        устаревала — она лгала проверяемо (BR-41a)."""
+        for username, subs in stub_data.SUBMISSIONS_BY_USER.items():
+            for stub in subs:
+                with self.subTest(author=username, contest=stub.contest_slug):
+                    row = Submission.objects.get(author__username=username,
+                                                 contest__slug=stub.contest_slug)
+                    self.assertEqual(row.submitted_label, stub.submitted_label)
+
+    def test_submission_lies_inside_the_intake_window(self):
+        """Инвариант данных: подача не может быть раньше открытия приёма
+        или позже дедлайна."""
+        for row in Submission.objects.select_related('contest'):
+            with self.subTest(author=row.author.username,
+                              contest=row.contest.slug):
+                self.assertGreaterEqual(row.submitted_on, row.contest.opens_on)
+                self.assertLessEqual(row.submitted_on, row.contest.closes_on)
+
+    def test_one_submission_per_author_per_contest(self):
+        """BR-23 — ограничение базы, а не только формы: вторая заявка
+        ломает и счёт участников, и конкурсную биографию."""
+        row = Submission.objects.first()
+        with self.assertRaises(IntegrityError):
+            Submission.objects.create(contest=row.contest, author=row.author,
+                                      story=row.story,
+                                      submitted_on=row.submitted_on)

@@ -1,8 +1,8 @@
 """Модели Ф14. Порядок появления — docs/19 §19.4.
 
-Сейчас здесь пользователь, справочники, произведения и главы. Конкурсы,
-библиотека, комментарии и уведомления приезжают своими этапами, и до тех
-пор их данные живут в `core/stub_data.py`.
+Сейчас здесь пользователь, справочники, произведения, главы и конкурсы.
+Библиотека, подписки, комментарии и уведомления приезжают своими этапами,
+и до тех пор их данные живут в `core/stub_data.py`.
 
 Модель появляется раньше, чем страницы начинают её читать: сначала
 таблица и сид, отдельным шагом — переключение чтения. Так видно, в каком
@@ -22,7 +22,8 @@ from django.db import models
 from django.utils import timezone
 
 from .domain.catalog import BADGE_LABELS, PUBLIC_STATUSES
-from .domain.formatting import kk_updated
+from .domain.contests import CONTEST_PHASE_LABELS, SUBMISSION_STATUSES
+from .domain.formatting import kk_ago, kk_date, kk_period, kk_updated
 from .domain.story import REACTIONS, REACTIONS_BY_SLUG, STORY_FORMATS, STORY_STATUSES
 from .domain.tags import TAG_STATUSES
 
@@ -464,3 +465,443 @@ class ChapterReaction(models.Model):
 
     def __str__(self):
         return f'{self.kind}: {self.count}'
+
+
+class Contest(models.Model):
+    """Конкурс. Заводит админ; всё, что можно вывести, выводится (DEC-45).
+
+    Хранятся **три даты** — открытие приёма, дедлайн, объявление итогов.
+    Из них считаются фаза, отсчёт дней и год; число заявок считается по
+    самим заявкам. Колонок `status`, `days_left`, `year` и `submissions`
+    нет и заводить их нельзя: «87 өтінім» стояло при одной настоящей
+    заявке, а `days_left=12` протухал назавтра (BR-40a).
+
+    Списки — номинации, этапы, жюри, условия — вынесены в отдельные
+    таблицы: админ добавляет строки, а не редактирует кортеж в коде.
+    Каждый список отдан наружу свойством (`awards`, `timeline`, `jury`,
+    `conditions`), потому что шаблон перебирает их напрямую, а менеджер
+    связи в шаблоне не перебирается.
+    """
+
+    slug = models.SlugField('slug', max_length=64, unique=True)
+    name = models.CharField('атауы', max_length=120)
+    subtitle = models.CharField('санаты', max_length=160, blank=True)
+
+    opens_on = models.DateField('қабылдау басталады')
+    closes_on = models.DateField('қабылдау жабылады')
+    results_on = models.DateField('қорытынды жарияланады')
+
+    # None — конкурс без денежного приза. Ноль означал бы «приз есть, но
+    # он нулевой», а это разные вещи.
+    prize_kzt = models.PositiveIntegerField('сыйлық (₸)', null=True, blank=True)
+    # Афиша — файл в MEDIA_ROOT (`contests/<slug>.png`), грузит админ
+    # (BR-47a). Пусто — платформа рисует типографическую афишу по названию.
+    poster = models.CharField('афиша', max_length=200, blank=True)
+    # Слаг семейства повторяющегося конкурса (BR-47). Пусто — разовый.
+    # Связь по слагу, а не по совпадению имён: у выпусков имена расходятся
+    # («Жас алдым — 2023» против «Жас алдым — 2026»).
+    series = models.SlugField('серия', max_length=64, blank=True)
+    description = models.TextField('сипаттамасы', blank=True)
+
+    # Пороги объёма для подачи (BR-22). У конкурса свои — подпись чек-листа
+    # берёт числа отсюда, а не вписывает литералом (FR-CONT-07).
+    min_chars = models.PositiveIntegerField('ең аз көлемі', default=5_000)
+    max_chars = models.PositiveIntegerField('ең көп көлемі', default=15_000)
+    # Возрастная вилка **этого конкурса** (BR-48). Любая граница может
+    # отсутствовать, обе — тоже: у платформы своего ценза нет и быть не
+    # может (DEC-47).
+    min_age = models.PositiveSmallIntegerField('ең кіші жас', null=True, blank=True)
+    max_age = models.PositiveSmallIntegerField('ең үлкен жас', null=True, blank=True)
+
+    class Meta:
+        ordering = ('-results_on',)
+        verbose_name = 'байқау'
+        verbose_name_plural = 'байқаулар'
+        constraints = [
+            # Инвариант дат: приём открывается не позже дедлайна, итоги —
+            # строго после него. Нарушение делает фазу невыводимой.
+            models.CheckConstraint(
+                condition=models.Q(opens_on__lte=models.F('closes_on')),
+                name='contest_opens_before_it_closes'),
+            models.CheckConstraint(
+                condition=models.Q(closes_on__lt=models.F('results_on')),
+                name='contest_results_after_it_closes'),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    # ── Списки состава ───────────────────────────────────────────────────
+    @property
+    def awards(self) -> list:
+        return list(self.award_set.all())
+
+    @property
+    def timeline(self) -> list:
+        return list(self.stage_set.all())
+
+    @property
+    def jury(self) -> list:
+        return list(self.jury_set.all())
+
+    @property
+    def conditions(self) -> list:
+        """Условия именно этого конкурса, строками. Общие для всех живут
+        в `common_rules` и здесь не повторяются (BR-48a)."""
+        return [c.text for c in self.condition_set.all()]
+
+    # ── Фаза и сроки (DEC-45) ────────────────────────────────────────────
+    @property
+    def phase(self) -> str:
+        """Одна из `CONTEST_PHASES`. Единственный источник — три даты.
+
+        Четвёртая фаза («қазылар қарауда») заведена потому, что двух не
+        хватало: между дедлайном и итогами конкурс либо врал «Белсенді,
+        0 күн қалды», либо резко становился «Аяқталды» без победителей.
+        """
+        today = timezone.localdate()
+        if today < self.opens_on:
+            return 'upcoming'
+        if today <= self.closes_on:
+            return 'accepting'
+        if today < self.results_on:
+            return 'judging'
+        return 'finished'
+
+    @property
+    def phase_label(self) -> str:
+        return CONTEST_PHASE_LABELS[self.phase]
+
+    @property
+    def is_accepting(self) -> bool:
+        """Можно ли подать работу. Именно это, а не «конкурс активен»,
+        решает судьбу кнопки «Қатысу»."""
+        return self.phase == 'accepting'
+
+    @property
+    def is_finished(self) -> bool:
+        return self.phase == 'finished'
+
+    @property
+    def days_left(self):
+        return (self.closes_on - timezone.localdate()).days if self.is_accepting else None
+
+    @property
+    def days_until_open(self):
+        if self.phase != 'upcoming':
+            return None
+        return (self.opens_on - timezone.localdate()).days
+
+    @property
+    def opens_on_label(self) -> str:
+        return kk_date(self.opens_on)
+
+    @property
+    def closes_on_label(self) -> str:
+        return kk_date(self.closes_on)
+
+    @property
+    def results_on_label(self) -> str:
+        return kk_date(self.results_on)
+
+    @property
+    def year(self) -> int:
+        """Год проведения — год объявления итогов. Нужен конкурсной
+        биографии автора: «1 жыл бұрын» устаревает каждый день."""
+        return self.results_on.year
+
+    @property
+    def eligibility_line(self) -> str:
+        """Возрастное требование словами. Пусто — конкурс его не ставит.
+
+        Собирать эту строку в шаблоне запрещено: её показывают чек-лист
+        подачи, секция условий и чекбокс подтверждения.
+        """
+        lo, hi = self.min_age, self.max_age
+        if lo and hi:
+            return f'{lo}-{hi} жас'
+        if lo:
+            return f'{lo} жастан бастап'
+        if hi:
+            return f'{hi} жасқа дейін'
+        return ''
+
+    @property
+    def timing_line(self) -> str:
+        """«Что дальше и когда» одной строкой. У завершённого — пусто.
+
+        Спрашивают об этом из трёх мест сразу: строка заявки, конкурсное
+        уведомление и рейл. Отсчёта в днях здесь нет — он протухает
+        назавтра (BR-40a).
+        """
+        if self.phase == 'upcoming':
+            return f'Қабылдау {self.opens_on_label} басталады'
+        if self.phase == 'accepting':
+            return (f'Қабылдау {self.closes_on_label} жабылады · '
+                    f'жеңімпаздар {self.results_on_label} жарияланады')
+        if self.phase == 'judging':
+            return f'Жеңімпаздар {self.results_on_label} жарияланады'
+        return ''
+
+    # ── Производное от состава ───────────────────────────────────────────
+    @property
+    def submissions(self) -> int:
+        """Число поданных работ — по самим заявкам, а не хранимым числом."""
+        return self.submission_set.count()
+
+    @property
+    def awards_by_slug(self) -> dict:
+        return {a.slug: a for a in self.awards}
+
+    @property
+    def grants(self) -> list:
+        """Присуждения этого конкурса, в порядке номинаций (DEC-46)."""
+        return list(self.grant_set.all())
+
+    @property
+    def winner_stories(self) -> list:
+        """Произведения-победители, в порядке номинаций, без повторов.
+
+        Автор выводится через работу: второй литерал с именем разошёлся бы
+        с первым так же, как хранимый `Author.works` разошёлся с числом
+        произведений.
+        """
+        seen, out = set(), []
+        for grant in self.grants:
+            if grant.story_id not in seen:
+                seen.add(grant.story_id)
+                out.append(grant.story)
+        return out
+
+    @property
+    def winners(self) -> tuple:
+        """Слаги победителей — производное от присуждений, не хранимый кортеж."""
+        return tuple(s.slug for s in self.winner_stories)
+
+    @property
+    def other_editions(self) -> list:
+        """Другие выпуски того же семейства, свежие сверху (BR-47).
+
+        Без них завершённый конкурс — тупик: страница кончалась составом
+        жюри, и пришедший из поиска уходил ни с чем, хотя приём в выпуск
+        этого года шёл прямо сейчас.
+        """
+        if not self.series:
+            return []
+        return list(Contest.objects.filter(series=self.series)
+                    .exclude(pk=self.pk).order_by('-results_on'))
+
+    @property
+    def current_stage(self):
+        """Этап, идущий сейчас. Нужен рейлу (FR-CONT-09) — «что происходит
+        прямо сейчас» единственное, чего нет в хиро."""
+        return next((s for s in self.timeline if s.state == 'active'), None)
+
+    @property
+    def next_stage(self):
+        return next((s for s in self.timeline if s.state == 'upcoming'), None)
+
+
+class ContestCondition(models.Model):
+    """Условие конкретного конкурса, одной строкой.
+
+    Здесь только то, чем этот конкурс отличается. Общие правила («бір
+    автор — бір өтінім» и прочие) живут одним списком в слое запросов и
+    в каждый конкурс не переписываются: две рукописные копии одних правил
+    уже расходились (BR-48a).
+    """
+
+    contest = models.ForeignKey(Contest, verbose_name='байқау',
+                                on_delete=models.CASCADE,
+                                related_name='condition_set')
+    text = models.CharField('шарт', max_length=200)
+    position = models.PositiveSmallIntegerField('реті', default=0)
+
+    class Meta:
+        ordering = ('position', 'pk')
+        verbose_name = 'байқау шарты'
+        verbose_name_plural = 'байқау шарттары'
+
+    def __str__(self):
+        return self.text
+
+
+class TimelineStage(models.Model):
+    """Этап конкурса. Хранятся даты, состояние выводится.
+
+    Раньше `state` лежал в данных руками и устаревал молча: этап «Өтінім
+    қабылдау» конкурса 2023 года стоял `active` в 2026-м.
+    """
+
+    contest = models.ForeignKey(Contest, verbose_name='байқау',
+                                on_delete=models.CASCADE,
+                                related_name='stage_set')
+    label = models.CharField('атауы', max_length=80)
+    starts = models.DateField('басталуы')
+    # Однодневный этап задаётся равными датами — «15 жел» вместо диапазона.
+    ends = models.DateField('аяқталуы')
+    position = models.PositiveSmallIntegerField('реті', default=0)
+
+    class Meta:
+        ordering = ('position', 'starts')
+        verbose_name = 'байқау кезеңі'
+        verbose_name_plural = 'байқау кезеңдері'
+
+    def __str__(self):
+        return f'{self.label} ({self.period})'
+
+    @property
+    def period(self) -> str:
+        return kk_period(self.starts, self.ends)
+
+    @property
+    def state(self) -> str:
+        today = timezone.localdate()
+        if today > self.ends:
+            return 'done'
+        if today >= self.starts:
+            return 'active'
+        return 'upcoming'
+
+
+class JuryMember(models.Model):
+    """Член жюри конкурса. Имя и роль — то, что видит участник."""
+
+    contest = models.ForeignKey(Contest, verbose_name='байқау',
+                                on_delete=models.CASCADE,
+                                related_name='jury_set')
+    name = models.CharField('аты-жөні', max_length=120)
+    role = models.CharField('рөлі', max_length=40)
+    position = models.PositiveSmallIntegerField('реті', default=0)
+
+    class Meta:
+        ordering = ('position', 'pk')
+        verbose_name = 'қазылар алқасының мүшесі'
+        verbose_name_plural = 'қазылар алқасы'
+
+    def __str__(self):
+        return f'{self.name} — {self.role}'
+
+
+class ContestAward(models.Model):
+    """Номинация конкурса и её награда (DEC-46, BR-44/46).
+
+    Набор произвольный: у одного конкурса «Бас жүлде» и «Оқырман
+    таңдауы», у другого четыре места. Общего реестра номинаций нет и быть
+    не может — он и есть то, чем один конкурс отличается от другого.
+
+    `image` — файл эмблемы в MEDIA_ROOT (`awards/<contest>/<award>.png`),
+    его загружает админ; растр, не SVG (файл из `/media/` открывается в
+    origin сайта). Пусто — типографическая заглушка. Раму — медальон,
+    кольцо, тень — рисует платформа: иначе через десять конкурсов ряд
+    наград станет коллекцией чужих JPEG.
+    """
+
+    contest = models.ForeignKey(Contest, verbose_name='байқау',
+                                on_delete=models.CASCADE,
+                                related_name='award_set')
+    slug = models.SlugField('slug', max_length=48)
+    title = models.CharField('атауы', max_length=80)
+    image = models.CharField('эмблема', max_length=200, blank=True)
+    description = models.CharField('сипаттамасы', max_length=200, blank=True)
+    position = models.PositiveSmallIntegerField('реті', default=0)
+
+    class Meta:
+        ordering = ('position', 'pk')
+        constraints = [
+            models.UniqueConstraint(fields=('contest', 'slug'),
+                                    name='unique_award_slug_per_contest'),
+        ]
+        verbose_name = 'байқау номинациясы'
+        verbose_name_plural = 'байқау номинациялары'
+
+    def __str__(self):
+        return f'{self.contest.slug} · {self.title}'
+
+
+class AwardGrant(models.Model):
+    """Присуждение: кому и за что вручена награда конкурса (DEC-46, BR-45).
+
+    **Хранится сам акт**, а не список наград у автора. Разница
+    принципиальная: «Бас жүлде в Алтын қалам» из данных не вычисляется —
+    это решение жюри, и в этом конкурсные награды отличаются от системных
+    знаков, которые выводятся (BR-ACH-01). Производной остаётся выдача:
+    ряд наград в профиле — запрос по присуждениям.
+
+    Автор не хранится: он у работы. Второе имя разошлось бы с первым.
+    """
+
+    contest = models.ForeignKey(Contest, verbose_name='байқау',
+                                on_delete=models.CASCADE,
+                                related_name='grant_set')
+    award = models.ForeignKey(ContestAward, verbose_name='номинация',
+                              on_delete=models.CASCADE,
+                              related_name='grant_set')
+    story = models.ForeignKey(Story, verbose_name='шығарма',
+                              on_delete=models.CASCADE,
+                              related_name='award_grants')
+    note = models.CharField('түсініктеме', max_length=200, blank=True)
+
+    class Meta:
+        ordering = ('award__position', 'pk')
+        constraints = [
+            models.UniqueConstraint(fields=('contest', 'award'),
+                                    name='unique_grant_per_award'),
+        ]
+        verbose_name = 'марапат'
+        verbose_name_plural = 'марапаттар'
+
+    def __str__(self):
+        return f'{self.award.title} — {self.story.title}'
+
+    @property
+    def author(self):
+        return self.story.author
+
+
+class Submission(models.Model):
+    """Заявка автора на конкурс (BR-23, BR-41).
+
+    Один автор — одна работа на конкретный конкурс; это ограничение
+    базы, а не только формы, потому что вторая заявка ломает счёт
+    участников и конкурсную биографию.
+
+    Хранится дата подачи, подпись выводится (BR-41a): строка
+    «6 ай бұрын» стояла у заявки на конкурс, закрывшийся двумя годами
+    раньше, — то есть подача приходилась на полгода позже дедлайна.
+    """
+
+    STATUS_CHOICES = [(s, s) for s in SUBMISSION_STATUSES]
+
+    contest = models.ForeignKey(Contest, verbose_name='байқау',
+                                on_delete=models.CASCADE,
+                                related_name='submission_set')
+    author = models.ForeignKey('core.User', verbose_name='авторы',
+                               on_delete=models.CASCADE,
+                               related_name='submissions')
+    story = models.ForeignKey(Story, verbose_name='шығарма',
+                              on_delete=models.CASCADE,
+                              related_name='submissions')
+    submitted_on = models.DateField('берілген күні')
+    status = models.CharField('күйі', max_length=16, choices=STATUS_CHOICES,
+                              default='reviewing')
+    # Комментарий жюри. Личный кабинет автора его показывает, чужой
+    # профиль — никогда (BR-74a).
+    note = models.CharField('қазылар пікірі', max_length=300, blank=True)
+
+    class Meta:
+        ordering = ('-submitted_on',)
+        constraints = [
+            models.UniqueConstraint(fields=('contest', 'author'),
+                                    name='one_submission_per_author_per_contest'),
+        ]
+        verbose_name = 'өтінім'
+        verbose_name_plural = 'өтінімдер'
+
+    def __str__(self):
+        return f'{self.author.username} → {self.contest.slug}'
+
+    @property
+    def submitted_label(self) -> str:
+        """«5 күн бұрын» — производное от даты, а не хранимая строка."""
+        return kk_ago((timezone.localdate() - self.submitted_on).days)

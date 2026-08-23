@@ -50,6 +50,7 @@ from .domain.contests import (
     CONTEST_RESULT_LABELS,
     PUBLIC_CONTEST_RESULTS,
     SUBMISSION_NOTES,
+    SUBMISSION_STATUSES,
 )
 from .domain.formatting import (
     KK_MONTHS_SHORT,
@@ -192,9 +193,11 @@ from .stub_data import SCHOOL_LINKS
 # ниже нужны только витрине состояний `/_design/states/` — DEBUG-странице,
 # которой требуется по одному экземпляру каждого объекта.
 from .stub_data import (  # noqa: F401
+    AWARD_GRANTS,
     COMMENTS_BY_STORY,
     LIBRARY_BY_USER,
     NOTIFICATIONS_BY_USER,
     STORIES,
     STORIES_BY_SLUG,
+    SUBMISSIONS_BY_USER,
 )

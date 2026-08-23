@@ -67,7 +67,12 @@ balaproza_v1/
 │   │                             # Story (badges — производное, кроме редакционного знака;
 │   │                             # updated_at вместо дельты в днях), Chapter (несёт текст,
 │   │                             # char_count денормализован от body),
-│   │                             # ChapterReaction (счётчик, не голос: писать некому до Ф15).
+│   │                             # ChapterReaction (счётчик, не голос: писать некому до Ф15),
+│   │                             # Contest (три даты; фаза/отсчёт/год/число заявок —
+│   │                             # производные, колонок нет) + ContestCondition/
+│   │                             # TimelineStage/JuryMember/ContestAward отдельными
+│   │                             # таблицами, AwardGrant (акт жюри — хранится),
+│   │                             # Submission (одна на автора и конкурс — ограничение базы).
 │   │                             # Производное не хранится: ни Genre.count, ни usage_count.
 │   │                             # Чтение всё ещё идёт из стаба — переключение отдельным шагом
 │   ├── migrations/               # 0001_initial + 0002_reference_data (жанры и блок-лист
@@ -146,7 +151,7 @@ balaproza_v1/
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
 │   │                             # domain.formatting.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 995 тестов в 19 файлах (см. ниже)
+│   └── tests/                    # 1012 тестов в 19 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -267,7 +272,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 995 тестов
+uv run python manage.py test core       # все 1012 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 

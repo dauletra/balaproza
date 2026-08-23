@@ -1,21 +1,29 @@
 """Админка — единственный инструмент модерации в MVP (DEC-23).
 
 Кастомного UI не будет до V2, значит стандартный admin обязан уметь всё,
-что модератору нужно делать руками. Пока это справочники, путь тега (BR-TAG-03)
-и карточка произведения; рабочий процесс модерации со сменой статуса и
-уведомлением автору приедет своим этапом (docs/19 §19.4).
+что модератору нужно делать руками. Пока это справочники, путь тега (BR-TAG-03),
+карточка произведения и конкурс со всем составом; рабочий процесс
+модерации со сменой статуса и уведомлением автору приедет своим этапом
+(docs/19 §19.4).
 """
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
 from .models import (
+    AwardGrant,
     BlockedTagPattern,
     Chapter,
     ChapterReaction,
+    Contest,
+    ContestAward,
+    ContestCondition,
     Genre,
+    JuryMember,
     Story,
+    Submission,
     Tag,
+    TimelineStage,
     User,
 )
 
@@ -150,3 +158,88 @@ class ChapterAdmin(admin.ModelAdmin):
     search_fields = ('title', 'story__title')
     readonly_fields = ('char_count',)
     inlines = (ChapterReactionInline,)
+
+
+class ContestConditionInline(admin.TabularInline):
+    model = ContestCondition
+    extra = 1
+
+
+class TimelineStageInline(admin.TabularInline):
+    """Этапы. Состояние («идёт», «прошёл») не редактируется — оно
+    выводится из дат, и поля под него нет намеренно (DEC-45)."""
+
+    model = TimelineStage
+    extra = 1
+
+
+class JuryMemberInline(admin.TabularInline):
+    model = JuryMember
+    extra = 1
+
+
+class ContestAwardInline(admin.TabularInline):
+    """Номинации. Показываются участнику **до** итогов: «вот что получит
+    победитель» отвечает на «зачем участвовать» лучше суммы в тенге."""
+
+    model = ContestAward
+    extra = 1
+
+
+@admin.register(Contest)
+class ContestAdmin(admin.ModelAdmin):
+    """Конкурс заводится тремя датами, остальное считается.
+
+    Полей «статус», «осталось дней» и «число заявок» в форме нет и быть
+    не может: они выводятся. Заведённые руками, они врали — «87 өтінім»
+    стояло при одной настоящей заявке (BR-40a).
+    """
+
+    list_display = ('name', 'phase_label', 'opens_on', 'closes_on',
+                    'results_on', 'submissions')
+    list_filter = ('series',)
+    search_fields = ('name', 'slug', 'series')
+    prepopulated_fields = {'slug': ('name',)}
+    inlines = (ContestConditionInline, TimelineStageInline,
+               JuryMemberInline, ContestAwardInline)
+    fieldsets = (
+        (None, {'fields': ('name', 'slug', 'subtitle', 'description')}),
+        ('Мерзімдер', {
+            'fields': ('opens_on', 'closes_on', 'results_on'),
+            'description': 'Кезең осы үш күннен есептеледі — оны бөлек '
+                           'қоятын өріс жоқ (DEC-45).',
+        }),
+        ('Шарттар', {'fields': ('min_chars', 'max_chars', 'min_age', 'max_age'),
+                     'description': 'Жас шегі — осы байқаудың талабы. '
+                                    'Платформаның өз цензы жоқ (DEC-47).'}),
+        ('Басқа', {'fields': ('prize_kzt', 'poster', 'series')}),
+    )
+
+    @admin.display(description='кезеңі')
+    def phase_label(self, obj):
+        return obj.phase_label
+
+    @admin.display(description='өтінім')
+    def submissions(self, obj):
+        return obj.submissions
+
+
+@admin.register(AwardGrant)
+class AwardGrantAdmin(admin.ModelAdmin):
+    """Присуждение — акт жюри, поэтому оно вводится, а не вычисляется."""
+
+    list_display = ('contest', 'award', 'story', 'author')
+    list_filter = ('contest',)
+    autocomplete_fields = ('story',)
+
+    @admin.display(description='авторы')
+    def author(self, obj):
+        return obj.author
+
+
+@admin.register(Submission)
+class SubmissionAdmin(admin.ModelAdmin):
+    list_display = ('author', 'contest', 'story', 'submitted_on', 'status')
+    list_filter = ('status', 'contest')
+    search_fields = ('author__username', 'story__title')
+    autocomplete_fields = ('author', 'story')
