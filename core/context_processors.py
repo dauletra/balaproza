@@ -1,4 +1,4 @@
-from . import stub_data
+from . import data
 
 
 def auth_state(request):
@@ -11,7 +11,7 @@ def auth_state(request):
         'signed_in': is_in,
         'current_user_name': request.session.get('user_name', ''),
         'current_user_username': username,
-        'unread_notifications': stub_data.unread_count_for_user(username) if is_in else 0,
+        'unread_notifications': data.unread_count_for_user(username) if is_in else 0,
     }
 
 
@@ -19,7 +19,7 @@ def site_links(request):
     """Глобально доступные внешние ссылки (FR-LINKS-06): «Авторлар мектебі».
     Используется в footer и любых страницах без явного контекста.
     """
-    return {'school_links_global': stub_data.SCHOOL_LINKS}
+    return {'school_links_global': data.SCHOOL_LINKS}
 
 
 def nav_state(request):

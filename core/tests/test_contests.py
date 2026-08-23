@@ -10,7 +10,7 @@ from unittest import mock
 from django.test import TestCase
 from django.urls import reverse
 
-from core import stub_data, views
+from core import data, stub_data, views
 
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
 
@@ -1530,8 +1530,10 @@ class ContestVocabularyInEmptyState(TestCase):
     """
 
     def test_empty_list_says_baiqau(self):
-        with mock.patch.object(stub_data, 'OPEN_CONTESTS', []), \
-             mock.patch.object(stub_data, 'FINISHED_CONTESTS', []):
+        # Патчится фасад, а не `stub_data`: view читает `core.data`, и
+        # подмена в модуле-источнике до неё уже не доходит.
+        with mock.patch.object(data, 'OPEN_CONTESTS', []), \
+             mock.patch.object(data, 'FINISHED_CONTESTS', []):
             html = self.client.get(reverse('core:contest_list')).content.decode()
         self.assertNotIn('онкурс', html)
         self.assertIn('Әзірге байқау жоқ', html)

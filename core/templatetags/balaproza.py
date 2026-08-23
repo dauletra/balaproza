@@ -7,7 +7,7 @@
 
 from django import template
 
-from core.stub_data import spaced_number
+from core.domain.formatting import spaced_number
 
 register = template.Library()
 

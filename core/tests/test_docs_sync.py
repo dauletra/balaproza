@@ -193,24 +193,29 @@ class TestDesignTokens(unittest.TestCase):
         )
 
 
-class TestStubDataContract(unittest.TestCase):
-    """Хелперы, перечисленные в docs/12 §12.3, существуют в stub_data.
+class TestDataContract(unittest.TestCase):
+    """Хелперы, перечисленные в docs/12 §12.3, доступны через `core.data`.
 
     Модуль 12 объявлен «implementation contract» для Ф14. Контракт,
     называющий несуществующие функции, хуже отсутствующего: по нему
     напишут вызовы, которых не с чем связывать.
+
+    Спрашивается фасад, а не файл `stub_data.py`. В этом весь смысл Ф14:
+    хелпер переезжает из стаба в менеджер модели, и проверка «есть ли
+    такая строка в таком-то файле» начала бы падать на каждом успешном
+    шаге миграции — то есть требовать, чтобы код не двигался.
     """
 
     def test_helpers_from_contract_exist(self):
-        stub = _text(BASE / 'core' / 'stub_data.py')
-        defined = set(re.findall(r'^def (\w+)', stub, re.M))
+        from core import data
+
         contract = _text(DOCS / '12-domain-model-contract.md')
         section = contract.split('## 12.3')[1].split('## 12.4')[0]
         cited = set(re.findall(r'`(\w+)\(', section))
-        missing = sorted(cited - defined)
+        missing = sorted(n for n in cited if not hasattr(data, n))
         self.assertEqual(
             [], missing,
-            'docs/12 §12.3 называет хелперы, которых нет в core/stub_data.py:\n  '
+            'docs/12 §12.3 называет хелперы, которых нет в core/data.py:\n  '
             + '\n  '.join(missing),
         )
 

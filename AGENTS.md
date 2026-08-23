@@ -1,15 +1,23 @@
 # AGENTS.md
 
-Заметки для Codex по проекту `balaproza_v1`. Платформа — Balaproza, казахоязычный детский литературный портал. Подробное ТЗ — в [`docs/`](docs/) (модули 00-18, 06 выведен из обращения).
+Заметки для Codex по проекту `balaproza_v1`. Платформа — Balaproza, казахоязычный детский литературный портал. Подробное ТЗ — в [`docs/`](docs/) (модули 00-19, 06 выведен из обращения).
 
 **Этот файл — копия [`CLAUDE.md`](CLAUDE.md) слово в слово, кроме шапки.** Правила у агентов общие, а две редакции одного текста расходятся молча: предыдущая копия отстала на девять DEC, а её счётчик показывал 315 при фактических 730. Правишь один — переписывай второй тем же коммитом; совпадение держит `test_docs_sync.TestCounters.test_agents_md_still_mirrors_claude_md`.
 
 ## Текущий фокус
 
-Делаем **только дизайн-систему** (вёрстка, токены, компоненты, шаблоны) и стаб-данные для рендера.
-**НЕ трогаем**: модели БД, миграции, формы, бизнес-логика, реальная авторизация. Всё это заменится после Ф14.
+Ф1-Ф13 готовы. **Идёт Ф14** — замена `core/stub_data.py` на Django-модели, ветка `f14-models`.
 
-Готовы Ф1-Ф13 (см. список тасок). Остаётся Ф14 — заменить `core/stub_data.py` на реальные Django-модели.
+План этапов и обоснования — [`docs/19`](docs/19-f14-migration-plan.md). Коротко:
+0. фасад `core.data` + доменный слой `core.domain` — **сделано**;
+1. `AUTH_USER_MODEL`, справочники, первая миграция;
+2. `seed_demo` + база тестов;
+3-8. каталог → произведение → библиотека → кабинет → конкурсы → комментарии и уведомления;
+9. реальная авторизация; 10. админка; 11. удаление стаба.
+
+**В Ф14 не входит запись**: формы создания и редактирования произведения, комментарии, реакции, подача на конкурс остаются заглушками до Ф15. Модерация в MVP идёт через Django admin (DEC-23).
+
+Пока этап не дошёл до раздела, его данные по-прежнему живут в `stub_data`. Правило перехода одно: **этап заканчивается удалением заменённых хелперов**, а не сосуществованием двух источников.
 
 ## Технический стек
 
@@ -40,6 +48,20 @@
 balaproza_v1/
 ├── config/                       # Django project (settings, urls)
 ├── core/
+│   ├── data.py                   # ФАСАД: единственная дверь к данным для views,
+│   │                             # контекст-процессоров и фильтров. Никто, кроме него,
+│   │                             # не импортирует stub_data (test_data_facade).
+│   │                             # По мере Ф14 строки переезжают из stub_data в модули
+│   │                             # запросов — список импортов и есть карта прогресса
+│   ├── domain/                   # правила, а не записи: то, что переживёт Ф14
+│   │   ├── catalog.py            # оси каталога, PUBLIC_STATUSES, пресеты, KIND_PREDICATES
+│   │   ├── story.py              # REACTIONS (5, DEC-32), PUBLISH_CHECKLIST
+│   │   ├── contests.py           # фазы, подписи результата, SUBMISSION_NOTES
+│   │   ├── awards.py             # READ_TIERS, AWARD_TIERS, READ_TIER_ART, tier_for
+│   │   ├── notifications.py      # NOTIF_KINDS, MODERATION_OUTCOME_LABELS, бакеты
+│   │   └── formatting.py         # kk_date / kk_period / kk_ago, spaced_number
+│   │                             # Домен НЕ импортирует stub_data, модели и core.data —
+│   │                             # иначе цикл на Ф14 и константы не взять в миграции
 │   ├── stub_data.py              # ВСЕ «данные» проекта (Genre, Tag, Author, Story, Chapter,
 │   │                             # Collection (только редакция, count/covers — производные),
 │   │                             # Contest (три даты — opens_on/closes_on/results_on;
@@ -80,19 +102,10 @@ balaproza_v1/
 │   │                             # submission_checklist (BR-22 — пороги берутся у конкурса),
 │   │                             # eligible_for_contest (только публичные работы +
 │   │                             # причина отказа), busy_contest_of (BR-23a),
-│   │                             # can_withdraw (BR-23b), spaced_number (канонические
-│   │                             # разряды; фильтр `spaced` вызывает её — одна реализация),
-│   │                             # kk_date / kk_period / kk_ago (одна лесенка
-│   │                             # относительного времени — docs/16 §16.4),
+│   │                             # can_withdraw (BR-23b),
 │   │                             # tag_by_slug, tags_of, is_blocked, popular_tags,
 │   │                             # accepted_tags_json, blocked_tag_patterns_list
-│   │                             # + константы: READ_TIERS, CATALOG_SORTS, CATALOG_DEFAULT_SORT,
-│   │                             # CATALOG_STATUS_FILTERS, CATALOG_BADGE_FILTERS,
-│   │                             # CATALOG_PRESETS, STORY_BADGES, PUBLIC_STATUSES,
-│   │                             # CATALOG_AUTHOR_FILTERS, NEW_AUTHOR_FOLLOWERS,
-│   │                             # TAGS, TAGS_BY_SLUG, BLOCKED_TAG_PATTERNS,
-│   │                             # AUDIENCE_ORDER (ось каталога) / STORY_AUDIENCES
-│   │                             # (та же пара ключей для формы автора — BR-10b)
+│   │                             # NB: константы и формулировки переехали в core/domain/
 │   │                             # Story.recent_views — просмотры за 14 дней (DEC-36),
 │   │                             # ось «Қазір танымал»; инвариант recent_views <= views
 │   │                             # Story.updated_days_ago — когда трогали (DEC-40), None = не задано
@@ -101,7 +114,7 @@ balaproza_v1/
 │   │                             # Дефолт «10+» ставил отметку за автора, а чеклист
 │   │                             # кабинета рисовал за неё зелёную галку
 │   │                             # Author.works — производное, только публичные работы
-│   ├── views.py                  # все view (тонкие, читают из stub_data)
+│   ├── views.py                  # все view (тонкие, читают через core.data)
 │   │                             # + legal_* (5 stub-страниц), profile_me_edit (stub-форма),
 │   │                             # search_index_json (lazy-fetch для popup, включает теги),
 │   │                             # _render_catalog (общий движок DEC-27) + тонкие обёртки
@@ -115,9 +128,9 @@ balaproza_v1/
 │   │                             # 5 legal routes
 │   ├── context_processors.py     # auth_state, nav_state, site_links
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
-│   │                             # stub_data.spaced_number), page_range,
+│   │                             # domain.formatting.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 949 тестов в 16 файлах (см. ниже)
+│   └── tests/                    # 952 теста в 17 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -190,7 +203,7 @@ balaproza_v1/
 │   ├── fonts/                    # 4 variable woff2
 │   └── vendor/{alpine,htmx}.min.js
 ├── static_src/input.css          # Tailwind v4 @import + @theme c токенами
-├── docs/                         # ТЗ модулями 00-18 (приоритет над прототипом)
+├── docs/                         # ТЗ модулями 00-19 (приоритет над прототипом)
 ├── package.json                  # @tailwindcss/cli + npm-скрипты dev/build
 ├── pyproject.toml + uv.lock
 └── manage.py
@@ -238,13 +251,15 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 949 тестов
+uv run python manage.py test core       # все 952 теста
 uv run python manage.py test core.tests.test_<file>
 ```
 
 Тесты в `core/tests/`:
 - `test_urls_smoke.py` — все маршруты в guest/auth + DEBUG-only design URLs
 - `test_auth.py`, `test_context.py`, `test_filters.py`, `test_stub_data.py`
+- `test_data_facade.py` — шов Ф14: `stub_data` импортирует только фасад `core.data`,
+  домен не знает о хранилище, каждое доменное имя достаётся через фасад
 - `test_home.py`, `test_story.py`, `test_catalog.py`, `test_write.py`
 - `test_prof_lib_notif.py`, `test_contests.py`, `test_auth_links.py`, `test_states.py`
 - `test_desktop_layout.py` — регрессии каркаса: рейл только на `xl`, колонка контента 860px
@@ -369,7 +384,8 @@ def _login_as_aidana(client):
 
 ## Что НЕ делать
 
-- **НЕ создавать** модели/миграции/реальные формы/сервисы/view с бизнес-логикой
+- **НЕ создавать** реальные формы записи и бизнес-логику вокруг них — это Ф15, а не Ф14 (модели и миграции теперь можно: идёт Ф14, порядок — docs/19)
+- **НЕ импортировать** `stub_data` мимо фасада `core.data`; **НЕ импортировать** хранилище в `core/domain`
 - **НЕ запускать** `npm run dev`/`npm run build` — пользователь сам
 - **НЕ запускать** `python manage.py runserver` для smoke-проверок — пользователь поднимает дев-сервер сам в своём терминале
 - **НЕ коммитить** `node_modules/`, `.venv/`, `__pycache__/`, скомпилированный `static/css/*.css` без явной просьбы

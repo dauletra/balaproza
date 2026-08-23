@@ -8,7 +8,7 @@ from unittest import mock
 from django.test import TestCase
 from django.urls import reverse
 
-from core import stub_data
+from core import data, stub_data
 
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
 
@@ -1402,7 +1402,8 @@ class NotificationsRenderFromTheRegistry(TestCase):
     def test_empty_bucket_renders_no_heading(self):
         grouped = stub_data.notifications_for_user('aidana')
         lonely = {b: (items if b == 'today' else []) for b, items in grouped.items()}
-        with mock.patch.object(stub_data, 'notifications_for_user', return_value=lonely):
+        # Патчится фасад: view ходит через `core.data`, а не в `stub_data`.
+        with mock.patch.object(data, 'notifications_for_user', return_value=lonely):
             r = self.client.get(reverse('core:notifications'))
         self.assertEqual([s['key'] for s in r.context['sections']], ['today'])
         self.assertNotContains(r, stub_data.NOTIF_BUCKET_LABELS['yesterday'])

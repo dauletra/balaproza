@@ -7,7 +7,7 @@ from django.templatetags.static import static
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from . import stub_data
+from . import data
 
 
 # ───────────────────────── DEC-17: демо-состояния ────────────────────────
@@ -27,9 +27,9 @@ def home(request):
     """Главная — редакционная витрина. Гость vs возвращающийся (FR-HOME-01)."""
     is_signed_in = bool(request.session.get('signed_in'))
     username = request.session.get('user_username') if is_signed_in else None
-    my_stories = stub_data.my_stories_of(username) if username else []
+    my_stories = data.my_stories_of(username) if username else []
     active_work = next((s for s in my_stories if s.status == 'OnProcess'), my_stories[0] if my_stories else None)
-    progress = stub_data.SAMPLE_PROGRESS if is_signed_in else None
+    progress = data.SAMPLE_PROGRESS if is_signed_in else None
 
     # Design-system demo override for the four authenticated hero states.
     hero_state_demo = request.GET.get('hero_state')
@@ -53,8 +53,8 @@ def home(request):
 
     # Не литерал 'Published': после DEC-37 опубликованный сериал носит
     # OnProcess или Completed, и по литералу с главной пропали бы все десять.
-    published = [s for s in stub_data.STORIES
-                 if s.status in stub_data.PUBLIC_STATUSES]
+    published = [s for s in data.STORIES
+                 if s.status in data.PUBLIC_STATUSES]
 
     # Жанры на главной — полоса-вывеска, а не навигация (DEC-31): 12 цветных слов
     # объясняют, что это литературный портал, и ведут на /genres/<slug>/.
@@ -67,21 +67,21 @@ def home(request):
         'progress':        progress,
         'active_work':     active_work,
         'hero_focus':      hero_focus,
-        'hero_contest':    stub_data.HERO_CONTEST,
-        'collections':     stub_data.COLLECTIONS,
-        'genres':          stub_data.GENRES,
-        'book_of_week':    stub_data.BOOK_OF_WEEK,
-        'new_authors':     stub_data.new_authors(4),
+        'hero_contest':    data.HERO_CONTEST,
+        'collections':     data.COLLECTIONS,
+        'genres':          data.GENRES,
+        'book_of_week':    data.BOOK_OF_WEEK,
+        'new_authors':     data.new_authors(4),
         'top_stories':     sorted(published, key=lambda s: s.views, reverse=True)[:5],
         'short_stories':   [s for s in published if s.is_single and s.read_minutes <= 15][:5],
         # Ряд называется «Жалғасып жатқан шығармалар» — значит именно те,
         # что продолжаются, а не все сериалы подряд.
         'serial_stories':  [s for s in published
                             if s.is_serial and s.status == 'OnProcess'][:5],
-        'portal_stats':    stub_data.portal_stats(),
-        'popular_tags':    stub_data.popular_tags(8),
-        'trending_tags':   stub_data.trending_tags(6),
-        'school_links':    stub_data.SCHOOL_LINKS,
+        'portal_stats':    data.portal_stats(),
+        'popular_tags':    data.popular_tags(8),
+        'trending_tags':   data.trending_tags(6),
+        'school_links':    data.SCHOOL_LINKS,
     })
 
 
@@ -138,22 +138,22 @@ def _catalog_default_sort(mode: str) -> str:
     (DEC-36). Тег остаётся на «Жаңалары»: DEC-31 отдал ему роль самой быстрой
     оси портала, и там ценна свежесть сама по себе, а не набранные просмотры.
     """
-    return 'recent' if mode == 'tag' else stub_data.CATALOG_DEFAULT_SORT
+    return 'recent' if mode == 'tag' else data.CATALOG_DEFAULT_SORT
 
 
 def _catalog_controls(request, default_sort=None):
     """Достаёт оси сүзгі из GET с валидацией по белым спискам."""
-    default_sort = default_sort or stub_data.CATALOG_DEFAULT_SORT
+    default_sort = default_sort or data.CATALOG_DEFAULT_SORT
     axes = {
-        'status':   stub_data.CATALOG_STATUS_FILTERS,
-        'audience': stub_data.CATALOG_AUDIENCE_FILTERS,
-        'length':   stub_data.CATALOG_LENGTH_FILTERS,
-        'format':   stub_data.CATALOG_FORMAT_FILTERS,
-        'badge':    stub_data.CATALOG_BADGE_FILTERS,
-        'author_tier': stub_data.CATALOG_AUTHOR_FILTERS,
-        'kind':     stub_data.CATALOG_KIND_FILTERS,
+        'status':   data.CATALOG_STATUS_FILTERS,
+        'audience': data.CATALOG_AUDIENCE_FILTERS,
+        'length':   data.CATALOG_LENGTH_FILTERS,
+        'format':   data.CATALOG_FORMAT_FILTERS,
+        'badge':    data.CATALOG_BADGE_FILTERS,
+        'author_tier': data.CATALOG_AUTHOR_FILTERS,
+        'kind':     data.CATALOG_KIND_FILTERS,
     }
-    valid_sorts = {k for k, _ in stub_data.CATALOG_SORTS}
+    valid_sorts = {k for k, _ in data.CATALOG_SORTS}
     sort = request.GET.get('sort', default_sort)
     picked = {
         name: (request.GET.get(name, '')
@@ -229,18 +229,18 @@ def _catalog_links(state: dict) -> dict:
     if state['query']:
         chips.append({'label': f'«{state["query"]}»', 'href': href(query='')})
     if state['genre']:
-        g = stub_data.GENRES_BY_SLUG[state['genre']]
+        g = data.GENRES_BY_SLUG[state['genre']]
         chips.append({'label': g.name, 'hue': g.hue, 'href': href(genre='')})
     if state['tag']:
-        t = stub_data.tag_by_slug(state['tag'])
+        t = data.tag_by_slug(state['tag'])
         chips.append({'label': f'#{t.name}', 'href': href(tag='')})
-    for axis, table in (('kind',      stub_data.CATALOG_KIND_FILTERS),
-                        ('author_tier', stub_data.CATALOG_AUTHOR_FILTERS),
-                        ('badge',    stub_data.CATALOG_BADGE_FILTERS),
-                        ('status',   stub_data.CATALOG_STATUS_FILTERS),
-                        ('format',   stub_data.CATALOG_FORMAT_FILTERS),
-                        ('audience', stub_data.CATALOG_AUDIENCE_FILTERS),
-                        ('length',   stub_data.CATALOG_LENGTH_FILTERS)):
+    for axis, table in (('kind',      data.CATALOG_KIND_FILTERS),
+                        ('author_tier', data.CATALOG_AUTHOR_FILTERS),
+                        ('badge',    data.CATALOG_BADGE_FILTERS),
+                        ('status',   data.CATALOG_STATUS_FILTERS),
+                        ('format',   data.CATALOG_FORMAT_FILTERS),
+                        ('audience', data.CATALOG_AUDIENCE_FILTERS),
+                        ('length',   data.CATALOG_LENGTH_FILTERS)):
         if state[axis] and axis not in covered:
             chips.append({'label': dict(table)[state[axis]],
                           'href': href(**{axis: ''})})
@@ -268,12 +268,12 @@ def _catalog_links(state: dict) -> dict:
         'genre_options': [
             {'genre': g, 'active': g.slug == state['genre'],
              'href': href(genre='' if g.slug == state['genre'] else g.slug)}
-            for g in stub_data.GENRES
+            for g in data.GENRES
         ],
         'tag_options': [
             {'tag': t, 'active': t.slug == state['tag'],
              'href': href(tag='' if t.slug == state['tag'] else t.slug)}
-            for t in stub_data.popular_tags(8)
+            for t in data.popular_tags(8)
         ],
         'presets': presets,
     }
@@ -288,12 +288,12 @@ def _catalog_presets(state: dict, href) -> list:
     сколько коротких историй есть именно там.
     """
     out = []
-    for preset in stub_data.CATALOG_PRESETS:
+    for preset in data.CATALOG_PRESETS:
         axes = {'format': '', 'length': '', 'status': '', 'badge': '',
                 'author_tier': '', 'kind': ''}
         axes.update(preset['filters'])
         active = all(state[k] == v for k, v in axes.items())
-        count = len(stub_data.filter_catalog(
+        count = len(data.filter_catalog(
             query=state['query'], genre=state['genre'], tag=state['tag'], **axes))
         if not count and not active:
             continue
@@ -324,8 +324,8 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
         request, default_sort=_catalog_default_sort(mode),
     )
 
-    genre = stub_data.GENRES_BY_SLUG.get(genre_slug) if genre_slug else None
-    tag = stub_data.tag_by_slug(tag_slug) if tag_slug else None
+    genre = data.GENRES_BY_SLUG.get(genre_slug) if genre_slug else None
+    tag = data.tag_by_slug(tag_slug) if tag_slug else None
     not_found = ((mode == 'genre' and genre is None)
                  or (mode == 'tag' and (tag is None or tag.status != 'accepted')))
 
@@ -333,10 +333,10 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
     eff_genre = genre_slug if genre else ''
     if not eff_genre:
         candidate = request.GET.get('genre', '')
-        eff_genre = candidate if candidate in stub_data.GENRES_BY_SLUG else ''
+        eff_genre = candidate if candidate in data.GENRES_BY_SLUG else ''
     eff_tag = tag_slug if (tag and tag.status == 'accepted') else ''
     if not eff_tag:
-        candidate = stub_data.tag_by_slug(request.GET.get('tag', ''))
+        candidate = data.tag_by_slug(request.GET.get('tag', ''))
         eff_tag = candidate.slug if candidate and candidate.status == 'accepted' else ''
 
     empty_title, empty_text = "Шығарма табылмады", "Сүзгіні өзгертіп көр."
@@ -352,7 +352,7 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
             "Жанр бойынша іздесең — жанрлар бетіне өт."
         )
     else:
-        results = stub_data.filter_catalog(query=query, genre=eff_genre, tag=eff_tag,
+        results = data.filter_catalog(query=query, genre=eff_genre, tag=eff_tag,
                                            status=status, sort=sort,
                                            audience=audience, length=length,
                                            format=format, badge=badge,
@@ -377,7 +377,7 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
         'kind': kind,
     }
 
-    sort_labels = dict(stub_data.CATALOG_SORTS)
+    sort_labels = dict(data.CATALOG_SORTS)
     ctx = {
         'has_right_rail': True,
         'mode':           mode,
@@ -385,7 +385,7 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
         'query':          query,
         'sort':           sort,
         'sort_label':     sort_labels.get(sort, ''),
-        'sorts':          stub_data.CATALOG_SORTS,
+        'sorts':          data.CATALOG_SORTS,
         'status':         status,
         'audience':       audience,
         'length':         length,
@@ -396,24 +396,24 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
         # Панель сүзгі рендерится одним циклом по группам — пять почти одинаковых
         # fieldset'ов в шаблоне расходились при каждой правке.
         'filter_groups': [
-            {'name': 'sort',     'legend': 'Сұрыптау',   'options': stub_data.CATALOG_SORTS,            'current': sort},
-            {'name': 'kind',     'legend': 'Түрі',       'options': stub_data.CATALOG_KIND_FILTERS,     'current': kind},
-            {'name': 'badge',    'legend': 'Белгі',      'options': stub_data.CATALOG_BADGE_FILTERS,    'current': badge},
-            {'name': 'author_tier', 'legend': 'Автор',   'options': stub_data.CATALOG_AUTHOR_FILTERS,   'current': author_tier},
-            {'name': 'audience', 'legend': 'Жасың',      'options': stub_data.CATALOG_AUDIENCE_FILTERS, 'current': audience},
-            {'name': 'length',   'legend': 'Оқу уақыты', 'options': stub_data.CATALOG_LENGTH_FILTERS,   'current': length},
+            {'name': 'sort',     'legend': 'Сұрыптау',   'options': data.CATALOG_SORTS,            'current': sort},
+            {'name': 'kind',     'legend': 'Түрі',       'options': data.CATALOG_KIND_FILTERS,     'current': kind},
+            {'name': 'badge',    'legend': 'Белгі',      'options': data.CATALOG_BADGE_FILTERS,    'current': badge},
+            {'name': 'author_tier', 'legend': 'Автор',   'options': data.CATALOG_AUTHOR_FILTERS,   'current': author_tier},
+            {'name': 'audience', 'legend': 'Жасың',      'options': data.CATALOG_AUDIENCE_FILTERS, 'current': audience},
+            {'name': 'length',   'legend': 'Оқу уақыты', 'options': data.CATALOG_LENGTH_FILTERS,   'current': length},
         ],
-        'genres':             stub_data.GENRES,
+        'genres':             data.GENRES,
         'not_found_slug':     (genre_slug or tag_slug) if not_found else '',
         'current_genre_slug': eff_genre,
         'genre':              genre,
         'current_tag_slug':   eff_tag,
-        'current_tag':        tag if (tag and tag.status == 'accepted') else stub_data.tag_by_slug(eff_tag),
-        'popular_tags':       stub_data.popular_tags(),
+        'current_tag':        tag if (tag and tag.status == 'accepted') else data.tag_by_slug(eff_tag),
+        'popular_tags':       data.popular_tags(),
         # Жинақтар — первичный вход в чтение (DEC-31). В каталоге они нужны
         # ровно там, где сүзгі не дали результата: пустой экран не должен быть
         # тупиком, из которого выход только назад.
-        'rail_collections':   stub_data.COLLECTIONS[:3],
+        'rail_collections':   data.COLLECTIONS[:3],
         'empty_title':        empty_title,
         'empty_text':         empty_text,
     }
@@ -432,8 +432,8 @@ def catalog(request):
 
 def genre_index(request):
     return render(request, 'pages/catalog/genre_index.html', {
-        'genres':       stub_data.GENRES,
-        'total_stories': sum(g.count for g in stub_data.GENRES),
+        'genres':       data.GENRES,
+        'total_stories': sum(g.count for g in data.GENRES),
     })
 
 
@@ -448,12 +448,12 @@ def tag_detail(request, slug):
 
 def collections(request):
     return render(request, 'pages/catalog/collections.html', {
-        'collections': stub_data.COLLECTIONS,
+        'collections': data.COLLECTIONS,
     })
 
 
 def collection_detail(request, slug):
-    collection = stub_data.COLLECTIONS_BY_SLUG.get(slug)
+    collection = data.COLLECTIONS_BY_SLUG.get(slug)
     return render(request, 'pages/catalog/collection_detail.html', {
         'slug':       slug,
         'collection': collection,
@@ -464,12 +464,12 @@ def collection_detail(request, slug):
 def _story_or_stub(slug):
     """Резолвить Story из стаба; для неизвестных slug отдаём None — UI
     остаётся валидным («Шығарма табылмады» в шаблоне можно показывать)."""
-    return stub_data.STORIES_BY_SLUG.get(slug)
+    return data.STORIES_BY_SLUG.get(slug)
 
 
 def story_detail(request, slug):
     story = _story_or_stub(slug)
-    chapters = stub_data.chapters_of(slug)
+    chapters = data.chapters_of(slug)
     # Автор своего стори видит pending-теги (BR-TAG-07). Для прочих скрыты.
     viewer = request.session.get('user_username') or ''
     is_author = bool(story and viewer and story.author.username == viewer)
@@ -481,7 +481,7 @@ def story_detail(request, slug):
     explicit_chapter = request.GET.get('chapter')
     has_progress_here = (
         request.session.get('signed_in')
-        and stub_data.SAMPLE_PROGRESS.story_slug == slug
+        and data.SAMPLE_PROGRESS.story_slug == slug
     )
     if chapters:
         try:
@@ -490,9 +490,9 @@ def story_detail(request, slug):
             chapter_number = None
         if not chapter_number or chapter_number < 1 or chapter_number > len(chapters):
             chapter_number = (
-                stub_data.SAMPLE_PROGRESS.current_chapter if has_progress_here else 1
+                data.SAMPLE_PROGRESS.current_chapter if has_progress_here else 1
             )
-        current = stub_data.chapter_of(slug, chapter_number)
+        current = data.chapter_of(slug, chapter_number)
     else:
         chapter_number = None
         current = None
@@ -514,26 +514,26 @@ def story_detail(request, slug):
         'has_prev': bool(current) and chapter_number > 1,
         'has_next': bool(current) and chapter_number < len(chapters),
         'is_teaser': is_teaser,
-        'comments': stub_data.comments_of_chapter(slug, chapter_number) if chapter_number else [],
+        'comments': data.comments_of_chapter(slug, chapter_number) if chapter_number else [],
         # FR-STORY-12 / DEC-32: пять реакций на главу вместо одиночного лайка
-        'reactions': stub_data.reactions_of(current) if current else [],
+        'reactions': data.reactions_of(current) if current else [],
         # FR-STORY-13: опрос автора — необязателен, чаще всего его нет
-        'poll': stub_data.poll_of(slug, chapter_number) if chapter_number else None,
+        'poll': data.poll_of(slug, chapter_number) if chapter_number else None,
         # Подсветка в правом рейле — текущая отображаемая глава.
         'current_chapter_number': chapter_number,
         # FR-STORY-02: блок «Басқа шығармалар» внизу страницы
-        'related':  stub_data.related_stories(slug, limit=6) if story else [],
+        'related':  data.related_stories(slug, limit=6) if story else [],
         # docs/11: UGC-теги произведения (resolved Tag-объекты)
-        'tags':      stub_data.tags_of(story) if story else [],
+        'tags':      data.tags_of(story) if story else [],
         # DEC-31: обратный вход в настроение — подборки, где лежит произведение
-        'in_collections': stub_data.collections_of(story) if story else [],
+        'in_collections': data.collections_of(story) if story else [],
         'is_author': is_author,
         # Шапка (FR-STORY-01): подпись главной кнопки — «начать» или «продолжить».
         'has_progress': bool(has_progress_here),
         # Кнопка «Сақтау» и подписка на автора в карточке автора.
-        'in_library':  stub_data.in_library(viewer, slug) if viewer else False,
+        'in_library':  data.in_library(viewer, slug) if viewer else False,
         'is_followed': (
-            stub_data.is_following(viewer, story.author.username)
+            data.is_following(viewer, story.author.username)
             if viewer and story else False
         ),
     })
@@ -554,7 +554,7 @@ def _attention_links(username: str) -> list:
     сигналы, за которыми стоит больше одной работы.
     """
     items = []
-    for item in stub_data.writer_attention(username):
+    for item in data.writer_attention(username):
         if item['kind'] == 'comments':
             href = reverse('core:notifications')
         elif item['slug']:
@@ -577,7 +577,7 @@ def my_stories(request):
         # черновик. Страница перечисляла имущество и молчала о том, что делать.
         'attention': _attention_links(username) if username else [],
         'page_state': _page_state(request),
-        'stories':    stub_data.my_stories_of(username) if username else [],
+        'stories':    data.my_stories_of(username) if username else [],
         'username':   username,
     })
 
@@ -588,7 +588,7 @@ def new_story(request):
         # переехали в баптаулар вместе с аннотацией и доп. жанром: тег к
         # ненаписанному рассказу не выбирается, а `tag_input` со своим
         # автокомплитом был самым тяжёлым элементом формы создания.
-        'genres': stub_data.GENRES,
+        'genres': data.GENRES,
     })
 
 
@@ -610,40 +610,40 @@ def _checklist_links(story) -> list:
         text_href = reverse('core:chapter_new', kwargs={'slug': story.slug})
     hrefs = {'settings': settings_href, 'text': text_href}
     return [{**item, 'href': hrefs[item['target']]}
-            for item in stub_data.publish_checklist(story)]
+            for item in data.publish_checklist(story)]
 
 
 def manage_story(request, slug):
-    story = stub_data.STORIES_BY_SLUG.get(slug)
+    story = data.STORIES_BY_SLUG.get(slug)
     return render(request, 'pages/write/manage_story.html', {
         'slug':     slug,
         'story':    story,
-        'chapters': stub_data.chapters_of(slug),
+        'chapters': data.chapters_of(slug),
         # FR-WRITE-09: чек-лист как следующий шаг, а не как опись.
         'checklist':  _checklist_links(story),
-        'can_submit': stub_data.can_submit_for_review(story),
-        'missing':    stub_data.missing_for_review(story) if story else [],
+        'can_submit': data.can_submit_for_review(story),
+        'missing':    data.missing_for_review(story) if story else [],
     })
 
 
 def story_settings(request, slug):
-    story = stub_data.STORIES_BY_SLUG.get(slug)
+    story = data.STORIES_BY_SLUG.get(slug)
     return render(request, 'pages/write/story_settings.html', {
         'slug':   slug,
         'story':  story,
-        'genres': stub_data.GENRES,
+        'genres': data.GENRES,
         # BR-10b: отметка выбирается автором, а не достаётся дефолтом.
-        'story_audiences': stub_data.STORY_AUDIENCES,
+        'story_audiences': data.STORY_AUDIENCES,
         # docs/11: данные для tag_input + текущие теги стори для edit-режима
-        'accepted_tags':    stub_data.accepted_tags_json(),
-        'blocked_patterns': stub_data.blocked_tag_patterns_list(),
-        'initial_tags':     stub_data.tags_of(story) if story else [],
+        'accepted_tags':    data.accepted_tags_json(),
+        'blocked_patterns': data.blocked_tag_patterns_list(),
+        'initial_tags':     data.tags_of(story) if story else [],
     })
 
 
 def chapter_editor(request, slug, chapter=None):
-    story = stub_data.STORIES_BY_SLUG.get(slug)
-    current = stub_data.chapter_of(slug, chapter) if chapter else None
+    story = data.STORIES_BY_SLUG.get(slug)
+    current = data.chapter_of(slug, chapter) if chapter else None
     return render(request, 'pages/write/chapter_editor.html', {
         'slug':    slug,
         'story':   story,
@@ -651,7 +651,7 @@ def chapter_editor(request, slug, chapter=None):
         'current': current,
         'is_new':  chapter is None,
         # FR-STORY-13: опрос главы, если автор его уже создал
-        'poll':    stub_data.poll_of(slug, chapter) if chapter else None,
+        'poll':    data.poll_of(slug, chapter) if chapter else None,
     })
 
 
@@ -673,8 +673,8 @@ def _prof_items(username: str, allowed: tuple, is_self: bool) -> list:
     арифметики, и «Шығармалар 5» открывало список из трёх у постороннего.
     Одно правило, посчитанное один раз, разойтись не может.
     """
-    works_n = len(stub_data.public_stories_of(username))
-    lib_n   = len(stub_data.library_of(username)) if is_self else 0
+    works_n = len(data.public_stories_of(username))
+    lib_n   = len(data.library_of(username)) if is_self else 0
     labels = {
         "works":   ("Шығармалар", works_n),
         "library": ("Кітапхана",  lib_n),
@@ -689,14 +689,14 @@ def _prof_items(username: str, allowed: tuple, is_self: bool) -> list:
 def profile_me(request):
     """Свой профиль (FR-PROF-01/03). Реальное переключение секций через ?tab=."""
     username = _current_username(request)
-    author = stub_data.AUTHORS_BY_USERNAME.get(username)
+    author = data.AUTHORS_BY_USERNAME.get(username)
     tab = _resolve_prof_tab(request, _PROF_TABS_ME)
     # Рейл профиля состоит из одного блока «Жазылулар»: без него
     # partials/right_rail/profile.html не рендерит ничего, и гость получал
     # пустую колонку в 300px, которая просто сдвигала гейт от центра.
-    following = stub_data.following_of(username) if username else []
-    catalog = stub_data.award_catalog(username) if username else []
-    ladder = stub_data.read_ladder(username) if username else []
+    following = data.following_of(username) if username else []
+    catalog = data.award_catalog(username) if username else []
+    ladder = data.read_ladder(username) if username else []
     return render(request, 'pages/profile/profile_me.html', {
         'has_right_rail':  bool(author and following),
         'profile_user':    author,
@@ -710,23 +710,23 @@ def profile_me(request):
         # Теперь здесь то же, что видит читатель; черновики и модерация
         # живут только в кабинете, а их количество автор видит во вкладке
         # «Статистика» под пометкой «Тек саған көрінеді» (FR-PROF-08).
-        'works':           stub_data.public_stories_of(username) if username else [],
-        'hidden_n':        (len(stub_data.my_stories_of(username))
-                            - len(stub_data.public_stories_of(username))) if username else 0,
+        'works':           data.public_stories_of(username) if username else [],
+        'hidden_n':        (len(data.my_stories_of(username))
+                            - len(data.public_stories_of(username))) if username else 0,
         'my_stories_href': reverse('core:my_stories'),
-        'lib_reading':     stub_data.library_of(username, 'reading') if username else [],
-        'lib_saved':       stub_data.library_of(username, 'saved') if username else [],
-        'stats':           stub_data.reader_stats(username) if username else None,
-        'achievements':    stub_data.achievements_of(username) if username else [],
-        'contest_awards':  stub_data.contest_awards_of(username) if username else [],
-        'contests_n':      len(stub_data.submissions_of(username)) if username else 0,
-        'contest_history': stub_data.contest_history(username, is_self=True) if username else [],
+        'lib_reading':     data.library_of(username, 'reading') if username else [],
+        'lib_saved':       data.library_of(username, 'saved') if username else [],
+        'stats':           data.reader_stats(username) if username else None,
+        'achievements':    data.achievements_of(username) if username else [],
+        'contest_awards':  data.contest_awards_of(username) if username else [],
+        'contests_n':      len(data.submissions_of(username)) if username else 0,
+        'contest_history': data.contest_history(username, is_self=True) if username else [],
         # FR-PROF-08 — своя статистика. Ничего из этого посторонний не видит.
-        'writer':          stub_data.writer_stats(username) if username else None,
+        'writer':          data.writer_stats(username) if username else None,
         'award_catalog':   catalog,
         'awards_earned':   sum(1 for a in catalog if a['earned']),
         'read_ladder':     ladder,
-        'reads_total':     stub_data.reads_total(username) if username else 0,
+        'reads_total':     data.reads_total(username) if username else 0,
         'next_tier':       next((s for s in ladder if s['is_next']), None),
         'following':       following,
         'new_story_href':  reverse('core:new_story'),
@@ -737,7 +737,7 @@ def profile_me(request):
 def profile_me_edit(request):
     """Редактирование своего профиля (FR-PROF-01). Stub: рендерит форму, без сабмита."""
     username = _current_username(request)
-    author = stub_data.AUTHORS_BY_USERNAME.get(username) if username else None
+    author = data.AUTHORS_BY_USERNAME.get(username) if username else None
     return render(request, 'pages/profile/profile_me_edit.html', {
         'profile_user': author,
         'username':     username,
@@ -753,12 +753,12 @@ def profile_other(request, username):
 
     Данные — только публичные (`public_stories_of` / `public_stats`).
     """
-    author = stub_data.AUTHORS_BY_USERNAME.get(username)
+    author = data.AUTHORS_BY_USERNAME.get(username)
     if not author:
         raise Http404(f'Автор @{username} табылмады')
     me = _current_username(request)
     tab = _resolve_prof_tab(request, _PROF_TABS_OTHER)
-    works = stub_data.public_stories_of(username)
+    works = data.public_stories_of(username)
     # Рейл чужого профиля — «Ең көп оқылғаны», а не «на кого он подписан»
     # (FR-PROF-09). Список чужих подписок читателю ничего не сообщает, а
     # занимал единственный блок рейла.
@@ -769,7 +769,7 @@ def profile_other(request, username):
     # test_desktop_layout.ProfileStatsNotDuplicated). На «Туралы» работ в
     # теле нет вовсе, поэтому там блок полезен с первой.
     rail_top = (
-        stub_data.top_stories_of(username)
+        data.top_stories_of(username)
         if tab == 'about' or len(works) >= 4 else []
     )
     return render(request, 'pages/profile/profile_other.html', {
@@ -781,23 +781,23 @@ def profile_other(request, username):
         'prof_items':    _prof_items(username, _PROF_TABS_OTHER, False),
         'works':         works,
         'rail_top':      rail_top,
-        'stats':         stub_data.public_stats(username),
+        'stats':         data.public_stats(username),
         # Знаки одинаковы для владельца и для постороннего: достижение
         # публично по определению (FR-PROF-06). Число конкурсов — участие
         # без статуса, поэтому совпадает с длиной публичного списка и не
         # выдаёт вычитанием, что какая-то заявка отклонена (BR-74a).
-        'achievements':  stub_data.achievements_of(username),
-        'contest_awards': stub_data.contest_awards_of(username),
-        'contests_n':    len(stub_data.submissions_of(username)),
+        'achievements':  data.achievements_of(username),
+        'contest_awards': data.contest_awards_of(username),
+        'contests_n':    len(data.submissions_of(username)),
         # is_self=False режет результат и комментарий жюри (BR-74a)
-        'contest_history': stub_data.contest_history(username),
-        'is_followed':   stub_data.is_following(me, username) if me else False,
+        'contest_history': data.contest_history(username),
+        'is_followed':   data.is_following(me, username) if me else False,
     })
 
 
 _PEOPLE_KINDS = {
-    'followers': ('Жазылушылар', stub_data.followers_of),
-    'following': ('Жазылулар',   stub_data.following_of),
+    'followers': ('Жазылушылар', data.followers_of),
+    'following': ('Жазылулар',   data.following_of),
 }
 
 
@@ -811,7 +811,7 @@ def profile_people(request, username, kind):
     Один view на два набора: страницы отличаются тем, кого показывают, и
     ничем больше. Неизвестный `kind` и неизвестный автор — 404.
     """
-    author = stub_data.AUTHORS_BY_USERNAME.get(username)
+    author = data.AUTHORS_BY_USERNAME.get(username)
     if not author or kind not in _PEOPLE_KINDS:
         raise Http404(f'@{username}: {kind} табылмады')
 
@@ -860,12 +860,12 @@ def library(request):
     tab = request.GET.get('tab', 'saved')
     if tab not in _LIB_TABS:
         tab = 'saved'
-    entries = stub_data.library_of(username, tab) if username else []
+    entries = data.library_of(username, tab) if username else []
     items = [
         {
             'slug':  t,
             'label': _LIB_LABELS[t],
-            'count': len(stub_data.library_of(username, t)) if username else 0,
+            'count': len(data.library_of(username, t)) if username else 0,
         }
         for t in _LIB_TABS
     ]
@@ -882,8 +882,8 @@ def library(request):
 def notifications(request):
     """Список уведомлений с группировкой БҮГІН / КЕШЕ / ӨТКЕН АПТАДА (FR-NOTIF-01)."""
     username = _current_username(request)
-    grouped = stub_data.notifications_for_user(username) if username else {}
-    has_any = any(grouped.get(b) for b in stub_data.NOTIF_BUCKETS)
+    grouped = data.notifications_for_user(username) if username else {}
+    has_any = any(grouped.get(b) for b in data.NOTIF_BUCKETS)
     state = _page_state(request)
     # Готовые секции вместо словаря и списка ключей. Django-шаблон не умеет
     # `grouped[b]`, поэтому прежняя разметка обходила это дословной копией
@@ -891,8 +891,8 @@ def notifications(request):
     # контекст и не читался никем. Порядок задаёт реестр, пустые группы
     # не доезжают — заголовок без строк не рисуется.
     sections = [
-        {'key': b, 'label': stub_data.NOTIF_BUCKET_LABELS[b], 'items': grouped[b]}
-        for b in stub_data.NOTIF_BUCKETS if grouped.get(b)
+        {'key': b, 'label': data.NOTIF_BUCKET_LABELS[b], 'items': grouped[b]}
+        for b in data.NOTIF_BUCKETS if grouped.get(b)
     ]
     return render(request, 'pages/notifications.html', {
         'page_state':    state,
@@ -903,7 +903,7 @@ def notifications(request):
         # оқылмаған» и кнопка «отметить всё» соседствовали с сообщением
         # о неудачной загрузке (DEC-17).
         'has_data':      state == 'content',
-        'unread_total':  stub_data.unread_count_for_user(username) if username else 0,
+        'unread_total':  data.unread_count_for_user(username) if username else 0,
     })
 
 
@@ -915,8 +915,8 @@ def contest_list(request):
         'page_state':        _page_state(request),
         # Секций по-прежнему две, но «идущий» больше не значит «принимает
         # заявки»: точную фазу называет бейдж на карточке (DEC-45).
-        'active_contests':   stub_data.OPEN_CONTESTS,
-        'finished_contests': stub_data.FINISHED_CONTESTS,
+        'active_contests':   data.OPEN_CONTESTS,
+        'finished_contests': data.FINISHED_CONTESTS,
     })
 
 
@@ -946,9 +946,9 @@ def _contest_rail_has_content(contest, *, submitted: bool, hide_cta: bool) -> bo
 
 
 def contest_detail(request, slug):
-    contest = stub_data.CONTESTS_BY_SLUG.get(slug)
+    contest = data.CONTESTS_BY_SLUG.get(slug)
     username = _current_username(request)
-    submitted = stub_data.has_submission(username, slug) if username else False
+    submitted = data.has_submission(username, slug) if username else False
     return render(request, 'pages/contests/contest_detail.html', {
         'has_right_rail': _contest_rail_has_content(contest, submitted=submitted,
                                                     hide_cta=False),
@@ -957,7 +957,7 @@ def contest_detail(request, slug):
         'contest':        contest,
         # Общие правила приходят из одного реестра (BR-48a), а не
         # переписываются в `conditions` каждого конкурса.
-        'common_rules':   stub_data.common_rules(contest) if contest else [],
+        'common_rules':   data.common_rules(contest) if contest else [],
         # Присуждения, а не просто работы: строка победителя называет
         # номинацию, а её знает только грант (DEC-46).
         'grants':         contest.grants if contest else [],
@@ -966,10 +966,10 @@ def contest_detail(request, slug):
 
 
 def contest_submit(request, slug):
-    contest = stub_data.CONTESTS_BY_SLUG.get(slug)
+    contest = data.CONTESTS_BY_SLUG.get(slug)
     username = _current_username(request)
-    submitted = stub_data.has_submission(username, slug) if username else False
-    candidates = (stub_data.submission_candidates(username, slug)
+    submitted = data.has_submission(username, slug) if username else False
+    candidates = (data.submission_candidates(username, slug)
                   if (username and contest) else [])
 
     # Выбранная по умолчанию — первая без заметок, иначе просто первая.
@@ -978,7 +978,7 @@ def contest_submit(request, slug):
     preview_story = next((c['story'] for c in candidates if not c['notes']),
                          candidates[0]['story'] if candidates else None)
     checklist = (
-        stub_data.submission_checklist(preview_story, contest)
+        data.submission_checklist(preview_story, contest)
         if preview_story and contest else []
     )
     # Чек-лист зависит от выбранной работы, а выбор меняется в браузере.
@@ -987,7 +987,7 @@ def contest_submit(request, slug):
     # клиента, из этой таблицы (FR-CONT-04).
     volumes = {}
     for item in candidates:
-        vol = next(c for c in stub_data.submission_checklist(item['story'], contest)
+        vol = next(c for c in data.submission_checklist(item['story'], contest)
                    if c['key'] == 'volume')
         volumes[item['story'].slug] = {
             'passed': vol['passed'],
@@ -1011,7 +1011,7 @@ def contest_submit(request, slug):
         # у автора с тремя работами поле над ними — лишний элемент.
         'picker_search':     len(candidates) > PICKER_SEARCH_FROM,
         'checklist':         checklist,
-        'can_withdraw':      stub_data.can_withdraw(username, slug) if username else False,
+        'can_withdraw':      data.can_withdraw(username, slug) if username else False,
         'already_submitted': submitted,
     })
 
@@ -1024,9 +1024,9 @@ def my_submissions(request):
         {
             'sub':          sub,
             'contest':      sub.contest,
-            'can_withdraw': stub_data.can_withdraw(username, sub.contest_slug),
+            'can_withdraw': data.can_withdraw(username, sub.contest_slug),
         }
-        for sub in (stub_data.submissions_of(username) if username else [])
+        for sub in (data.submissions_of(username) if username else [])
     ]
     return render(request, 'pages/contests/my_submissions.html', {
         'page_state': _page_state(request),
@@ -1058,19 +1058,19 @@ def search_index_json(request):
                     # Обложки лежат в /media/ (после Фазы интеграции реальных файлов)
                     'cover':  ('/media/' + s.cover) if s.cover else '',
                 }
-                for s in stub_data.STORIES
+                for s in data.STORIES
                 # Тот же набор, что и в каталоге: по литералу 'Published'
                 # из Cmd+K выпали бы все сериалы (DEC-37).
-                if s.status in stub_data.PUBLIC_STATUSES
+                if s.status in data.PUBLIC_STATUSES
             ],
             'authors': [
                 {'username': a.username, 'name': a.public_name}
-                for a in stub_data.AUTHORS
+                for a in data.AUTHORS
             ],
             # docs/11 Phase 3: теги в Cmd+K (только accepted)
             'tags': [
                 {'slug': t.slug, 'name': t.name, 'usage_count': t.usage_count}
-                for t in stub_data.TAGS if t.status == 'accepted'
+                for t in data.TAGS if t.status == 'accepted'
             ],
         }
     return JsonResponse(_SEARCH_INDEX_CACHE)
@@ -1109,12 +1109,12 @@ _LEGAL_PAGES = {
 
 
 def _legal(key):
-    data = _LEGAL_PAGES[key]
+    page = _LEGAL_PAGES[key]
     def view(request):
         return render(request, 'pages/legal.html', {
-            'page_title':    data['title'],
-            'page_subtitle': data['subtitle'],
-            'page_body':     data['body'],
+            'page_title':    page['title'],
+            'page_subtitle': page['subtitle'],
+            'page_body':     page['body'],
             'last_updated':  None,
         })
     view.__name__ = f'legal_{key}'
@@ -1133,25 +1133,25 @@ def design_components(request):
     """Каталог всех атомов во всех состояниях. Только при DEBUG."""
     if not settings.DEBUG:
         raise Http404
-    accepted = [t for t in stub_data.TAGS if t.status == 'accepted']
-    pending  = [t for t in stub_data.TAGS if t.status == 'pending']
+    accepted = [t for t in data.TAGS if t.status == 'accepted']
+    pending  = [t for t in data.TAGS if t.status == 'pending']
     # Микс accepted + pending — иллюстрирует фильтрацию tag_list по viewer
     mixed = accepted[:3] + pending[:2]
     return render(request, 'pages/_design/components.html', {
-        'genres':    stub_data.GENRES,
-        'stories':   stub_data.STORIES,
-        'authors':   stub_data.AUTHORS,
+        'genres':    data.GENRES,
+        'stories':   data.STORIES,
+        'authors':   data.AUTHORS,
         # Стаб-набор покрывает все четыре фазы (DEC-45), поэтому showcase
         # бейджа — это просто перебор конкурсов, а не четыре ручных вызова
         # с выдуманными аргументами, которые разойдутся с компонентом.
-        'contests':  stub_data.CONTESTS,
+        'contests':  data.CONTESTS,
         # docs/11 — showcase тегов
         'showcase_tags_accepted': accepted[:8],
         'showcase_tags_pending':  pending,
         'showcase_tags_mixed':    mixed,
         # для интерактивного tag_input
-        'accepted_tags':    stub_data.accepted_tags_json(),
-        'blocked_patterns': stub_data.blocked_tag_patterns_list(),
+        'accepted_tags':    data.accepted_tags_json(),
+        'blocked_patterns': data.blocked_tag_patterns_list(),
     })
 
 
@@ -1160,10 +1160,10 @@ def design_states(request):
     if not settings.DEBUG:
         raise Http404
     return render(request, 'pages/_design/states.html', {
-        'sample_story':   stub_data.STORIES[0],
-        'sample_entry':   stub_data.LIBRARY_BY_USER['aidana'][0],
-        'sample_notif':   stub_data.NOTIFICATIONS_BY_USER['aidana'][0],
-        'sample_comment': stub_data.COMMENTS_BY_STORY['dalney-berega'][0],
+        'sample_story':   data.STORIES[0],
+        'sample_entry':   data.LIBRARY_BY_USER['aidana'][0],
+        'sample_notif':   data.NOTIFICATIONS_BY_USER['aidana'][0],
+        'sample_comment': data.COMMENTS_BY_STORY['dalney-berega'][0],
     })
 
 

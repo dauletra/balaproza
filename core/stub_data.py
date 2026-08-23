@@ -3,6 +3,13 @@
 которые рисует UI. После Ф14 этот файл заменится на Django-модели.
 
 Не импортировать в продакшен-логику — это сугубо для рендера шаблонов.
+Читающая сторона (views, контекст-процессоры, фильтры) обращается не сюда,
+а к фасаду `core.data`: он переживёт замену хранилища, а этот модуль — нет.
+
+Словарь предметной области — оси каталога, реакции, ступени наград, подписи
+статусов, формулировки времени — переехал в `core.domain`. Данные исчезнут
+вместе с этим файлом, правила останутся; лежать им в одном модуле значило
+однажды удалить вторые вместе с первыми.
 """
 
 import zlib
@@ -10,6 +17,31 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Callable, Optional
+
+from .domain.awards import (
+    AWARD_TIERS, READ_TIER_ART, READ_TIERS, next_tier_for, tier_for,
+)
+from .domain.catalog import (
+    AUDIENCE_ORDER, BADGE_LABELS, CATALOG_AUDIENCE_FILTERS,
+    CATALOG_AUTHOR_FILTERS, CATALOG_BADGE_FILTERS, CATALOG_DEFAULT_SORT,
+    CATALOG_FORMAT_FILTERS, CATALOG_KIND_FILTERS, CATALOG_LENGTH_FILTERS,
+    CATALOG_PRESETS, CATALOG_SORTS, CATALOG_STATUS_FILTERS, KIND_PREDICATES,
+    NEW_AUTHOR_FOLLOWERS, PUBLIC_STATUSES, STORY_AUDIENCES, STORY_BADGES,
+)
+from .domain.contests import (
+    CONTEST_PHASE_BADGE, CONTEST_PHASE_LABELS, CONTEST_PHASES,
+    CONTEST_RESULT_LABELS, PUBLIC_CONTEST_RESULTS, SUBMISSION_NOTES,
+)
+from .domain.formatting import (
+    KK_MONTHS_SHORT, kk_ago, kk_date, kk_period, spaced_number,
+)
+from .domain.notifications import (
+    MODERATION_OUTCOME_LABELS, MODERATION_OUTCOMES, NOTIF_BUCKET_LABELS,
+    NOTIF_BUCKETS, NOTIF_KINDS,
+)
+from .domain.story import (
+    PUBLISH_CHECKLIST, REACTIONS, REACTIONS_BY_SLUG, Reaction,
+)
 
 
 # ───────────────────────── Жанры (docs/03 — 12 шт) ─────────────────────────
@@ -539,34 +571,6 @@ STORIES = [
 STORIES_BY_SLUG = {s.slug: s for s in STORIES}
 
 
-# ───────────────────────── Реакции на главу ───────────────────────────────
-
-@dataclass(frozen=True)
-class Reaction:
-    """Одна реакция читателя на главу (FR-STORY-12, DEC-32).
-
-    Словарь закрытый: пять штук, пользовательских реакций нет. Открытый
-    список означал бы бесконечную модерацию и длинный хвост мёртвых кнопок.
-    """
-    slug: str
-    label: str    # первое лицо — читатель говорит о себе, как в docs/16 («сен»)
-    icon: str     # symbol в спрайте; эмодзи запрещены, поэтому только SVG
-    hint: str     # как это читать автору в разбивке по главам
-
-
-# Порядок фиксирован и в данных, и в интерфейсе: кнопки не должны прыгать
-# местами по мере голосования.
-REACTIONS = (
-    Reaction("kuldim",    "Күлдім",    "smile",        "күлкілі болды"),
-    Reaction("jyladym",   "Жыладым",   "drop",         "қатты әсер етті"),
-    Reaction("juregim",   "Жүрегім",   "heart-filled", "романтикалық"),
-    Reaction("shabyt",    "Шабыт",     "feather",      "жазуға шабыттандырды"),
-    Reaction("tangaldym", "Таңғалдым", "sparkle",      "күтпеген бұрылыс"),
-)
-
-REACTIONS_BY_SLUG = {r.slug: r for r in REACTIONS}
-
-
 # ───────────────────────── Главы (для STORY/READ) ─────────────────────────
 
 @dataclass(frozen=True)
@@ -1035,127 +1039,10 @@ def search_authors(query: str, limit: int = 5) -> list:
     ][:limit]
 
 
-# Порядок значим: первый ключ — дефолт каталога (DEC-36).
-CATALOG_SORTS = (
-    ("trending",   "Қазір танымал"),
-    ("popularity", "Ең көп оқылған"),
-    ("recent",     "Жаңалары"),
-    ("alphabet",   "Әліпби бойынша"),
-)
-
-CATALOG_DEFAULT_SORT = CATALOG_SORTS[0][0]
-
-# Знаки качества платформы (docs/13 §13.7). Ключ — для фильтра, подпись — для
-# карточки. Единственная ось, где качество заявлено отдельно от просмотров:
-# без неё «Редакция таңдауы» оставался незаметной подписью на карточке, а
-# отобрать по нему было нельзя.
-STORY_BADGES = (
-    ("editorial", "Редакция таңдауы"),
-    ("contest",   "Байқауға қатысады"),
-)
-
-BADGE_LABELS = dict(STORY_BADGES)
-
-CATALOG_BADGE_FILTERS = (("", "Барлығы"),) + STORY_BADGES
-
-CATALOG_STATUS_FILTERS = (
-    ("",           "Барлығы"),
-    ("Published",  "Жарияланған"),
-    ("Completed",  "Аяқталды"),
-    ("OnProcess",  "Жазылып жатыр"),
-)
-
-# Возрастные отметки произведения, от младшей к старшей. Порядок значим:
-# фильтр сравнивает по индексу, а не по равенству (DEC-38).
-AUDIENCE_ORDER = ("10+", "14+")
-
-# Ось «Жасың» — про читателя, а не про произведение. Ключ остаётся отметкой
-# произведения (это верхняя граница того, что читателю подходит), подпись —
-# возрастная вилка самого читателя. Прежняя подпись «10+ / 14+» повторяла
-# ключ и читалась как отметка работы, из-за чего выбор «14+» выглядел как
-# «покажи только взрослое» и прятал 15 из 21 доступной работы.
-CATALOG_AUDIENCE_FILTERS = (
-    ("",    "Барлығы"),
-    ("10+", "10-13"),
-    ("14+", "14+"),
-)
-
-# Те же ключи, но для автора, а не для читателя (BR-10b). Подписи в каталоге
-# называют вилку читателя («10-13»), потому что ось накопительная (DEC-38);
-# в форме автор ставит отметку своей работе, и там вилка читателя врала бы:
-# «10-13» звучит как «старше не читают». Список закрыт AUDIENCE_ORDER — новая
-# отметка означает новую ось каталога, а не новую строку в форме.
-STORY_AUDIENCES = (
-    ("10+", "10+", "Кез келген оқырманға жарайды"),
-    ("14+", "14+", "Жасөспірімге арналған: ауыр тақырып, күрделі көрініс"),
-)
-
-# Границы — в Story.length_bucket, там же и обоснование.
-CATALOG_LENGTH_FILTERS = (
-    ("",       "Барлығы"),
-    ("short",  "10 минутқа дейін"),
-    ("medium", "10-30 минут"),
-    ("long",   "30 минуттан ұзақ"),
-)
-
-# Legacy-ось: в панели её больше нет, но параметр читается — на неё ведут
-# старые ссылки. Читательский вопрос закрывает CATALOG_KIND_FILTERS.
-CATALOG_FORMAT_FILTERS = (
-    ("",       "Барлығы"),
-    ("single", "Бір бөлімді"),
-    ("serial", "Көп бөлімді"),
-)
-
-# «Түрі» (DEC-37) — одна ось вместо «Формат» + «Мәртебесі».
-#
-# Прежний `status` держал две несовместимые вещи: путь модерации (Жоба →
-# Модерацияда → Жарияланды) и завершённость сериала. Первая читателю не нужна
-# вовсе — в каталоге всё и так прошло модерацию, «Жарияланған» стоял у 90%
-# выдачи и ничего не отбирал. Вторая нужна, но применима только к сериалу:
-# у одночастевого произведения текст цел по определению.
-#
-# Три значения покрывают все осмысленные сочетания и отбрасывают невозможное
-# (`single` + «пишется»), отвечая на «что я получу».
-CATALOG_KIND_FILTERS = (
-    ("",        "Барлығы"),
-    ("single",  "Бір бөлімді"),
-    ("done",    "Аяқталған сериал"),
-    ("ongoing", "Жазылып жатыр"),
-)
-
-# kind → предикат. «Любого сериала» среди значений нет намеренно: оба места,
-# которые раньше вели на `?format=serial` (ряд главной и пресет), означают
-# «продолжается», а не «сериал любой».
-KIND_PREDICATES = {
-    "single":  lambda s: s.format == "single",
-    "done":    lambda s: s.format == "serial" and s.status == "Completed",
-    "ongoing": lambda s: s.format == "serial" and s.status == "OnProcess",
-}
-
-# Порог «нового имени». Значение стаб-условное: авторов здесь шесть, и любая
-# граница между ними произвольна. После Ф14 это должен быть перцентиль по
-# подписчикам или возраст аккаунта — не унаследовать это число как правило.
-NEW_AUTHOR_FOLLOWERS = 150
-
-# Ось «Автор». Ни одна другая ось не помогает найти того, кого ещё не читают,
-# при том что вся культура портала построена вокруг растущего автора
-# (docs/13 §13.2), а «новые авторы» стоят отдельным блоком на главной.
-CATALOG_AUTHOR_FILTERS = (
-    ("",    "Барлығы"),
-    ("new", "Жаңа есімдер"),
-)
-
-
 def is_new_author(username: str) -> bool:
     """Автор, которого ещё не читают: подписчиков меньше порога."""
     a = AUTHORS_BY_USERNAME.get(username)
     return bool(a and a.followers < NEW_AUTHOR_FOLLOWERS)
-
-# Статусы, которые вообще показываются публике (BR-10/11, DEC-23).
-# «Жоба» и «Модерацияда» — этапы авторского пути, а не публикация: до явного
-# решения модератора работа в каталоге не появляется.
-PUBLIC_STATUSES = frozenset({"Published", "Completed", "OnProcess"})
-
 
 def apply_catalog_filters(stories: list, sort: str = CATALOG_DEFAULT_SORT,
                           status: str = "", audience: str = "", length: str = "",
@@ -1236,25 +1123,6 @@ def filter_catalog(*, query: str = "", genre: str = "", tag: str = "",
                                  audience=audience, length=length,
                                  format=format, badge=badge,
                                  author_tier=author_tier, kind=kind)
-
-
-# Пресеты «Не оқимын?» (docs/13 §13.6). Готовые ответы на вопрос состояния,
-# а не набор атрибутов: комбинацию `single + short` §13.11 называет быстрым
-# чтением дословно, но в панели она была двумя тапами в разных группах.
-CATALOG_PRESETS = (
-    {"slug": "bir-otyrysta", "label": "Бір отырыста",
-     "filters": {"kind": "single", "length": "short"}},
-    {"slug": "jalgasy-bar",  "label": "Жалғасы бар",
-     "filters": {"kind": "ongoing"}},
-    {"slug": "ayaqtalgan",   "label": "Аяқталған",
-     "filters": {"kind": "done"}},
-    {"slug": "redaksiya",    "label": "Редакция таңдауы",
-     "filters": {"badge": "editorial"}},
-    {"slug": "baiqau",       "label": "Байқау жұмыстары",
-     "filters": {"badge": "contest"}},
-    {"slug": "jana-esimder", "label": "Жаңа есімдер",
-     "filters": {"author_tier": "new"}},
-)
 
 
 def related_stories(slug: str, limit: int = 6) -> list:
@@ -1384,26 +1252,6 @@ def writer_attention(username: str) -> list:
                    if s.status == "NotPublished" and not chapters_of(s.slug)])
 
     return items
-
-
-# Чек-лист готовности произведения (FR-WRITE-09).
-#
-# Порядок пунктов — порядок работы автора, а не порядок полей формы.
-# `required` отделяет то, без чего работу нельзя показать читателю, от того,
-# что её улучшает: обложка и теги остаются советом, аннотация, текст и
-# возрастная отметка — условием. Раньше все шесть пунктов были одинаковыми
-# серо-зелёными строками, и «Мұқаба дайын» весила столько же, сколько
-# «Жас белгісі», которое к тому же было проставлено дефолтом (BR-10b).
-#
-# `target` — куда вести; ссылку строит view (`_checklist_links`), как и в
-# writer_attention. URL-ы в слой данных не спускаются.
-PUBLISH_CHECKLIST = (
-    ("text",       "text",     True),
-    ("annotation", "settings", True),
-    ("audience",   "settings", True),
-    ("cover",      "settings", False),
-    ("tags",       "settings", False),
-)
 
 
 def publish_checklist(story: Story) -> list:
@@ -1678,47 +1526,6 @@ COLLECTIONS_BY_SLUG = {c.slug: c for c in COLLECTIONS}
 class JuryMember:
     name: str
     role: str   # «Төраға», «Мүше», ...
-
-
-# Сокращения месяцев для дат конкурса: «10 қаз — 5 жел».
-KK_MONTHS_SHORT = ("қаң", "ақп", "нау", "сәу", "мам", "мау",
-                   "шіл", "там", "қыр", "қаз", "қар", "жел")
-
-
-def kk_date(d: date) -> str:
-    """«5 желтоқсан» в короткой форме — «5 жел»."""
-    return f"{d.day} {KK_MONTHS_SHORT[d.month - 1]}"
-
-
-def kk_period(starts: date, ends: date) -> str:
-    """Диапазон дат одной строкой; однодневный этап — просто дата."""
-    return kk_date(starts) if starts == ends else f"{kk_date(starts)} — {kk_date(ends)}"
-
-
-def kk_ago(days: int, hours: Optional[int] = None) -> str:
-    """«Сколько времени назад» словами — одна формулировка на весь проект.
-
-    Относительное время до этого лежало в данных строкой: у уведомления
-    «5 күн бұрын», у заявки «6 ай бұрын». Это то же хранимое производное,
-    что `days_left=12` (DEC-45, BR-40a), только заметить его труднее —
-    страница выглядит правдоподобно ровно один день. Заявка `aidana` на
-    «Жас алдым — 2023» говорила «6 ай бұрын» о конкурсе, закрывшемся в
-    декабре 2023-го.
-
-    Часы называются только сегодня: «26 сағат бұрын» человек в уме
-    переводит в дни, и «кеше» короче.
-    """
-    if days <= 0:
-        if hours:
-            return f"{hours} сағат бұрын"
-        return "бүгін"
-    if days == 1:
-        return "кеше"
-    if days < 30:
-        return f"{days} күн бұрын"
-    if days < 365:
-        return f"{days // 30} ай бұрын"
-    return f"{days // 365} жыл бұрын"
 
 
 @dataclass(frozen=True)
@@ -2006,25 +1813,6 @@ class Contest:
     def next_stage(self) -> Optional["TimelineStage"]:
         """Ближайший ещё не наступивший этап или None."""
         return next((t for t in self.timeline if t.state == "upcoming"), None)
-
-
-# Фазы конкурса (BR-40, DEC-45). Порядок — хронологический.
-CONTEST_PHASES = ("upcoming", "accepting", "judging", "finished")
-
-CONTEST_PHASE_LABELS = {
-    "upcoming":  "Жақында",
-    "accepting": "Өтінім қабылдау",
-    "judging":   "Қазылар қарауда",
-    "finished":  "Аяқталды",
-}
-
-# Семантика бейджа фазы — та же шкала, что у статусов произведения.
-CONTEST_PHASE_BADGE = {
-    "upcoming":  "info",
-    "accepting": "published",
-    "judging":   "attention",
-    "finished":  "neutral",
-}
 
 
 # Даты идущих конкурсов заданы относительно сегодняшнего дня. Абсолютные
@@ -2345,21 +2133,6 @@ def has_submission(username: str, contest_slug: str) -> bool:
     return any(s.contest_slug == contest_slug for s in submissions_of(username))
 
 
-# Подписи результата — те же слова, что в «Менің өтінімдерім» (BR-41),
-# плюс «Жеңімпаз» для победы: победа выводится из `Contest.winners`,
-# отдельного статуса заявки под неё нет.
-CONTEST_RESULT_LABELS = {
-    "winner":    "Жеңімпаз",
-    "accepted":  "Қабылданды",
-    "reviewing":  "Қаралуда",
-    "rejected":  "Қабылданбады",
-}
-
-# Что из результата видит посторонний (BR-74a). Всё остальное публично
-# выглядит просто участием.
-PUBLIC_CONTEST_RESULTS = ("winner", "accepted")
-
-
 def contest_history(username: str, *, is_self: bool = False) -> list:
     """Конкурсная биография автора (FR-PROF-07), свежие сверху.
 
@@ -2400,21 +2173,6 @@ def contest_history(username: str, *, is_self: bool = False) -> list:
             "note":         sub.note if is_self else "",
         })
     return sorted(out, key=lambda i: (-i["year"], i["contest"].name))
-
-
-def spaced_number(value) -> str:
-    """Разряды через неразрывный пробел: 500000 -> «500 000».
-
-    Канонический вид числа для автора. Живёт здесь, а не в фильтре
-    `balaproza.spaced`, потому что те же числа собираются на стороне
-    данных — в подсказках `submission_checklist`. Фильтр вызывает эту
-    функцию; двух реализаций одной формы записи в проекте быть не должно.
-    """
-    try:
-        n = int(value)
-    except (TypeError, ValueError):
-        return value
-    return f"{n:,}".replace(",", " ")
 
 
 def common_rules(contest: "Contest") -> list:
@@ -2501,21 +2259,6 @@ def submission_checklist(story: "Story", contest: "Contest") -> list:
                       "hint": "Өтінім бергенде растайсың.",
                       "passed": True, "auto": False})
     return items
-
-
-# Что стоит знать автору о работе перед подачей (BR-24). Это **заметки,
-# а не запреты**: форма ничего не отклоняет.
-#
-# Раньше эти же ключи гасили радио и кнопку отправки, то есть отказывали
-# от имени конкурса до всякого жюри. Решение о работе принимает человек,
-# а не чек в браузере: короткий текст может быть намеренно короткой
-# формой, а работа, уже поданная в другой конкурс, — предметом
-# разбирательства, а не поводом молча закрыть дверь.
-SUBMISSION_NOTES = {
-    "too_short": "Көлемі шарттан аз",
-    "too_long":  "Көлемі шарттан үлкен",
-    "busy":      "Бұл шығарма басқа байқауда тұр",
-}
 
 
 def busy_contest_of(username: str, story_slug: str, *, besides: str = "") -> Optional["Contest"]:
@@ -2738,35 +2481,9 @@ def following_of(username: str) -> list:
 # не будет (DEC-41, docs/13 §13.10). Знак говорит «ты сделал», рейтинг —
 # «ты хуже вон того»; аудитории 14-18 второе не нужно.
 
-# Ступени прочтений. Считаются **накопительно по всем публичным работам**:
-# это знак автора, а у произведения свои бейджи уже есть (STORY_BADGES).
-READ_TIERS = (
-    (1_000,   "Мың оқылым"),
-    (10_000,  "Он мың оқылым"),
-    (50_000,  "Елу мың оқылым"),
-    (100_000, "Жүз мың оқылым"),
-)
-
-
 def reads_total(username: str) -> int:
     """Сколько раз прочитали автора — по публичным работам (BR-73)."""
     return sum(s.views for s in public_stories_of(username))
-
-
-def tier_for(total: int) -> Optional[tuple]:
-    """Высшая ступень, взятая при таком числе прочтений, или None.
-
-    Отдельно от `read_tier`, чтобы границы (999/1 000/9 999/10 000)
-    проверялись напрямую, а не через подгонку фикстур.
-    """
-    taken = [t for t in READ_TIERS if total >= t[0]]
-    return taken[-1] if taken else None
-
-
-def next_tier_for(total: int) -> Optional[tuple]:
-    """Следующая невзятая ступень или None, если взяты все."""
-    ahead = [t for t in READ_TIERS if total < t[0]]
-    return ahead[0] if ahead else None
 
 
 def read_tier(username: str) -> Optional[tuple]:
@@ -2822,23 +2539,6 @@ def contest_awards_of(username: str) -> list:
             "note":    grant.note,
         })
     return sorted(out, key=lambda i: (-i["year"], i["contest"].name, i["title"]))
-
-
-# Слаг иллюстрации и металл ступени для каждой награды (DEC-43).
-# Металл — не украшение, а сигнал ценности: бронза — первые шаги, серебро —
-# середина пути, золото — редкое. Он заменил прежнюю подсветку `kind`,
-# потому что читается без легенды и не требует подписи рядом.
-AWARD_TIERS = ("bronze", "silver", "gold")
-
-# Ступени оқылым: слаг иллюстрации + металл. Один рисунок-стела, у которого
-# меняются число на табличке и металл, — как «5 ЛЕТ» у аналогов. Четыре
-# отдельные картинки рисовать незачем.
-READ_TIER_ART = {
-    1_000:   ("reads-1k",   "bronze"),
-    10_000:  ("reads-10k",  "silver"),
-    50_000:  ("reads-50k",  "silver"),
-    100_000: ("reads-100k", "gold"),
-}
 
 
 @dataclass(frozen=True)
@@ -2961,53 +2661,6 @@ def read_ladder(username: str) -> list:
 
 
 # ───────────────────────── NOTIF — уведомления ────────────────────────────
-
-# Типы (FR-NOTIF-03):
-#   comment      — новый комментарий к твоему произведению
-#   like         — лайк твоему произведению
-#   new_chapter  — новая глава у отслеживаемого автора/произведения
-#   follower     — новый подписчик
-#   moderation   — результат модерации (одобрено / отклонено)
-#   contest      — статус заявки на конкурс
-NOTIF_KINDS = ("comment", "like", "new_chapter", "follower", "moderation", "contest")
-
-# Исход модерации (BR-11). Хранится, а не выводится из `Story.status`:
-# статус меняется дальше — автор правит работу и отправляет её снова, — а
-# уведомление остаётся записью о том, что решил модератор в тот день.
-# Выведи его из статуса, и вчерашний отказ завтра скажет «Модерацияда».
-# Тот же довод, по которому DEC-46 хранит `AwardGrant`, а не вычисляет
-# победу: акт человека не восстанавливается из состояния объекта.
-#
-# Пустая строка — решения ещё нет: модерация идёт.
-#
-# Исходов три, а не два, потому что «доработай» и «нарушает правила» —
-# разные события, и одним словом они не называются. docs/13 §13.5 требует
-# обучающего тона прямо сейчас («вместо "отклонено" — "толықтыру қажет"»),
-# и пока оба случая лежали под `rejected`, правило нарушалось на первом из
-# них. Смягчить формулировку сразу для обоих было нельзя: детской
-# платформе нужен исход, который не обещает возврата.
-#
-# `needs_work` — часть авторского пути: работа возвращается с замечанием.
-# `rejected` — редкий твёрдый отказ по правилам, без приглашения продолжить.
-#
-# NB: `NeedsWork` как **статус произведения** остаётся V2-кандидатом
-# (docs/16 §16.3). Здесь это исход события, а не состояние работы.
-MODERATION_OUTCOMES = ("approved", "needs_work", "rejected")
-MODERATION_OUTCOME_LABELS = {
-    "approved":   "Жарияланды",
-    "needs_work": "Толықтыру қажет",
-    "rejected":   "Қабылданбады",
-    "":           "Модерацияда",
-}
-
-# Группы по времени (FR-NOTIF-01).
-NOTIF_BUCKETS = ("today", "yesterday", "past_week")
-NOTIF_BUCKET_LABELS = {
-    "today":     "Бүгін",
-    "yesterday": "Кеше",
-    "past_week": "Өткен аптада",
-}
-
 
 @dataclass(frozen=True)
 class Notification:

@@ -1,6 +1,6 @@
 # 14 · Карта реализации: требование → код
 
-> `Обновлён: 2026-08-22` · `Сверен с кодом: 98696de`
+> `Обновлён: 2026-08-23` · `Сверен с кодом: 3888897`
 
 Этот документ отвечает на два вопроса, на которые остальное ТЗ не отвечает: **где живёт то, что описано требованием**, и **что придётся обновить, если это изменить**.
 
@@ -301,6 +301,8 @@ Showcase-маршруты `/_design/tokens/`, `/_design/components/`, `/_design/
 | Состав/порядок секций `pages/story/story_detail.html` | [05 §5.4](05-functional-spec.md) FR-STORY-*, эта карта §14.5 |
 | `_render_catalog`, `filter_catalog` | [05](05-functional-spec.md) FR-CAT-07 (таблица параметров), [12 §12.3](12-domain-model-contract.md) |
 | Сигнатура хелпера в `stub_data.py` | [12 §12.3](12-domain-model-contract.md) |
+| Новое имя в `core/domain/` | добавить строку в `core/data.py` — дверь одна (`test_data_facade`) |
+| Перенос хелпера из `stub_data` в модели | [19 §19.4](19-f14-migration-plan.md) — этап заканчивается удалением заменённого хелпера, а не сосуществованием двух источников |
 | Поле/property на `Story` | [12 §12.4](12-domain-model-contract.md) |
 | Даты или фаза `Contest` | [08 BR-40/40a](08-business-rules.md), [12 §12.4](12-domain-model-contract.md), [05](05-functional-spec.md) FR-CONT-01…03 |
 | Поле `Notification` или `Submission` | [08 BR-70a / BR-72a / BR-41a](08-business-rules.md), [12 §12.4](12-domain-model-contract.md), [05](05-functional-spec.md) FR-NOTIF-05/06 |

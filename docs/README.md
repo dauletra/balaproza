@@ -29,10 +29,11 @@
 | 12 | [`12-domain-model-contract.md`](12-domain-model-contract.md) | Контракт будущих Django-моделей и query/service helpers для Ф14 |
 | 13 | [`13-product-culture.md`](13-product-culture.md) | Продуктовая культура: Balaproza как әдеби шеберхана, роль школы авторов, модерации и план дизайн-изменений |
 | 14 | [`14-implementation-map.md`](14-implementation-map.md) | Карта «требование → код»: где живёт каждый FR/BR/DEC и что обновить, меняя файл |
-| 15 | [`15-testing-contract.md`](15-testing-contract.md) | Что защищает каждый из 15 тест-файлов и что считать регрессией |
+| 15 | [`15-testing-contract.md`](15-testing-contract.md) | Что защищает каждый из 17 тест-файлов и что считать регрессией |
 | 16 | [`16-content-voice.md`](16-content-voice.md) | Тон интерфейса (обращение на «сен»), словарь статусов, правила оформления строк |
 | 17 | [`17-deployment.md`](17-deployment.md) | Деплой, прод-настройки, статика и media, чек-лист перед запуском |
 | 18 | [`18-open-questions.md`](18-open-questions.md) | Реестр открытых вопросов: владелец, приоритет, что блокирует |
+| 19 | [`19-f14-migration-plan.md`](19-f14-migration-plan.md) | План Ф14: порядок этапов замены стаба на модели, развилки и ловушки |
 
 ## Как читать
 

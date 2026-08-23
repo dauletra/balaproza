@@ -1,6 +1,8 @@
 # 12. Domain model contract for F14
 
-> `Обновлён: 2026-08-22` · `Сверен с кодом: 98696de`
+> `Обновлён: 2026-08-23` · `Сверен с кодом: 3888897`
+
+**Порядок работ по этому контракту — [`19`](19-f14-migration-plan.md).** Читающая сторона обращается к фасаду `core.data`, а не к `stub_data` напрямую: имена ниже — его поверхность, и она не меняется от того, кто за ней отвечает сегодня. Словарь предметной области (оси каталога, реакции, ступени наград, подписи статусов, формулировки времени) вынесен в `core/domain/`: это правила, а не записи, и удаление стаба их не касается.
 
 This document is the implementation contract for replacing `core/stub_data.py` with real Django models. It does not introduce models yet; it fixes the fields, relationships, computed values, and query helpers that the current templates already depend on.
 
