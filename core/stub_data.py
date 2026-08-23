@@ -33,7 +33,7 @@ from .domain.contests import (
     CONTEST_RESULT_LABELS, PUBLIC_CONTEST_RESULTS, SUBMISSION_NOTES,
 )
 from .domain.formatting import (
-    KK_MONTHS_SHORT, kk_ago, kk_date, kk_period, spaced_number,
+    KK_MONTHS_SHORT, kk_ago, kk_date, kk_period, kk_updated, spaced_number,
 )
 from .domain.notifications import (
     MODERATION_OUTCOME_LABELS, MODERATION_OUTCOMES, NOTIF_BUCKET_LABELS,
@@ -321,18 +321,7 @@ class Story:
     @property
     def updated_label(self) -> str:
         """«кеше», «3 күн бұрын», «2 апта бұрын». Пусто, если дата не задана."""
-        days = self.updated_days_ago
-        if days is None:
-            return ""
-        if days <= 0:
-            return "бүгін"
-        if days == 1:
-            return "кеше"
-        if days < 7:
-            return f"{days} күн бұрын"
-        if days < 30:
-            return f"{days // 7} апта бұрын"
-        return f"{days // 30} ай бұрын"
+        return kk_updated(self.updated_days_ago)
 
     @property
     def text_chapter(self) -> int | None:

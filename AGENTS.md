@@ -62,11 +62,16 @@ balaproza_v1/
 │   │   └── formatting.py         # kk_date / kk_period / kk_ago, spaced_number
 │   │                             # Домен НЕ импортирует stub_data, модели и core.data —
 │   │                             # иначе цикл на Ф14 и константы не взять в миграции
-│   ├── models.py                 # модели Ф14. Пока: User (DEC-01 — роли «читатель» нет;
+│   ├── models.py                 # модели Ф14. Сейчас: User (DEC-01 — роли «читатель» нет;
 │   │                             # first_name/last_name убраны, есть name + pen_name),
 │   │                             # Genre (закрытый справочник 12), Tag (путь pending →
-│   │                             # accepted|rejected), BlockedTagPattern.
-│   │                             # Производное не хранится: ни Genre.count, ни usage_count
+│   │                             # accepted|rejected), BlockedTagPattern,
+│   │                             # Story (badges — производное, кроме редакционного знака;
+│   │                             # updated_at вместо дельты в днях), Chapter (несёт текст,
+│   │                             # char_count денормализован от body),
+│   │                             # ChapterReaction (счётчик, не голос: писать некому до Ф15).
+│   │                             # Производное не хранится: ни Genre.count, ни usage_count.
+│   │                             # Чтение всё ещё идёт из стаба — переключение отдельным шагом
 │   ├── migrations/               # 0001_initial + 0002_reference_data (жанры и блок-лист
 │   │                             # заливает миграция: без них не работает каталог;
 │   │                             # литералы заморожены, stub_data не импортируется)
@@ -143,7 +148,7 @@ balaproza_v1/
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
 │   │                             # domain.formatting.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 980 тестов в 19 файлах (см. ниже)
+│   └── tests/                    # 995 тестов в 19 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -264,7 +269,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 980 тестов
+uv run python manage.py test core       # все 995 тестов
 uv run python manage.py test core.tests.test_<file>
 ```
 
@@ -276,7 +281,8 @@ uv run python manage.py test core.tests.test_<file>
 - `test_models.py` — модели Ф14: публичное и приватное имя автора, путь тега,
   нормализация блок-листа; справочник жанров из миграции совпадает со стабом
 - `test_seed.py` — `seed_demo`: идемпотентность (повтор возвращает изменённое
-  к эталону) и совпадение засеянного корпуса со стабом
+  к эталону) и совпадение засеянного корпуса со стабом — вплоть до бакета
+  объёма и суммы реакций, от которых зависит выдача каталога
 - `test_home.py`, `test_story.py`, `test_catalog.py`, `test_write.py`
 - `test_prof_lib_notif.py`, `test_contests.py`, `test_auth_links.py`, `test_states.py`
 - `test_desktop_layout.py` — регрессии каркаса: рейл только на `xl`, колонка контента 860px
