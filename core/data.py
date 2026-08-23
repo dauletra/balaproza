@@ -169,18 +169,18 @@ from .stub_data import (
 )
 
 # ── Конкурсы (DEC-45, DEC-46) ────────────────────────────────────────────
-from .stub_data import (
-    ACCEPTING_CONTESTS,
-    CONTESTS,
-    CONTESTS_BY_SLUG,
-    FINISHED_CONTESTS,
-    HERO_CONTEST,
-    OPEN_CONTESTS,
+from .queries.contests import (
+    accepting_contests,
+    all_contests,
     busy_contest_of,
     can_withdraw,
     common_rules,
+    contest_by_slug,
     contest_history,
+    finished_contests,
     has_submission,
+    hero_contest,
+    open_contests,
     submission_candidates,
     submission_checklist,
     submissions_of,

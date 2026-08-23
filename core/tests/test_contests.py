@@ -10,7 +10,9 @@ from unittest import mock
 from core.tests.base import TestCase
 from django.urls import reverse
 
-from core import data, stub_data, views
+from core import data, views
+from core.models import Contest, ContestCondition, Submission
+from core.queries import contests as contest_queries
 
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
 
@@ -36,10 +38,10 @@ def _login_as(client, username):
 class ContestModel(TestCase):
 
     def test_contests_have_required_fields(self):
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             with self.subTest(slug=c.slug):
                 self.assertTrue(c.name)
-                self.assertIn(c.phase, stub_data.CONTEST_PHASES)
+                self.assertIn(c.phase, data.CONTEST_PHASES)
                 self.assertGreaterEqual(c.submissions, 0)
                 # Отсчёт есть ровно там, где ему есть что считать.
                 self.assertEqual(c.days_left is not None, c.is_accepting)
@@ -48,29 +50,29 @@ class ContestModel(TestCase):
 
     def test_contests_by_slug_lookup(self):
         self.assertEqual(
-            stub_data.CONTESTS_BY_SLUG['altyn-qalam'].name,
+            data.contest_by_slug('altyn-qalam').name,
             'Алтын қалам',
         )
 
     def test_every_phase_is_represented_in_the_stub_set(self):
         """Демо-набор покрывает все четыре фазы — иначе `judging` и
         `upcoming` не на чем увидеть, а ради них DEC-45 и заводился."""
-        self.assertEqual({c.phase for c in stub_data.CONTESTS},
-                         set(stub_data.CONTEST_PHASES))
+        self.assertEqual({c.phase for c in data.all_contests()},
+                         set(data.CONTEST_PHASES))
 
     def test_contest_groups_do_not_overlap(self):
-        accepting = {c.slug for c in stub_data.ACCEPTING_CONTESTS}
-        open_ = {c.slug for c in stub_data.OPEN_CONTESTS}
-        finished = {c.slug for c in stub_data.FINISHED_CONTESTS}
+        accepting = {c.slug for c in data.accepting_contests()}
+        open_ = {c.slug for c in data.open_contests()}
+        finished = {c.slug for c in data.finished_contests()}
         self.assertTrue(accepting <= open_)
         self.assertEqual(open_ & finished, set())
-        self.assertEqual(open_ | finished, {c.slug for c in stub_data.CONTESTS})
+        self.assertEqual(open_ | finished, {c.slug for c in data.all_contests()})
 
     def test_hero_contest_is_the_one_accepting_work(self):
-        self.assertTrue(stub_data.HERO_CONTEST.is_accepting)
+        self.assertTrue(data.hero_contest().is_accepting)
 
     def test_jury_and_timeline_present_for_active(self):
-        c = stub_data.CONTESTS_BY_SLUG['bolashak-mektebi']
+        c = data.contest_by_slug('bolashak-mektebi')
         self.assertGreater(len(c.jury), 0)
         self.assertGreater(len(c.timeline), 0)
         # ровно одна активная фаза
@@ -81,13 +83,13 @@ class ContestDatesAreTheSource(TestCase):
     """DEC-45: фаза, отсчёт, год и число заявок выводятся, а не хранятся."""
 
     def test_dates_are_ordered(self):
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             with self.subTest(slug=c.slug):
                 self.assertLessEqual(c.opens_on, c.closes_on)
                 self.assertLess(c.closes_on, c.results_on)
 
     def test_timeline_lies_inside_the_contest_window(self):
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             for t in c.timeline:
                 with self.subTest(slug=c.slug, stage=t.label):
                     self.assertLessEqual(t.starts, t.ends)
@@ -95,58 +97,58 @@ class ContestDatesAreTheSource(TestCase):
                     self.assertLessEqual(t.starts, c.results_on)
 
     def test_timeline_stages_are_chronological(self):
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             starts = [t.starts for t in c.timeline]
             with self.subTest(slug=c.slug):
                 self.assertEqual(starts, sorted(starts))
 
     def test_submission_count_matches_real_submissions(self):
         """Хранимое «87 өтінім» стояло при одной настоящей заявке."""
-        for c in stub_data.CONTESTS:
-            real = sum(1 for subs in stub_data.SUBMISSIONS_BY_USER.values()
-                       for s in subs if s.contest_slug == c.slug)
+        for c in data.all_contests():
+            real = sum(1 for subs in data.SUBMISSIONS_BY_USER.values()
+                       for s in subs if s.contest.slug == c.slug)
             with self.subTest(slug=c.slug):
                 self.assertEqual(c.submissions, real)
 
     def test_year_comes_from_the_results_date(self):
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             with self.subTest(slug=c.slug):
                 self.assertEqual(c.year, c.results_on.year)
 
     def test_only_finished_contests_have_winners(self):
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             if c.winners:
                 with self.subTest(slug=c.slug):
                     self.assertTrue(c.is_finished)
 
     def test_stage_state_follows_the_calendar(self):
-        c = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        c = data.contest_by_slug('zhas-aldym-2023')
         self.assertTrue(all(t.state == 'done' for t in c.timeline))
 
 
 class SubmissionsHelpers(TestCase):
 
     def test_submissions_of_aidana(self):
-        subs = stub_data.submissions_of('aidana')
+        subs = data.submissions_of('aidana')
         self.assertEqual(len(subs), 2)
 
     def test_submissions_of_unknown(self):
-        self.assertEqual(stub_data.submissions_of('ghost'), [])
+        self.assertEqual(data.submissions_of('ghost'), [])
 
     def test_has_submission_true(self):
-        self.assertTrue(stub_data.has_submission('aidana', 'altyn-qalam'))
+        self.assertTrue(data.has_submission('aidana', 'altyn-qalam'))
 
     def test_has_submission_false(self):
-        self.assertFalse(stub_data.has_submission('aidana', 'bolashak-mektebi'))
+        self.assertFalse(data.has_submission('aidana', 'bolashak-mektebi'))
 
 
 class ChecklistHelpers(TestCase):
 
     def test_checklist_short_story_fails_volume(self):
         # aidana-koshe: главы 800+1200+950+1100+700 = 4750 < 5000
-        story = stub_data.STORIES_BY_SLUG['aidana-koshe']
-        contest = stub_data.CONTESTS_BY_SLUG['altyn-qalam']
-        cl = stub_data.submission_checklist(story, contest)
+        story = data.story_by_slug('aidana-koshe')
+        contest = data.contest_by_slug('altyn-qalam')
+        cl = data.submission_checklist(story, contest)
         vol = next(i for i in cl if i['key'] == 'volume')
         self.assertFalse(vol['passed'])
         self.assertIn('Көлемі тым аз', vol['hint'])
@@ -159,16 +161,16 @@ class ChecklistHelpers(TestCase):
         # подмножество через первые N глав. Или используем aidana-erteg.
         # aidana-erteg в CHAPTERS_BY_STORY отсутствует → total=0 → fail.
         # Нет идеальной — проверим что для 0 главы fail и для слишком большой fail.
-        story = stub_data.STORIES_BY_SLUG['aidana-erteg']  # без глав → 0 chars
-        contest = stub_data.CONTESTS_BY_SLUG['altyn-qalam']
-        cl = stub_data.submission_checklist(story, contest)
+        story = data.story_by_slug('aidana-erteg')  # без глав → 0 chars
+        contest = data.contest_by_slug('altyn-qalam')
+        cl = data.submission_checklist(story, contest)
         vol = next(i for i in cl if i['key'] == 'volume')
         self.assertFalse(vol['passed'])
 
     def test_checklist_ai_declaration_required(self):
-        story = stub_data.STORIES_BY_SLUG['aidana-tan']
-        contest = stub_data.CONTESTS_BY_SLUG['altyn-qalam']
-        cl = stub_data.submission_checklist(story, contest)
+        story = data.story_by_slug('aidana-tan')
+        contest = data.contest_by_slug('altyn-qalam')
+        cl = data.submission_checklist(story, contest)
         ai = next(i for i in cl if i['key'] == 'ai_decl')
         self.assertFalse(ai['passed'])
         self.assertTrue(ai.get('required'))
@@ -183,24 +185,24 @@ class SubmissionCandidates(TestCase):
         с победителями. Это единственное, что список кандидатов сужает:
         всё остальное — заметки, не запреты (BR-24).
         """
-        items = stub_data.submission_candidates('aidana', 'altyn-qalam')
+        items = data.submission_candidates('aidana', 'altyn-qalam')
         self.assertEqual([i['story'].slug for i in items],
-                         [s.slug for s in stub_data.public_stories_of('aidana')])
+                         [s.slug for s in data.public_stories_of('aidana')])
         self.assertTrue(all(i['story'].is_public for i in items))
 
     def test_shape_is_complete(self):
-        for it in stub_data.submission_candidates('aidana', 'altyn-qalam'):
+        for it in data.submission_candidates('aidana', 'altyn-qalam'):
             with self.subTest(story=it['story'].slug):
                 self.assertEqual(set(it), {'story', 'chars', 'notes'})
                 for note in it['notes']:
                     self.assertEqual(set(note), {'key', 'text'})
-                    self.assertIn(note['key'], stub_data.SUBMISSION_NOTES)
+                    self.assertIn(note['key'], data.SUBMISSION_NOTES)
 
     def test_candidates_unknown_contest(self):
-        self.assertEqual(stub_data.submission_candidates('aidana', 'no-such'), [])
+        self.assertEqual(data.submission_candidates('aidana', 'no-such'), [])
 
     def test_candidates_unknown_user(self):
-        self.assertEqual(stub_data.submission_candidates('ghost', 'altyn-qalam'), [])
+        self.assertEqual(data.submission_candidates('ghost', 'altyn-qalam'), [])
 
 
 # ════════════════════════════ Contest list ═════════════════════════════════
@@ -219,7 +221,7 @@ class ContestList(TestCase):
 
     def test_shows_all_active_cards(self):
         r = self.client.get(reverse('core:contest_list'))
-        for c in stub_data.OPEN_CONTESTS:
+        for c in data.open_contests():
             with self.subTest(slug=c.slug):
                 self.assertContains(r, c.name)
                 self.assertContains(
@@ -249,7 +251,7 @@ class ContestDetailKnown(TestCase):
         self.assertEqual(self.response.status_code, 200)
 
     def test_shows_name_subtitle_prize(self):
-        c = stub_data.CONTESTS_BY_SLUG[self.SLUG]
+        c = data.contest_by_slug(self.SLUG)
         self.assertContains(self.response, c.name)
         self.assertContains(self.response, c.subtitle)
         # Призовой фонд в ₸ — с разрядами через неразрывный пробел (фильтр `spaced`).
@@ -265,7 +267,7 @@ class ContestDetailKnown(TestCase):
         self.assertContains(self.response, 'Қазір')
 
     def test_shows_jury_members(self):
-        c = stub_data.CONTESTS_BY_SLUG[self.SLUG]
+        c = data.contest_by_slug(self.SLUG)
         for j in c.jury:
             with self.subTest(name=j.name):
                 self.assertContains(self.response, j.name)
@@ -275,7 +277,7 @@ class ContestDetailKnown(TestCase):
         self.assertContains(self.response, reverse('core:contest_submit', kwargs={'slug': self.SLUG}))
 
     def test_countdown_for_active(self):
-        c = stub_data.CONTESTS_BY_SLUG[self.SLUG]
+        c = data.contest_by_slug(self.SLUG)
         self.assertContains(self.response, f'{c.days_left} күн қалды')
 
 
@@ -338,12 +340,12 @@ class ContestSubmitForm(TestCase):
         self.assertEqual(self.response.status_code, 200)
 
     def test_form_lists_the_public_works(self):
-        for s in stub_data.public_stories_of('aidana'):
+        for s in data.public_stories_of('aidana'):
             with self.subTest(slug=s.slug):
                 self.assertContains(self.response, f'value="{s.slug}"')
 
     def test_form_hides_drafts_and_moderation(self):
-        for s in stub_data.my_stories_of('aidana'):
+        for s in data.my_stories_of('aidana'):
             if s.is_public:
                 continue
             with self.subTest(slug=s.slug):
@@ -351,7 +353,7 @@ class ContestSubmitForm(TestCase):
 
     def test_notes_a_too_short_story_without_disabling_it(self):
         # aidana-koshe: 2 482 < 5 000 — заметка есть, запрета нет (BR-24)
-        self.assertContains(self.response, stub_data.SUBMISSION_NOTES['too_short'])
+        self.assertContains(self.response, data.SUBMISSION_NOTES['too_short'])
         self.assertContains(self.response, 'value="aidana-koshe"')
 
     def test_shows_checklist(self):
@@ -417,8 +419,8 @@ class MySubmissionsAuthed(TestCase):
         self.assertEqual(self.response.status_code, 200)
 
     def test_lists_all_submissions(self):
-        for sub in stub_data.submissions_of('aidana'):
-            with self.subTest(slug=sub.contest_slug):
+        for sub in data.submissions_of('aidana'):
+            with self.subTest(slug=sub.contest.slug):
                 self.assertContains(self.response, sub.contest.name)
                 self.assertContains(self.response, sub.story.title)
 
@@ -428,11 +430,11 @@ class MySubmissionsAuthed(TestCase):
         self.assertContains(self.response, 'Қабылданбады')
 
     def test_links_to_contest_detail(self):
-        for sub in stub_data.submissions_of('aidana'):
-            with self.subTest(slug=sub.contest_slug):
+        for sub in data.submissions_of('aidana'):
+            with self.subTest(slug=sub.contest.slug):
                 self.assertContains(
                     self.response,
-                    reverse('core:contest_detail', kwargs={'slug': sub.contest_slug}),
+                    reverse('core:contest_detail', kwargs={'slug': sub.contest.slug}),
                 )
 
     def test_rejected_shows_jury_note(self):
@@ -456,28 +458,28 @@ class ContestWinners(TestCase):
     """`Contest.winners` — слаги произведений, а не имена авторов."""
 
     def test_winners_reference_known_stories(self):
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             for slug in c.winners:
                 with self.subTest(contest=c.slug, story=slug):
-                    self.assertIn(slug, stub_data.STORIES_BY_SLUG)
+                    self.assertIn(slug, data.STORIES_BY_SLUG)
 
     def test_active_contests_have_no_winners(self):
-        for c in stub_data.OPEN_CONTESTS:
+        for c in data.open_contests():
             with self.subTest(contest=c.slug):
                 self.assertEqual(c.winners, ())
 
     def test_winner_stories_resolve_to_authors(self):
-        c = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
-        authors = {s.author_username for s in c.winner_stories}
+        c = data.contest_by_slug('zhas-aldym-2023')
+        authors = {s.author.username for s in c.winner_stories}
         self.assertEqual(authors, {'bekzhan_t', 'dina_books'})
 
     def test_every_winner_has_a_submission(self):
         """Победа без поданной заявки — конкурсной истории неоткуда взяться."""
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             for story in c.winner_stories:
                 with self.subTest(contest=c.slug, story=story.slug):
-                    self.assertTrue(stub_data.has_submission(
-                        story.author_username, c.slug))
+                    self.assertTrue(data.has_submission(
+                        story.author.username, c.slug))
 
 
 class SubmissionsMatchContestBadges(TestCase):
@@ -491,17 +493,17 @@ class SubmissionsMatchContestBadges(TestCase):
     LABEL = 'Байқауға қатысады'
 
     def _stories_with_active_submission(self):
-        active = {c.slug for c in stub_data.OPEN_CONTESTS}
+        active = {c.slug for c in data.open_contests()}
         return {
-            sub.story_slug
-            for subs in stub_data.SUBMISSIONS_BY_USER.values()
+            sub.story.slug
+            for subs in data.SUBMISSIONS_BY_USER.values()
             for sub in subs
-            if sub.contest_slug in active
+            if sub.contest.slug in active
         }
 
     def test_badge_implies_active_submission(self):
         expected = self._stories_with_active_submission()
-        for s in stub_data.STORIES:
+        for s in data.STORIES:
             if self.LABEL in s.badges:
                 with self.subTest(story=s.slug):
                     self.assertIn(s.slug, expected)
@@ -509,31 +511,33 @@ class SubmissionsMatchContestBadges(TestCase):
     def test_active_submission_implies_badge(self):
         for slug in self._stories_with_active_submission():
             with self.subTest(story=slug):
-                self.assertIn(self.LABEL, stub_data.STORIES_BY_SLUG[slug].badges)
+                self.assertIn(self.LABEL, data.story_by_slug(slug).badges)
 
 
 class SubmissionIntegrity(TestCase):
 
     def test_submissions_reference_known_contests_and_stories(self):
-        for username, subs in stub_data.SUBMISSIONS_BY_USER.items():
-            for sub in subs:
-                with self.subTest(user=username, contest=sub.contest_slug):
-                    self.assertIn(sub.contest_slug, stub_data.CONTESTS_BY_SLUG)
-                    self.assertIn(sub.story_slug, stub_data.STORIES_BY_SLUG)
+        """На моделях это гарантия внешнего ключа, а не совпадение слагов —
+        но проверка остаётся: сид мог не донести часть корпуса."""
+        for username in ('aidana', 'dina_books', 'bekzhan_t'):
+            for sub in data.submissions_of(username):
+                with self.subTest(user=username, contest=sub.contest.slug):
+                    self.assertIsNotNone(data.contest_by_slug(sub.contest.slug))
+                    self.assertIsNotNone(data.story_by_slug(sub.story.slug))
 
     def test_submitted_story_belongs_to_submitter(self):
-        for username, subs in stub_data.SUBMISSIONS_BY_USER.items():
+        for username, subs in data.SUBMISSIONS_BY_USER.items():
             for sub in subs:
-                with self.subTest(user=username, story=sub.story_slug):
+                with self.subTest(user=username, story=sub.story.slug):
                     self.assertEqual(
-                        stub_data.STORIES_BY_SLUG[sub.story_slug].author_username,
+                        data.story_by_slug(sub.story.slug).author.username,
                         username,
                     )
 
     def test_one_work_per_contest(self):
         """BR-23: один автор — не больше одной заявки на конкретный конкурс."""
-        for username, subs in stub_data.SUBMISSIONS_BY_USER.items():
-            slugs = [s.contest_slug for s in subs]
+        for username, subs in data.SUBMISSIONS_BY_USER.items():
+            slugs = [s.contest.slug for s in subs]
             with self.subTest(user=username):
                 self.assertEqual(len(slugs), len(set(slugs)))
 
@@ -541,14 +545,14 @@ class SubmissionIntegrity(TestCase):
 class ContestYear(TestCase):
 
     def test_every_contest_has_a_year(self):
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             with self.subTest(contest=c.slug):
                 self.assertGreater(c.year, 2000)
 
     def test_year_matches_slug_when_slug_carries_one(self):
         """«altyn-qalam-2024» с годом 2023 — расхождение, которое видит читатель."""
         import re
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             m = re.search(r'-(\d{4})$', c.slug)
             if m:
                 with self.subTest(contest=c.slug):
@@ -612,7 +616,7 @@ class ContestRail(TestCase):
     def test_rail_does_not_repeat_the_prize_from_the_hero(self):
         """Сыйақы написан в хиро; вторая копия в рейле — не дополнение, а дубль."""
         r = self.client.get(reverse('core:contest_detail', args=['bolashak-mektebi']))
-        money = stub_data.spaced_number(500_000)
+        money = data.spaced_number(500_000)
         self.assertEqual(r.content.decode().count(money), 1)
 
     def test_submit_page_rail_has_no_cta_to_itself(self):
@@ -627,16 +631,16 @@ class ContestRail(TestCase):
 class ContestStages(TestCase):
 
     def test_current_stage_is_the_active_one(self):
-        c = stub_data.CONTESTS_BY_SLUG['bolashak-mektebi']
+        c = data.contest_by_slug('bolashak-mektebi')
         self.assertEqual(c.current_stage.state, 'active')
         self.assertEqual(c.current_stage.label, 'Өтінім қабылдау')
 
     def test_next_stage_is_the_first_upcoming(self):
-        c = stub_data.CONTESTS_BY_SLUG['bolashak-mektebi']
+        c = data.contest_by_slug('bolashak-mektebi')
         self.assertEqual(c.next_stage.label, 'Қазылар қарауы')
 
     def test_finished_contest_has_no_open_stages(self):
-        c = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        c = data.contest_by_slug('zhas-aldym-2023')
         self.assertIsNone(c.current_stage)
         self.assertIsNone(c.next_stage)
 
@@ -645,18 +649,18 @@ class ChecklistNumbers(TestCase):
     """Числа в подсказках — с разрядами, пороги — из конкурса, не литералом."""
 
     def setUp(self):
-        self.contest = stub_data.CONTESTS_BY_SLUG['altyn-qalam']
-        self.story = stub_data.STORIES_BY_SLUG['aidana-tan']
-        self.volume = next(i for i in stub_data.submission_checklist(self.story, self.contest)
+        self.contest = data.contest_by_slug('altyn-qalam')
+        self.story = data.story_by_slug('aidana-tan')
+        self.volume = next(i for i in data.submission_checklist(self.story, self.contest)
                            if i['key'] == 'volume')
 
     def test_thresholds_come_from_the_contest(self):
-        self.assertIn(stub_data.spaced_number(self.contest.min_chars), self.volume['label'])
-        self.assertIn(stub_data.spaced_number(self.contest.max_chars), self.volume['label'])
+        self.assertIn(data.spaced_number(self.contest.min_chars), self.volume['label'])
+        self.assertIn(data.spaced_number(self.contest.max_chars), self.volume['label'])
 
     def test_char_count_is_spaced(self):
-        total = sum(c.char_count for c in stub_data.chapters_of(self.story.slug))
-        self.assertIn(stub_data.spaced_number(total), self.volume['hint'])
+        total = sum(c.char_count for c in data.chapters_of(self.story.slug))
+        self.assertIn(data.spaced_number(total), self.volume['hint'])
         self.assertNotIn(str(total), self.volume['hint'])
 
 
@@ -664,8 +668,8 @@ class RejectionNoteMatchesTheData(TestCase):
     """Отказ по объёму должен называть ту сторону порога, которая нарушена."""
 
     def test_aidana_rejection_says_too_small(self):
-        sub = next(s for s in stub_data.submissions_of('aidana') if s.status == 'rejected')
-        total = sum(c.char_count for c in stub_data.chapters_of(sub.story_slug))
+        sub = next(s for s in data.submissions_of('aidana') if s.status == 'rejected')
+        total = sum(c.char_count for c in data.chapters_of(sub.story.slug))
         self.assertLess(total, sub.contest.min_chars)
         self.assertIn('аз', sub.note)
 
@@ -676,7 +680,7 @@ class ContestWinnersOnDetail(TestCase):
     """FR-CONT-08. `winner_stories` существовал и не был отрендерен нигде."""
 
     def setUp(self):
-        self.contest = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        self.contest = data.contest_by_slug('zhas-aldym-2023')
         self.response = self.client.get(
             reverse('core:contest_detail', args=['zhas-aldym-2023']))
 
@@ -712,7 +716,7 @@ class ContestWinnersOnCard(TestCase):
 
     def test_finished_card_names_its_winners(self):
         r = self.client.get(reverse('core:contest_list'))
-        for story in stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023'].winner_stories:
+        for story in data.contest_by_slug('zhas-aldym-2023').winner_stories:
             with self.subTest(story=story.slug):
                 self.assertContains(r, story.title)
 
@@ -765,13 +769,13 @@ class DetailHeroSpeaksByPhase(TestCase):
         self.assertContains(r, reverse('core:contest_submit', args=['bolashak-mektebi']))
 
     def test_upcoming_names_the_opening_date_instead_of_a_button(self):
-        c = stub_data.CONTESTS_BY_SLUG['qys-ertegisi']
+        c = data.contest_by_slug('qys-ertegisi')
         r = self.client.get(reverse('core:contest_detail', args=['qys-ertegisi']))
         self.assertNotContains(r, reverse('core:contest_submit', args=['qys-ertegisi']))
         self.assertContains(r, c.opens_on_label)
 
     def test_judging_names_the_results_date(self):
-        c = stub_data.CONTESTS_BY_SLUG['altyn-qalam']
+        c = data.contest_by_slug('altyn-qalam')
         r = self.client.get(reverse('core:contest_detail', args=['altyn-qalam']))
         self.assertNotContains(r, reverse('core:contest_submit', args=['altyn-qalam']))
         self.assertContains(r, c.results_on_label)
@@ -784,11 +788,11 @@ class DetailHeroSpeaksByPhase(TestCase):
 class ContestListOrdersByWhatYouCanDo(TestCase):
 
     def test_accepting_contest_comes_first(self):
-        self.assertTrue(stub_data.OPEN_CONTESTS[0].is_accepting)
+        self.assertTrue(data.open_contests()[0].is_accepting)
 
     def test_every_open_contest_is_on_the_page(self):
         html = self.client.get(reverse('core:contest_list')).content.decode()
-        positions = [html.index(c.name) for c in stub_data.OPEN_CONTESTS]
+        positions = [html.index(c.name) for c in data.open_contests()]
         self.assertEqual(positions, sorted(positions))
 
 
@@ -796,27 +800,27 @@ class PhaseLabelsAreOneRegistry(TestCase):
     """Подпись фазы приходит из `CONTEST_PHASE_LABELS`, не из шаблона."""
 
     def test_every_phase_has_a_label_and_a_badge_kind(self):
-        for phase in stub_data.CONTEST_PHASES:
+        for phase in data.CONTEST_PHASES:
             with self.subTest(phase=phase):
-                self.assertIn(phase, stub_data.CONTEST_PHASE_LABELS)
-                self.assertIn(phase, stub_data.CONTEST_PHASE_BADGE)
+                self.assertIn(phase, data.CONTEST_PHASE_LABELS)
+                self.assertIn(phase, data.CONTEST_PHASE_BADGE)
 
     def test_card_shows_the_registry_label(self):
         html = self.client.get(reverse('core:contest_list')).content.decode()
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             with self.subTest(slug=c.slug):
-                self.assertIn(stub_data.CONTEST_PHASE_LABELS[c.phase], html)
+                self.assertIn(data.CONTEST_PHASE_LABELS[c.phase], html)
 
 
 class KazakhDateFormatting(TestCase):
 
     def test_single_day_stage_has_no_dash(self):
-        c = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        c = data.contest_by_slug('zhas-aldym-2023')
         final = next(t for t in c.timeline if t.label == 'Финал')
         self.assertEqual(final.period, '15 жел')
 
     def test_range_stage_joins_two_dates(self):
-        c = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        c = data.contest_by_slug('zhas-aldym-2023')
         intake = next(t for t in c.timeline if t.label == 'Өтінім қабылдау')
         self.assertEqual(intake.period, '1 қыр — 1 жел')
 
@@ -827,7 +831,7 @@ class ContestAwardsData(TestCase):
     """DEC-46: набор номинаций у каждого конкурса свой, победа — акт жюри."""
 
     def test_award_slugs_are_unique_within_a_contest(self):
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             slugs = [a.slug for a in c.awards]
             with self.subTest(contest=c.slug):
                 self.assertEqual(len(slugs), len(set(slugs)))
@@ -835,39 +839,39 @@ class ContestAwardsData(TestCase):
     def test_every_contest_declares_at_least_one_award(self):
         """Номинация — ответ на «зачем участвовать». Конкурс без неё
         предлагает только сумму в тенге."""
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             with self.subTest(contest=c.slug):
                 self.assertTrue(c.awards)
 
     def test_grants_reference_known_contest_award_and_story(self):
-        for g in stub_data.AWARD_GRANTS:
-            with self.subTest(grant=(g.contest_slug, g.award_slug, g.story_slug)):
+        for g in data.AWARD_GRANTS:
+            with self.subTest(grant=(g.contest_slug, g.award.slug, g.story.slug)):
                 self.assertIsNotNone(g.contest)
                 self.assertIsNotNone(g.award)
                 self.assertIsNotNone(g.story)
 
     def test_grant_implies_a_finished_contest(self):
         """Награду нельзя вручить, пока жюри не закончило."""
-        for g in stub_data.AWARD_GRANTS:
-            with self.subTest(grant=g.award_slug):
+        for g in data.AWARD_GRANTS:
+            with self.subTest(grant=g.award.slug):
                 self.assertTrue(g.contest.is_finished)
 
     def test_grant_implies_a_submission_by_the_same_author(self):
-        for g in stub_data.AWARD_GRANTS:
-            subs = stub_data.submissions_of(g.story.author_username)
-            with self.subTest(grant=g.award_slug):
-                self.assertIn(g.contest_slug, {s.contest_slug for s in subs})
+        for g in data.AWARD_GRANTS:
+            subs = data.submissions_of(g.story.author.username)
+            with self.subTest(grant=g.award.slug):
+                self.assertIn(g.contest_slug, {s.contest.slug for s in subs})
 
     def test_one_award_is_granted_at_most_once(self):
-        seen = [(g.contest_slug, g.award_slug) for g in stub_data.AWARD_GRANTS]
+        seen = [(g.contest_slug, g.award.slug) for g in data.AWARD_GRANTS]
         self.assertEqual(len(seen), len(set(seen)))
 
     def test_winners_are_derived_from_grants(self):
-        c = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
-        self.assertEqual(c.winners, tuple(g.story_slug for g in c.grants))
+        c = data.contest_by_slug('zhas-aldym-2023')
+        self.assertEqual(c.winners, tuple(g.story.slug for g in c.grants))
 
     def test_contest_without_grants_has_no_winners(self):
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             if not c.grants:
                 with self.subTest(contest=c.slug):
                     self.assertEqual(c.winners, ())
@@ -890,7 +894,7 @@ class ContestAwardImages(TestCase):
         root = Path(settings.MEDIA_ROOT) / 'awards'
         if not root.is_dir():
             self.skipTest('media/awards/ нет локально — ассеты не в репозитории')
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             for a in c.awards:
                 if not a.image:
                     continue
@@ -904,7 +908,7 @@ class ContestAwardImages(TestCase):
         SVG из `/media/` открывается в origin сайта и может нести скрипт;
         загрузка эмблем идёт через админку, но правило одно для всех.
         """
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             for a in c.awards:
                 if not a.image:
                     continue
@@ -914,7 +918,7 @@ class ContestAwardImages(TestCase):
 
     def test_award_without_image_still_renders(self):
         """Админ не загрузил файл — типографическая заглушка, не дыра."""
-        c = stub_data.CONTESTS_BY_SLUG['bolashak-mektebi']
+        c = data.contest_by_slug('bolashak-mektebi')
         self.assertTrue(any(not a.image for a in c.awards),
                         'фикстура сломана: нужна номинация без эмблемы')
         r = self.client.get(reverse('core:contest_detail', args=[c.slug]))
@@ -937,18 +941,18 @@ class ContestAwardsOnDetail(TestCase):
         self.assertNotContains(r, 'Марапаттар')
 
     def test_winner_row_names_the_nomination(self):
-        c = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        c = data.contest_by_slug('zhas-aldym-2023')
         r = self.client.get(reverse('core:contest_detail', args=[c.slug]))
         for g in c.grants:
-            with self.subTest(award=g.award_slug):
+            with self.subTest(award=g.award.slug):
                 self.assertContains(r, g.award.title)
 
     def test_winner_emblem_is_rendered(self):
-        c = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
+        c = data.contest_by_slug('zhas-aldym-2023')
         r = self.client.get(reverse('core:contest_detail', args=[c.slug]))
         for g in c.grants:
             if g.award.image:
-                with self.subTest(award=g.award_slug):
+                with self.subTest(award=g.award.slug):
                     self.assertContains(r, f'/media/{g.award.image}')
 
 
@@ -956,10 +960,10 @@ class SystemWinnerAwardIsRetired(TestCase):
     """DEC-46 снял общий «Байқау жеңімпазы» — его вытеснила награда конкурса."""
 
     def test_registry_has_no_generic_winner_award(self):
-        self.assertNotIn('contest_winner', {a.key for a in stub_data.AWARDS})
+        self.assertNotIn('contest_winner', {a.key for a in data.AWARDS})
 
     def test_participation_awards_stay(self):
-        keys = {a.key for a in stub_data.AWARDS}
+        keys = {a.key for a in data.AWARDS}
         self.assertIn('contest_participant', keys)
         self.assertIn('contest_accepted', keys)
 
@@ -977,7 +981,7 @@ class SubmissionNotesInformButDoNotBlock(TestCase):
 
     def _items(self, username, slug='bolashak-mektebi'):
         return {i['story'].slug: i
-                for i in stub_data.submission_candidates(username, slug)}
+                for i in data.submission_candidates(username, slug)}
 
     def _keys(self, item):
         return {n['key'] for n in item['notes']}
@@ -985,7 +989,7 @@ class SubmissionNotesInformButDoNotBlock(TestCase):
     def test_short_work_is_noted_not_removed(self):
         item = self._items('aidana')['aidana-koshe']
         self.assertIn('too_short', self._keys(item))
-        self.assertIn(stub_data.SUBMISSION_NOTES['too_short'],
+        self.assertIn(data.SUBMISSION_NOTES['too_short'],
                       item['notes'][0]['text'])
 
     def test_work_in_another_open_contest_is_noted(self):
@@ -1002,20 +1006,17 @@ class SubmissionNotesInformButDoNotBlock(TestCase):
         Работа и короткая, и занятая другим конкурсом сообщала только про
         объём — второе всплывало бы уже у админа.
         """
-        contest = stub_data.CONTESTS_BY_SLUG['bolashak-mektebi']
-        tall = replace(contest, min_chars=10_000)
-        with mock.patch.dict(stub_data.CONTESTS_BY_SLUG,
-                             {'bolashak-mektebi': tall}):
-            item = self._items('aidana')['aidana-tan']
+        Contest.objects.filter(slug='bolashak-mektebi').update(min_chars=10_000)
+        item = self._items('aidana')['aidana-tan']
         self.assertEqual(self._keys(item), {'too_short', 'busy'})
 
     def test_finished_contest_does_not_hold_a_work(self):
         """Работа своё отучаствовала — заметки о ней больше нет."""
         self.assertIsNone(
-            stub_data.busy_contest_of('bekzhan_t', 'temniy-lord'))
+            data.busy_contest_of('bekzhan_t', 'temniy-lord'))
 
     def test_the_same_contest_is_not_a_note_about_itself(self):
-        busy = stub_data.busy_contest_of('aidana', 'aidana-tan', besides='altyn-qalam')
+        busy = data.busy_contest_of('aidana', 'aidana-tan', besides='altyn-qalam')
         self.assertIsNone(busy)
 
     def test_clean_work_carries_no_notes(self):
@@ -1091,16 +1092,16 @@ class WithdrawSubmission(TestCase):
     """BR-23b: одна работа на конкурс — но заявку можно забрать назад."""
 
     def test_allowed_while_the_contest_still_accepts(self):
-        self.assertTrue(stub_data.can_withdraw('dina_books', 'bolashak-mektebi'))
+        self.assertTrue(data.can_withdraw('dina_books', 'bolashak-mektebi'))
 
     def test_denied_once_judging_started(self):
-        self.assertFalse(stub_data.can_withdraw('aidana', 'altyn-qalam'))
+        self.assertFalse(data.can_withdraw('aidana', 'altyn-qalam'))
 
     def test_denied_for_a_finished_contest(self):
-        self.assertFalse(stub_data.can_withdraw('bekzhan_t', 'zhas-aldym-2023'))
+        self.assertFalse(data.can_withdraw('bekzhan_t', 'zhas-aldym-2023'))
 
     def test_denied_without_a_submission(self):
-        self.assertFalse(stub_data.can_withdraw('bekzhan_t', 'bolashak-mektebi'))
+        self.assertFalse(data.can_withdraw('bekzhan_t', 'bolashak-mektebi'))
 
     def test_button_and_modal_are_on_the_submissions_page(self):
         _login_as(self.client, 'dina_books')
@@ -1120,7 +1121,7 @@ class SubmissionsPageNamesTheDates(TestCase):
     def test_accepting_contest_shows_both_dates(self):
         _login_as(self.client, 'dina_books')
         r = self.client.get(reverse('core:my_submissions'))
-        c = stub_data.CONTESTS_BY_SLUG['bolashak-mektebi']
+        c = data.contest_by_slug('bolashak-mektebi')
         self.assertContains(r, c.closes_on_label)
         self.assertContains(r, c.results_on_label)
 
@@ -1128,7 +1129,7 @@ class SubmissionsPageNamesTheDates(TestCase):
         _login_as_aidana(self.client)
         r = self.client.get(reverse('core:my_submissions'))
         self.assertContains(r,
-                            stub_data.CONTESTS_BY_SLUG['altyn-qalam'].results_on_label)
+                            data.contest_by_slug('altyn-qalam').results_on_label)
 
 
 # ════════════════════════════ CONT-6 · сроки и слова ═══════════════════════
@@ -1142,28 +1143,29 @@ class SubmissionDatesAreReal(TestCase):
     """
 
     def test_relative_string_is_not_stored(self):
-        stored = stub_data.Submission.__dataclass_fields__
+        stored = {f.name for f in Submission._meta.get_fields()}
         self.assertNotIn(
             'submitted_relative', stored,
             '`submitted_relative` снова стало полем — это хранимое производное')
+        self.assertIn('submitted_on', stored)
 
     def test_submitted_inside_the_acceptance_window(self):
-        for username, subs in stub_data.SUBMISSIONS_BY_USER.items():
+        for username, subs in data.SUBMISSIONS_BY_USER.items():
             for sub in subs:
-                with self.subTest(user=username, contest=sub.contest_slug):
+                with self.subTest(user=username, contest=sub.contest.slug):
                     c = sub.contest
                     self.assertGreaterEqual(sub.submitted_on, c.opens_on)
                     self.assertLessEqual(sub.submitted_on, c.closes_on)
 
     def test_label_follows_the_date(self):
-        sub = stub_data.SUBMISSIONS_BY_USER['aidana'][0]
+        sub = data.SUBMISSIONS_BY_USER['aidana'][0]
         self.assertEqual(
             sub.submitted_label,
-            stub_data.kk_ago((date.today() - sub.submitted_on).days))
+            data.kk_ago((date.today() - sub.submitted_on).days))
 
     def test_old_submission_is_not_called_a_year_ago_forever(self):
         """Заявка 2023 года в 2026-м — не «1 жыл бұрын»."""
-        sub = stub_data.SUBMISSIONS_BY_USER['bekzhan_t'][0]
+        sub = data.SUBMISSIONS_BY_USER['bekzhan_t'][0]
         years = (date.today() - sub.submitted_on).days // 365
         self.assertEqual(sub.submitted_label, f'{years} жыл бұрын')
 
@@ -1177,7 +1179,7 @@ class ContestTimingLineIsOneImplementation(TestCase):
     """
 
     def test_line_matches_the_phase(self):
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             with self.subTest(contest=c.slug, phase=c.phase):
                 line = c.timing_line
                 if c.phase == 'finished':
@@ -1192,7 +1194,7 @@ class ContestTimingLineIsOneImplementation(TestCase):
 
     def test_line_carries_no_countdown_number(self):
         """Числа «12 күн» в строке нет: оно протухло бы назавтра (BR-40a)."""
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             with self.subTest(contest=c.slug):
                 self.assertNotIn('күн қалды', c.timing_line)
 
@@ -1200,7 +1202,7 @@ class ContestTimingLineIsOneImplementation(TestCase):
         _login_as(self.client, 'dina_books')
         r = self.client.get(reverse('core:my_submissions'))
         self.assertContains(r,
-                            stub_data.CONTESTS_BY_SLUG['bolashak-mektebi'].timing_line)
+                            data.contest_by_slug('bolashak-mektebi').timing_line)
 
 
 class AcceptedIsTheJuryWord(TestCase):
@@ -1220,7 +1222,7 @@ class AcceptedIsTheJuryWord(TestCase):
     def test_word_survives_where_it_means_the_verdict(self):
         _login_as(self.client, 'dina_books')
         r = self.client.get(reverse('core:my_submissions'))
-        self.assertContains(r, stub_data.CONTEST_RESULT_LABELS['accepted'])
+        self.assertContains(r, data.CONTEST_RESULT_LABELS['accepted'])
 
 
 # ════════════════════════════ CONT-8 · требования конкурса ═════════════════
@@ -1235,7 +1237,7 @@ class AgeIsTheContestsRule(TestCase):
     """
 
     def test_line_reads_right_in_every_shape(self):
-        C = stub_data.Contest
+        C = Contest
         base = dict(slug='x', name='X', subtitle='',
                     opens_on=date(2026, 1, 1), closes_on=date(2026, 2, 1),
                     results_on=date(2026, 3, 1), prize_kzt=None)
@@ -1251,13 +1253,13 @@ class AgeIsTheContestsRule(TestCase):
 
     def test_contests_do_not_all_share_one_bracket(self):
         """Если у всех одна вилка, поле ничем не отличается от константы."""
-        brackets = {(c.min_age, c.max_age) for c in stub_data.CONTESTS}
+        brackets = {(c.min_age, c.max_age) for c in data.all_contests()}
         self.assertGreater(len(brackets), 1)
         self.assertIn((None, None), brackets,
                       'нужен конкурс без ценза — иначе ветка «нет требования» не показана')
 
     def test_conditions_no_longer_repeat_the_age(self):
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             for cond in c.conditions:
                 with self.subTest(contest=c.slug, cond=cond):
                     self.assertNotIn('жас', cond,
@@ -1265,18 +1267,18 @@ class AgeIsTheContestsRule(TestCase):
 
     def test_conditions_carry_no_spec_codes(self):
         """«(BR-23)» и «(DEC-21)» читал подросток."""
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             for cond in c.conditions:
                 with self.subTest(contest=c.slug, cond=cond):
                     self.assertNotRegex(cond, r'\b(BR|DEC|FR|NFR)-\d+')
 
     def test_detail_shows_the_bracket_from_data(self):
-        c = stub_data.CONTESTS_BY_SLUG['altyn-qalam']
+        c = data.contest_by_slug('altyn-qalam')
         r = self.client.get(reverse('core:contest_detail', args=[c.slug]))
         self.assertContains(r, c.eligibility_line)
 
     def test_detail_of_an_unrestricted_contest_claims_no_age(self):
-        c = stub_data.CONTESTS_BY_SLUG['qys-ertegisi']
+        c = data.contest_by_slug('qys-ertegisi')
         self.assertEqual(c.eligibility_line, '')
         html = self.client.get(reverse('core:contest_detail', args=[c.slug])).content.decode()
         self.assertNotIn('Қатысушы:', html)
@@ -1292,17 +1294,17 @@ class CommonRulesAreWrittenOnce(TestCase):
 
     def test_thresholds_come_from_the_contest(self):
         for slug in ('altyn-qalam', 'bolashak-mektebi'):
-            c = stub_data.CONTESTS_BY_SLUG[slug]
-            vol = next(r for r in stub_data.common_rules(c) if r['key'] == 'volume')
+            c = data.contest_by_slug(slug)
+            vol = next(r for r in data.common_rules(c) if r['key'] == 'volume')
             with self.subTest(contest=slug):
-                self.assertIn(stub_data.spaced_number(c.min_chars), vol['label'])
-                self.assertIn(stub_data.spaced_number(c.max_chars), vol['label'])
+                self.assertIn(data.spaced_number(c.min_chars), vol['label'])
+                self.assertIn(data.spaced_number(c.max_chars), vol['label'])
 
     def test_every_contest_page_states_them_all(self):
-        for slug in stub_data.CONTESTS_BY_SLUG:
+        for slug in [c.slug for c in data.all_contests()]:
             r = self.client.get(reverse('core:contest_detail', args=[slug]))
-            contest = stub_data.CONTESTS_BY_SLUG[slug]
-            for rule in stub_data.common_rules(contest):
+            contest = data.contest_by_slug(slug)
+            for rule in data.common_rules(contest):
                 with self.subTest(contest=slug, rule=rule['key']):
                     self.assertContains(r, rule['label'])
 
@@ -1313,26 +1315,28 @@ class CommonRulesAreWrittenOnce(TestCase):
         себе в `conditions` от слияния только вырос, а расходиться копия
         начнёт так же — с AI-декларации, названной у одного конкурса.
         """
-        for c in stub_data.CONTESTS:
-            labels = {r['label'] for r in stub_data.common_rules(c)}
+        for c in data.all_contests():
+            labels = {r['label'] for r in data.common_rules(c)}
             for cond in c.conditions:
                 with self.subTest(contest=c.slug, cond=cond):
                     self.assertNotIn(cond, labels)
                     # Пороги объёма живут в min_chars/max_chars и приходят
                     # готовой строкой; переписанные руками, они разойдутся.
-                    self.assertNotIn(stub_data.spaced_number(c.min_chars), cond)
-                    self.assertNotIn(stub_data.spaced_number(c.max_chars), cond)
+                    self.assertNotIn(data.spaced_number(c.min_chars), cond)
+                    self.assertNotIn(data.spaced_number(c.max_chars), cond)
 
     def test_conditions_may_be_any_length(self):
         """Список свободный: и пустой, и длинный рендерятся одинаково."""
         slug = 'qys-ertegisi'
-        base = stub_data.CONTESTS_BY_SLUG[slug]
+        contest = data.contest_by_slug(slug)
         many = tuple(f"Қосымша шарт {n}" for n in range(1, 13))
         for conds in ((), many):
             with self.subTest(count=len(conds)):
-                with mock.patch.dict(stub_data.CONTESTS_BY_SLUG,
-                                     {slug: replace(base, conditions=conds)}):
-                    r = self.client.get(reverse('core:contest_detail', args=[slug]))
+                contest.condition_set.all().delete()
+                ContestCondition.objects.bulk_create([
+                    ContestCondition(contest=contest, text=text, position=i)
+                    for i, text in enumerate(conds)])
+                r = self.client.get(reverse('core:contest_detail', args=[slug]))
                 self.assertEqual(r.status_code, 200)
                 # Секция стоит и у конкурса без единого своего условия:
                 # общие правила есть всегда.
@@ -1341,22 +1345,22 @@ class CommonRulesAreWrittenOnce(TestCase):
                     self.assertContains(r, cond)
 
     def test_checklist_is_built_from_the_same_registry(self):
-        c = stub_data.CONTESTS_BY_SLUG['altyn-qalam']
-        story = stub_data.STORIES_BY_SLUG['aidana-tan']
-        checklist = {i['key'] for i in stub_data.submission_checklist(story, c)}
-        per_work = {r['key'] for r in stub_data.common_rules(c) if r['per_work']}
+        c = data.contest_by_slug('altyn-qalam')
+        story = data.story_by_slug('aidana-tan')
+        checklist = {i['key'] for i in data.submission_checklist(story, c)}
+        per_work = {r['key'] for r in data.common_rules(c) if r['per_work']}
         self.assertTrue(per_work <= checklist)
         # «Бір автор — бір өтінім» — про автора, не про текст: его держит
         # сама форма (BR-23), в чек-лист работы он не идёт.
         self.assertNotIn('one_entry', checklist)
 
     def test_checklist_age_item_follows_the_contest(self):
-        story = stub_data.STORIES_BY_SLUG['aidana-tan']
-        with_age = stub_data.submission_checklist(
-            story, stub_data.CONTESTS_BY_SLUG['altyn-qalam'])
+        story = data.story_by_slug('aidana-tan')
+        with_age = data.submission_checklist(
+            story, data.contest_by_slug('altyn-qalam'))
         self.assertIn('eligibility', {i['key'] for i in with_age})
-        without = stub_data.submission_checklist(
-            story, stub_data.CONTESTS_BY_SLUG['qys-ertegisi'])
+        without = data.submission_checklist(
+            story, data.contest_by_slug('qys-ertegisi'))
         self.assertNotIn('eligibility', {i['key'] for i in without},
                          'конкурс без ценза не должен показывать вечно пройденный пункт')
 
@@ -1375,11 +1379,9 @@ class CommonRulesAreWrittenOnce(TestCase):
         self.assertIn('confirm_rules', with_age, 'форма не отрендерилась — проверка пуста')
         self.assertIn('confirm_age', with_age)
 
-        contest = stub_data.CONTESTS_BY_SLUG[slug]
-        no_age = replace(contest, min_age=None, max_age=None)
-        with mock.patch.dict(stub_data.CONTESTS_BY_SLUG, {slug: no_age}):
-            without = self.client.get(
-                reverse('core:contest_submit', args=[slug])).content.decode()
+        Contest.objects.filter(slug=slug).update(min_age=None, max_age=None)
+        without = self.client.get(
+            reverse('core:contest_submit', args=[slug])).content.decode()
         self.assertIn('confirm_rules', without, 'форма не отрендерилась — проверка пуста')
         self.assertNotIn('confirm_age', without)
 
@@ -1404,8 +1406,9 @@ class ContestPosterIsItsOwn(TestCase):
                 self.assertNotIn('contest.cover', body)
 
     def test_cover_field_is_gone(self):
-        self.assertNotIn('cover', stub_data.Contest.__dataclass_fields__)
-        self.assertIn('poster', stub_data.Contest.__dataclass_fields__)
+        fields = {f.name for f in Contest._meta.get_fields()}
+        self.assertNotIn('cover', fields)
+        self.assertIn('poster', fields)
 
     def test_poster_renders_on_list_and_detail(self):
         for url in ('/contests/', '/contests/bolashak-mektebi/'):
@@ -1416,7 +1419,7 @@ class ContestPosterIsItsOwn(TestCase):
 
     def test_declared_poster_files_live_in_media(self):
         """Афишу грузит админ в MEDIA_ROOT, как эмблему награды (BR-46)."""
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             if c.poster:
                 with self.subTest(contest=c.slug):
                     self.assertTrue(c.poster.startswith('contests/'))
@@ -1488,13 +1491,13 @@ class ContestEditionsAreLinked(TestCase):
     """Завершённый конкурс перестал быть тупиком (FR-CONT-13, BR-47)."""
 
     def test_editions_see_each_other(self):
-        old = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2023']
-        new = stub_data.CONTESTS_BY_SLUG['zhas-aldym-2026']
+        old = data.contest_by_slug('zhas-aldym-2023')
+        new = data.contest_by_slug('zhas-aldym-2026')
         self.assertEqual([c.slug for c in old.other_editions], [new.slug])
         self.assertEqual([c.slug for c in new.other_editions], [old.slug])
 
     def test_a_one_off_contest_has_no_editions(self):
-        self.assertEqual(stub_data.CONTESTS_BY_SLUG['altyn-qalam'].other_editions, [])
+        self.assertEqual(data.contest_by_slug('altyn-qalam').other_editions, [])
 
     def test_finished_page_links_to_the_open_edition(self):
         r = self.client.get(reverse('core:contest_detail', args=['zhas-aldym-2023']))
@@ -1502,7 +1505,7 @@ class ContestEditionsAreLinked(TestCase):
         self.assertContains(r, 'Басқа жылдар')
 
     def test_year_comes_from_the_data_not_the_name(self):
-        for c in stub_data.CONTESTS:
+        for c in data.all_contests():
             for e in c.other_editions:
                 with self.subTest(contest=c.slug, edition=e.slug):
                     self.assertEqual(e.year, e.results_on.year)
@@ -1512,7 +1515,7 @@ class ContestPageCanBeShared(TestCase):
     """FR-CONT-12: конкурс живёт тем, что о нём рассказывают."""
 
     def test_share_button_in_every_phase(self):
-        for slug in stub_data.CONTESTS_BY_SLUG:
+        for slug in [c.slug for c in data.all_contests()]:
             with self.subTest(contest=slug):
                 r = self.client.get(reverse('core:contest_detail', args=[slug]))
                 self.assertContains(r, 'Бөлісу')
@@ -1530,10 +1533,10 @@ class ContestVocabularyInEmptyState(TestCase):
     """
 
     def test_empty_list_says_baiqau(self):
-        # Патчится фасад, а не `stub_data`: view читает `core.data`, и
-        # подмена в модуле-источнике до неё уже не доходит.
-        with mock.patch.object(data, 'OPEN_CONTESTS', []), \
-             mock.patch.object(data, 'FINISHED_CONTESTS', []):
+        # Патчится фасад: view читает `core.data`, и подмена в модуле
+        # запросов до него уже не доходит.
+        with mock.patch.object(data, 'open_contests', lambda: []), \
+             mock.patch.object(data, 'finished_contests', lambda: []):
             html = self.client.get(reverse('core:contest_list')).content.decode()
         self.assertNotIn('онкурс', html)
         self.assertIn('Әзірге байқау жоқ', html)
@@ -1552,7 +1555,7 @@ class NotesStandNextToTheirWork(TestCase):
         html = self.client.get(
             reverse('core:contest_submit', args=['bolashak-mektebi'])).content.decode()
         picker = html[html.index('name="story_slug"'):html.index('Сәйкестік чек-листі')]
-        items = stub_data.submission_candidates('rudazov', 'bolashak-mektebi')
+        items = data.submission_candidates('rudazov', 'bolashak-mektebi')
         self.assertTrue(any(i['notes'] for i in items), 'стаб потерял работы с заметками')
         for item in items:
             for note in item['notes']:
@@ -1587,7 +1590,7 @@ class WorkPickerScalesToManyWorks(TestCase):
 
     def _submit_html(self, username='aidana', stories=None):
         _login_as(self.client, username)
-        ctx = (mock.patch.object(stub_data, 'public_stories_of', lambda u: stories)
+        ctx = (mock.patch.object(contest_queries, 'public_stories_of', lambda u: stories)
                if stories is not None else contextlib.nullcontext())
         with ctx:
             r = self.client.get(reverse('core:contest_submit', args=['bolashak-mektebi']))
@@ -1600,7 +1603,7 @@ class WorkPickerScalesToManyWorks(TestCase):
         self.assertNotIn('type="search"', self._picker(html))
 
     def test_long_list_gets_a_search(self):
-        many = stub_data.public_stories_of('aidana') * 4   # > порога
+        many = data.public_stories_of('aidana') * 4   # > порога
         r, html = self._submit_html(stories=many)
         self.assertTrue(r.context['picker_search'])
         picker = self._picker(html)
@@ -1612,9 +1615,9 @@ class WorkPickerScalesToManyWorks(TestCase):
 
     def test_search_does_not_hide_anything_without_js(self):
         """Без JS `x-show` не срабатывает, и список остаётся целым."""
-        many = stub_data.public_stories_of('aidana') * 4
+        many = data.public_stories_of('aidana') * 4
         _, html = self._submit_html(stories=many)
         picker = self._picker(html)
-        for s in stub_data.public_stories_of('aidana'):
+        for s in data.public_stories_of('aidana'):
             self.assertIn(s.title, picker)
         self.assertNotIn('style="display:none"', picker)

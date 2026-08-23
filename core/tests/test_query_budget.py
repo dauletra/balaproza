@@ -33,15 +33,15 @@ def _login(client):
 class PagesStayWithinTheirQueryBudget(TestCase):
 
     def test_home_guest(self):
-        """Одиннадцать: ряды, жинақтар, книга недели, полоса жанров, две
-        витрины тегов."""
-        with self.assertNumQueries(11):
+        """Двенадцать: ряды, жинақтар, книга недели, полоса жанров, две
+        витрины тегов, баннер конкурса."""
+        with self.assertNumQueries(12):
             self.client.get(reverse('core:home'))
 
     def test_home_signed_in(self):
         """Плюс прогресс чтения и работы автора."""
         _login(self.client)
-        with self.assertNumQueries(15):
+        with self.assertNumQueries(16):
             self.client.get(reverse('core:home'))
 
     def test_catalog(self):

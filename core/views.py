@@ -66,7 +66,7 @@ def home(request):
         'progress':        progress,
         'active_work':     active_work,
         'hero_focus':      hero_focus,
-        'hero_contest':    data.HERO_CONTEST,
+        'hero_contest':    data.hero_contest(),
         'collections':     data.all_collections(),
         'genres':          data.all_genres(),
         'book_of_week':    data.book_of_week(),
@@ -911,8 +911,8 @@ def contest_list(request):
         'page_state':        _page_state(request),
         # Секций по-прежнему две, но «идущий» больше не значит «принимает
         # заявки»: точную фазу называет бейдж на карточке (DEC-45).
-        'active_contests':   data.OPEN_CONTESTS,
-        'finished_contests': data.FINISHED_CONTESTS,
+        'active_contests':   data.open_contests(),
+        'finished_contests': data.finished_contests(),
     })
 
 
@@ -942,7 +942,7 @@ def _contest_rail_has_content(contest, *, submitted: bool, hide_cta: bool) -> bo
 
 
 def contest_detail(request, slug):
-    contest = data.CONTESTS_BY_SLUG.get(slug)
+    contest = data.contest_by_slug(slug)
     username = _current_username(request)
     submitted = data.has_submission(username, slug) if username else False
     return render(request, 'pages/contests/contest_detail.html', {
@@ -962,7 +962,7 @@ def contest_detail(request, slug):
 
 
 def contest_submit(request, slug):
-    contest = data.CONTESTS_BY_SLUG.get(slug)
+    contest = data.contest_by_slug(slug)
     username = _current_username(request)
     submitted = data.has_submission(username, slug) if username else False
     candidates = (data.submission_candidates(username, slug)
@@ -1020,7 +1020,7 @@ def my_submissions(request):
         {
             'sub':          sub,
             'contest':      sub.contest,
-            'can_withdraw': data.can_withdraw(username, sub.contest_slug),
+            'can_withdraw': data.can_withdraw(username, sub.contest.slug),
         }
         for sub in (data.submissions_of(username) if username else [])
     ]
@@ -1140,7 +1140,7 @@ def design_components(request):
         # Стаб-набор покрывает все четыре фазы (DEC-45), поэтому showcase
         # бейджа — это просто перебор конкурсов, а не четыре ручных вызова
         # с выдуманными аргументами, которые разойдутся с компонентом.
-        'contests':  data.CONTESTS,
+        'contests':  data.all_contests(),
         # docs/11 — showcase тегов
         'showcase_tags_accepted': accepted[:8],
         'showcase_tags_pending':  pending,

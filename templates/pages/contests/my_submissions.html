@@ -43,11 +43,7 @@
                     <div class="min-w-0 flex-1">
                         <p class="font-sans text-xs uppercase tracking-wide text-slate-500">{{ sub.submitted_label }}</p>
                         <h2 class="mt-1 font-display text-lg font-bold leading-tight text-slate-900">
-                            {% if c %}
-                                <a href="{% url 'core:contest_detail' slug=c.slug %}" class="hover:text-brand">{{ c.name }}</a>
-                            {% else %}
-                                {{ sub.contest_slug }}
-                            {% endif %}
+                            <a href="{% url 'core:contest_detail' slug=c.slug %}" class="hover:text-brand">{{ c.name }}</a>
                         </h2>
                         {% if sub.story %}
                             <p class="mt-0.5 font-sans text-sm text-slate-600">
