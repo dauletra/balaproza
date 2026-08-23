@@ -29,7 +29,7 @@ def home(request):
     username = request.session.get('user_username') if is_signed_in else None
     my_stories = data.my_stories_of(username) if username else []
     active_work = next((s for s in my_stories if s.status == 'OnProcess'), my_stories[0] if my_stories else None)
-    progress = data.SAMPLE_PROGRESS if is_signed_in else None
+    progress = data.reading_progress_of(username) if is_signed_in else None
 
     # Design-system demo override for the four authenticated hero states.
     hero_state_demo = request.GET.get('hero_state')
@@ -53,7 +53,7 @@ def home(request):
 
     # Не литерал 'Published': после DEC-37 опубликованный сериал носит
     # OnProcess или Completed, и по литералу с главной пропали бы все десять.
-    published = data.public_stories()
+    published = list(data.public_stories())
 
     # Жанры на главной — полоса-вывеска, а не навигация (DEC-31): 12 цветных слов
     # объясняют, что это литературный портал, и ведут на /genres/<slug>/.
@@ -67,9 +67,9 @@ def home(request):
         'active_work':     active_work,
         'hero_focus':      hero_focus,
         'hero_contest':    data.HERO_CONTEST,
-        'collections':     data.COLLECTIONS,
+        'collections':     data.all_collections(),
         'genres':          data.all_genres(),
-        'book_of_week':    data.BOOK_OF_WEEK,
+        'book_of_week':    data.book_of_week(),
         'new_authors':     data.new_authors(4),
         'top_stories':     sorted(published, key=lambda s: s.views, reverse=True)[:5],
         'short_stories':   [s for s in published if s.is_single and s.read_minutes <= 15][:5],
@@ -412,7 +412,7 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
         # Жинақтар — первичный вход в чтение (DEC-31). В каталоге они нужны
         # ровно там, где сүзгі не дали результата: пустой экран не должен быть
         # тупиком, из которого выход только назад.
-        'rail_collections':   data.COLLECTIONS[:3],
+        'rail_collections':   data.all_collections()[:3],
         'empty_title':        empty_title,
         'empty_text':         empty_text,
     }
@@ -450,12 +450,12 @@ def tag_detail(request, slug):
 
 def collections(request):
     return render(request, 'pages/catalog/collections.html', {
-        'collections': data.COLLECTIONS,
+        'collections': data.all_collections(),
     })
 
 
 def collection_detail(request, slug):
-    collection = data.COLLECTIONS_BY_SLUG.get(slug)
+    collection = data.collection_by_slug(slug)
     return render(request, 'pages/catalog/collection_detail.html', {
         'slug':       slug,
         'collection': collection,
@@ -463,14 +463,10 @@ def collection_detail(request, slug):
 
 
 # ───────────────────────── STORY — произведение и чтение ─────────────────
-def _story_or_stub(slug):
-    """Резолвить Story из стаба; для неизвестных slug отдаём None — UI
-    остаётся валидным («Шығарма табылмады» в шаблоне можно показывать)."""
-    return data.STORIES_BY_SLUG.get(slug)
-
-
 def story_detail(request, slug):
-    story = _story_or_stub(slug)
+    # Неизвестный slug отдаёт None: страница остаётся валидной и говорит
+    # «Шығарма табылмады», а не падает 500.
+    story = data.story_by_slug(slug)
     chapters = data.chapters_of(slug)
     # Автор своего стори видит pending-теги (BR-TAG-07). Для прочих скрыты.
     viewer = request.session.get('user_username') or ''
@@ -481,10 +477,8 @@ def story_detail(request, slug):
     #  - иначе → 1
     # Если глав нет вовсе — chapter_number=None, current=None (no-op в шаблоне).
     explicit_chapter = request.GET.get('chapter')
-    has_progress_here = (
-        request.session.get('signed_in')
-        and data.SAMPLE_PROGRESS.story_slug == slug
-    )
+    progress = data.reading_progress_of(viewer) if viewer else None
+    has_progress_here = bool(progress and progress.story.slug == slug)
     if chapters:
         try:
             chapter_number = int(explicit_chapter) if explicit_chapter else None
@@ -492,7 +486,7 @@ def story_detail(request, slug):
             chapter_number = None
         if not chapter_number or chapter_number < 1 or chapter_number > len(chapters):
             chapter_number = (
-                data.SAMPLE_PROGRESS.current_chapter if has_progress_here else 1
+                progress.current_chapter if has_progress_here else 1
             )
         current = data.chapter_of(slug, chapter_number)
     else:
@@ -526,7 +520,7 @@ def story_detail(request, slug):
         # FR-STORY-02: блок «Басқа шығармалар» внизу страницы
         'related':  data.related_stories(slug, limit=6) if story else [],
         # docs/11: UGC-теги произведения (resolved Tag-объекты)
-        'tags':      data.tags_of(story) if story else [],
+        'tags':      story.tags_resolved if story else [],
         # DEC-31: обратный вход в настроение — подборки, где лежит произведение
         'in_collections': data.collections_of(story) if story else [],
         'is_author': is_author,

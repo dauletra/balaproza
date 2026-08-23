@@ -10,8 +10,11 @@
 другую фазу, и тесты начнут падать по календарю, а не по коду. Команда
 пересчитывает такие значения при каждом запуске.
 
-Почему источник — `core.data`, а не `core.stub_data` напрямую. Дверь к
-данным одна (`test_data_facade`), и у сида нет причин быть исключением.
+Почему источник — `core.stub_data` напрямую, в обход фасада. Это
+единственный модуль, которому так можно, и причина простая: фасад по мере
+Ф14 начинает отвечать моделями, и сид, читающий через него, читал бы то,
+что сам же записал. Команда — конвертер между двумя мирами, ей положено
+видеть исходный; вместе со стабом она и умрёт.
 
 **Команда покрывает весь корпус.** Когда стаб уйдёт, литералы переедут
 сюда: удалить стаб — значит забрать его данные себе, иначе демо-корпуса
@@ -28,7 +31,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
-from core import data
+from core import stub_data
 from core.domain.catalog import BADGE_LABELS
 from core.domain.formatting import kk_updated
 from core.models import (
@@ -143,7 +146,7 @@ class Command(BaseCommand):
         (BR-73, docs/12 §12.4), а день никогда не выводится.
         """
         added = updated = 0
-        for author in data.AUTHORS:
+        for author in stub_data.AUTHORS:
             joined = timezone.make_aware(datetime(author.joined_year, 1, 1))
             user, is_new = User.objects.update_or_create(
                 username=author.username,
@@ -165,7 +168,7 @@ class Command(BaseCommand):
         """UGC-теги. Счётчики использования не переносятся: колонок под них
         нет и не будет — это агрегаты по работам (см. `core.models.Tag`)."""
         added = updated = 0
-        for tag in data.TAGS:
+        for tag in stub_data.TAGS:
             _, is_new = Tag.objects.update_or_create(
                 slug=tag.slug,
                 defaults={'name': tag.name, 'status': tag.status},
@@ -189,7 +192,7 @@ class Command(BaseCommand):
         tags = {t.slug: t for t in Tag.objects.all()}
         added = updated = 0
 
-        for stub in data.STORIES:
+        for stub in stub_data.STORIES:
             primary, secondary = stub.genres[0], (stub.genres[1:] or (None,))[0]
             story, is_new = Story.objects.update_or_create(
                 slug=stub.slug,
@@ -229,9 +232,9 @@ class Command(BaseCommand):
         обязана исчезнуть и из базы, иначе повторный сид копит мусор.
         """
         added = updated = 0
-        for stub in data.STORIES:
+        for stub in stub_data.STORIES:
             story = Story.objects.get(slug=stub.slug)
-            chapters = data.chapters_of(stub.slug)
+            chapters = stub_data.chapters_of(stub.slug)
             story.chapter_set.exclude(
                 number__in=[c.number for c in chapters]).delete()
 
@@ -266,7 +269,7 @@ class Command(BaseCommand):
         решение жюри.
         """
         added = updated = 0
-        for stub in data.CONTESTS:
+        for stub in stub_data.CONTESTS:
             contest, is_new = Contest.objects.update_or_create(
                 slug=stub.slug,
                 defaults={
@@ -321,7 +324,7 @@ class Command(BaseCommand):
         """Присуждения (DEC-46) — акт жюри, поэтому переносятся как данные,
         а не выводятся из чего-либо."""
         added = updated = 0
-        for stub in data.AWARD_GRANTS:
+        for stub in stub_data.AWARD_GRANTS:
             contest = Contest.objects.get(slug=stub.contest_slug)
             _, is_new = AwardGrant.objects.update_or_create(
                 contest=contest,
@@ -337,7 +340,7 @@ class Command(BaseCommand):
         """Заявки авторов. Автор берётся из ключа стаба, а не из работы:
         подаёт человек, и BR-23 считает заявки именно по нему."""
         added = updated = 0
-        for username, subs in data.SUBMISSIONS_BY_USER.items():
+        for username, subs in stub_data.SUBMISSIONS_BY_USER.items():
             author = User.objects.get(username=username)
             for stub in subs:
                 _, is_new = Submission.objects.update_or_create(
@@ -361,11 +364,11 @@ class Command(BaseCommand):
         показывает профиль, строки обслуживают «подписан ли я» и списки.
         """
         added = updated = 0
-        for author in data.AUTHORS:
+        for author in stub_data.AUTHORS:
             User.objects.filter(username=author.username).update(
                 followers=author.followers)
             updated += 1
-        for follower, targets in data.FOLLOWING.items():
+        for follower, targets in stub_data.FOLLOWING.items():
             me = User.objects.get(username=follower)
             for target in targets:
                 _, is_new = Follow.objects.get_or_create(
@@ -377,7 +380,7 @@ class Command(BaseCommand):
         """Редакционные жинақтар. Состав пересобирается: порядок внутри —
         и есть подборка, а сверять его построчно дороже, чем переложить."""
         added = updated = 0
-        for i, stub in enumerate(data.COLLECTIONS):
+        for i, stub in enumerate(stub_data.COLLECTIONS):
             collection, is_new = Collection.objects.update_or_create(
                 slug=stub.slug,
                 defaults={'name': stub.name, 'tint_hue': stub.tint_hue,
@@ -395,7 +398,7 @@ class Command(BaseCommand):
         return added, updated
 
     def _seed_book_of_week(self):
-        stub = data.BOOK_OF_WEEK
+        stub = stub_data.BOOK_OF_WEEK
         _, is_new = BookOfWeek.objects.update_or_create(
             story=Story.objects.get(slug=stub.story_slug),
             defaults={'editorial_note': stub.editorial_note,
@@ -413,7 +416,7 @@ class Command(BaseCommand):
         ту же подпись, сид падает, а не молча меняет текст на странице.
         """
         added = updated = 0
-        for username, entries in data.LIBRARY_BY_USER.items():
+        for username, entries in stub_data.LIBRARY_BY_USER.items():
             user = User.objects.get(username=username)
             for stub in entries:
                 _, is_new = LibraryEntry.objects.update_or_create(
@@ -427,7 +430,7 @@ class Command(BaseCommand):
                 added += is_new
                 updated += not is_new
 
-        progress = data.SAMPLE_PROGRESS
+        progress = stub_data.SAMPLE_PROGRESS
         ReadingProgress.objects.update_or_create(
             user=User.objects.get(username='aidana'),
             story=Story.objects.get(slug=progress.story_slug),
@@ -449,7 +452,7 @@ class Command(BaseCommand):
         ровно тем, что BR-70a запрещает.
         """
         added = updated = 0
-        for story_slug, comments in data.COMMENTS_BY_STORY.items():
+        for story_slug, comments in stub_data.COMMENTS_BY_STORY.items():
             story = Story.objects.get(slug=story_slug)
             story.comment_set.all().delete()
             for stub in comments:
@@ -474,7 +477,7 @@ class Command(BaseCommand):
     def _seed_polls(self):
         """Опросы под главами. Голоса — счётчиком: голосовать пока негде."""
         added = updated = 0
-        for (story_slug, number), stub in data.POLLS_BY_CHAPTER.items():
+        for (story_slug, number), stub in stub_data.POLLS_BY_CHAPTER.items():
             chapter = Chapter.objects.get(story__slug=story_slug, number=number)
             poll, is_new = ChapterPoll.objects.update_or_create(
                 chapter=chapter, defaults={'question': stub.question})
@@ -492,7 +495,7 @@ class Command(BaseCommand):
     def _seed_notifications(self):
         """Уведомления. Хранится момент, «как давно» и группа выводятся."""
         added = updated = 0
-        for username, items in data.NOTIFICATIONS_BY_USER.items():
+        for username, items in stub_data.NOTIFICATIONS_BY_USER.items():
             user = User.objects.get(username=username)
             user.notifications.all().delete()
             for stub in items:
@@ -516,7 +519,7 @@ class Command(BaseCommand):
 
     def _seed_school_links(self):
         added = updated = 0
-        for i, stub in enumerate(data.SCHOOL_LINKS):
+        for i, stub in enumerate(stub_data.SCHOOL_LINKS):
             _, is_new = SchoolLink.objects.update_or_create(
                 channel=stub.channel,
                 defaults={'title': stub.title, 'subtitle': stub.subtitle,

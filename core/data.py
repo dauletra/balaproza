@@ -95,6 +95,22 @@ from .queries.catalog import (
     story_by_slug,
 )
 
+# ── Произведение: главы, отклик, комментарии, подборки ───────────────────
+from .queries.library import reading_progress_of
+from .queries.story import (
+    all_collections,
+    book_of_week,
+    chapter_of,
+    chapters_of,
+    collection_by_slug,
+    collections_of,
+    comments_of,
+    comments_of_chapter,
+    poll_of,
+    reaction_breakdown,
+    reactions_of,
+)
+
 # ── Справочники: теги (жанры уже выше, из моделей) ───────────────────────
 from .stub_data import (
     BLOCKED_TAG_PATTERNS,
@@ -107,21 +123,6 @@ from .stub_data import (
     tag_by_slug,
     tags_of,
     trending_tags,
-)
-
-# ── Произведение, главы, отклик ──────────────────────────────────────────
-from .stub_data import (
-    BOOK_OF_WEEK,
-    COLLECTIONS,
-    COLLECTIONS_BY_SLUG,
-    chapter_of,
-    chapters_of,
-    collections_of,
-    comments_of,
-    comments_of_chapter,
-    poll_of,
-    reaction_breakdown,
-    reactions_of,
 )
 
 # ── Автор: кабинет, профиль, публичные счётчики ──────────────────────────
@@ -142,7 +143,6 @@ from .stub_data import (
 
 # ── Библиотека, чтение, подписки ─────────────────────────────────────────
 from .stub_data import (
-    SAMPLE_PROGRESS,
     followers_of,
     following_of,
     in_library,
@@ -199,11 +199,14 @@ from .stub_data import (  # noqa: F401
     AUTHORS,
     AUTHORS_BY_USERNAME,
     AWARD_GRANTS,
+    BOOK_OF_WEEK,
+    COLLECTIONS,
     COMMENTS_BY_STORY,
     FOLLOWING,
     LIBRARY_BY_USER,
     NOTIFICATIONS_BY_USER,
     POLLS_BY_CHAPTER,
+    SAMPLE_PROGRESS,
     STORIES,
     STORIES_BY_SLUG,
     SUBMISSIONS_BY_USER,

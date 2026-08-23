@@ -374,7 +374,16 @@ class Story(models.Model):
     def total_chars(self) -> int:
         """Объём текста. Без написанных глав — оценка по заявленным частям:
         у четырёх сериалов каталога текста нет, и ноль знаков превратил бы
-        их в «3 минут оқу»."""
+        их в «3 минут оқу».
+
+        Выдача каталога считает то же самое аннотацией и подставляет её
+        сюда: карточка спрашивает время чтения, и без подстановки страница
+        каталога делала по запросу за главы на каждую карточку — сорок
+        два запроса на двадцать одну работу.
+        """
+        annotated = getattr(self, 'effective_chars', None)
+        if annotated is not None:
+            return annotated
         total = sum(c.char_count for c in self.chapter_set.all())
         return total or self.chapters * 1800
 
@@ -1000,9 +1009,13 @@ class Collection(models.Model):
 
     @property
     def stories(self) -> list:
-        return [item.story for item in
-                self.item_set.select_related('story', 'story__author',
-                                             'story__primary_genre')]
+        """Работы подборки в редакционном порядке.
+
+        Через `item_set.all()`, а не через свой `select_related`: свой
+        запрос игнорирует `prefetch_related` вызывающей стороны, и десять
+        карточек на главной превращаются в десять лишних запросов.
+        """
+        return [item.story for item in self.item_set.all()]
 
     @property
     def covers(self) -> list:
@@ -1011,7 +1024,9 @@ class Collection(models.Model):
 
     @property
     def count(self) -> int:
-        return self.item_set.count()
+        # `len()` по тому же списку, а не `count()`: при готовом prefetch
+        # отдельный COUNT — это ещё один запрос на каждую подборку.
+        return len(self.item_set.all())
 
 
 class CollectionItem(models.Model):

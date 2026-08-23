@@ -13,7 +13,7 @@
 from core.tests.base import TestCase
 from django.urls import reverse
 
-from core import stub_data
+from core import data
 
 
 STORY_SLUG = 'dalney-berega'   # есть в STORIES_BY_SLUG и в CHAPTERS_BY_STORY
@@ -49,7 +49,7 @@ class StoryDetailValidSlug(TestCase):
         self.assertEqual(self.response.status_code, 200)
 
     def test_title_includes_story_and_author(self):
-        story = stub_data.STORIES_BY_SLUG[STORY_SLUG]
+        story = data.story_by_slug(STORY_SLUG)
         self.assertContains(self.response, story.title)
         self.assertContains(self.response, story.author.public_name)
 
@@ -58,7 +58,7 @@ class StoryDetailValidSlug(TestCase):
 
     def test_first_chapter_shown_inline(self):
         """Под аннотацией — первая глава с её заголовком."""
-        ch1 = stub_data.chapter_of(STORY_SLUG, 1)
+        ch1 = data.chapter_of(STORY_SLUG, 1)
         self.assertContains(self.response, ch1.title)
         self.assertContains(self.response, '1-бөлім')
 
@@ -79,7 +79,7 @@ class StoryDetailValidSlug(TestCase):
 
     def test_right_rail_chapter_links_use_query(self):
         """Список глав в рейле ведёт на ?chapter=N (а не на /read/N/)."""
-        for c in stub_data.chapters_of(STORY_SLUG):
+        for c in data.chapters_of(STORY_SLUG):
             with self.subTest(chapter=c.number):
                 self.assertContains(self.response, f'?chapter={c.number}')
 
@@ -97,7 +97,7 @@ class StoryDetailValidSlug(TestCase):
         self.assertNotContains(self.response, 'Алдыңғы бөлім')
 
     def test_genres_chips_rendered(self):
-        story = stub_data.STORIES_BY_SLUG[STORY_SLUG]
+        story = data.story_by_slug(STORY_SLUG)
         for g in story.genres_resolved:
             with self.subTest(genre=g.slug):
                 self.assertContains(self.response, g.name)
@@ -107,7 +107,7 @@ class StoryDetailChapterParam(TestCase):
     """?chapter=N показывает конкретную главу полностью (без тизера)."""
 
     def test_chapter_2_renders_full_text(self):
-        ch2 = stub_data.chapter_of(STORY_SLUG, 2)
+        ch2 = data.chapter_of(STORY_SLUG, 2)
         url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=2'
         r = self.client.get(url)
         self.assertEqual(r.status_code, 200)
@@ -125,7 +125,7 @@ class StoryDetailChapterParam(TestCase):
         self.assertContains(r, '?chapter=5')
 
     def test_last_chapter_has_no_next(self):
-        last = len(stub_data.chapters_of(STORY_SLUG))
+        last = len(data.chapters_of(STORY_SLUG))
         url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + f'?chapter={last}'
         r = self.client.get(url)
         # Ссылки на ?chapter=last+1 быть не должно
@@ -137,7 +137,7 @@ class StoryDetailChapterParam(TestCase):
         url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=999'
         r = self.client.get(url)
         self.assertEqual(r.status_code, 200)
-        ch1 = stub_data.chapter_of(STORY_SLUG, 1)
+        ch1 = data.chapter_of(STORY_SLUG, 1)
         self.assertContains(r, ch1.title)
 
     def test_garbage_chapter_param_falls_back(self):
@@ -213,7 +213,7 @@ class StoryDetailReadingProgress(TestCase):
 
     def test_authed_with_matching_progress_shows_indicator(self):
         # SAMPLE_PROGRESS привязан к 'dalney-berega'
-        self.assertEqual(stub_data.SAMPLE_PROGRESS.story_slug, STORY_SLUG)
+        self.assertEqual(data.reading_progress_of('aidana').story.slug, STORY_SLUG)
         _login(self.client)
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
         self.assertContains(r, 'Оқылды:')
@@ -277,7 +277,7 @@ class StoryDetailAnnotation(TestCase):
     def test_annotation_comes_from_the_story(self):
         for slug in ('dalney-berega', 'tunge-deiin'):
             with self.subTest(story=slug):
-                story = stub_data.STORIES_BY_SLUG[slug]
+                story = data.story_by_slug(slug)
                 r = self.client.get(reverse('core:story_detail', kwargs={'slug': slug}))
                 self.assertContains(r, story.annotation)
 
@@ -337,7 +337,7 @@ class StoryDetailAuthorOnMobile(TestCase):
 
     def test_author_card_rendered_twice(self):
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        story = stub_data.STORIES_BY_SLUG[STORY_SLUG]
+        story = data.story_by_slug(STORY_SLUG)
         self.assertContains(r, story.author.bio, count=2)
 
     def test_follow_action_present_for_guest(self):
@@ -419,7 +419,7 @@ class ChapterTextMeasure(TestCase):
 
     def test_chapter_text_is_long_enough_to_show_the_problem(self):
         """На тексте в три абзаца ни мера, ни прогресс, ни панель не проявляются."""
-        body = stub_data.chapter_of(STORY_SLUG, 3).body
+        body = data.chapter_of(STORY_SLUG, 3).body
         self.assertGreater(len(body), 2000, 'нужна длинная глава для проверки чтения')
 
 
@@ -465,7 +465,7 @@ class ChapterListShowsLikes(TestCase):
 
     def test_chapter_like_counts_rendered(self):
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        first = stub_data.chapter_of(STORY_SLUG, 1)
+        first = data.chapter_of(STORY_SLUG, 1)
         self.assertTrue(first.likes, 'нужна глава с реакциями для проверки')
         self.assertContains(r, f'{first.likes} реакция')
 
@@ -482,13 +482,13 @@ class ChapterReactions(TestCase):
         self.response = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
 
     def test_all_five_reactions_rendered(self):
-        for reaction in stub_data.REACTIONS:
+        for reaction in data.REACTIONS:
             with self.subTest(reaction=reaction.slug):
                 self.assertContains(self.response, reaction.label)
 
     def test_every_reaction_carries_a_word_label(self):
         """Эмодзи запрещены, монохромная иконка 20px без подписи неразличима."""
-        for reaction in stub_data.REACTIONS:
+        for reaction in data.REACTIONS:
             with self.subTest(reaction=reaction.slug):
                 self.assertContains(self.response, f'>{reaction.label}<')
 
@@ -500,17 +500,18 @@ class ChapterReactions(TestCase):
 
     def test_zero_count_reactions_still_shown(self):
         """Набор из пяти кнопок одинаков у первой главы и у сотой."""
-        items = stub_data.reactions_of(stub_data.chapter_of(STORY_SLUG, 1))
+        items = data.reactions_of(data.chapter_of(STORY_SLUG, 1))
         self.assertEqual(5, len(items))
 
     def test_story_counter_is_the_sum_of_reactions(self):
-        chapter = stub_data.chapter_of(STORY_SLUG, 3)
-        self.assertEqual(chapter.likes, sum(c for _, c in chapter.reactions))
+        chapter = data.chapter_of(STORY_SLUG, 3)
+        self.assertEqual(chapter.likes,
+                         sum(r.count for r in chapter.reactions.all()))
 
     def test_top_reaction_reads_the_chapter(self):
         """«Алғашқы кездесу» собирает Жүрегім, «Депрессия» — Жыладым."""
-        self.assertEqual('juregim', stub_data.chapter_of(STORY_SLUG, 3).top_reaction.slug)
-        self.assertEqual('jyladym', stub_data.chapter_of(STORY_SLUG, 4).top_reaction.slug)
+        self.assertEqual('juregim', data.chapter_of(STORY_SLUG, 3).top_reaction.slug)
+        self.assertEqual('jyladym', data.chapter_of(STORY_SLUG, 4).top_reaction.slug)
 
 
 class ChapterPollStates(TestCase):
@@ -525,16 +526,16 @@ class ChapterPollStates(TestCase):
 
     def test_chapter_without_a_poll_shows_no_block(self):
         """Опрос необязателен — его отсутствие не пустое состояние (BR-POLL-01)."""
-        self.assertIsNone(stub_data.poll_of(STORY_SLUG, 5))
+        self.assertIsNone(data.poll_of(STORY_SLUG, 5))
         self.assertNotContains(self._get(5), 'Автордың сұрағы')
 
     def test_open_poll_rendered_with_its_question(self):
-        poll = stub_data.poll_of(STORY_SLUG, self.OPEN_CHAPTER)
+        poll = data.poll_of(STORY_SLUG, self.OPEN_CHAPTER)
         self.assertFalse(poll.closed)
         self.assertContains(self._get(self.OPEN_CHAPTER), poll.question)
 
     def test_poll_closes_when_the_next_chapter_ships(self):
-        poll = stub_data.poll_of(STORY_SLUG, self.CLOSED_CHAPTER)
+        poll = data.poll_of(STORY_SLUG, self.CLOSED_CHAPTER)
         self.assertTrue(poll.closed)
         self.assertEqual(self.CLOSED_CHAPTER + 1, poll.answer_chapter)
 
@@ -555,7 +556,7 @@ class ChapterPollStates(TestCase):
         self.assertNotContains(r, 'Жауап беру үшін')
 
     def test_percentages_sum_to_a_hundred(self):
-        poll = stub_data.poll_of(STORY_SLUG, self.OPEN_CHAPTER)
+        poll = data.poll_of(STORY_SLUG, self.OPEN_CHAPTER)
         self.assertEqual(100, sum(r['percent'] for r in poll.results))
 
     def test_the_decorative_block_is_gone(self):
@@ -638,18 +639,23 @@ class CommentMenu(TestCase):
         """На свой комментарий жаловаться некому — его удаляют."""
         _login(self.client)
         html = self._get().content.decode()
-        own = next(c for c in stub_data.comments_of_chapter(STORY_SLUG, 3)
+        own = next(c for c in data.comments_of_chapter(STORY_SLUG, 3)
                    if c.belongs_to('aidana'))
         block = html[html.index(f'id="comment-{own.id}"'):]
         block = block[:block.index('</article>')]
         self.assertIn('Жою', block)
         self.assertNotIn('Шағым жіберу', block)
 
-    def test_comment_id_is_stable_across_processes(self):
-        """Скопированная ссылка должна работать и завтра — hash() не годится."""
-        c = stub_data.comments_of_chapter(STORY_SLUG, 3)[0]
-        self.assertEqual(c.id, c.id)
-        self.assertRegex(c.id, r'^[a-z_]+-\d{4}$')
+    def test_comment_anchor_is_its_primary_key(self):
+        """Скопированная ссылка обязана работать и завтра.
+
+        В стабе якорь считался из текста crc32-суммой — потому что ключа
+        не было, а `hash()` рандомизируется от запуска к запуску. Теперь
+        якорь и есть первичный ключ строки: устойчивее не бывает.
+        """
+        c = data.comments_of_chapter(STORY_SLUG, 3)[0]
+        self.assertIsInstance(c.id, int)
+        self.assertContains(self._get(), f'id="comment-{c.id}"')
 
 
 class ReportUsesItsOwnIcon(TestCase):
@@ -715,7 +721,7 @@ class CommentReplies(TestCase):
         _login(self.client)
         url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=2'
         html = self.client.get(url).content.decode()
-        reply = stub_data.comments_of_chapter(STORY_SLUG, 2)[-1].replies[0]
+        reply = data.comments_of_chapter(STORY_SLUG, 2)[-1].replies[0]
         block = html[html.index(f'id="comment-{reply.id}"'):]
         block = block[:block.index('</article>')]
         self.assertNotIn('Жауап беру', block)
@@ -726,7 +732,7 @@ class CommentAuthorLinks(TestCase):
 
     def test_name_links_to_profile(self):
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        author = stub_data.comments_of_chapter(STORY_SLUG, 1)[0].author
+        author = data.comments_of_chapter(STORY_SLUG, 1)[0].author
         self.assertContains(r, reverse('core:profile_other',
                                        kwargs={'username': author.username}))
 
@@ -746,8 +752,8 @@ class StoryLinksBackToItsCollections(TestCase):
 
     def test_block_lists_every_collection_holding_the_story(self):
         from core import stub_data
-        story = stub_data.STORIES_BY_SLUG['tunge-deiin']
-        collections = stub_data.collections_of(story)
+        story = data.story_by_slug('tunge-deiin')
+        collections = data.collections_of(story)
         self.assertTrue(collections)
         self.assertContains(self.response, 'Мына жинақтарда бар')
         for c in collections:
@@ -764,7 +770,7 @@ class StoryLinksBackToItsCollections(TestCase):
     def test_block_absent_when_story_is_in_no_collection(self):
         from core import stub_data
         orphan = next(
-            (s for s in stub_data.STORIES if not stub_data.collections_of(s)), None)
+            (s for s in data.public_stories() if not data.collections_of(s)), None)
         self.assertIsNotNone(orphan, 'нужен стори вне подборок для проверки пустого случая')
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': orphan.slug}))
         self.assertNotContains(r, 'Мына жинақтарда бар')
