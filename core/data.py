@@ -60,6 +60,7 @@ from .domain.formatting import (
     kk_updated,
     spaced_number,
 )
+from .domain.library import LIBRARY_KINDS
 from .domain.notifications import (
     MODERATION_OUTCOME_LABELS,
     MODERATION_OUTCOMES,
@@ -195,6 +196,8 @@ from .stub_data import SCHOOL_LINKS
 from .stub_data import (  # noqa: F401
     AWARD_GRANTS,
     COMMENTS_BY_STORY,
+    FOLLOWING,
+    POLLS_BY_CHAPTER,
     LIBRARY_BY_USER,
     NOTIFICATIONS_BY_USER,
     STORIES,

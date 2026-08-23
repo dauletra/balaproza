@@ -1,8 +1,8 @@
 """Модели Ф14. Порядок появления — docs/19 §19.4.
 
-Сейчас здесь пользователь, справочники, произведения, главы и конкурсы.
-Библиотека, подписки, комментарии и уведомления приезжают своими этапами,
-и до тех пор их данные живут в `core/stub_data.py`.
+Здесь все таблицы Ф14: пользователь и справочники, произведения и главы,
+конкурсы, подписки, жинақтар, библиотека, комментарии, опросы и
+уведомления.
 
 Модель появляется раньше, чем страницы начинают её читать: сначала
 таблица и сид, отдельным шагом — переключение чтения. Так видно, в каком
@@ -24,6 +24,12 @@ from django.utils import timezone
 from .domain.catalog import BADGE_LABELS, PUBLIC_STATUSES
 from .domain.contests import CONTEST_PHASE_LABELS, SUBMISSION_STATUSES
 from .domain.formatting import kk_ago, kk_date, kk_period, kk_updated
+from .domain.library import LIBRARY_KINDS
+from .domain.notifications import (
+    MODERATION_OUTCOME_LABELS,
+    MODERATION_OUTCOMES,
+    NOTIF_KINDS,
+)
 from .domain.story import REACTIONS, REACTIONS_BY_SLUG, STORY_FORMATS, STORY_STATUSES
 from .domain.tags import TAG_STATUSES
 
@@ -54,6 +60,12 @@ class User(AbstractUser):
     # молча проставленным за человека.
     pen_name = models.CharField('лақап аты', max_length=60, blank=True)
     bio = models.CharField('өзі туралы', max_length=200, blank=True)
+    # Число подписчиков. Колонка, а не `follower_set.count()`, по той же
+    # причине, что `Story.likes`: у демо-корпуса счётчик есть, а строк под
+    # ним нет — восемь тысяч подписчиков `rudazov` некому создать. Строки
+    # `Follow` при этом настоящие и обслуживают «подписан ли я» и списки
+    # (FR-PROF-10). После Ф15 колонка становится агрегатом.
+    followers = models.PositiveIntegerField('оқырман саны', default=0)
 
     class Meta:
         verbose_name = 'пайдаланушы'
@@ -905,3 +917,457 @@ class Submission(models.Model):
     def submitted_label(self) -> str:
         """«5 күн бұрын» — производное от даты, а не хранимая строка."""
         return kk_ago((timezone.localdate() - self.submitted_on).days)
+
+
+class Follow(models.Model):
+    """Подписка одного автора на другого (FR-PROF-10, BR-75).
+
+    Связь маленькая и навигацию не двигает: списки «Жазылулар» и
+    «Оқырмандар» публичны, но входа в контент из них нет — читать зовут
+    жинақтар и каталог (DEC-31).
+    """
+
+    follower = models.ForeignKey('core.User', verbose_name='кім жазылды',
+                                 on_delete=models.CASCADE,
+                                 related_name='following_set')
+    following = models.ForeignKey('core.User', verbose_name='кімге жазылды',
+                                  on_delete=models.CASCADE,
+                                  related_name='follower_set')
+    created_at = models.DateTimeField('жазылған күні', auto_now_add=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        constraints = [
+            models.UniqueConstraint(fields=('follower', 'following'),
+                                    name='unique_follow_pair'),
+            # На себя не подписываются. Проверка в базе, потому что такая
+            # строка ломает счётчики тихо, а не громко.
+            models.CheckConstraint(
+                condition=~models.Q(follower=models.F('following')),
+                name='no_self_follow'),
+        ]
+        verbose_name = 'жазылым'
+        verbose_name_plural = 'жазылымдар'
+
+    def __str__(self):
+        return f'{self.follower.username} → {self.following.username}'
+
+
+class Collection(models.Model):
+    """Редакционная подборка — первичный вход в чтение (DEC-31).
+
+    Создаёт **только редакция**: пользовательских подборок на портале нет,
+    личное хранение — это «Кітапхана». Подборка отвечает на вопрос «зачем
+    читать сейчас», поэтому имя у неё — фраза-состояние, а не жанр.
+
+    Ни `count`, ни `covers` не хранятся: два списка одних и тех же работ
+    рано или поздно разъезжаются, а число в интерфейсе не имеет права
+    соврать.
+    """
+
+    slug = models.SlugField('slug', max_length=64, unique=True)
+    name = models.CharField('атауы', max_length=120)
+    # OKLCH hue для тонировки карточки и иконки (docs/03 §3.3).
+    tint_hue = models.PositiveSmallIntegerField('түс (OKLCH hue)',
+                                                validators=[MaxValueValidator(360)])
+    icon = models.CharField('иконка', max_length=32)
+    curator = models.CharField('құрастырған', max_length=80, default='редакция')
+    description = models.TextField('сипаттамасы', blank=True)
+    position = models.PositiveSmallIntegerField('реті', default=0)
+
+    class Meta:
+        ordering = ('position', 'pk')
+        verbose_name = 'жинақ'
+        verbose_name_plural = 'жинақтар'
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def stories(self) -> list:
+        return [item.story for item in
+                self.item_set.select_related('story', 'story__author',
+                                             'story__primary_genre')]
+
+    @property
+    def covers(self) -> list:
+        """Стопка обложек на карточке — первые три в редакционном порядке."""
+        return self.stories[:3]
+
+    @property
+    def count(self) -> int:
+        return self.item_set.count()
+
+
+class CollectionItem(models.Model):
+    """Произведение в подборке. Порядок — редакционный, поэтому хранится."""
+
+    collection = models.ForeignKey(Collection, verbose_name='жинақ',
+                                   on_delete=models.CASCADE,
+                                   related_name='item_set')
+    story = models.ForeignKey(Story, verbose_name='шығарма',
+                              on_delete=models.CASCADE,
+                              related_name='collection_items')
+    position = models.PositiveSmallIntegerField('реті', default=0)
+
+    class Meta:
+        ordering = ('position', 'pk')
+        constraints = [
+            models.UniqueConstraint(fields=('collection', 'story'),
+                                    name='unique_story_per_collection'),
+        ]
+        verbose_name = 'жинақтағы шығарма'
+        verbose_name_plural = 'жинақтағы шығармалар'
+
+    def __str__(self):
+        return f'{self.collection.slug} · {self.story.slug}'
+
+
+class BookOfWeek(models.Model):
+    """Книга недели (FR-HOME-03) — редакционный выбор с двумя цитатами.
+
+    Отдельной таблицей, а не флагом у произведения: неделя проходит, и
+    выбор становится историей. Флаг же пришлось бы снимать руками, и
+    главная однажды показала бы двух «книг недели» сразу.
+    """
+
+    story = models.ForeignKey(Story, verbose_name='шығарма',
+                              on_delete=models.CASCADE,
+                              related_name='weeks')
+    # Голос редакции: почему именно это и почему сейчас.
+    editorial_note = models.TextField('редакциядан')
+    # Цитата из самой книги — приглашение, а не пересказ.
+    quote = models.TextField('үзінді')
+    published_on = models.DateField('апта басы', default=timezone.localdate)
+
+    class Meta:
+        ordering = ('-published_on',)
+        get_latest_by = 'published_on'
+        verbose_name = 'аптаның кітабы'
+        verbose_name_plural = 'аптаның кітаптары'
+
+    def __str__(self):
+        return f'{self.published_on}: {self.story.title}'
+
+
+class LibraryEntry(models.Model):
+    """Запись в библиотеке читателя (BR-60/61).
+
+    Три вида — «сақталған», «оқу үстінде», «оқылған» — **не
+    пересекаются**: работа лежит ровно в одном из них, и это ограничение
+    базы, а не только формы.
+
+    Давность хранится датой, подпись выводится: «3 күн бұрын» в колонке
+    устаревало бы каждые сутки — та же ошибка, что с `days_left` (DEC-45).
+    """
+
+    KIND_CHOICES = [(k, k) for k in LIBRARY_KINDS]
+
+    user = models.ForeignKey('core.User', verbose_name='оқырман',
+                             on_delete=models.CASCADE,
+                             related_name='library')
+    story = models.ForeignKey(Story, verbose_name='шығарма',
+                              on_delete=models.CASCADE,
+                              related_name='library_entries')
+    kind = models.CharField('түрі', max_length=16, choices=KIND_CHOICES)
+    added_on = models.DateField('қосылған күні', default=timezone.localdate)
+    # Имеет смысл только у «оқу үстінде».
+    progress_chapter = models.PositiveSmallIntegerField('бөлім', default=1)
+
+    class Meta:
+        ordering = ('-added_on', 'pk')
+        constraints = [
+            models.UniqueConstraint(fields=('user', 'story'),
+                                    name='one_library_entry_per_story'),
+        ]
+        verbose_name = 'кітапхана жазбасы'
+        verbose_name_plural = 'кітапхана жазбалары'
+
+    def __str__(self):
+        return f'{self.user.username} · {self.story.slug} ({self.kind})'
+
+    @property
+    def added_relative(self) -> str:
+        return kk_updated((timezone.localdate() - self.added_on).days)
+
+
+class ReadingProgress(models.Model):
+    """Где читатель остановился. Двигатель «Оқуды жалғастыру» (FR-HOME-02).
+
+    Цитата хранится, хотя в идеале выводится из позиции в тексте: позиции
+    у нас пока нет — читалка не сообщает, где закрыли страницу. Когда
+    появится, это поле уступит ей место.
+    """
+
+    user = models.ForeignKey('core.User', verbose_name='оқырман',
+                             on_delete=models.CASCADE,
+                             related_name='reading_progress')
+    story = models.ForeignKey(Story, verbose_name='шығарма',
+                              on_delete=models.CASCADE,
+                              related_name='reading_progress')
+    current_chapter = models.PositiveSmallIntegerField('бөлім', default=1)
+    quote = models.TextField('соңғы абзац', blank=True)
+    minutes_left = models.PositiveSmallIntegerField('қалған минут', default=0)
+    last_read_on = models.DateField('соңғы оқыған күні', default=timezone.localdate)
+
+    class Meta:
+        ordering = ('-last_read_on',)
+        constraints = [
+            models.UniqueConstraint(fields=('user', 'story'),
+                                    name='one_progress_per_story'),
+        ]
+        verbose_name = 'оқу барысы'
+        verbose_name_plural = 'оқу барысы'
+
+    def __str__(self):
+        return f'{self.user.username} · {self.story.slug} → {self.current_chapter}'
+
+    @property
+    def last_read_days(self) -> int:
+        return (timezone.localdate() - self.last_read_on).days
+
+
+class StoryComment(models.Model):
+    """Комментарий к произведению или к конкретной главе (BR-30, BR-33).
+
+    Вложенность **ровно одна**: ответ на ответ превращает обсуждение в
+    ветвящееся дерево, которое на телефоне не читается и которое некому
+    модерировать.
+
+    Время хранится моментом, подпись выводится. В стабе здесь лежала
+    строка («45 мин бұрын», «1 апта бұрын»), написанная руками, — то же
+    хранимое производное, что и у уведомления, только заметнее: свежий
+    комментарий обязан выглядеть свежим.
+    """
+
+    story = models.ForeignKey(Story, verbose_name='шығарма',
+                              on_delete=models.CASCADE,
+                              related_name='comment_set')
+    author = models.ForeignKey('core.User', verbose_name='авторы',
+                               on_delete=models.CASCADE,
+                               related_name='comments')
+    # К какой главе пришвартован; пусто — комментарий ко всему произведению.
+    chapter_number = models.PositiveSmallIntegerField('бөлім', null=True,
+                                                      blank=True)
+    parent = models.ForeignKey('self', verbose_name='жауап',
+                               on_delete=models.CASCADE, null=True, blank=True,
+                               related_name='reply_set')
+    text = models.TextField('мәтіні')
+    # Лайки комментария — счётчик по той же причине, что реакции главы:
+    # ставить их пока негде (Ф15), а показывать надо.
+    likes = models.PositiveIntegerField('ұнату', default=0)
+    created_at = models.DateTimeField('жазылған', default=timezone.now)
+
+    class Meta:
+        ordering = ('pk',)
+        verbose_name = 'пікір'
+        verbose_name_plural = 'пікірлер'
+
+    def __str__(self):
+        return f'{self.author.username}: {self.text[:40]}'
+
+    @property
+    def replies(self) -> list:
+        return list(self.reply_set.select_related('author'))
+
+    @property
+    def is_author_badge(self) -> bool:
+        """Пишет автор произведения — выводится, не проставляется руками."""
+        return self.author_id == self.story.author_id
+
+    @property
+    def date(self) -> str:
+        """«45 мин бұрын», «2 сағат бұрын», «3 күн бұрын» — из момента."""
+        delta = timezone.now() - self.created_at
+        return kk_ago(delta.days, delta.seconds // 3600,
+                      (delta.seconds % 3600) // 60)
+
+    def belongs_to(self, username: str) -> bool:
+        """Свой комментарий: меню предлагает «Жою», а не «Шағым» (BR-33)."""
+        return bool(username) and self.author.username == username
+
+
+class ChapterPoll(models.Model):
+    """Необязательный вопрос автора под главой (FR-STORY-13, BR-POLL-01).
+
+    Не квиз: правильного ответа нет и очков не бывает. Смысл в другом — у
+    сериальной прозы появляется повод вернуться («кого он выберет?»), а у
+    автора обязательство дописать.
+
+    Опрос закрывается публикацией следующей главы (BR-POLL-05): ответ
+    приходит там, сюжетом. Поэтому `closed` вычисляется.
+    """
+
+    chapter = models.OneToOneField(Chapter, verbose_name='бөлім',
+                                   on_delete=models.CASCADE,
+                                   related_name='poll')
+    question = models.CharField('сұрақ', max_length=200)
+
+    class Meta:
+        verbose_name = 'бөлім сауалнамасы'
+        verbose_name_plural = 'бөлім сауалнамалары'
+
+    def __str__(self):
+        return self.question
+
+    @property
+    def closed(self) -> bool:
+        return self.chapter.story.chapter_set.filter(
+            number__gt=self.chapter.number).exists()
+
+    @property
+    def answer_chapter(self):
+        """Глава, где ответ уже есть, — куда вести дочитавшего."""
+        return self.chapter.number + 1 if self.closed else None
+
+    @property
+    def options(self) -> list:
+        return list(self.option_set.all())
+
+    @property
+    def total_votes(self) -> int:
+        return sum(o.votes for o in self.options)
+
+    @property
+    def results(self) -> list:
+        total = self.total_votes or 1
+        return [
+            {
+                'slug':    o.slug,
+                'text':    o.text,
+                'count':   o.votes,
+                'percent': round(o.votes * 100 / total),
+                # Свой голос появится вместе с возможностью голосовать (Ф15):
+                # сейчас его негде поставить, и «мой вариант» ничей.
+                'mine':    False,
+            }
+            for o in self.options
+        ]
+
+
+class PollOption(models.Model):
+    """Вариант ответа. До четырёх на опрос (BR-POLL-02) — лимит формы, а не
+    схемы: база не то место, где автору отказывают в пятом варианте."""
+
+    poll = models.ForeignKey(ChapterPoll, verbose_name='сауалнама',
+                             on_delete=models.CASCADE,
+                             related_name='option_set')
+    slug = models.SlugField('slug', max_length=32)
+    text = models.CharField('мәтіні', max_length=160)
+    # Счётчик, а не голоса: голосовать пока негде (та же причина, что у
+    # реакций главы).
+    votes = models.PositiveIntegerField('дауыс', default=0)
+    position = models.PositiveSmallIntegerField('реті', default=0)
+
+    class Meta:
+        ordering = ('position', 'pk')
+        constraints = [
+            models.UniqueConstraint(fields=('poll', 'slug'),
+                                    name='unique_option_slug_per_poll'),
+        ]
+        verbose_name = 'сауалнама нұсқасы'
+        verbose_name_plural = 'сауалнама нұсқалары'
+
+    def __str__(self):
+        return self.text
+
+
+class Notification(models.Model):
+    """Событие в ленте автора (FR-NOTIF-01, BR-70…72).
+
+    **Хранится «когда», выводится «как давно»** — подпись и группа
+    считаются из момента. Прежние поля `when="5 күн бұрын"` и
+    `bucket="past_week"` устаревали назавтра.
+
+    **Уведомление ведёт к своему предмету** (BR-72a): имя конкурса или
+    работы приходит из объекта, а в `text` лежит только событие.
+    Исключений два, и оба про чужие слова: у комментария в тексте цитата
+    читателя, у отклонённой модерации — причина от модератора (BR-11).
+    """
+
+    KIND_CHOICES = [(k, k) for k in NOTIF_KINDS]
+    OUTCOME_CHOICES = [(o, MODERATION_OUTCOME_LABELS[o])
+                       for o in MODERATION_OUTCOMES]
+
+    user = models.ForeignKey('core.User', verbose_name='кімге',
+                             on_delete=models.CASCADE,
+                             related_name='notifications')
+    kind = models.CharField('түрі', max_length=16, choices=KIND_CHOICES)
+    created_at = models.DateTimeField('болған уақыты', default=timezone.now)
+    # Кто инициатор; пусто — системное событие.
+    actor = models.ForeignKey('core.User', verbose_name='кім', null=True,
+                              blank=True, on_delete=models.CASCADE,
+                              related_name='caused_notifications')
+    story = models.ForeignKey(Story, verbose_name='шығарма', null=True,
+                              blank=True, on_delete=models.CASCADE,
+                              related_name='notifications')
+    contest = models.ForeignKey(Contest, verbose_name='байқау', null=True,
+                                blank=True, on_delete=models.CASCADE,
+                                related_name='notifications')
+    # Исход модерации **хранится** (BR-72b): это акт модератора, а не
+    # состояние работы. Вывести его из `Story.status` нельзя — статус
+    # живёт дальше события, и вчерашний отказ завтра сказал бы
+    # «Модерацияда». Пусто — решения ещё нет.
+    outcome = models.CharField('модерация нәтижесі', max_length=16, blank=True,
+                               choices=OUTCOME_CHOICES)
+    text = models.CharField('оқиға', max_length=300, blank=True)
+    read = models.BooleanField('оқылды', default=False)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'хабарлама'
+        verbose_name_plural = 'хабарламалар'
+
+    def __str__(self):
+        return f'{self.user.username} · {self.kind}'
+
+    @property
+    def days_ago(self) -> int:
+        return (timezone.localdate() - timezone.localtime(self.created_at).date()).days
+
+    @property
+    def when(self) -> str:
+        delta = timezone.now() - self.created_at
+        return kk_ago(self.days_ago, delta.seconds // 3600)
+
+    @property
+    def bucket(self) -> str:
+        """Группа FR-NOTIF-01 или '' — событие старше недели не попадает ни
+        в одну: групп ровно три, и четвёртой («раньше») в требовании нет,
+        значит неделя и есть глубина ленты."""
+        days = self.days_ago
+        if days <= 0:
+            return 'today'
+        if days == 1:
+            return 'yesterday'
+        return 'past_week' if days <= 7 else ''
+
+    @property
+    def outcome_label(self) -> str:
+        """Подпись исхода — из реестра, а не из шаблона: то же правило, что
+        у статусов работы (BR-10) и фаз конкурса (BR-40)."""
+        return MODERATION_OUTCOME_LABELS.get(self.outcome, '')
+
+
+class SchoolLink(models.Model):
+    """Ссылка «Авторлар мектебі» (DEC-22).
+
+    Страницы школы у платформы нет и не будет: есть блок ссылок на то,
+    что уже написано другими. Таблицей — потому что список меняется чаще,
+    чем выходит релиз.
+    """
+
+    # Площадка: по ней компонент берёт иконку и фирменный цвет.
+    channel = models.CharField('арна', max_length=32)
+    title = models.CharField('атауы', max_length=120)
+    subtitle = models.CharField('мазмұны', max_length=120, blank=True)
+    url = models.URLField('сілтеме')
+    position = models.PositiveSmallIntegerField('реті', default=0)
+
+    class Meta:
+        ordering = ('position', 'pk')
+        verbose_name = 'мектеп сілтемесі'
+        verbose_name_plural = 'мектеп сілтемелері'
+
+    def __str__(self):
+        return self.title

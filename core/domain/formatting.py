@@ -24,7 +24,8 @@ def kk_period(starts: date, ends: date) -> str:
     return kk_date(starts) if starts == ends else f"{kk_date(starts)} — {kk_date(ends)}"
 
 
-def kk_ago(days: int, hours: Optional[int] = None) -> str:
+def kk_ago(days: int, hours: Optional[int] = None,
+           minutes: Optional[int] = None) -> str:
     """«Сколько времени назад» словами — одна формулировка на весь проект.
 
     Относительное время до этого лежало в данных строкой: у уведомления
@@ -35,9 +36,13 @@ def kk_ago(days: int, hours: Optional[int] = None) -> str:
     декабре 2023-го.
 
     Часы называются только сегодня: «26 сағат бұрын» человек в уме
-    переводит в дни, и «кеше» короче.
+    переводит в дни, и «кеше» короче. Минуты — только в пределах часа, и
+    нужны они одному месту: под свежей главой комментарий, написанный
+    сорок минут назад, «бүгін» описывает бесполезно.
     """
     if days <= 0:
+        if not hours and minutes:
+            return f"{minutes} мин бұрын"
         if hours:
             return f"{hours} сағат бұрын"
         return "бүгін"

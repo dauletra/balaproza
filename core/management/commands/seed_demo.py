@@ -13,11 +13,9 @@
 Почему источник — `core.data`, а не `core.stub_data` напрямую. Дверь к
 данным одна (`test_data_facade`), и у сида нет причин быть исключением.
 
-**Команда растёт по этапам.** Сейчас она умеет пользователей, теги,
-произведения, главы и конкурсы — всё, для чего есть модели. Библиотека,
-подписки, комментарии приезжают своими этапами (docs/19 §19.4), и тогда
-же в неё переезжают литералы из стаба: удалить стаб — значит забрать его
-данные себе, иначе демо-корпуса не станет вовсе.
+**Команда покрывает весь корпус.** Когда стаб уйдёт, литералы переедут
+сюда: удалить стаб — значит забрать его данные себе, иначе демо-корпуса
+не станет вовсе.
 
 Справочник жанров сюда не входит: 12 жанров заливает миграция. Портал без
 них не работает, и приезжать они обязаны со схемой, а не с командой,
@@ -26,27 +24,74 @@
 
 from datetime import datetime, timedelta
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
 from core import data
 from core.domain.catalog import BADGE_LABELS
+from core.domain.formatting import kk_updated
 from core.models import (
     AwardGrant,
+    BookOfWeek,
     Chapter,
+    ChapterPoll,
     ChapterReaction,
     Contest,
     ContestAward,
     ContestCondition,
+    Collection,
+    CollectionItem,
+    Follow,
     Genre,
     JuryMember,
+    LibraryEntry,
+    Notification,
+    PollOption,
+    ReadingProgress,
+    SchoolLink,
     Story,
+    StoryComment,
     Submission,
     Tag,
     TimelineStage,
     User,
 )
+
+
+# Разбор рукописной давности («3 күн бұрын») в дельту. Код переходный: он
+# исчезнет вместе со стабом, когда литералы переедут сюда уже датами.
+_RELATIVE_UNITS = {
+    'мин':   timedelta(minutes=1),
+    'сағат': timedelta(hours=1),
+    'күн':   timedelta(days=1),
+    'апта':  timedelta(weeks=1),
+    'ай':    timedelta(days=30),
+}
+
+
+def _delta_behind(text: str) -> timedelta:
+    parts = text.split()
+    if parts[0] == 'бүгін':
+        return timedelta(0)
+    amount, unit = parts[0], parts[1]
+    if unit not in _RELATIVE_UNITS:
+        raise CommandError(f'непонятная давность в стабе: «{text}»')
+    return int(amount) * _RELATIVE_UNITS[unit]
+
+
+def _date_behind(text: str):
+    """Дата, от которой подпись выходит **той же самой**.
+
+    Проверка не формальность: если разобранная дата даёт другую строку,
+    сид молча поменял бы текст на странице библиотеки. Пусть лучше упадёт.
+    """
+    days = _delta_behind(text).days
+    if kk_updated(days) != text:
+        raise CommandError(
+            f'давность «{text}» не восстанавливается из даты: '
+            f'{days} дней дают «{kk_updated(days)}»')
+    return timezone.localdate() - timedelta(days=days)
 
 
 class Command(BaseCommand):
@@ -72,6 +117,14 @@ class Command(BaseCommand):
             'contests': self._seed_contests(),
             'grants': self._seed_grants(),
             'submissions': self._seed_submissions(),
+            'follows': self._seed_follows(),
+            'collections': self._seed_collections(),
+            'book of week': self._seed_book_of_week(),
+            'library': self._seed_library(),
+            'comments': self._seed_comments(),
+            'polls': self._seed_polls(),
+            'notifications': self._seed_notifications(),
+            'school links': self._seed_school_links(),
         }
         if not options['quiet']:
             for name, (added, updated) in report.items():
@@ -297,4 +350,178 @@ class Command(BaseCommand):
                 )
                 added += is_new
                 updated += not is_new
+        return added, updated
+
+    def _seed_follows(self):
+        """Подписки и счётчик подписчиков.
+
+        Счётчик приходит из стаба числом, а строки `Follow` — настоящие,
+        и их несколько. Это не рассогласование сида, а состояние демо:
+        восемь тысяч подписчиков `rudazov` некому создать поимённо. Число
+        показывает профиль, строки обслуживают «подписан ли я» и списки.
+        """
+        added = updated = 0
+        for author in data.AUTHORS:
+            User.objects.filter(username=author.username).update(
+                followers=author.followers)
+            updated += 1
+        for follower, targets in data.FOLLOWING.items():
+            me = User.objects.get(username=follower)
+            for target in targets:
+                _, is_new = Follow.objects.get_or_create(
+                    follower=me, following=User.objects.get(username=target))
+                added += is_new
+        return added, updated
+
+    def _seed_collections(self):
+        """Редакционные жинақтар. Состав пересобирается: порядок внутри —
+        и есть подборка, а сверять его построчно дороже, чем переложить."""
+        added = updated = 0
+        for i, stub in enumerate(data.COLLECTIONS):
+            collection, is_new = Collection.objects.update_or_create(
+                slug=stub.slug,
+                defaults={'name': stub.name, 'tint_hue': stub.tint_hue,
+                          'icon': stub.icon, 'curator': stub.curator,
+                          'description': stub.description, 'position': i},
+            )
+            added += is_new
+            updated += not is_new
+            collection.item_set.all().delete()
+            CollectionItem.objects.bulk_create([
+                CollectionItem(collection=collection,
+                               story=Story.objects.get(slug=slug), position=n)
+                for n, slug in enumerate(stub.story_slugs)
+            ])
+        return added, updated
+
+    def _seed_book_of_week(self):
+        stub = data.BOOK_OF_WEEK
+        _, is_new = BookOfWeek.objects.update_or_create(
+            story=Story.objects.get(slug=stub.story_slug),
+            defaults={'editorial_note': stub.editorial_note,
+                      'quote': stub.quote,
+                      'published_on': timezone.localdate()},
+        )
+        return int(is_new), int(not is_new)
+
+    def _seed_library(self):
+        """Библиотека и место, на котором читатель остановился.
+
+        Давность в стабе — строка («2 күн бұрын»). Здесь она обращается в
+        дату: подпись обязана выводиться, иначе она устареет к завтрашнему
+        дню. Обращение проверяет само себя — если разобранная дата не даёт
+        ту же подпись, сид падает, а не молча меняет текст на странице.
+        """
+        added = updated = 0
+        for username, entries in data.LIBRARY_BY_USER.items():
+            user = User.objects.get(username=username)
+            for stub in entries:
+                _, is_new = LibraryEntry.objects.update_or_create(
+                    user=user, story=Story.objects.get(slug=stub.story_slug),
+                    defaults={
+                        'kind': stub.kind,
+                        'progress_chapter': stub.progress_chapter,
+                        'added_on': _date_behind(stub.added_relative),
+                    },
+                )
+                added += is_new
+                updated += not is_new
+
+        progress = data.SAMPLE_PROGRESS
+        ReadingProgress.objects.update_or_create(
+            user=User.objects.get(username='aidana'),
+            story=Story.objects.get(slug=progress.story_slug),
+            defaults={'current_chapter': progress.current_chapter,
+                      'quote': progress.quote,
+                      'minutes_left': progress.minutes_left,
+                      'last_read_on': timezone.localdate()
+                      - timedelta(days=progress.last_read_days)},
+        )
+        return added, updated
+
+    def _seed_comments(self):
+        """Комментарии с одним уровнем ответов (BR-30).
+
+        Время в стабе лежало строкой, написанной руками. Здесь остаётся
+        момент, а подпись выводится — поэтому две формулировки меняются:
+        «1 күн бұрын» становится «кеше», «1 апта бұрын» — «7 күн бұрын».
+        Это не потеря: лесенка в проекте одна, и рукописная строка была
+        ровно тем, что BR-70a запрещает.
+        """
+        added = updated = 0
+        for story_slug, comments in data.COMMENTS_BY_STORY.items():
+            story = Story.objects.get(slug=story_slug)
+            story.comment_set.all().delete()
+            for stub in comments:
+                row = self._comment(story, stub, parent=None)
+                added += 1
+                for reply in stub.replies:
+                    self._comment(story, reply, parent=row)
+                    added += 1
+        return added, updated
+
+    def _comment(self, story, stub, *, parent):
+        return StoryComment.objects.create(
+            story=story,
+            author=User.objects.get(username=stub.author_username),
+            chapter_number=stub.chapter_number,
+            parent=parent,
+            text=stub.text,
+            likes=stub.likes,
+            created_at=timezone.now() - _delta_behind(stub.date),
+        )
+
+    def _seed_polls(self):
+        """Опросы под главами. Голоса — счётчиком: голосовать пока негде."""
+        added = updated = 0
+        for (story_slug, number), stub in data.POLLS_BY_CHAPTER.items():
+            chapter = Chapter.objects.get(story__slug=story_slug, number=number)
+            poll, is_new = ChapterPoll.objects.update_or_create(
+                chapter=chapter, defaults={'question': stub.question})
+            added += is_new
+            updated += not is_new
+            votes = dict(stub.votes)
+            poll.option_set.all().delete()
+            PollOption.objects.bulk_create([
+                PollOption(poll=poll, slug=slug, text=text,
+                           votes=votes.get(slug, 0), position=i)
+                for i, (slug, text) in enumerate(stub.options)
+            ])
+        return added, updated
+
+    def _seed_notifications(self):
+        """Уведомления. Хранится момент, «как давно» и группа выводятся."""
+        added = updated = 0
+        for username, items in data.NOTIFICATIONS_BY_USER.items():
+            user = User.objects.get(username=username)
+            user.notifications.all().delete()
+            for stub in items:
+                Notification.objects.create(
+                    user=user,
+                    kind=stub.kind,
+                    created_at=timezone.now() - timedelta(
+                        days=stub.days_ago, hours=stub.hours_ago or 0),
+                    actor=(User.objects.filter(username=stub.actor_username).first()
+                           if stub.actor_username else None),
+                    story=(Story.objects.filter(slug=stub.story_slug).first()
+                           if stub.story_slug else None),
+                    contest=(Contest.objects.filter(slug=stub.contest_slug).first()
+                             if stub.contest_slug else None),
+                    outcome=stub.outcome,
+                    text=stub.text,
+                    read=stub.read,
+                )
+                added += 1
+        return added, updated
+
+    def _seed_school_links(self):
+        added = updated = 0
+        for i, stub in enumerate(data.SCHOOL_LINKS):
+            _, is_new = SchoolLink.objects.update_or_create(
+                channel=stub.channel,
+                defaults={'title': stub.title, 'subtitle': stub.subtitle,
+                          'url': stub.url, 'position': i},
+            )
+            added += is_new
+            updated += not is_new
         return added, updated

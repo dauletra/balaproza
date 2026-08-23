@@ -13,6 +13,9 @@ from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from .models import (
     AwardGrant,
     BlockedTagPattern,
+    BookOfWeek,
+    Collection,
+    CollectionItem,
     Chapter,
     ChapterReaction,
     Contest,
@@ -20,7 +23,9 @@ from .models import (
     ContestCondition,
     Genre,
     JuryMember,
+    SchoolLink,
     Story,
+    StoryComment,
     Submission,
     Tag,
     TimelineStage,
@@ -243,3 +248,59 @@ class SubmissionAdmin(admin.ModelAdmin):
     list_filter = ('status', 'contest')
     search_fields = ('author__username', 'story__title')
     autocomplete_fields = ('author', 'story')
+
+
+class CollectionItemInline(admin.TabularInline):
+    """Состав подборки. Порядок редакционный: первые три идут на обложку."""
+
+    model = CollectionItem
+    extra = 1
+    autocomplete_fields = ('story',)
+
+
+@admin.register(Collection)
+class CollectionAdmin(admin.ModelAdmin):
+    """Жинақ — редакционная кураторская работа (DEC-31).
+
+    Пользовательских подборок нет и не планируется: личное хранение —
+    это «Кітапхана».
+    """
+
+    list_display = ('name', 'position', 'curator', 'count')
+    list_editable = ('position',)
+    prepopulated_fields = {'slug': ('name',)}
+    inlines = (CollectionItemInline,)
+
+    @admin.display(description='шығарма саны')
+    def count(self, obj):
+        return obj.count
+
+
+@admin.register(BookOfWeek)
+class BookOfWeekAdmin(admin.ModelAdmin):
+    """Отдельной записью на неделю, а не флагом у произведения: флаг
+    пришлось бы снимать руками, и главная показала бы двух сразу."""
+
+    list_display = ('published_on', 'story')
+    autocomplete_fields = ('story',)
+
+
+@admin.register(StoryComment)
+class StoryCommentAdmin(admin.ModelAdmin):
+    """Модерации комментариев в MVP ровно столько: прочитать и удалить."""
+
+    list_display = ('author', 'story', 'chapter_number', 'short_text',
+                    'created_at')
+    list_filter = ('story',)
+    search_fields = ('text', 'author__username')
+    autocomplete_fields = ('author', 'story', 'parent')
+
+    @admin.display(description='мәтіні')
+    def short_text(self, obj):
+        return obj.text[:60]
+
+
+@admin.register(SchoolLink)
+class SchoolLinkAdmin(admin.ModelAdmin):
+    list_display = ('title', 'channel', 'subtitle', 'position')
+    list_editable = ('position',)
