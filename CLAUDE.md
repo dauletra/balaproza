@@ -136,7 +136,7 @@ balaproza_v1/
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
 │   │                             # domain.formatting.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 1064 теста в 21 файле (см. ниже)
+│   └── tests/                    # 1063 теста в 21 файле (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -260,7 +260,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 1064 теста
+uv run python manage.py test core       # все 1063 теста
 uv run python manage.py test core.tests.test_<file>
 ```
 
@@ -395,13 +395,13 @@ login_as_newcomer(client, 'lonely_reader')    # вошедший без един
 | Состав секций главной | `docs/05` FR-HOME-*, `docs/14 §14.3` |
 | Сигнатуру хелпера в `core/queries/*` | `docs/12 §12.3` |
 | Строку интерфейса | сверить с `docs/16` (обращение на «сен», словарь статусов) |
-| Новый компонент или тест-файл | `docs/04` / `docs/15` + счётчики в `README.md`, `CLAUDE.md` и `AGENTS.md` |
+| Новый компонент или тест-файл | `docs/04` / `docs/15` + счётчики в `README.md` и `CLAUDE.md` |
 
 **Решение не правится — оно отменяется новым.** Передумал насчёт DEC-NN — добавляй новый DEC со ссылкой «отменяет DEC-NN», старый помечай перечёркнутым. История решений и есть ценность реестра. Аннулированные номера FR/BR/DEC не переиспользуются.
 
 **Невыполненное помечается явно** (⛔ + объяснение), иначе документ выглядит описанием факта. Так помечены NFR-30, NFR-41, DEC-12.
 
-Проверяемая часть этого правила закрыта тестом `core/tests/test_docs_sync.py`: счётчики, пути к файлам, имена токенов и хелперов, тексты статусов, наличие шапки со сверкой, совпадение `AGENTS.md` с `CLAUDE.md`. Он не проверяет смысл — только имена и числа.
+Проверяемая часть этого правила закрыта тестом `core/tests/test_docs_sync.py`: счётчики, пути к файлам, имена токенов и хелперов, тексты статусов, наличие шапки со сверкой. Он не проверяет смысл — только имена и числа.
 
 ## Что НЕ делать
 

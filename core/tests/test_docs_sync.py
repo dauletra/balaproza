@@ -38,18 +38,18 @@ def _code_spans(text):
 
 
 class TestCounters(unittest.TestCase):
-    """Счётчики в README.md, CLAUDE.md и AGENTS.md — цифры, которые устаревают тише всего.
+    """Счётчики в README.md и CLAUDE.md — цифры, которые устаревают тише всего.
 
     Они устарели дважды: «315 тестов в 12 файлах» при фактических 397 в 15,
     и «~55 компонентов» при 50.
 
-    `AGENTS.md` — дословная копия `CLAUDE.md` для другого агента, и как
-    ручная копия он и отстал: девять DEC и «315 тестов в 12 файлах» при
-    фактических 729 в 16. Проверка одна на оба файла ровно потому, что
-    расходятся они молча.
+    Рядом жил `AGENTS.md` — дословная копия `CLAUDE.md` для другого агента,
+    и проверка держала их совпадение, потому что расходились они молча. Копия
+    удалена: одни и те же правила в двух файлах — это не подстраховка, а
+    вторая вещь, которую надо помнить при каждой правке.
     """
 
-    MIRRORS = ('CLAUDE.md', 'AGENTS.md')
+    MIRRORS = ('CLAUDE.md',)
 
     def _actual_tests(self):
         files = sorted((BASE / 'core' / 'tests').glob('test_*.py'))
@@ -90,26 +90,6 @@ class TestCounters(unittest.TestCase):
                 int(claimed.group(1)), actual,
                 f'{name}: заявлено {claimed.group(1)} компонентов, фактически {actual}.',
             )
-
-    def test_agents_md_still_mirrors_claude_md(self):
-        """Две редакции одного текста расходятся молча — здесь они сверяются.
-
-        Отличаться разрешено ровно шапке: заголовок, имя агента и абзац
-        о том, что файл — копия. Всё, что ниже «## Текущий фокус», обязано
-        совпадать символ в символ.
-        """
-        marker = '## Текущий фокус'
-        bodies = []
-        for name in self.MIRRORS:
-            text = _text(BASE / name)
-            self.assertIn(marker, text, f'{name}: не нашёл «{marker}»')
-            bodies.append(text[text.index(marker):])
-        self.assertEqual(
-            bodies[0], bodies[1],
-            'CLAUDE.md и AGENTS.md разошлись ниже шапки. Правишь один — '
-            'переписывай второй тем же коммитом: правила у агентов общие, '
-            'а прошлая копия отстала на девять DEC незамеченной.',
-        )
 
 
 class TestReferencedPathsExist(unittest.TestCase):

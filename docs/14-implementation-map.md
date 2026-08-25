@@ -1,6 +1,6 @@
 # 14 · Карта реализации: требование → код
 
-> `Обновлён: 2026-08-26` · `Сверен с кодом: be979e3`
+> `Обновлён: 2026-08-26` · `Сверен с кодом: 6b01a3a`
 
 Этот документ отвечает на два вопроса, на которые остальное ТЗ не отвечает: **где живёт то, что описано требованием**, и **что придётся обновить, если это изменить**.
 
@@ -336,8 +336,8 @@ Showcase-маршруты `/_design/tokens/`, `/_design/components/`, `/_design/
 | Афиша конкурса или связь выпусков | [08 BR-47/47a](08-business-rules.md), [12 §12.4](12-domain-model-contract.md), [05](05-functional-spec.md) FR-CONT-11/13, [03 §3.3](03-genre-color-system.md) (пары `L C` афиши) |
 | Новый маршрут в `core/urls.py` | [05 §5.13](05-functional-spec.md) (карта переходов), эта карта, `PUBLIC_URLS` в `test_urls_smoke.py` |
 | Новый компонент в `templates/components/` | [04](04-component-library.md), счётчик в `CLAUDE.md` |
-| Новый тест-файл | [15](15-testing-contract.md), счётчики в `README.md`, `CLAUDE.md` и `AGENTS.md` |
-| Новые тесты в существующем файле | счётчики в `README.md`, `CLAUDE.md` и `AGENTS.md` (их держит `test_docs_sync.TestCounters`) |
+| Новый тест-файл | [15](15-testing-contract.md), счётчики в `README.md` и `CLAUDE.md` |
+| Новые тесты в существующем файле | счётчики в `README.md` и `CLAUDE.md` (их держит `test_docs_sync.TestCounters`) |
 | Строка интерфейса | [16](16-content-voice.md) — тон, обращение на «сен», одно слово на одну сущность |
 | Любая строка про возраст или аудиторию | [08 BR-48](08-business-rules.md), [10 DEC-47](10-resolved-decisions.md) — вилку называет только страница конкурса, платформа молчит |
 | `partials/right_rail/*.html` | FR-раздела в [05](05-functional-spec.md) + флаг `has_right_rail` во view: рейл ставится по наличию данных, а не безусловно (DEC-25) |
