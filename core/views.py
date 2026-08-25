@@ -1104,7 +1104,7 @@ def search_index_json(request):
                     'title':  s.title,
                     'author': s.author.public_name if s.author else '',
                     # Обложки лежат в /media/ (после Фазы интеграции реальных файлов)
-                    'cover':  ('/media/' + s.cover) if s.cover else '',
+                    'cover':  s.cover.url if s.cover else '',
                 }
                 for s in data.public_stories()
                 # Тот же набор, что и в каталоге: по литералу 'Published'

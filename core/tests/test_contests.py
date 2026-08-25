@@ -891,8 +891,8 @@ class ContestAwardImages(TestCase):
                 if not a.image:
                     continue
                 with self.subTest(contest=c.slug, award=a.slug):
-                    self.assertTrue((Path(settings.MEDIA_ROOT) / a.image).is_file(),
-                                    f'нет файла: {a.image}')
+                    self.assertTrue((Path(settings.MEDIA_ROOT) / a.image.name).is_file(),
+                                    f'нет файла: {a.image.name}')
 
     def test_image_path_follows_the_contract(self):
         """`awards/<contest>/<award>.png` — растр, не SVG.
@@ -905,8 +905,10 @@ class ContestAwardImages(TestCase):
                 if not a.image:
                     continue
                 with self.subTest(award=a.slug):
-                    self.assertTrue(a.image.startswith(f'awards/{c.slug}/'), a.image)
-                    self.assertTrue(a.image.endswith(('.png', '.webp')), a.image)
+                    self.assertTrue(a.image.name.startswith(f'awards/{c.slug}/'),
+                                    a.image.name)
+                    self.assertTrue(a.image.name.endswith(('.png', '.webp')),
+                                    a.image.name)
 
     def test_award_without_image_still_renders(self):
         """Админ не загрузил файл — типографическая заглушка, не дыра."""
@@ -945,7 +947,7 @@ class ContestAwardsOnDetail(TestCase):
         for g in c.grants:
             if g.award.image:
                 with self.subTest(award=g.award.slug):
-                    self.assertContains(r, f'/media/{g.award.image}')
+                    self.assertContains(r, f'/media/{g.award.image.name}')
 
 
 class SystemWinnerAwardIsRetired(TestCase):
@@ -1414,8 +1416,8 @@ class ContestPosterIsItsOwn(TestCase):
         for c in data.all_contests():
             if c.poster:
                 with self.subTest(contest=c.slug):
-                    self.assertTrue(c.poster.startswith('contests/'))
-                    self.assertFalse(c.poster.endswith('.svg'))
+                    self.assertTrue(c.poster.name.startswith('contests/'))
+                    self.assertFalse(c.poster.name.endswith('.svg'))
 
 
 class PosterStripHasAWidthBudget(TestCase):

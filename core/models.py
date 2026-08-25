@@ -16,9 +16,11 @@
 агрегат по логу слишком дорог — и тогда рядом стоит его пересчёт.
 """
 
+from pathlib import Path
+
 from django.contrib.auth.models import AbstractUser
-from django.core.validators import MaxValueValidator
-from django.db import models
+from django.core.validators import FileExtensionValidator, MaxValueValidator
+from django.db import models, transaction
 from django.utils import timezone
 
 from .domain.catalog import BADGE_LABELS, PUBLIC_STATUSES
@@ -30,8 +32,52 @@ from .domain.notifications import (
     MODERATION_OUTCOMES,
     NOTIF_KINDS,
 )
-from .domain.story import REACTIONS, REACTIONS_BY_SLUG, STORY_FORMATS, STORY_STATUSES
+from .domain.story import (
+    REACTIONS,
+    REACTIONS_BY_SLUG,
+    STORY_FORMATS,
+    STORY_STATUSES,
+    status_after_moderation,
+)
 from .domain.tags import TAG_STATUSES
+
+
+# Что принимаем в `media/` (BR-46). Растр и только растр: файл из `/media/`
+# открывается в origin сайта, а SVG — это документ со скриптами, а не
+# картинка. Проверка по расширению, а не по содержимому: `ImageField`
+# потребовал бы Pillow ради одного поля в админке, куда файлы кладёт
+# модератор, а не посетитель.
+RASTER_ONLY = FileExtensionValidator(
+    ['png', 'jpg', 'jpeg', 'webp'],
+    message='Тек растр сурет: png, jpg, webp. SVG қабылданбайды (BR-46).',
+)
+
+
+def _ext(filename: str) -> str:
+    return Path(filename).suffix.lower()
+
+
+def story_cover_path(instance, filename):
+    """`covers/<slug>.<ext>` — имя файла из работы, а не из машины автора.
+
+    Загруженное имя («IMG_20240817 (1).PNG») попадает в публичный URL и
+    остаётся там навсегда; слаг у работы уже есть, он уникален и читается.
+    """
+    return f'covers/{instance.slug}{_ext(filename)}'
+
+
+def contest_poster_path(instance, filename):
+    return f'contests/{instance.slug}{_ext(filename)}'
+
+
+def award_image_path(instance, filename):
+    """`awards/<contest>/<award>.<ext>` — раскладка из BR-46.
+
+    Конкурс в пути, потому что номинации у разных конкурсов называются
+    одинаково: «бас-жүлде» есть у каждого второго, и без каталога
+    конкурса эмблемы затирали бы друг друга.
+    """
+    return f'awards/{instance.contest.slug}/{instance.slug}{_ext(filename)}'
 
 
 class User(AbstractUser):
@@ -256,9 +302,10 @@ class Story(models.Model):
     title = models.CharField('атауы', max_length=120)
     author = models.ForeignKey('core.User', verbose_name='авторы',
                                on_delete=models.CASCADE, related_name='stories')
-    # Имя файла в MEDIA_ROOT. Пусто — `cover_placeholder.html` рисует
+    # Файл в MEDIA_ROOT. Пусто — `cover_placeholder.html` рисует
     # типографическую плашку по тону основного жанра, и страница не ломается.
-    cover = models.CharField('мұқаба', max_length=200, blank=True)
+    cover = models.FileField('мұқаба', upload_to=story_cover_path, blank=True,
+                             max_length=200, validators=[RASTER_ONLY])
     annotation = models.TextField('аннотация', blank=True)
 
     primary_genre = models.ForeignKey(Genre, verbose_name='негізгі жанр',
@@ -371,6 +418,45 @@ class Story(models.Model):
         """Видит ли работу читатель. По `PUBLIC_STATUSES`, а не по литералу
         'Published' — иначе из выдачи молча пропадают все сериалы (DEC-37)."""
         return self.status in PUBLIC_STATUSES
+
+    def apply_moderation(self, outcome: str, reason: str = ''):
+        """Решение модератора: сменить статус и сказать об этом автору.
+
+        Одна дверь на два действия, потому что порознь они бессмысленны:
+        статус без уведомления оставляет автора гадать, что случилось с
+        работой, а уведомление без статуса обещает публикацию, которой
+        не произошло. Инструмент модерации сегодня — админка (DEC-23),
+        завтра будет вью; правило от этого не меняется, поэтому живёт
+        здесь, а не в `admin.py`.
+
+        Причина обязательна у обоих отрицательных исходов (BR-11,
+        BR-72b): «Толықтыру қажет» без неё сообщает ровно столько же,
+        сколько «Қабылданбады», то есть ничего. У одобрения причины нет —
+        есть необязательное слово модератора.
+
+        Решается только то, что автор сам отправил на проверку. Одобрить
+        чужой черновик значит опубликовать работу, которую не показывали:
+        готовность объявляет автор (FR-WRITE-09), модератор отвечает
+        «да» или «нет».
+
+        Возвращает созданное уведомление.
+        """
+        if outcome not in MODERATION_OUTCOMES:
+            raise ValueError(f'Белгісіз модерация нәтижесі: {outcome!r}')
+        if self.status != 'OnModeration':
+            raise ValueError(
+                f'«{self.title}» модерацияға жіберілмеген (қазір {self.status}).')
+        reason = reason.strip()
+        if outcome != 'approved' and not reason:
+            raise ValueError('Себепсіз қайтаруға болмайды (BR-11).')
+
+        with transaction.atomic():
+            self.status = status_after_moderation(outcome, self.format)
+            self.save(update_fields=['status', 'updated_at'])
+            return Notification.objects.create(
+                user=self.author, kind='moderation', story=self,
+                outcome=outcome, text=reason,
+            )
 
     @property
     def updated_days_ago(self) -> int:
@@ -568,7 +654,9 @@ class Contest(models.Model):
     prize_kzt = models.PositiveIntegerField('сыйлық (₸)', null=True, blank=True)
     # Афиша — файл в MEDIA_ROOT (`contests/<slug>.png`), грузит админ
     # (BR-47a). Пусто — платформа рисует типографическую афишу по названию.
-    poster = models.CharField('афиша', max_length=200, blank=True)
+    poster = models.FileField('афиша', upload_to=contest_poster_path,
+                              blank=True, max_length=200,
+                              validators=[RASTER_ONLY])
     # Слаг семейства повторяющегося конкурса (BR-47). Пусто — разовый.
     # Связь по слагу, а не по совпадению имён: у выпусков имена расходятся
     # («Жас алдым — 2023» против «Жас алдым — 2026»).
@@ -874,7 +962,9 @@ class ContestAward(models.Model):
                                 related_name='award_set')
     slug = models.SlugField('slug', max_length=48)
     title = models.CharField('атауы', max_length=80)
-    image = models.CharField('эмблема', max_length=200, blank=True)
+    image = models.FileField('эмблема', upload_to=award_image_path,
+                             blank=True, max_length=200,
+                             validators=[RASTER_ONLY])
     description = models.CharField('сипаттамасы', max_length=200, blank=True)
     position = models.PositiveSmallIntegerField('реті', default=0)
 
