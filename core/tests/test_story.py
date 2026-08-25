@@ -743,7 +743,6 @@ class StoryLinksBackToItsCollections(TestCase):
         self.html = self.response.content.decode()
 
     def test_block_lists_every_collection_holding_the_story(self):
-        from core import stub_data
         story = data.story_by_slug('tunge-deiin')
         collections = data.collections_of(story)
         self.assertTrue(collections)
@@ -760,7 +759,6 @@ class StoryLinksBackToItsCollections(TestCase):
         )
 
     def test_block_absent_when_story_is_in_no_collection(self):
-        from core import stub_data
         orphan = next(
             (s for s in data.public_stories() if not data.collections_of(s)), None)
         self.assertIsNotNone(orphan, 'нужен стори вне подборок для проверки пустого случая')

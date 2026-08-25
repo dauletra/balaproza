@@ -11,6 +11,7 @@ import unittest
 from html.parser import HTMLParser
 from pathlib import Path
 
+from core import data
 from core.tests.base import TestCase, login_as
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "templates"
@@ -324,12 +325,12 @@ class IconLabelsDoNotDuplicateText(TestCase):
         )
 
 
-class IconNamesExistInSprite(unittest.TestCase):
+class IconNamesExistInSprite(TestCase):
     """Имя иконки, которого нет в спрайте, рендерит пустой `<use>`.
 
     Пустой квадрат в консоль не пишет и в вёрстке почти не виден. Раньше
     все имена были литералами в шаблонах и проверялись глазами при ревью;
-    с достижениями (FR-PROF-06) они приходят из `stub_data`, где опечатку
+    с достижениями (FR-PROF-06) они приходят из данных, где опечатку
     заметить уже негде.
     """
 
@@ -349,26 +350,23 @@ class IconNamesExistInSprite(unittest.TestCase):
 
     def test_award_art_exists_in_sprite(self):
         """Слаг иллюстрации приходит из данных — опечатку заметить негде."""
-        from core import stub_data
         ids = self._award_ids()
-        for a in stub_data.AUTHORS:
-            for ach in stub_data.achievements_of(a.username):
+        for a in data.all_authors():
+            for ach in data.achievements_of(a.username):
                 with self.subTest(author=a.username, art=ach["art"]):
                     self.assertIn(ach["art"], ids)
 
     def test_every_read_tier_has_art(self):
-        from core import stub_data
         ids = self._award_ids()
-        for art, _ in stub_data.READ_TIER_ART.values():
+        for art, _ in data.READ_TIER_ART.values():
             with self.subTest(art=art):
                 self.assertIn(art, ids)
 
     def test_award_sprite_has_no_orphan_symbols(self):
         """Символ, на который никто не ссылается, — мёртвый вес на странице."""
-        from core import stub_data
-        used = {a[0] for a in stub_data.READ_TIER_ART.values()}
-        for author in stub_data.AUTHORS:
-            used |= {x["art"] for x in stub_data.achievements_of(author.username)}
+        used = {a[0] for a in data.READ_TIER_ART.values()}
+        for author in data.all_authors():
+            used |= {x["art"] for x in data.achievements_of(author.username)}
         self.assertEqual(self._award_ids() - used, set())
 
     def test_template_icon_literals_exist(self):

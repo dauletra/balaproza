@@ -36,7 +36,7 @@ def _notification(username='ghost', **fields):
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
 
 
-# ════════════════════════════ stub_data helpers ════════════════════════════
+# ════════════════════════════ Данные корпуса ═══════════════════════════════
 
 class LibraryHelpers(TestCase):
 

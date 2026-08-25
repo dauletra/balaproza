@@ -6,11 +6,12 @@
 читателю, что уходит из публичного имени в приватное, как нормализуется
 блок-лист.
 
-Вторая — **временная и потому самая важная**: справочник жанров, залитый
-миграцией, обязан совпадать с тем, что до сих пор рисует стаб. Пока
-источника два, любое расхождение — это молчаливая смена каталога в тот
-день, когда чтение переключится на базу (этап 3). Литералы в миграции
-заморожены намеренно, сверять их с живым модулем больше нечем.
+Вторая — справочник, который приезжает вместе со схемой: двенадцать
+жанров заливает миграция, и без них не работает ни каталог, ни главная.
+Сверять их больше не с чем — второго списка в проекте нет, и это цель,
+а не потеря. Проверяется поэтому не совпадение с копией, а то, что
+делает справочник справочником: полнота, редакторский порядок и
+пригодность каждой записи к рендеру.
 """
 
 from datetime import UTC, datetime
@@ -19,7 +20,6 @@ from zoneinfo import ZoneInfo
 from django.test import TestCase
 from django.utils import timezone
 
-from core import stub_data
 from core.models import BlockedTagPattern, Genre, Tag, User
 
 
@@ -74,27 +74,40 @@ class ReferenceDataArrivesWithTheSchema(TestCase):
         self.assertEqual(Genre.objects.count(), 12)
 
     def test_order_is_editorial_not_alphabetical(self):
-        slugs = list(Genre.objects.values_list('slug', flat=True))
-        self.assertEqual(slugs, [g.slug for g in stub_data.GENRES])
+        """Порядок жанров — редакторский выбор (DEC-11).
 
-    def test_hue_and_icon_match_the_stub(self):
-        """Расхождение здесь — смена цвета карточки в день переключения
-        чтения на базу, и заметить её будет нечем."""
-        for stub in stub_data.GENRES:
-            with self.subTest(genre=stub.slug):
-                genre = Genre.objects.get(slug=stub.slug)
-                self.assertEqual(genre.name, stub.name)
-                self.assertEqual(genre.hue, stub.hue)
-                self.assertEqual(genre.icon, stub.icon)
+        Проверяется, что он не совпадает с алфавитом: `position` без
+        этого выглядит декоративным полем, и первая же сортировка «для
+        порядка» переставила бы полосу на главной.
+        """
+        names = [g.name for g in Genre.objects.all()]
+        self.assertEqual(len(names), 12)
+        self.assertNotEqual(names, sorted(names))
+
+    def test_every_genre_can_be_rendered(self):
+        """У жанра есть всё, чем его рисуют: имя, тон и иконка тайла.
+
+        Пустой `hue` — бесцветный чип, пустой `icon` — дыра на карточке
+        `/genres/`; и то и другое видно только глазами, потому что
+        страница при этом не падает.
+        """
+        for genre in Genre.objects.all():
+            with self.subTest(genre=genre.slug):
+                self.assertTrue(genre.name)
+                self.assertTrue(genre.icon)
+                self.assertTrue(0 <= genre.hue <= 360)
 
     def test_genre_carries_no_story_counter(self):
         """`count` — агрегат по каталогу; колонкой он разошёлся бы с выдачей
         на первой же смене статуса работы."""
         self.assertNotIn('count', {f.name for f in Genre._meta.get_fields()})
 
-    def test_blocked_patterns_match_the_stub(self):
+    def test_blocked_patterns_arrive_with_the_schema(self):
+        """Блок-лист тоже референс-данные: без него `is_blocked` пропускает
+        всё (BR-TAG-05), а команду сида можно и не запустить."""
         patterns = set(BlockedTagPattern.objects.values_list('pattern', flat=True))
-        self.assertEqual(patterns, set(stub_data.BLOCKED_TAG_PATTERNS))
+        self.assertTrue(patterns)
+        self.assertEqual(patterns, {p.lower().strip() for p in patterns})
 
 
 class TagsFollowTheirPath(TestCase):

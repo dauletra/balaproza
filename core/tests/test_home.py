@@ -7,6 +7,8 @@
 from core.tests.base import TestCase, login_as
 from django.urls import reverse
 
+from core import data
+
 
 class HomeGuestMode(TestCase):
 
@@ -164,8 +166,7 @@ class HomeMobileSecondFold(TestCase):
     def test_genre_strip_shows_all_twelve_genres(self):
         """Вывеска обязана показать весь ассортимент: двенадцать цветных слов
         за пару секунд объясняют, что это литературный портал (DEC-31)."""
-        from core import stub_data
-        for genre in stub_data.GENRES:
+        for genre in data.all_genres():
             with self.subTest(genre=genre.slug):
                 self.assertIn(f'/genres/{genre.slug}/', self.html)
 
@@ -184,13 +185,12 @@ class HomeMobileSecondFold(TestCase):
 
     def test_every_genre_has_at_least_one_published_story(self):
         """Пустой чип — тупик: подросток тапает жанр и упирается в заглушку."""
-        from core import stub_data
-        for genre in stub_data.GENRES:
+        for genre in data.all_genres():
             with self.subTest(genre=genre.slug):
                 # Не литерал 'Published': после DEC-37 опубликованный сериал
                 # носит OnProcess или Completed, и проверка ловила бы не то.
-                published = [s for s in stub_data.stories_by_genre(genre.slug)
-                             if s.status in stub_data.PUBLIC_STATUSES]
+                published = [s for s in data.stories_by_genre(genre.slug)
+                             if s.status in data.PUBLIC_STATUSES]
                 self.assertTrue(published)
 
 
@@ -458,7 +458,7 @@ class FooterSiteMap(TestCase):
 class StoryDetailHasGate(TestCase):
     """FR-STORY-05: гость на странице произведения видит CommentLoginGate."""
 
-    # Реальный slug из stub_data — иначе попадаем в ветку «Шығарма табылмады»,
+    # Реальный slug из корпуса — иначе попадаем в ветку «Шығарма табылмады»,
     # где gate не рендерится.
     STORY_SLUG = 'dalney-berega'
 

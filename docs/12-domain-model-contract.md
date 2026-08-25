@@ -1,10 +1,12 @@
 # 12. Domain model contract for F14
 
-> `Обновлён: 2026-08-23` · `Сверен с кодом: 3888897`
+> `Обновлён: 2026-08-26` · `Сверен с кодом: be979e3`
 
-**Порядок работ по этому контракту — [`19`](19-f14-migration-plan.md).** Читающая сторона обращается к фасаду `core.data`, а не к `stub_data` напрямую: имена ниже — его поверхность, и она не меняется от того, кто за ней отвечает сегодня. Словарь предметной области (оси каталога, реакции, ступени наград, подписи статусов, формулировки времени) вынесен в `core/domain/`: это правила, а не записи, и удаление стаба их не касается.
+> ✅ **Контракт исполнен.** Ф14 завершена: стаба нет, читает база, порядок работ и разбор каждого этапа — [`19`](19-f14-migration-plan.md). Документ остаётся **не описанием таблиц** (для них есть `core/models.py`, где у каждого поля стоит причина), а списком того, что миграция была обязана сохранить, и почему. Читается он теперь в обратную сторону: не «что сделать», а «что нельзя сломать потом».
 
-This document is the implementation contract for replacing `core/stub_data.py` with real Django models. It does not introduce models yet; it fixes the fields, relationships, computed values, and query helpers that the current templates already depend on.
+Читающая сторона обращается к фасаду `core.data`, а не к моделям напрямую: имена ниже — его поверхность, и она не меняется от того, кто за ней отвечает. Словарь предметной области (оси каталога, реакции, ступени наград, подписи статусов, формулировки времени) живёт в `core/domain/`: это правила, а не записи, и замена хранилища их не коснулась — ни один файл домена в Ф14 не изменился по существу.
+
+Колонка «Stub source» сохранена намеренно: по ней видно, что чем стало, и она же объясняет, почему у некоторых моделей поля выглядят странно (`Story.likes`, `Tag.weekly_count`, `User.followers` — счётчики без строк под ними, потому что в демо-корпусе их некому создать).
 
 ## 12.1 Product boundary
 
@@ -24,15 +26,15 @@ Secondary scenarios stay minimal until real usage exists:
 
 ## 12.2 Core models
 
-Fields are **not listed here.** Every stub dataclass is in `core/stub_data.py`, twenty lines above the data it holds — a prose copy of those field lists would be a second source that silently rots, which is exactly what happened to §12.3 before this revision.
+Fields are **not listed here.** Они в `core/models.py`, у каждого — причина рядом; прозаическая копия тех же списков была бы вторым источником, который тихо гниёт, — ровно это и случилось с §12.3 до одной из ревизий.
 
-**`Story.recent_views` и `Story.updated_days_ago` в Ф14 не переносятся как есть.** Второе — дельта в днях от «сегодня», в бою это `updated_at` с `auto_now`: хранить дельту нельзя, она устаревает каждые сутки. В стабе она числом потому, что фиксированная дата «сегодня» ломала бы тесты через день. Заполнена только у произведений демо-автора — кабинет показывает своё, а `None` значит «не задано» и уходит в конец сортировки.
+**`Story.updated_days_ago` не перенесён как есть** — это была дельта в днях от «сегодня», и в базе ей соответствует `updated_at` с `auto_now`: хранить дельту нельзя, она устаревает каждые сутки. Состояния «не задано» вместе со стабом не стало: у строки времени изменения не может не быть. Postgres при `DESC` ставит `NULL` первыми — сортировка кабинета поэтому явно просит `nulls_last`.
 
-**`Story.recent_views` — про окно, а не про давность.** Это просмотры за 14 дней (DEC-36), в стабе — литерал, в бою — агрегат по логу просмотров с окном. Считать его от `views` нельзя: смысл оси в том, что она расходится с накопленным счётчиком. Инвариант `recent_views <= views` закрыт тестом `test_stub_data.RecentViewsAreConsistent`.
+**`Story.recent_views` — про окно, а не про давность.** Это просмотры за 14 дней (DEC-36); пока колонка, дальше — агрегат по логу просмотров с окном. Считать его от `views` нельзя: смысл оси в том, что она расходится с накопленным счётчиком. Инвариант `recent_views <= views` закрыт тестом `test_corpus.RecentViewsAreConsistent`.
 
-**`NEW_AUTHOR_FOLLOWERS = 150` — стаб-условная константа, не правило.** Авторов в стабе шесть, и любая граница между ними произвольна. В Ф14 «новое имя» должно определяться перцентилем по подписчикам или возрастом аккаунта, а не абсолютным числом: 150 подписчиков на портале из двухсот авторов и из двадцати тысяч означают разное. Число не наследовать.
+**`NEW_AUTHOR_FOLLOWERS = 150` — условная константа, не правило.** Авторов в демо-корпусе шесть, и любая граница между ними произвольна. В Ф14 «новое имя» должно определяться перцентилем по подписчикам или возрастом аккаунта, а не абсолютным числом: 150 подписчиков на портале из двухсот авторов и из двадцати тысяч означают разное. Число не наследовать.
 
-What the table carries instead is the part `stub_data.py` cannot state: what must survive the migration and why.
+What the table carries instead is the part a field list cannot state: what had to survive the migration, and what must keep surviving.
 
 | Model | Stub source | Must survive F14 |
 |-------|-------------|------------------|
@@ -40,7 +42,7 @@ What the table carries instead is the part `stub_data.py` cannot state: what mus
 | **Genre** | `Genre` | Closed reference of 12 (DEC-11). `/genres/` is an overview page, `/catalog/` the primary reading entry, `/genres/<slug>/` a catalog filter entry — **not** a separate engine (DEC-27) |
 | **Tag** | `Tag`, `TAGS`, `BLOCKED_TAG_PATTERNS` | Up to 10 per story (BR-TAG-01). `status`: `pending` / `accepted` / `rejected`. Pending visible to the author, hidden from public catalog and story views (BR-TAG-07). Blocked patterns stay admin-managed |
 | **Story** | `Story` | `OnProcess` is a continuation state, **not** a moderation state. Public catalog carries only `Published` and explicitly allowed public states. `format` is chosen by the author, never inferred from chapter count (DEC-28). Status labels — `components/status_badge.html`, see [16 §16.3](16-content-voice.md). **`audience` has no default** — blank means «not chosen yet», and anything past `NotPublished` must carry a mark (BR-10b); after F14 the column stays nullable/blank rather than defaulting, or the choice silently reverts to being made by the schema |
-| **Chapter** | `Chapter`, `CHAPTERS_BY_STORY` | One-based numbers. Bodies live **outside** `stub_data.py` in `core/story_texts/<slug>/<n>.txt`; `_chapter()` loads them and derives `char_count`. Keep long prose out of the data module. Read via `?chapter=N` — no separate route (DEC-30). **`Story.chapters` не может обещать больше, чем есть записей**: запись главы обязана нести текст, поэтому произведение без текста несёт `chapters=0`, а не пустые главы. Закрыто `test_stub_data.DeclaredChapterCountMatchesLoadedChapters`, там же заморожен список каталожных сериалов, которым текст ещё не написан |
+| **Chapter** | `Chapter`, `CHAPTERS_BY_STORY` | One-based numbers. Bodies live **outside** the data module in `core/story_texts/<slug>/<n>.txt`; сид читает их в `Chapter.body`, `char_count` считается при сохранении. Keep long prose out of the data module. Read via `?chapter=N` — no separate route (DEC-30). **`Story.chapters` не может обещать больше, чем есть записей**: запись главы обязана нести текст, поэтому произведение без текста несёт `chapters=0`, а не пустые главы. Закрыто `test_corpus.DeclaredChapterCountMatchesLoadedChapters`, там же заморожен список каталожных сериалов, которым текст ещё не написан |
 | **Collection** | `Collection` | Ordered many-to-many with `Story`. Editorial curation by a moderator, not a smart auto-filter, and separate from contests (DEC-27). **Admin-authored only** — there is no user-created collection (DEC-31); `count` and `covers` are derived from `story_slugs`, never stored alongside it |
 | **Contest** | `Contest` | Хранятся три даты (`opens_on` / `closes_on` / `results_on`); фаза, отсчёт, год и число заявок **выводятся** (DEC-45, BR-40a). Хранимого `status` нет и заводить его нельзя — это тот же класс поля, что `Author.works`. Повторяющийся конкурс — отдельный объект на каждый выпуск, связь через `series` (BR-47): у выпусков расходится всё, чем конкурс является. Separate from collections. Admin UI is Django admin for MVP (DEC-23) |
 | **Submission** | `Submission` | One story per author per contest (BR-23). Eligibility is a query/service concern, never template logic (BR-22, BR-24). `submitted_on` is a date; the relative wording is derived (BR-41a) |
@@ -50,9 +52,9 @@ What the table carries instead is the part `stub_data.py` cannot state: what mus
 
 ## 12.3 Query/service helpers to preserve
 
-Current views rely on these helpers from `stub_data.py`. In F14 they should move to query/service functions, not into templates.
+Views полагаются на эти хелперы; после Ф14 они живут в `core/queries/*` и отдаются через фасад `core.data`. В шаблоны эта логика не спускается.
 
-**Signatures below are the actual ones in the code.** Note that every helper takes a **string key** (`username`, `story_slug`, `genre_slug`, `contest_slug`), not a model object — stub dataclasses are frozen and unlinked. F14 may switch these to objects, but that is a deliberate signature change touching every call site, not a free refactor.
+**Signatures below are the actual ones in the code.** Каждый хелпер принимает **строковый ключ** (`username`, `story_slug`, `genre_slug`, `contest_slug`), а не объект модели. Так было в стабе, и так осталось намеренно: перевод на объекты — отдельное решение и отдельный проход по всем вызовам, а смешанный с миграцией он лишил бы возможности понять, что сломалось — модель или вызов.
 
 Catalog and search:
 - `filter_catalog(*, query="", genre="", tag="", status="", sort="trending", audience="", length="", format="", badge="", author_tier="", kind="") -> list[Story]`
@@ -144,7 +146,7 @@ Templates should continue receiving objects with these attributes:
 Story — stored fields plus computed properties. In the stubs the computed ones are `@property` on the dataclass; after F14 they may become model properties, annotations, or denormalised columns, but the template-facing names must not change.
 
 - stored: `slug`, `title`, `cover`, `annotation`, `status`, `audience`, `badges`, `chapters`, `views`, `likes`, `comments`
-- ⛔ `likes` — **сумма реакций по главам** (BR-14, DEC-32), и по общему правилу его следовало бы вычислять, как `Author.works`. Пока хранится: у четырёх работ главы не написаны вовсе (48 глав текста, `KNOWN_TEXTLESS`), и вычисление обнулило бы им метрику в каталоге. Инвариант условный — где главы несут реакции, итог обязан сходиться с их суммой (BR-14a, `test_stub_data.StoryReactionsMatchTheirChapters`). **После Ф14 — агрегат запроса**, имя для шаблонов не меняется
+- ⛔ `likes` — **сумма реакций по главам** (BR-14, DEC-32), и по общему правилу его следовало бы вычислять, как `Author.works`. Пока хранится: у четырёх работ главы не написаны вовсе (48 глав текста, `KNOWN_TEXTLESS`), и вычисление обнулило бы им метрику в каталоге. Инвариант условный — где главы несут реакции, итог обязан сходиться с их суммой (BR-14a, `test_corpus.StoryReactionsMatchTheirChapters`). **После Ф14 — агрегат запроса**, имя для шаблонов не меняется
 - resolved relations: `author`, `primary_genre`, `genres_resolved`, `tags_resolved`
 - format (DEC-28): `format`, `format_label`, `format_badge_label`, `is_single`, `is_serial`, `text_chapter`
 - статус и время: `is_public`, `updated_days_ago`, `updated_label`
@@ -216,7 +218,7 @@ Tag:
 5. Replace write dashboard with real user-owned stories.
 6. Replace contests/submissions.
 7. Replace comments and notifications.
-8. Remove `stub_data.py` only after all tests pass against models.
+8. Remove `stub_data.py` only after all tests pass against models. ✅ — сделано на этапе 11: файла нет, демо-корпус лежит литералами рядом с `seed_demo` и читается только ею.
 
 ## 12.6 Test contract
 

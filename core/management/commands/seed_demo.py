@@ -1,24 +1,25 @@
 """Демо-корпус в базе: то, что до Ф14 ехало вместе с кодом.
 
-Пока данные лежат литералами в `core/stub_data.py`, они переносятся между
-машинами как обычный код. После Ф14 так больше нельзя, и место этого
-механизма занимает эта команда: она **идемпотентна** и запускается сколько
-угодно раз — на пустой базе, поверх уже засеянной, после смены схемы.
+Раньше содержимое портала лежало литералами в `core/stub_data.py`, и
+страницы читали его прямо оттуда — то есть переносилось между машинами
+как обычный код. Теперь читает база, а раскладывает по таблицам эта
+команда: она **идемпотентна** и запускается сколько угодно раз — на
+пустой базе, поверх уже засеянной, после смены схемы.
 
 Почему команда, а не фикстура. Даты идущих конкурсов заданы относительно
 сегодняшнего дня (DEC-45): застывший JSON через месяц переведёт конкурс в
 другую фазу, и тесты начнут падать по календарю, а не по коду. Команда
 пересчитывает такие значения при каждом запуске.
 
-Почему источник — `core.stub_data` напрямую, в обход фасада. Это
-единственный модуль, которому так можно, и причина простая: фасад по мере
-Ф14 начинает отвечать моделями, и сид, читающий через него, читал бы то,
-что сам же записал. Команда — конвертер между двумя мирами, ей положено
-видеть исходный; вместе со стабом она и умрёт.
+Сами литералы лежат рядом — `_corpus.py`, приватный модуль команды.
+Читать его больше некому: приложение отвечает из базы, а корпус остался
+тем, чем и был по сути, — демо-содержимым, которое кто-то однажды
+придумал. Прежний стаб держал вокруг тех же записей девяносто хелперов и
+полсотни вычисляемых свойств, то есть вторую реализацию портала; из неё
+не осталось ничего.
 
-**Команда покрывает весь корпус.** Когда стаб уйдёт, литералы переедут
-сюда: удалить стаб — значит забрать его данные себе, иначе демо-корпуса
-не станет вовсе.
+Идемпотентность — это **сходимость**, а не «ничего не делать при
+повторе»: изменённое возвращается к эталону, лишнее удаляется.
 
 Справочник жанров сюда не входит: 12 жанров заливает миграция. Портал без
 них не работает, и приезжать они обязаны со схемой, а не с командой,
@@ -27,13 +28,10 @@
 
 from datetime import datetime, timedelta
 
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from core import stub_data
-from core.domain.catalog import BADGE_LABELS
-from core.domain.formatting import kk_updated
 from core.models import (
     AwardGrant,
     BookOfWeek,
@@ -61,40 +59,7 @@ from core.models import (
     User,
 )
 
-
-# Разбор рукописной давности («3 күн бұрын») в дельту. Код переходный: он
-# исчезнет вместе со стабом, когда литералы переедут сюда уже датами.
-_RELATIVE_UNITS = {
-    'мин':   timedelta(minutes=1),
-    'сағат': timedelta(hours=1),
-    'күн':   timedelta(days=1),
-    'апта':  timedelta(weeks=1),
-    'ай':    timedelta(days=30),
-}
-
-
-def _delta_behind(text: str) -> timedelta:
-    parts = text.split()
-    if parts[0] == 'бүгін':
-        return timedelta(0)
-    amount, unit = parts[0], parts[1]
-    if unit not in _RELATIVE_UNITS:
-        raise CommandError(f'непонятная давность в стабе: «{text}»')
-    return int(amount) * _RELATIVE_UNITS[unit]
-
-
-def _date_behind(text: str):
-    """Дата, от которой подпись выходит **той же самой**.
-
-    Проверка не формальность: если разобранная дата даёт другую строку,
-    сид молча поменял бы текст на странице библиотеки. Пусть лучше упадёт.
-    """
-    days = _delta_behind(text).days
-    if kk_updated(days) != text:
-        raise CommandError(
-            f'давность «{text}» не восстанавливается из даты: '
-            f'{days} дней дают «{kk_updated(days)}»')
-    return timezone.localdate() - timedelta(days=days)
+from . import _corpus
 
 
 class Command(BaseCommand):
@@ -146,7 +111,7 @@ class Command(BaseCommand):
         (BR-73, docs/12 §12.4), а день никогда не выводится.
         """
         added = updated = 0
-        for author in stub_data.AUTHORS:
+        for author in _corpus.AUTHORS:
             joined = timezone.make_aware(datetime(author.joined_year, 1, 1))
             user, is_new = User.objects.update_or_create(
                 username=author.username,
@@ -172,7 +137,7 @@ class Command(BaseCommand):
         накопленным (DEC-31). Подробности — в `core.models.Tag`.
         """
         added = updated = 0
-        for tag in stub_data.TAGS:
+        for tag in _corpus.TAGS:
             _, is_new = Tag.objects.update_or_create(
                 slug=tag.slug,
                 defaults={'name': tag.name, 'status': tag.status,
@@ -198,7 +163,7 @@ class Command(BaseCommand):
         tags = {t.slug: t for t in Tag.objects.all()}
         added = updated = 0
 
-        for stub in stub_data.STORIES:
+        for stub in _corpus.STORIES:
             primary, secondary = stub.genres[0], (stub.genres[1:] or (None,))[0]
             story, is_new = Story.objects.update_or_create(
                 slug=stub.slug,
@@ -218,8 +183,8 @@ class Command(BaseCommand):
                     'likes':           stub.likes,
                     'comments':        stub.comments,
                     # Знак редакции — акт человека; конкурсный знак выводится
-                    # из заявки и сюда не переносится (см. `Story.badges`).
-                    'is_editorial_pick': BADGE_LABELS['editorial'] in stub.badges,
+                    # из заявки и в корпусе его нет (см. `Story.badges`).
+                    'is_editorial_pick': stub.is_editorial_pick,
                 },
             )
             story.tags.set([tags[slug] for slug in stub.tags if slug in tags])
@@ -238,9 +203,9 @@ class Command(BaseCommand):
         обязана исчезнуть и из базы, иначе повторный сид копит мусор.
         """
         added = updated = 0
-        for stub in stub_data.STORIES:
+        for stub in _corpus.STORIES:
             story = Story.objects.get(slug=stub.slug)
-            chapters = stub_data.chapters_of(stub.slug)
+            chapters = _corpus.CHAPTERS_BY_STORY.get(stub.slug, ())
             story.chapter_set.exclude(
                 number__in=[c.number for c in chapters]).delete()
 
@@ -275,7 +240,7 @@ class Command(BaseCommand):
         решение жюри.
         """
         added = updated = 0
-        for stub in stub_data.CONTESTS:
+        for stub in _corpus.CONTESTS:
             contest, is_new = Contest.objects.update_or_create(
                 slug=stub.slug,
                 defaults={
@@ -330,7 +295,7 @@ class Command(BaseCommand):
         """Присуждения (DEC-46) — акт жюри, поэтому переносятся как данные,
         а не выводятся из чего-либо."""
         added = updated = 0
-        for stub in stub_data.AWARD_GRANTS:
+        for stub in _corpus.AWARD_GRANTS:
             contest = Contest.objects.get(slug=stub.contest_slug)
             _, is_new = AwardGrant.objects.update_or_create(
                 contest=contest,
@@ -346,7 +311,7 @@ class Command(BaseCommand):
         """Заявки авторов. Автор берётся из ключа стаба, а не из работы:
         подаёт человек, и BR-23 считает заявки именно по нему."""
         added = updated = 0
-        for username, subs in stub_data.SUBMISSIONS_BY_USER.items():
+        for username, subs in _corpus.SUBMISSIONS_BY_USER.items():
             author = User.objects.get(username=username)
             for stub in subs:
                 _, is_new = Submission.objects.update_or_create(
@@ -370,11 +335,11 @@ class Command(BaseCommand):
         показывает профиль, строки обслуживают «подписан ли я» и списки.
         """
         added = updated = 0
-        for author in stub_data.AUTHORS:
+        for author in _corpus.AUTHORS:
             User.objects.filter(username=author.username).update(
                 followers=author.followers)
             updated += 1
-        for follower, targets in stub_data.FOLLOWING.items():
+        for follower, targets in _corpus.FOLLOWING.items():
             me = User.objects.get(username=follower)
             for target in targets:
                 _, is_new = Follow.objects.get_or_create(
@@ -386,7 +351,7 @@ class Command(BaseCommand):
         """Редакционные жинақтар. Состав пересобирается: порядок внутри —
         и есть подборка, а сверять его построчно дороже, чем переложить."""
         added = updated = 0
-        for i, stub in enumerate(stub_data.COLLECTIONS):
+        for i, stub in enumerate(_corpus.COLLECTIONS):
             collection, is_new = Collection.objects.update_or_create(
                 slug=stub.slug,
                 defaults={'name': stub.name, 'tint_hue': stub.tint_hue,
@@ -404,7 +369,7 @@ class Command(BaseCommand):
         return added, updated
 
     def _seed_book_of_week(self):
-        stub = stub_data.BOOK_OF_WEEK
+        stub = _corpus.BOOK_OF_WEEK
         _, is_new = BookOfWeek.objects.update_or_create(
             story=Story.objects.get(slug=stub.story_slug),
             defaults={'editorial_note': stub.editorial_note,
@@ -422,7 +387,7 @@ class Command(BaseCommand):
         ту же подпись, сид падает, а не молча меняет текст на странице.
         """
         added = updated = 0
-        for username, entries in stub_data.LIBRARY_BY_USER.items():
+        for username, entries in _corpus.LIBRARY_BY_USER.items():
             user = User.objects.get(username=username)
             for stub in entries:
                 _, is_new = LibraryEntry.objects.update_or_create(
@@ -430,13 +395,13 @@ class Command(BaseCommand):
                     defaults={
                         'kind': stub.kind,
                         'progress_chapter': stub.progress_chapter,
-                        'added_on': _date_behind(stub.added_relative),
+                        'added_on': timezone.localdate() - stub.added_ago,
                     },
                 )
                 added += is_new
                 updated += not is_new
 
-        progress = stub_data.SAMPLE_PROGRESS
+        progress = _corpus.SAMPLE_PROGRESS
         ReadingProgress.objects.update_or_create(
             user=User.objects.get(username='aidana'),
             story=Story.objects.get(slug=progress.story_slug),
@@ -458,7 +423,7 @@ class Command(BaseCommand):
         ровно тем, что BR-70a запрещает.
         """
         added = updated = 0
-        for story_slug, comments in stub_data.COMMENTS_BY_STORY.items():
+        for story_slug, comments in _corpus.COMMENTS_BY_STORY.items():
             story = Story.objects.get(slug=story_slug)
             story.comment_set.all().delete()
             for stub in comments:
@@ -477,13 +442,13 @@ class Command(BaseCommand):
             parent=parent,
             text=stub.text,
             likes=stub.likes,
-            created_at=timezone.now() - _delta_behind(stub.date),
+            created_at=timezone.now() - stub.ago,
         )
 
     def _seed_polls(self):
         """Опросы под главами. Голоса — счётчиком: голосовать пока негде."""
         added = updated = 0
-        for (story_slug, number), stub in stub_data.POLLS_BY_CHAPTER.items():
+        for (story_slug, number), stub in _corpus.POLLS_BY_CHAPTER.items():
             chapter = Chapter.objects.get(story__slug=story_slug, number=number)
             poll, is_new = ChapterPoll.objects.update_or_create(
                 chapter=chapter, defaults={'question': stub.question})
@@ -498,18 +463,36 @@ class Command(BaseCommand):
             ])
         return added, updated
 
+    @staticmethod
+    def _moment(days_ago: int, hours_ago: int):
+        """Момент события, не переезжающий в чужие сутки.
+
+        «Сегодня» в корпусе задано часами назад, а лента группирует по
+        календарным дням (FR-NOTIF-01). Между полуночью и утром «2 сағат
+        бұрын» оказывалось вчерашним, и группа «Бүгін» исчезала целиком —
+        сид, запущенный ночью, показывал портал без верхнего блока ленты.
+        Поэтому сегодняшнее событие прижимается к началу суток.
+        """
+        now = timezone.now()
+        moment = now - timedelta(days=days_ago, hours=hours_ago)
+        if days_ago == 0:
+            start = timezone.localtime(now).replace(
+                hour=0, minute=5, second=0, microsecond=0)
+            moment = max(moment, start)
+        return moment
+
     def _seed_notifications(self):
         """Уведомления. Хранится момент, «как давно» и группа выводятся."""
         added = updated = 0
-        for username, items in stub_data.NOTIFICATIONS_BY_USER.items():
+        for username, items in _corpus.NOTIFICATIONS_BY_USER.items():
             user = User.objects.get(username=username)
             user.notifications.all().delete()
             for stub in items:
                 Notification.objects.create(
                     user=user,
                     kind=stub.kind,
-                    created_at=timezone.now() - timedelta(
-                        days=stub.days_ago, hours=stub.hours_ago or 0),
+                    created_at=self._moment(stub.days_ago,
+                                            stub.hours_ago or 0),
                     actor=(User.objects.filter(username=stub.actor_username).first()
                            if stub.actor_username else None),
                     story=(Story.objects.filter(slug=stub.story_slug).first()
@@ -525,7 +508,7 @@ class Command(BaseCommand):
 
     def _seed_school_links(self):
         added = updated = 0
-        for i, stub in enumerate(stub_data.SCHOOL_LINKS):
+        for i, stub in enumerate(_corpus.SCHOOL_LINKS):
             _, is_new = SchoolLink.objects.update_or_create(
                 channel=stub.channel,
                 defaults={'title': stub.title, 'subtitle': stub.subtitle,

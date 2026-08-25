@@ -25,7 +25,7 @@ from core.queries import contests as contest_queries
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
 
 
-# ════════════════════════════ stub_data helpers ════════════════════════════
+# ════════════════════════════ Данные корпуса ═══════════════════════════════
 
 class ContestModel(TestCase):
 

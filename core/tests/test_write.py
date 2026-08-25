@@ -7,34 +7,35 @@ from django.template.loader import render_to_string
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from core import stub_data
+from core import data
+from core.models import Story
 from core.tests.base import login_as, login_as_newcomer
 from core.templatetags.balaproza import spaced
 
 
-# ───────────────────────── stub_data: my_stories_of / writer_stats ───────
+# ───────────────────────── Кабинет: my_stories_of / writer_stats ─────────
 
 class MyStoriesHelper(TestCase):
 
     def test_my_stories_filters_by_username(self):
-        result = stub_data.my_stories_of('aidana')
+        result = data.my_stories_of('aidana')
         self.assertEqual(len(result), 5)
         for s in result:
-            self.assertEqual(s.author_username, 'aidana')
+            self.assertEqual(s.author.username, 'aidana')
 
     def test_my_stories_unknown_user_is_empty(self):
-        self.assertEqual(stub_data.my_stories_of('no-such-user'), [])
+        self.assertEqual(data.my_stories_of('no-such-user'), [])
 
     def test_writer_stats_aggregates_correctly(self):
-        stats = stub_data.writer_stats('aidana')
-        mine = stub_data.my_stories_of('aidana')
+        stats = data.writer_stats('aidana')
+        mine = data.my_stories_of('aidana')
         self.assertEqual(stats['total'], len(mine))
         self.assertEqual(stats['views'], sum(s.views for s in mine))
         self.assertEqual(stats['likes'], sum(s.likes for s in mine))
-        self.assertEqual(stats['followers'], stub_data.AUTHORS_BY_USERNAME['aidana'].followers)
+        self.assertEqual(stats['followers'], data.author_by_username('aidana').followers)
 
     def test_writer_stats_counts_statuses(self):
-        stats = stub_data.writer_stats('aidana')
+        stats = data.writer_stats('aidana')
         self.assertEqual(stats['published'], 2)
         self.assertEqual(stats['on_moderation'], 1)
         self.assertEqual(stats['ongoing'], 1)
@@ -62,7 +63,7 @@ class MyStoriesAuthedHasItems(TestCase):
         self.assertEqual(self.response.status_code, 200)
 
     def test_lists_every_story(self):
-        for s in stub_data.my_stories_of('aidana'):
+        for s in data.my_stories_of('aidana'):
             with self.subTest(story=s.slug):
                 self.assertContains(self.response, s.title)
 
@@ -79,7 +80,7 @@ class MyStoriesAuthedHasItems(TestCase):
         self.assertNotContains(self.response, 'Әлі шығарма жоқ')
 
     def test_each_card_links_to_manage(self):
-        for s in stub_data.my_stories_of('aidana'):
+        for s in data.my_stories_of('aidana'):
             with self.subTest(story=s.slug):
                 self.assertContains(
                     self.response,
@@ -160,7 +161,7 @@ class SingleStoryTextButtonOpensExistingText(TestCase):
         return reverse('core:chapter_new', kwargs={'slug': slug})
 
     def test_every_single_with_text_links_to_that_chapter(self):
-        for story in stub_data.my_stories_of('aidana'):
+        for story in data.my_stories_of('aidana'):
             if not story.text_chapter:
                 continue
             with self.subTest(story=story.slug):
@@ -192,14 +193,14 @@ class MyStoryRowMetricsAreAnnounced(TestCase):
 
     def test_metrics_carry_spoken_labels(self):
         # Просмотры — за две недели (DEC-36), а не накопленные
-        story = stub_data.STORIES_BY_SLUG['aidana-tan']   # 310 / 87 / 12
+        story = data.story_by_slug('aidana-tan')   # 310 / 87 / 12
         self.assertContains(self.response, f'{spaced(story.recent_views)} оқылым')
         self.assertContains(self.response, f'{spaced(story.likes)} реакция')
         self.assertContains(self.response, f'{spaced(story.comments)} пікір')
 
     def test_labels_are_reachable_by_screen_readers(self):
         # sr-only, а не aria-label: у <span> с role=generic имя не выставляется
-        views = spaced(stub_data.STORIES_BY_SLUG['aidana-tan'].recent_views)
+        views = spaced(data.story_by_slug('aidana-tan').recent_views)
         self.assertContains(self.response, f'class="sr-only">{views} оқылым')
 
     def test_counts_are_exact_not_compacted(self):
@@ -238,8 +239,8 @@ class WriteHasNoAuthorStatsRail(TestCase):
 
     def test_no_author_totals_leak_onto_a_single_story_page(self):
         """Числа автора не стоят рядом с числами произведения."""
-        stats = stub_data.writer_stats('aidana')
-        story = stub_data.STORIES_BY_SLUG['aidana-tan']
+        stats = data.writer_stats('aidana')
+        story = data.story_by_slug('aidana-tan')
         self.assertNotEqual(stats['views'], story.views)   # иначе тест пуст
         body = self.client.get(
             reverse('core:manage_story', kwargs={'slug': 'aidana-tan'})
@@ -306,7 +307,7 @@ class NewStoryForm(TestCase):
         self.assertContains(self.response, 'Жазуға кірісу')
 
     def test_genre_select_lists_all_12(self):
-        for g in stub_data.GENRES:
+        for g in data.all_genres():
             with self.subTest(genre=g.slug):
                 self.assertContains(self.response, f'value="{g.slug}"')
 
@@ -361,13 +362,13 @@ class ManageStoryKnown(TestCase):
         из-за которой рейл и убрали (DEC-48) — слово про портфель автора
         читалось как слово про произведение.
         """
-        story = stub_data.STORIES_BY_SLUG[self.SLUG]
+        story = data.story_by_slug(self.SLUG)
         self.assertEqual(story.status, 'OnProcess')
         self.assertContains(self.response, story.title)
         self.assertContains(self.response, 'Жазылып жатыр')
 
     def test_lists_each_chapter_with_edit_link(self):
-        chapters = stub_data.chapters_of(self.SLUG)
+        chapters = data.chapters_of(self.SLUG)
         self.assertGreater(len(chapters), 0)
         for c in chapters:
             with self.subTest(chapter=c.number):
@@ -420,12 +421,12 @@ class StorySettingsForm(TestCase):
         self.assertEqual(self.response.status_code, 200)
 
     def test_prefilled_title(self):
-        story = stub_data.STORIES_BY_SLUG[self.SLUG]
+        story = data.story_by_slug(self.SLUG)
         # значение title попадает в value инпута
         self.assertContains(self.response, f'value="{story.title}"')
 
     def test_primary_genre_preselected(self):
-        story = stub_data.STORIES_BY_SLUG[self.SLUG]
+        story = data.story_by_slug(self.SLUG)
         # Селектор содержит selected на текущем жанре
         self.assertContains(self.response, f'value="{story.primary_genre.slug}" selected')
 
@@ -450,12 +451,12 @@ class StorySettingsForm(TestCase):
     def test_audience_radios_are_offered(self):
         """BR-10b: отметку выбирает автор, и выбирает он её здесь."""
         self.assertContains(self.response, 'name="audience"')
-        for key, _mark, _hint in stub_data.STORY_AUDIENCES:
+        for key, _mark, _hint in data.STORY_AUDIENCES:
             with self.subTest(audience=key):
                 self.assertContains(self.response, f'value="{key}"')
 
     def test_current_audience_is_preselected(self):
-        story = stub_data.STORIES_BY_SLUG[self.SLUG]
+        story = data.story_by_slug(self.SLUG)
         body = self.response.content.decode()
         # Ровно один радио группы отмечен, и это текущая отметка работы.
         checked = re.findall(
@@ -479,22 +480,22 @@ class StorySettingsStatusIsOnlyForPublicSerials(TestCase):
         return self.client.get(reverse('core:story_settings', kwargs={'slug': slug}))
 
     def test_draft_gets_no_status_radio(self):
-        story = stub_data.STORIES_BY_SLUG['aidana-kus']
+        story = data.story_by_slug('aidana-kus')
         self.assertEqual(story.status, 'NotPublished')
         self.assertNotContains(self._get('aidana-kus'), 'name="status"')
 
     def test_moderation_gets_no_status_radio(self):
-        story = stub_data.STORIES_BY_SLUG['aidana-erteg']
+        story = data.story_by_slug('aidana-erteg')
         self.assertEqual(story.status, 'OnModeration')
         self.assertNotContains(self._get('aidana-erteg'), 'name="status"')
 
     def test_single_gets_no_status_radio(self):
-        story = stub_data.STORIES_BY_SLUG['aidana-koshe']
+        story = data.story_by_slug('aidana-koshe')
         self.assertTrue(story.is_single and story.is_public)
         self.assertNotContains(self._get('aidana-koshe'), 'name="status"')
 
     def test_public_serial_keeps_it(self):
-        story = stub_data.STORIES_BY_SLUG['aidana-tan']
+        story = data.story_by_slug('aidana-tan')
         self.assertTrue(story.is_public and not story.is_single)
         self.assertContains(self._get('aidana-tan'), 'name="status"')
 
@@ -511,17 +512,19 @@ class AudienceIsChosenNotDefaulted(TestCase):
     кабинета рисовал за это решение зелёную галку — галку за несделанное.
     """
 
-    def test_dataclass_has_no_default_mark(self):
-        blank = stub_data.Story('x', 'X', 'aidana', '', ('drama', None), 0, 0, 0, 0)
-        self.assertEqual(blank.audience, '')
+    def test_model_has_no_default_mark(self):
+        """Пустая строка — «автор ещё не выбрал», и это состояние схемы,
+        а не обход дефолта."""
+        self.assertFalse(Story._meta.get_field('audience').has_default())
+        self.assertEqual(Story().audience, '')
 
     def test_every_non_draft_story_carries_a_mark(self):
-        for s in stub_data.STORIES:
+        for s in Story.objects.all():
             if s.status == 'NotPublished':
                 continue
             with self.subTest(story=s.slug):
                 self.assertIn(
-                    s.audience, stub_data.AUDIENCE_ORDER,
+                    s.audience, data.AUDIENCE_ORDER,
                     f'{s.slug} вышла из черновика без возрастной отметки',
                 )
 
@@ -529,12 +532,12 @@ class AudienceIsChosenNotDefaulted(TestCase):
         # В каталоге подпись называет вилку читателя («10-13»), в форме —
         # отметку работы. Одна константа на оба места означала бы, что автор
         # ставит работе метку «10-13», то есть «старше не читают».
-        form = {mark for _k, mark, _h in stub_data.STORY_AUDIENCES}
-        catalog = {label for key, label in stub_data.CATALOG_AUDIENCE_FILTERS if key}
+        form = {mark for _k, mark, _h in data.STORY_AUDIENCES}
+        catalog = {label for key, label in data.CATALOG_AUDIENCE_FILTERS if key}
         self.assertNotEqual(form, catalog)
         self.assertEqual(
-            [k for k, _m, _h in stub_data.STORY_AUDIENCES],
-            list(stub_data.AUDIENCE_ORDER),
+            [k for k, _m, _h in data.STORY_AUDIENCES],
+            list(data.AUDIENCE_ORDER),
         )
 
 
@@ -545,12 +548,12 @@ class ManageStoryChecklistIsHonestAboutAudience(TestCase):
         login_as(self.client)
 
     def test_draft_without_a_mark_shows_it_as_missing(self):
-        self.assertEqual(stub_data.STORIES_BY_SLUG['aidana-kus'].audience, '')
+        self.assertEqual(data.story_by_slug('aidana-kus').audience, '')
         r = self.client.get(reverse('core:manage_story', kwargs={'slug': 'aidana-kus'}))
         self.assertContains(r, 'Жас белгісін қой')
 
     def test_marked_story_shows_the_mark(self):
-        story = stub_data.STORIES_BY_SLUG['aidana-tan']
+        story = data.story_by_slug('aidana-tan')
         r = self.client.get(reverse('core:manage_story', kwargs={'slug': 'aidana-tan'}))
         self.assertContains(r, f'Жас белгісі: {story.audience}')
 
@@ -566,8 +569,8 @@ class PublishChecklistIsActionable(TestCase):
         login_as(self.client)
 
     def test_every_unfinished_item_carries_a_link(self):
-        story = stub_data.STORIES_BY_SLUG['aidana-kus']
-        for item in stub_data.publish_checklist(story):
+        story = data.story_by_slug('aidana-kus')
+        for item in data.publish_checklist(story):
             with self.subTest(item=item['key']):
                 self.assertIn(item['target'], ('settings', 'text'))
         r = self.client.get(reverse('core:manage_story', kwargs={'slug': 'aidana-kus'}))
@@ -587,7 +590,7 @@ class PublishChecklistIsActionable(TestCase):
         # У одночастного «дописать текст» — это правка существующей главы,
         # а не создание второй: тот же разбор, что в my_story_row.
         slug = 'aidana-koshe'
-        story = stub_data.STORIES_BY_SLUG[slug]
+        story = data.story_by_slug(slug)
         self.assertTrue(story.is_single and story.text_chapter)
         r = self.client.get(reverse('core:manage_story', kwargs={'slug': slug}))
         text = next(i for i in r.context['checklist'] if i['key'] == 'text')
@@ -597,8 +600,8 @@ class PublishChecklistIsActionable(TestCase):
 
     def test_optional_items_are_marked_optional(self):
         # Обложка и теги улучшают карточку, но не держат публикацию.
-        required = {i['key'] for i in stub_data.publish_checklist(
-            stub_data.STORIES_BY_SLUG['aidana-kus']) if i['required']}
+        required = {i['key'] for i in data.publish_checklist(
+            data.story_by_slug('aidana-kus')) if i['required']}
         self.assertEqual(required, {'text', 'annotation', 'audience'})
 
 
@@ -612,44 +615,44 @@ class SubmitForReviewIsOnlyForReadyDrafts(TestCase):
         return self.client.get(reverse('core:manage_story', kwargs={'slug': slug}))
 
     def test_draft_missing_required_items_cannot_submit(self):
-        story = stub_data.STORIES_BY_SLUG['aidana-kus']
+        story = data.story_by_slug('aidana-kus')
         # Черновик без единого бөлім и без возрастной отметки.
-        self.assertFalse(stub_data.can_submit_for_review(story))
+        self.assertFalse(data.can_submit_for_review(story))
         r = self._get('aidana-kus')
         self.assertFalse(r.context['can_submit'])
         self.assertContains(r, 'disabled')
         self.assertContains(r, 'Модерацияға жіберу')
 
     def test_public_story_gets_no_submit_button(self):
-        story = stub_data.STORIES_BY_SLUG['aidana-tan']
+        story = data.story_by_slug('aidana-tan')
         self.assertTrue(story.is_public)
-        self.assertFalse(stub_data.can_submit_for_review(story))
+        self.assertFalse(data.can_submit_for_review(story))
         self.assertNotContains(self._get('aidana-tan'), 'Модерацияға жіберу')
 
     def test_story_already_on_moderation_gets_no_submit_button(self):
-        story = stub_data.STORIES_BY_SLUG['aidana-erteg']
+        story = data.story_by_slug('aidana-erteg')
         self.assertEqual(story.status, 'OnModeration')
-        self.assertFalse(stub_data.can_submit_for_review(story))
+        self.assertFalse(data.can_submit_for_review(story))
         self.assertNotContains(self._get('aidana-erteg'), 'Модерацияға жіберу')
 
     def test_a_complete_draft_can_submit(self):
-        draft = stub_data.STORIES_BY_SLUG['aidana-kus']
+        draft = data.story_by_slug('aidana-kus')
         self.assertEqual(
-            stub_data.missing_for_review(draft), ['text', 'audience'])
-        # Тот же черновик с закрытыми обязательными пунктами. `slug` подменён
-        # на работу с загруженным текстом: chapters_of ходит по slug, а не
-        # по объекту, так что «текст есть» иначе не смоделировать.
-        ready = replace(draft, audience='10+', slug='aidana-tan',
-                        status='NotPublished')
-        self.assertEqual(stub_data.missing_for_review(ready), [])
-        self.assertTrue(stub_data.can_submit_for_review(ready))
+            data.missing_for_review(draft), ['text', 'audience'])
+        # Черновик с закрытыми обязательными пунктами. Берётся работа с
+        # написанным текстом и возвращается в черновики **в памяти**:
+        # проверяется чек-лист, а не запись — сохранять нечего.
+        ready = data.story_by_slug('aidana-tan')
+        ready.status = 'NotPublished'
+        self.assertEqual(data.missing_for_review(ready), [])
+        self.assertTrue(data.can_submit_for_review(ready))
 
     def test_readiness_and_status_are_different_questions(self):
         # Готовая, но уже отправленная работа отправляться повторно не должна.
-        ready = replace(stub_data.STORIES_BY_SLUG['aidana-tan'],
-                        status='OnModeration')
-        self.assertEqual(stub_data.missing_for_review(ready), [])
-        self.assertFalse(stub_data.can_submit_for_review(ready))
+        ready = data.story_by_slug('aidana-tan')
+        ready.status = 'OnModeration'
+        self.assertEqual(data.missing_for_review(ready), [])
+        self.assertFalse(data.can_submit_for_review(ready))
 
 
 # ───────────────────────── Chapter editor ─────────────────────────
@@ -742,11 +745,11 @@ class ChapterEditorEdit(TestCase):
         self.assertEqual(self.response.status_code, 200)
 
     def test_prefilled_chapter_title(self):
-        ch = stub_data.chapter_of(self.SLUG, self.CH)
+        ch = data.chapter_of(self.SLUG, self.CH)
         self.assertContains(self.response, f'value="{ch.title}"')
 
     def test_prefilled_chapter_body(self):
-        ch = stub_data.chapter_of(self.SLUG, self.CH)
+        ch = data.chapter_of(self.SLUG, self.CH)
         # Первые слова длинного текста из core/story_texts
         self.assertContains(self.response, 'Бірде ерте таңда')
 
@@ -818,12 +821,12 @@ class MyStoriesAreOrderedByLastTouch(TestCase):
     """Свежее сверху. Порядок был порядком объявления в STORIES."""
 
     def test_helper_sorts_recent_first(self):
-        mine = stub_data.my_stories_of('aidana')
+        mine = data.my_stories_of('aidana')
         days = [s.updated_days_ago for s in mine if s.updated_days_ago is not None]
         self.assertEqual(days, sorted(days))
 
     def test_stories_without_a_date_go_last(self):
-        mine = stub_data.my_stories_of('aidana')
+        mine = data.my_stories_of('aidana')
         known = [i for i, s in enumerate(mine) if s.updated_days_ago is not None]
         unknown = [i for i, s in enumerate(mine) if s.updated_days_ago is None]
         if known and unknown:
@@ -832,13 +835,13 @@ class MyStoriesAreOrderedByLastTouch(TestCase):
     def test_page_renders_them_in_that_order(self):
         login_as(self.client)
         body = self.client.get(reverse('core:my_stories')).content.decode()
-        positions = [body.index(s.title) for s in stub_data.my_stories_of('aidana')]
+        positions = [body.index(s.title) for s in data.my_stories_of('aidana')]
         self.assertEqual(positions, sorted(positions))
 
     def test_row_shows_when_it_was_touched(self):
         login_as(self.client)
         response = self.client.get(reverse('core:my_stories'))
-        self.assertContains(response, stub_data.STORIES_BY_SLUG['aidana-tan'].updated_label)
+        self.assertContains(response, data.story_by_slug('aidana-tan').updated_label)
 
 
 class AttentionStripAnswersWhatToDoNext(TestCase):
@@ -852,9 +855,9 @@ class AttentionStripAnswersWhatToDoNext(TestCase):
         self.assertContains(self.response, 'модерацияда')
 
     def test_unread_comments_link_to_notifications(self):
-        unread = sum(1 for n in stub_data.NOTIFICATIONS_BY_USER['aidana']
-                     if n.kind == 'comment' and not n.read)
-        self.assertGreater(unread, 0, 'стаб потерял непрочитанные пікір')
+        unread = sum(len([n for n in items if n.kind == 'comment' and not n.read])
+                     for items in data.notifications_for_user('aidana').values())
+        self.assertGreater(unread, 0, 'корпус потерял непрочитанные пікір')
         self.assertContains(self.response, f'{unread} жаңа пікір')
         self.assertContains(self.response, reverse('core:notifications'))
 
@@ -862,7 +865,7 @@ class AttentionStripAnswersWhatToDoNext(TestCase):
         self.assertContains(self.response, 'жоба бастамада тұр')
 
     def test_single_item_links_to_that_work(self):
-        moderated = [s for s in stub_data.my_stories_of('aidana')
+        moderated = [s for s in data.my_stories_of('aidana')
                      if s.status == 'OnModeration']
         self.assertEqual(len(moderated), 1)
         self.assertContains(
@@ -887,7 +890,7 @@ class NonPublicRowsReplaceZeroesWithProgress(TestCase):
         self.response = self.client.get(reverse('core:my_stories'))
 
     def test_moderation_says_how_long_it_waits(self):
-        story = stub_data.STORIES_BY_SLUG['aidana-erteg']
+        story = data.story_by_slug('aidana-erteg')
         self.assertContains(self.response, f'{story.updated_days_ago} күн тексеруде')
 
     def test_draft_says_it_has_no_chapters(self):
@@ -908,7 +911,7 @@ class MyStoryMenuOffersTheMissingActions(TestCase):
         self.response = self.client.get(reverse('core:my_stories'))
 
     def test_every_row_offers_settings_and_delete(self):
-        for story in stub_data.my_stories_of('aidana'):
+        for story in data.my_stories_of('aidana'):
             with self.subTest(story=story.slug):
                 self.assertContains(
                     self.response,
@@ -916,7 +919,7 @@ class MyStoryMenuOffersTheMissingActions(TestCase):
         self.assertContains(self.response, 'open-delete-confirm')
 
     def test_public_works_can_be_viewed_as_a_reader(self):
-        for story in stub_data.my_stories_of('aidana'):
+        for story in data.my_stories_of('aidana'):
             url = reverse('core:story_detail', kwargs={'slug': story.slug})
             with self.subTest(story=story.slug, public=story.is_public):
                 if story.is_public:
@@ -926,7 +929,7 @@ class MyStoryMenuOffersTheMissingActions(TestCase):
 
     def test_public_check_is_not_a_literal(self):
         # DEC-37: сериал в работе публичен, хотя статус не 'Published'
-        serial = stub_data.STORIES_BY_SLUG['aidana-tan']
+        serial = data.story_by_slug('aidana-tan')
         self.assertEqual(serial.status, 'OnProcess')
         self.assertTrue(serial.is_public)
 
@@ -940,8 +943,8 @@ class WriterStatsBreakdownSumsToTotal(TestCase):
     """
 
     def test_every_author(self):
-        for a in stub_data.AUTHORS:
-            s = stub_data.writer_stats(a.username)
+        for a in data.all_authors():
+            s = data.writer_stats(a.username)
             with self.subTest(author=a.username):
                 self.assertEqual(
                     s['published'] + s['ongoing'] + s['on_moderation'] + s['draft'],

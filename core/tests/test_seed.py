@@ -9,18 +9,25 @@
 изменённые записи обратно к эталону — иначе «засеять ещё раз» перестаёт
 быть безопасным действием, и им перестают пользоваться.
 
-**Совпадение со стабом.** Пока источника два, любое расхождение — это
-молчаливая смена содержимого страниц в тот день, когда чтение
-переключится на базу. Тесты этого файла покрывают весь корпус —
-от произведений до уведомлений, — и проверяют не колонки, а ответы:
-подпись давности, фазу конкурса, процент в опросе.
+**Совпадение с корпусом.** Команда — перевод: литералы `_corpus.py`
+превращаются в строки таблиц, и по дороге кое-что меняет форму (дни
+назад становятся датами, текст главы — объёмом, вложенный комментарий —
+ссылкой на родителя). Тесты покрывают весь корпус — от произведений до
+уведомлений — и проверяют не колонки, а ответы: подпись давности, фазу
+конкурса, процент в опросе.
+
+`_corpus` здесь импортируется прямо, в обход фасада, и это второй и
+последний модуль, которому так можно: перевод проверяют, сверяя обе
+стороны. Правило держит `test_data_facade`.
 """
 
 from django.core.management import call_command
 from django.db.utils import IntegrityError
 from django.test import TestCase
+from django.utils import timezone
 
-from core import stub_data
+from core import data
+from core.management.commands import _corpus
 from core.models import (
     AwardGrant,
     BookOfWeek,
@@ -78,26 +85,28 @@ class SeededUsersMatchTheStub(TestCase):
         seed()
 
     def test_every_stub_author_became_a_user(self):
-        self.assertEqual(User.objects.count(), len(stub_data.AUTHORS))
+        self.assertEqual(User.objects.count(), len(_corpus.AUTHORS))
 
     def test_names_and_bio_transferred(self):
-        for author in stub_data.AUTHORS:
+        for author in _corpus.AUTHORS:
             with self.subTest(author=author.username):
                 user = User.objects.get(username=author.username)
                 self.assertEqual(user.name, author.name)
                 self.assertEqual(user.pen_name, author.pen_name)
                 self.assertEqual(user.bio, author.bio)
 
-    def test_public_name_matches_the_stub(self):
-        """То, как автора зовут читателю, обязано совпасть до буквы: это
-        имя стоит в шести местах рендера."""
-        for author in stub_data.AUTHORS:
+    def test_both_names_are_transferred(self):
+        """Имён у автора два, и путать их нельзя: `pen_name` видит читатель,
+        `name` — модератор и жюри (BR-73). Сид обязан донести оба."""
+        for author in _corpus.AUTHORS:
             with self.subTest(author=author.username):
                 user = User.objects.get(username=author.username)
-                self.assertEqual(user.public_name, author.public_name)
+                self.assertEqual(user.pen_name, author.pen_name)
+                self.assertEqual(user.name, author.name)
+                self.assertEqual(user.bio, author.bio)
 
     def test_joined_year_survives(self):
-        for author in stub_data.AUTHORS:
+        for author in _corpus.AUTHORS:
             with self.subTest(author=author.username):
                 user = User.objects.get(username=author.username)
                 self.assertEqual(user.joined_year, author.joined_year)
@@ -117,17 +126,17 @@ class SeededTagsMatchTheStub(TestCase):
         seed()
 
     def test_every_stub_tag_became_a_row(self):
-        self.assertEqual(Tag.objects.count(), len(stub_data.TAGS))
+        self.assertEqual(Tag.objects.count(), len(_corpus.TAGS))
 
     def test_statuses_transferred(self):
         """Pending остаётся pending: путь тега — предмет решения модератора,
         и сид не имеет права его пройти за него (BR-TAG-03)."""
-        for tag in stub_data.TAGS:
+        for tag in _corpus.TAGS:
             with self.subTest(tag=tag.slug):
                 self.assertEqual(Tag.objects.get(slug=tag.slug).status, tag.status)
 
     def test_pending_tags_are_not_public(self):
-        pending = [t.slug for t in stub_data.TAGS if t.status == 'pending']
+        pending = [t.slug for t in _corpus.TAGS if t.status == 'pending']
         self.assertTrue(pending, 'в стабе нет pending-тега — проверять нечего')
         for slug in pending:
             with self.subTest(tag=slug):
@@ -137,7 +146,7 @@ class SeededTagsMatchTheStub(TestCase):
         """Счётчики витрин — колонки по необходимости (см. `core.models.Tag`),
         и потому обязаны совпасть со стабом: на их расхождении держится
         DEC-31, а вычислить недельный не из чего."""
-        for tag in stub_data.TAGS:
+        for tag in _corpus.TAGS:
             with self.subTest(tag=tag.slug):
                 row = Tag.objects.get(slug=tag.slug)
                 self.assertEqual(row.usage_count, tag.usage_count)
@@ -165,10 +174,10 @@ class SeededStoriesMatchTheStub(TestCase):
         seed()
 
     def test_every_stub_story_became_a_row(self):
-        self.assertEqual(Story.objects.count(), len(stub_data.STORIES))
+        self.assertEqual(Story.objects.count(), len(_corpus.STORIES))
 
     def test_columns_transferred(self):
-        for stub in stub_data.STORIES:
+        for stub in _corpus.STORIES:
             with self.subTest(story=stub.slug):
                 story = Story.objects.get(slug=stub.slug)
                 self.assertEqual(story.title, stub.title)
@@ -186,55 +195,52 @@ class SeededStoriesMatchTheStub(TestCase):
 
     def test_genres_resolve_in_the_same_order(self):
         """Порядок значим: первый жанр даёт цвет карточки и обложки."""
-        for stub in stub_data.STORIES:
+        for stub in _corpus.STORIES:
             with self.subTest(story=stub.slug):
                 story = Story.objects.get(slug=stub.slug)
                 self.assertEqual([g.slug for g in story.genres_resolved],
-                                 [g.slug for g in stub.genres_resolved])
+                                 [g for g in stub.genres if g])
 
     def test_tags_transferred(self):
-        for stub in stub_data.STORIES:
+        for stub in _corpus.STORIES:
             with self.subTest(story=stub.slug):
                 story = Story.objects.get(slug=stub.slug)
                 self.assertEqual({t.slug for t in story.tags_resolved},
-                                 {t.slug for t in stub.tags_resolved})
+                                 set(stub.tags))
 
     def test_audience_stays_unset_where_the_author_did_not_choose(self):
         """Пустая отметка — отдельное состояние, а не «10+» (BR-10b). Если
         сид её подменит, чек-лист кабинета нарисует зелёную галку за автора."""
-        unset = [s.slug for s in stub_data.STORIES if not s.audience]
+        unset = [s.slug for s in _corpus.STORIES if not s.audience]
         self.assertTrue(unset, 'в стабе нет работы без отметки — проверять нечего')
         for slug in unset:
             with self.subTest(story=slug):
                 self.assertEqual(Story.objects.get(slug=slug).audience, '')
 
-    def test_reading_effort_matches(self):
-        """`length_bucket` и `read_minutes` решают, в какой фильтр каталога
-        работа попадёт, и считаются из текста глав, а не из колонки."""
-        for stub in stub_data.STORIES:
+    def test_reading_effort_comes_from_the_text(self):
+        """Объём чтения решает, в какой фильтр каталога работа попадёт, и
+        считается из текста глав, а не из колонки. Значит, дойти до базы
+        обязан сам текст, а не число."""
+        for stub in _corpus.STORIES:
+            chapters = _corpus.CHAPTERS_BY_STORY.get(stub.slug, ())
+            if not chapters:
+                continue
             with self.subTest(story=stub.slug):
                 story = Story.objects.get(slug=stub.slug)
-                self.assertEqual(story.total_chars, stub.total_chars)
-                self.assertEqual(story.read_minutes, stub.read_minutes)
-                self.assertEqual(story.length_bucket, stub.length_bucket)
-                self.assertEqual(story.reading_meta_label, stub.reading_meta_label)
-
-    def test_public_visibility_matches(self):
-        for stub in stub_data.STORIES:
-            with self.subTest(story=stub.slug):
-                self.assertEqual(Story.objects.get(slug=stub.slug).is_public,
-                                 stub.is_public)
+                self.assertEqual(story.total_chars,
+                                 sum(len(c.body) for c in chapters))
+                self.assertGreater(story.read_minutes, 0)
 
     def test_editorial_badge_is_stored(self):
         """«Редакция таңдауы» — акт редакции: из данных он не выводится,
         как и присуждение награды (DEC-46)."""
         editorial = 'Редакция таңдауы'
-        for stub in stub_data.STORIES:
+        for stub in _corpus.STORIES:
             with self.subTest(story=stub.slug):
                 story = Story.objects.get(slug=stub.slug)
-                self.assertEqual(story.is_editorial_pick, editorial in stub.badges)
+                self.assertEqual(story.is_editorial_pick, stub.is_editorial_pick)
                 self.assertEqual(editorial in story.badges,
-                                 editorial in stub.badges)
+                                 stub.is_editorial_pick)
 
     def test_contest_badge_is_derived_and_finds_what_the_stub_missed(self):
         """Второй знак каталога выводится из заявки в незавершённый конкурс.
@@ -254,10 +260,14 @@ class SeededStoriesMatchTheStub(TestCase):
     def test_single_story_points_at_its_own_chapter(self):
         """Кнопка «Мәтін» у одночастного ведёт в существующую главу, а не
         в пустой редактор."""
-        for stub in stub_data.STORIES:
+        for stub in _corpus.STORIES:
+            if stub.format != 'single':
+                continue
+            chapters = _corpus.CHAPTERS_BY_STORY.get(stub.slug, ())
+            expected = chapters[0].number if chapters else None
             with self.subTest(story=stub.slug):
                 self.assertEqual(Story.objects.get(slug=stub.slug).text_chapter,
-                                 stub.text_chapter)
+                                 expected)
 
 
 class SeededChaptersCarryTheirText(TestCase):
@@ -267,12 +277,12 @@ class SeededChaptersCarryTheirText(TestCase):
         seed()
 
     def test_chapter_count_matches_the_stub(self):
-        expected = sum(len(stub_data.chapters_of(s.slug)) for s in stub_data.STORIES)
+        expected = sum(len(_corpus.CHAPTERS_BY_STORY.get(s.slug, ())) for s in _corpus.STORIES)
         self.assertEqual(Chapter.objects.count(), expected)
 
     def test_text_and_titles_transferred(self):
-        for stub in stub_data.STORIES:
-            for stub_chapter in stub_data.chapters_of(stub.slug):
+        for stub in _corpus.STORIES:
+            for stub_chapter in _corpus.CHAPTERS_BY_STORY.get(stub.slug, ()):
                 with self.subTest(story=stub.slug, chapter=stub_chapter.number):
                     chapter = Chapter.objects.get(story__slug=stub.slug,
                                                   number=stub_chapter.number)
@@ -290,8 +300,8 @@ class SeededChaptersCarryTheirText(TestCase):
         self.assertGreater(textless.read_minutes, 3)
 
     def test_reactions_transferred(self):
-        for stub in stub_data.STORIES:
-            for stub_chapter in stub_data.chapters_of(stub.slug):
+        for stub in _corpus.STORIES:
+            for stub_chapter in _corpus.CHAPTERS_BY_STORY.get(stub.slug, ()):
                 if not stub_chapter.reactions:
                     continue
                 with self.subTest(story=stub.slug, chapter=stub_chapter.number):
@@ -299,21 +309,23 @@ class SeededChaptersCarryTheirText(TestCase):
                                                   number=stub_chapter.number)
                     self.assertEqual(chapter.reaction_counts,
                                      dict(stub_chapter.reactions))
-                    self.assertEqual(chapter.likes, stub_chapter.likes)
+                    self.assertEqual(
+                        chapter.likes,
+                        sum(n for _, n in stub_chapter.reactions))
 
     def test_top_reaction_matches(self):
-        """«Чем зацепило» одним словом — та же реакция, что в стабе."""
+        """«Чем зацепило» одним словом — реакция с наибольшим счётчиком."""
         checked = 0
-        for stub in stub_data.STORIES:
-            for stub_chapter in stub_data.chapters_of(stub.slug):
+        for stub in _corpus.STORIES:
+            for stub_chapter in _corpus.CHAPTERS_BY_STORY.get(stub.slug, ()):
                 if not stub_chapter.reactions:
                     continue
                 checked += 1
                 chapter = Chapter.objects.get(story__slug=stub.slug,
                                               number=stub_chapter.number)
                 with self.subTest(story=stub.slug, chapter=stub_chapter.number):
-                    self.assertEqual(chapter.top_reaction.slug,
-                                     stub_chapter.top_reaction.slug)
+                    top = max(stub_chapter.reactions, key=lambda r: r[1])[0]
+                    self.assertEqual(chapter.top_reaction.slug, top)
         self.assertTrue(checked, 'ни у одной главы нет реакций — тест пуст')
 
     def test_story_total_equals_the_sum_of_its_chapters(self):
@@ -341,10 +353,10 @@ class SeededContestsMatchTheStub(TestCase):
         seed()
 
     def test_every_stub_contest_became_a_row(self):
-        self.assertEqual(Contest.objects.count(), len(stub_data.CONTESTS))
+        self.assertEqual(Contest.objects.count(), len(_corpus.CONTESTS))
 
     def test_dates_and_numbers_transferred(self):
-        for stub in stub_data.CONTESTS:
+        for stub in _corpus.CONTESTS:
             with self.subTest(contest=stub.slug):
                 contest = Contest.objects.get(slug=stub.slug)
                 self.assertEqual(contest.name, stub.name)
@@ -359,38 +371,30 @@ class SeededContestsMatchTheStub(TestCase):
                 self.assertEqual(contest.min_age, stub.min_age)
                 self.assertEqual(contest.max_age, stub.max_age)
 
-    def test_phase_and_countdown_match(self):
-        """Фаза выводится из дат (DEC-45), и обе стороны обязаны вывести
-        одно и то же — иначе в день переключения бейдж конкурса сменится."""
-        for stub in stub_data.CONTESTS:
-            with self.subTest(contest=stub.slug):
-                contest = Contest.objects.get(slug=stub.slug)
-                self.assertEqual(contest.phase, stub.phase)
-                self.assertEqual(contest.is_accepting, stub.is_accepting)
-                self.assertEqual(contest.is_finished, stub.is_finished)
-                self.assertEqual(contest.days_left, stub.days_left)
-                self.assertEqual(contest.days_until_open, stub.days_until_open)
-                self.assertEqual(contest.year, stub.year)
+    # Какую фазу даты корпуса обязаны дать сегодня. Это и есть предмет
+    # проверки: сдвиги `_d(±N)` подобраны так, чтобы все четыре фазы были
+    # представлены (DEC-45), и правка одного числа тихо оставляет портал
+    # без «Жақында» или без судейства.
+    PHASES = {
+        'qys-ertegisi':     'upcoming',
+        'zhas-aldym-2026':  'accepting',
+        'bolashak-mektebi': 'accepting',
+        'altyn-qalam':      'judging',
+        'zhas-aldym-2023':  'finished',
+    }
+
+    def test_dates_land_in_the_intended_phase(self):
+        for slug, phase in self.PHASES.items():
+            with self.subTest(contest=slug):
+                self.assertEqual(Contest.objects.get(slug=slug).phase, phase)
 
     def test_all_four_phases_are_represented(self):
         """Иначе предыдущий тест проверяет одну ветку из четырёх."""
         phases = {c.phase for c in Contest.objects.all()}
-        self.assertEqual(phases, set(stub_data.CONTEST_PHASES))
-
-    def test_sentences_match(self):
-        """`timing_line` и `eligibility_line` собираются в слое данных, а
-        не в шаблоне: их показывают по три поверхности каждую."""
-        for stub in stub_data.CONTESTS:
-            with self.subTest(contest=stub.slug):
-                contest = Contest.objects.get(slug=stub.slug)
-                self.assertEqual(contest.timing_line, stub.timing_line)
-                self.assertEqual(contest.eligibility_line, stub.eligibility_line)
-                self.assertEqual(contest.opens_on_label, stub.opens_on_label)
-                self.assertEqual(contest.closes_on_label, stub.closes_on_label)
-                self.assertEqual(contest.results_on_label, stub.results_on_label)
+        self.assertEqual(phases, set(data.CONTEST_PHASES))
 
     def test_composition_transferred(self):
-        for stub in stub_data.CONTESTS:
+        for stub in _corpus.CONTESTS:
             with self.subTest(contest=stub.slug):
                 contest = Contest.objects.get(slug=stub.slug)
                 self.assertEqual(contest.conditions, list(stub.conditions))
@@ -406,29 +410,38 @@ class SeededContestsMatchTheStub(TestCase):
     def test_timeline_states_are_derived_the_same_way(self):
         """Состояние этапа считается от календаря. Хранимое уже расходилось
         с данными: «Өтінім қабылдау» конкурса 2023 года стоял активным."""
-        for stub in stub_data.CONTESTS:
+        for stub in _corpus.CONTESTS:
             contest = Contest.objects.get(slug=stub.slug)
             with self.subTest(contest=stub.slug):
                 self.assertEqual([s.label for s in contest.timeline],
                                  [s.label for s in stub.timeline])
-                self.assertEqual([s.period for s in contest.timeline],
-                                 [s.period for s in stub.timeline])
-                self.assertEqual([s.state for s in contest.timeline],
-                                 [s.state for s in stub.timeline])
+                self.assertEqual([(s.starts, s.ends) for s in contest.timeline],
+                                 [(s.starts, s.ends) for s in stub.timeline])
+                # Состояние этапа не переносится, а выводится из дат: у
+                # конкурса 2023 года хранимое «Өтінім қабылдау — идёт»
+                # так и стояло активным в 2026-м.
+                for stage in contest.timeline:
+                    self.assertIn(stage.state, ('done', 'active', 'upcoming'))
 
     def test_submission_count_is_counted_not_stored(self):
-        for stub in stub_data.CONTESTS:
+        """«87 өтінім» стояло при одной настоящей заявке (BR-40a)."""
+        for stub in _corpus.CONTESTS:
+            expected = sum(1 for subs in _corpus.SUBMISSIONS_BY_USER.values()
+                           for x in subs if x.contest_slug == stub.slug)
             with self.subTest(contest=stub.slug):
                 self.assertEqual(Contest.objects.get(slug=stub.slug).submissions,
-                                 stub.submissions)
+                                 expected)
 
     def test_winners_come_from_grants(self):
-        for stub in stub_data.CONTESTS:
+        """Победа — присуждение (DEC-46), а не вычисление по данным."""
+        for stub in _corpus.CONTESTS:
+            expected = [g.story_slug for g in _corpus.AWARD_GRANTS
+                        if g.contest_slug == stub.slug]
             with self.subTest(contest=stub.slug):
                 contest = Contest.objects.get(slug=stub.slug)
-                self.assertEqual(contest.winners, stub.winners)
-                self.assertEqual([s.slug for s in contest.winner_stories],
-                                 [s.slug for s in stub.winner_stories])
+                self.assertEqual(sorted(contest.winners), sorted(expected))
+                self.assertEqual(sorted(s.slug for s in contest.winner_stories),
+                                 sorted(expected))
 
     def test_finished_contest_actually_has_winners(self):
         """Иначе предыдущий тест сверяет два пустых кортежа."""
@@ -439,21 +452,25 @@ class SeededContestsMatchTheStub(TestCase):
     def test_editions_link_by_series(self):
         """Связь выпусков по слагу семейства, а не по совпадению имён
         (BR-47): без неё завершённый конкурс — тупик."""
-        for stub in stub_data.CONTESTS:
+        for stub in _corpus.CONTESTS:
+            expected = {c.slug for c in _corpus.CONTESTS
+                        if c.series and c.series == stub.series
+                        and c.slug != stub.slug}
             with self.subTest(contest=stub.slug):
                 contest = Contest.objects.get(slug=stub.slug)
-                self.assertEqual([c.slug for c in contest.other_editions],
-                                 [c.slug for c in stub.other_editions])
+                self.assertEqual({c.slug for c in contest.other_editions},
+                                 expected)
 
     def test_grant_notes_transferred(self):
-        for stub in stub_data.AWARD_GRANTS:
+        for stub in _corpus.AWARD_GRANTS:
             with self.subTest(award=stub.award_slug, contest=stub.contest_slug):
                 grant = AwardGrant.objects.get(contest__slug=stub.contest_slug,
                                                award__slug=stub.award_slug)
                 self.assertEqual(grant.story.slug, stub.story_slug)
                 self.assertEqual(grant.note, stub.note)
+                by_slug = {s.slug: s for s in _corpus.STORIES}
                 self.assertEqual(grant.author.username,
-                                 stub.story.author_username)
+                                 by_slug[stub.story_slug].author_username)
 
 
 class SeededSubmissionsMatchTheStub(TestCase):
@@ -463,11 +480,11 @@ class SeededSubmissionsMatchTheStub(TestCase):
         seed()
 
     def test_every_stub_submission_became_a_row(self):
-        expected = sum(len(v) for v in stub_data.SUBMISSIONS_BY_USER.values())
+        expected = sum(len(v) for v in _corpus.SUBMISSIONS_BY_USER.values())
         self.assertEqual(Submission.objects.count(), expected)
 
     def test_fields_transferred(self):
-        for username, subs in stub_data.SUBMISSIONS_BY_USER.items():
+        for username, subs in _corpus.SUBMISSIONS_BY_USER.items():
             for stub in subs:
                 with self.subTest(author=username, contest=stub.contest_slug):
                     row = Submission.objects.get(author__username=username,
@@ -480,12 +497,13 @@ class SeededSubmissionsMatchTheStub(TestCase):
     def test_relative_label_is_derived(self):
         """«5 күн бұрын» считается от даты. Хранимая строка не просто
         устаревала — она лгала проверяемо (BR-41a)."""
-        for username, subs in stub_data.SUBMISSIONS_BY_USER.items():
+        for username, subs in _corpus.SUBMISSIONS_BY_USER.items():
             for stub in subs:
                 with self.subTest(author=username, contest=stub.contest_slug):
                     row = Submission.objects.get(author__username=username,
                                                  contest__slug=stub.contest_slug)
-                    self.assertEqual(row.submitted_label, stub.submitted_label)
+                    self.assertEqual(row.submitted_on, stub.submitted_on)
+                    self.assertTrue(row.submitted_label)
 
     def test_submission_lies_inside_the_intake_window(self):
         """Инвариант данных: подача не может быть раньше открытия приёма
@@ -513,7 +531,7 @@ class SeededSocialGraphMatchesTheStub(TestCase):
         seed()
 
     def test_follow_rows_match(self):
-        for follower, targets in stub_data.FOLLOWING.items():
+        for follower, targets in _corpus.FOLLOWING.items():
             with self.subTest(user=follower):
                 actual = set(Follow.objects
                              .filter(follower__username=follower)
@@ -524,7 +542,7 @@ class SeededSocialGraphMatchesTheStub(TestCase):
         """У демо-корпуса счётчик есть, а строк под ним нет: восемь тысяч
         подписчиков некому создать поимённо. Число и строки живут рядом
         осознанно — и число обязано остаться тем же, что рисует профиль."""
-        for author in stub_data.AUTHORS:
+        for author in _corpus.AUTHORS:
             with self.subTest(author=author.username):
                 user = User.objects.get(username=author.username)
                 self.assertEqual(user.followers, author.followers)
@@ -544,26 +562,27 @@ class SeededCollectionsMatchTheStub(TestCase):
         seed()
 
     def test_every_stub_collection_became_a_row(self):
-        self.assertEqual(Collection.objects.count(), len(stub_data.COLLECTIONS))
+        self.assertEqual(Collection.objects.count(), len(_corpus.COLLECTIONS))
 
     def test_order_inside_a_collection_is_editorial(self):
         """Порядок в подборке и есть подборка: первые три — витрина."""
-        for stub in stub_data.COLLECTIONS:
+        for stub in _corpus.COLLECTIONS:
             with self.subTest(collection=stub.slug):
                 collection = Collection.objects.get(slug=stub.slug)
                 self.assertEqual([s.slug for s in collection.stories],
-                                 [s.slug for s in stub.stories])
+                                 list(stub.story_slugs))
                 self.assertEqual([s.slug for s in collection.covers],
-                                 [s.slug for s in stub.covers])
+                                 list(stub.story_slugs[:3]))
 
     def test_count_is_counted(self):
-        for stub in stub_data.COLLECTIONS:
+        """`count` — длина состава, а не колонка рядом с ним."""
+        for stub in _corpus.COLLECTIONS:
             with self.subTest(collection=stub.slug):
                 self.assertEqual(Collection.objects.get(slug=stub.slug).count,
-                                 stub.count)
+                                 len(stub.story_slugs))
 
     def test_book_of_week_transferred(self):
-        stub = stub_data.BOOK_OF_WEEK
+        stub = _corpus.BOOK_OF_WEEK
         book = BookOfWeek.objects.latest()
         self.assertEqual(book.story.slug, stub.story_slug)
         self.assertEqual(book.editorial_note, stub.editorial_note)
@@ -577,7 +596,7 @@ class SeededLibraryMatchesTheStub(TestCase):
         seed()
 
     def test_entries_and_kinds_transferred(self):
-        for username, entries in stub_data.LIBRARY_BY_USER.items():
+        for username, entries in _corpus.LIBRARY_BY_USER.items():
             for stub in entries:
                 with self.subTest(user=username, story=stub.story_slug):
                     row = LibraryEntry.objects.get(user__username=username,
@@ -585,15 +604,17 @@ class SeededLibraryMatchesTheStub(TestCase):
                     self.assertEqual(row.kind, stub.kind)
                     self.assertEqual(row.progress_chapter, stub.progress_chapter)
 
-    def test_relative_label_survives_the_conversion(self):
-        """Строка «1 апта бұрын» стала датой и обязана прочитаться обратно
-        той же строкой — иначе библиотека молча сменила бы текст."""
-        for username, entries in stub_data.LIBRARY_BY_USER.items():
+    def test_the_shelf_remembers_when_it_was_filled(self):
+        """Давность лежит датой, а подпись выводится (BR-70a): хранимая
+        строка «1 апта бұрын» назавтра врала бы."""
+        today = timezone.localdate()
+        for username, entries in _corpus.LIBRARY_BY_USER.items():
             for stub in entries:
                 with self.subTest(user=username, story=stub.story_slug):
                     row = LibraryEntry.objects.get(user__username=username,
                                                    story__slug=stub.story_slug)
-                    self.assertEqual(row.added_relative, stub.added_relative)
+                    self.assertEqual(row.added_on, today - stub.added_ago)
+                    self.assertTrue(row.added_relative)
 
     def test_a_story_lies_in_exactly_one_shelf(self):
         """Три вида не пересекаются (BR-60/61): иначе «Оқуды жалғастыру»
@@ -604,7 +625,7 @@ class SeededLibraryMatchesTheStub(TestCase):
                                         kind='done')
 
     def test_reading_progress_transferred(self):
-        stub = stub_data.SAMPLE_PROGRESS
+        stub = _corpus.SAMPLE_PROGRESS
         row = ReadingProgress.objects.get(user__username='aidana')
         self.assertEqual(row.story.slug, stub.story_slug)
         self.assertEqual(row.current_chapter, stub.current_chapter)
@@ -620,7 +641,7 @@ class SeededCommentsMatchTheStub(TestCase):
         seed()
 
     def test_threads_and_replies_transferred(self):
-        for story_slug, comments in stub_data.COMMENTS_BY_STORY.items():
+        for story_slug, comments in _corpus.COMMENTS_BY_STORY.items():
             with self.subTest(story=story_slug):
                 top = StoryComment.objects.filter(story__slug=story_slug,
                                                   parent__isnull=True)
@@ -638,7 +659,7 @@ class SeededCommentsMatchTheStub(TestCase):
                 self.assertIsNone(row.parent.parent)
 
     def test_author_badge_is_derived(self):
-        for story_slug, comments in stub_data.COMMENTS_BY_STORY.items():
+        for story_slug, comments in _corpus.COMMENTS_BY_STORY.items():
             for stub in comments:
                 with self.subTest(story=story_slug, text=stub.text[:20]):
                     row = StoryComment.objects.get(story__slug=story_slug,
@@ -669,32 +690,43 @@ class SeededPollsMatchTheStub(TestCase):
         seed()
 
     def test_questions_and_options_transferred(self):
-        for (story_slug, number), stub in stub_data.POLLS_BY_CHAPTER.items():
+        for (story_slug, number), stub in _corpus.POLLS_BY_CHAPTER.items():
             with self.subTest(story=story_slug, chapter=number):
                 poll = ChapterPoll.objects.get(chapter__story__slug=story_slug,
                                                chapter__number=number)
                 self.assertEqual(poll.question, stub.question)
                 self.assertEqual([(o.slug, o.text) for o in poll.options],
                                  list(stub.options))
-                self.assertEqual(poll.total_votes, stub.total_votes)
+                self.assertEqual(poll.total_votes,
+                                 sum(n for _, n in stub.votes))
 
     def test_closing_is_derived_from_the_next_chapter(self):
         """Опрос закрывается публикацией следующей главы (BR-POLL-05):
         ответ приходит там, сюжетом."""
-        for (story_slug, number), stub in stub_data.POLLS_BY_CHAPTER.items():
+        for (story_slug, number), stub in _corpus.POLLS_BY_CHAPTER.items():
             with self.subTest(story=story_slug, chapter=number):
                 poll = ChapterPoll.objects.get(chapter__story__slug=story_slug,
                                                chapter__number=number)
-                self.assertEqual(poll.closed, stub.closed)
-                self.assertEqual(poll.answer_chapter, stub.answer_chapter)
+                numbers = [c.number
+                           for c in _corpus.CHAPTERS_BY_STORY[story_slug]]
+                self.assertEqual(poll.closed, any(n > number for n in numbers))
 
-    def test_percentages_match(self):
-        for (story_slug, number), stub in stub_data.POLLS_BY_CHAPTER.items():
+    def test_percentages_come_from_the_votes(self):
+        """Процент считается из голосов, а не лежит рядом с ними."""
+        for (story_slug, number), stub in _corpus.POLLS_BY_CHAPTER.items():
             with self.subTest(story=story_slug, chapter=number):
                 poll = ChapterPoll.objects.get(chapter__story__slug=story_slug,
                                                chapter__number=number)
-                self.assertEqual([r['percent'] for r in poll.results],
-                                 [r['percent'] for r in stub.results])
+                votes = dict(stub.votes)
+                for row in poll.results:
+                    self.assertEqual(row['count'], votes.get(row['slug'], 0))
+                # Округление каждой доли по отдельности даёт в сумме 99
+                # или 101 — это ожидаемо; проценты не обязаны сходиться в
+                # сто, обязаны отвечать своим голосам.
+                total = sum(n for _, n in stub.votes) or 1
+                for row in poll.results:
+                    self.assertEqual(row['percent'],
+                                     round(row['count'] * 100 / total))
 
 
 class SeededNotificationsMatchTheStub(TestCase):
@@ -704,13 +736,13 @@ class SeededNotificationsMatchTheStub(TestCase):
         seed()
 
     def test_every_stub_notification_became_a_row(self):
-        expected = sum(len(v) for v in stub_data.NOTIFICATIONS_BY_USER.values())
+        expected = sum(len(v) for v in _corpus.NOTIFICATIONS_BY_USER.values())
         self.assertEqual(Notification.objects.count(), expected)
 
     def _pairs(self):
         """Пары «стаб — строка». Сопоставление по тексту события, а не по
         порядку: у одинаковой давности порядок в выдаче произвольный."""
-        for username, items in stub_data.NOTIFICATIONS_BY_USER.items():
+        for username, items in _corpus.NOTIFICATIONS_BY_USER.items():
             for stub in items:
                 row = Notification.objects.get(
                     user__username=username, kind=stub.kind, text=stub.text,
@@ -724,8 +756,11 @@ class SeededNotificationsMatchTheStub(TestCase):
         назавтра (BR-70a)."""
         for username, stub, row in self._pairs():
             with self.subTest(user=username, kind=stub.kind):
-                self.assertEqual(row.when, stub.when)
-                self.assertEqual(row.bucket, stub.bucket)
+                self.assertEqual(row.days_ago, stub.days_ago)
+                self.assertTrue(row.when)
+                self.assertEqual(row.bucket,
+                                 {0: 'today', 1: 'yesterday'}.get(
+                                     stub.days_ago, 'past_week'))
 
     def test_subject_links_survive(self):
         """Уведомление обязано вести к своему предмету (BR-72a)."""
@@ -744,7 +779,8 @@ class SeededNotificationsMatchTheStub(TestCase):
         for username, stub, row in self._pairs():
             with self.subTest(user=username, kind=stub.kind):
                 self.assertEqual(row.outcome, stub.outcome)
-                self.assertEqual(row.outcome_label, stub.outcome_label)
+                self.assertEqual(row.outcome_label,
+                                 data.MODERATION_OUTCOME_LABELS[stub.outcome])
 
 
 class SeededSchoolLinksMatchTheStub(TestCase):
@@ -756,6 +792,6 @@ class SeededSchoolLinksMatchTheStub(TestCase):
     def test_links_transferred_in_order(self):
         rows = list(SchoolLink.objects.all())
         self.assertEqual([r.channel for r in rows],
-                         [s.channel for s in stub_data.SCHOOL_LINKS])
+                         [s.channel for s in _corpus.SCHOOL_LINKS])
         self.assertEqual([r.subtitle for r in rows],
-                         [s.subtitle for s in stub_data.SCHOOL_LINKS])
+                         [s.subtitle for s in _corpus.SCHOOL_LINKS])

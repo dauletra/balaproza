@@ -1,6 +1,6 @@
 # 14 · Карта реализации: требование → код
 
-> `Обновлён: 2026-08-25` · `Сверен с кодом: 97aab90`
+> `Обновлён: 2026-08-26` · `Сверен с кодом: be979e3`
 
 Этот документ отвечает на два вопроса, на которые остальное ТЗ не отвечает: **где живёт то, что описано требованием**, и **что придётся обновить, если это изменить**.
 
@@ -16,7 +16,7 @@
 
 | Слой | Где | Правило |
 |------|-----|---------|
-| Данные | `core/models.py` + `core/queries/*` + `core/story_texts/` | Django-модели; правила — в `core/domain/`, контракт в [12](12-domain-model-contract.md). `core/stub_data.py` остался источником демо-корпуса **только для `seed_demo`** и уходит на этапе 11 ([19 §19.4](19-f14-migration-plan.md)) |
+| Данные | `core/models.py` + `core/queries/*` + `core/story_texts/` | Django-модели; правила — в `core/domain/`, что миграция была обязана сохранить — [12](12-domain-model-contract.md). Демо-содержимое кладёт `seed_demo`; его литералы (`core/management/commands/_corpus.py`) читает только она |
 | View | `core/views.py` (≈40 функций) | **Тонкие**: читают через фасад `core/data.py`, собирают контекст, рендерят. Бизнес-логики нет |
 | Маршруты | `core/urls.py`, `app_name='core'` | Все URL проекта, кроме `/admin/` — админка это инструмент модерации, §14.9a |
 | Общий контекст | `core/context_processors.py` | `auth_state`, `nav_state`, `site_links` |
@@ -113,7 +113,7 @@
 | FR-CAT-08 | `_catalog_href` / `_catalog_links` в `core/views.py` | `test_catalog.CatalogStateIsCarried`, `CatalogActiveChips` |
 | Комбинации фильтров | `/genres/triller/?tag=mektep` | `test_catalog.CatalogFilterCombination`, `CatalogSecondAxisFromQuery` |
 | FR-CAT-09 (дефолт «Қазір танымал») | `Story.recent_views`, `_catalog_default_sort` | `test_catalog.TrendingIsTheDefaultSort` |
-| FR-CAT-10 (пресеты) | `stub_data.CATALOG_PRESETS`, `_catalog_presets` | `test_catalog.CatalogPresets` |
+| FR-CAT-10 (пресеты) | `data.CATALOG_PRESETS`, `_catalog_presets` | `test_catalog.CatalogPresets` |
 | FR-CAT-11 (жинақтар в каталоге) | `rail_collections` → `partials/right_rail/catalog.html`, `partials/catalog/_book_list.html` | `test_catalog.EmptyCatalogOffersAWayOut` |
 | Ось знака качества | `STORY_BADGES`, `badge=` в `filter_catalog` | `test_catalog.QualityBadgeAxis` |
 | FR-CAT-12 (границы длины) | `Story.length_bucket`, `CATALOG_LENGTH_FILTERS` | `test_catalog.ReadingTimeBuckets` |
@@ -163,7 +163,7 @@
 | FR-STORY-07, 08 (DEC-35) | `storyReader` + `localStorage` (`bp-reader-*`); мера — `max-width: 68ch` | `test_story.StoryReaderSettings`, `test_story.ChapterTextMeasure` |
 | FR-STORY-09 | `components/report_modal.html`, событие `open-report` (в подвале страницы) | `test_story.StoryDetailGuestVsAuth`, `test_story.StoryDetailReportPlacement` |
 | FR-STORY-10 | `components/share_button.html` | — |
-| FR-STORY-11 | `related_stories(slug, limit=6)` | `test_stub_data.StoryRelations` |
+| FR-STORY-11 | `related_stories(slug, limit=6)` | `test_corpus.StoryRelations` |
 | FR-STORY-12 (DEC-32) | `components/reaction_bar.html`, `REACTIONS`, `reactions_of()` | `test_story.ChapterReactions` |
 | FR-STORY-13 (DEC-33) | `components/chapter_poll.html`, `ChapterPoll`, `poll_of()` | `test_story.ChapterPollStates` |
 | DEC-28 (`single` vs `serial`) | `story.is_single` / `is_serial` | `test_story.StoryDetailSingleWork` |
@@ -203,20 +203,20 @@
 |-----------|------|------|
 | FR-PROF-01, 03 | `profile_me` (+ `_resolve_prof_tab`, `_prof_items`) | `test_prof_lib_notif.ProfileMeAuthed` |
 | DEC-44 (профиль ≠ кабинет) | `profile_me` → `public_stories_of`, `_prof_items` без ветки `is_self` | `ProfileIsNotASecondCabinet` |
-| FR-PROF-01 (числа) | `stub_data.public_stats` / `reader_stats` | `PublicStatsHelper`, `ReaderStatsHelper` |
+| FR-PROF-01 (числа) | `data.public_stats` / `reader_stats` | `PublicStatsHelper`, `ReaderStatsHelper` |
 | FR-PROF-02, 04 | `profile_other` | `ProfileOtherKnown`, `FollowGraph` |
-| BR-73 (черновики скрыты) | `stub_data.public_stories_of` → `profile_other` | `PublicStoriesHelper`, `ProfileOtherKnown.test_hides_drafts_and_moderation` |
+| BR-73 (черновики скрыты) | `data.public_stories_of` → `profile_other` | `PublicStoriesHelper`, `ProfileOtherKnown.test_hides_drafts_and_moderation` |
 | FR-PROF-02 (404) | `profile_other` → `Http404` | `ProfileOtherUnknown.test_unknown_user_is_404` |
 | DEC-25 (рейл по данным) | `has_right_rail = bool(...)` в обоих profile-view | `ProfileMeGuestRail`, `ProfileOtherKnown.test_guest_gets_no_empty_rail` |
 | FR-PROF-01…04 (разметка) | `partials/profile/_header.html`, `_stats.html`, `_about.html` — общие для обоих профилей | `ProfileTemplatesShareParts` |
 | BR-73 (приватные поля) | `_about.html`, блок «Тек саған көрінеді» | `ProfileOtherKnown.test_about_hides_private_fields`, `ProfileMeAuthed.test_about_tab_shows_private_block_to_owner` |
 | FR-PROF-08 / BR-ACH-07, 08 | `_PROF_TABS_ME` + `partials/profile/_statistics.html`, `award_catalog`, `read_ladder` | `ProfileStatsTab`, `AwardRegistry`, `AwardSpriteIsIncludedOnce`, `test_write.WriterStatsBreakdownSumsToTotal` |
-| FR-PROF-07 / BR-74a | `stub_data.contest_history` → `partials/profile/_contest_history.html` | `ContestHistoryPrivacy` |
-| `Contest.year` | `stub_data.CONTESTS` | `test_contests.ContestYear` |
+| FR-PROF-07 / BR-74a | `data.contest_history` → `partials/profile/_contest_history.html` | `ContestHistoryPrivacy` |
+| `Contest.year` | `data.CONTESTS` | `test_contests.ContestYear` |
 | FR-PROF-05 | `profile_me_edit` → `/me/edit/` | `ProfileMeAuthed` |
-| FR-PROF-06 / BR-ACH-01…05 | `stub_data.achievements_of` (+ `READ_TIERS`, `tier_for`, `winning_stories_of`) и `contest_awards_of` — два класса знаков в одном ряду (DEC-46) | `test_stub_data.Achievements`, `ReadTiers`, `test_prof_lib_notif.ContestAwardsInProfile` |
+| FR-PROF-06 / BR-ACH-01…05 | `data.achievements_of` (+ `READ_TIERS`, `tier_for`, `winning_stories_of`) и `contest_awards_of` — два класса знаков в одном ряду (DEC-46) | `test_corpus.Achievements`, `ReadTiers`, `test_prof_lib_notif.ContestAwardsInProfile` |
 | FR-PROF-06 (рендер) | `partials/profile/_achievements.html` + строка фактов в `_header.html` | `ProfileAchievementsRender` |
-| FR-PROF-09 (рейл по зрителю) | `stub_data.top_stories_of` → `partials/right_rail/profile.html` | `TopStoriesHelper`, `ProfileRailByViewer` |
+| FR-PROF-09 (рейл по зрителю) | `data.top_stories_of` → `partials/right_rail/profile.html` | `TopStoriesHelper`, `ProfileRailByViewer` |
 | FR-PROF-10 (люди) | `profile_people` → `pages/profile/profile_people.html`, `components/author_row.html` | `ProfilePeoplePages` |
 | FR-PROF-10 / BR-75 (числа-ссылки) | `partials/profile/_stats.html` | `ProfileStatTilesLinkToLists` |
 | DEC-43 (иллюстрации) | `components/award.html`, `components/tooltip.html`, `components/awards/_sprite.html` | `test_template_lint.IconNamesExistInSprite.test_award_art_exists_in_sprite`, `test_award_sprite_has_no_orphan_symbols` |
@@ -224,7 +224,7 @@
 | Инварианты конкурсных данных | `Contest.winners`, `SUBMISSIONS_BY_USER` | `test_contests.ContestWinners`, `SubmissionsMatchContestBadges`, `SubmissionIntegrity` |
 | FR-LIB-01…03 / BR-60, BR-61 | `library` + `segmented_control` | `LibraryAuthed`, `LibraryEmpty`, `LibraryHelpers` |
 | FR-NOTIF-01…04 / BR-70…72 | `notifications` | `NotificationsAuthed`, `NotificationsEmpty` |
-| FR-NOTIF-01 / BR-70a (время выводится) | `Notification.days_ago` → `when` / `bucket`, `stub_data.kk_ago` | `test_prof_lib_notif.NotificationTime` |
+| FR-NOTIF-01 / BR-70a (время выводится) | `Notification.days_ago` → `when` / `bucket`, `data.kk_ago` | `test_prof_lib_notif.NotificationTime` |
 | FR-NOTIF-05, 06 / BR-72a | `Notification.contest_slug` → `components/notification_item.html`, `Contest.timing_line` | `test_prof_lib_notif.NotificationsLeadSomewhere` |
 | FR-NOTIF-02 (бейдж) | `auth_state.unread_notifications` → `components/notif_bell.html` | `HeaderUnreadBadge` |
 | FR-NOTIF-02 (вход с мобильного) | `partials/header.html` — колокольчик вне `hidden md:flex` | `test_prof_lib_notif.NotificationsReachableWithoutDesktopHeader` |
@@ -234,7 +234,7 @@
 | BR-11 / BR-72b (исход модерации) | `Notification.outcome` → `outcome_label`, `MODERATION_OUTCOME_LABELS` | `test_prof_lib_notif.ModerationNotificationNamesItsOutcome` |
 | FR-NOTIF-03 / DEC-32 (отклик, не лайк) | `components/notification_item.html` | `test_prof_lib_notif.ReactionNotificationDoesNotSayLike` |
 | BR-14 / DEC-32 (метрика — реакции) | `stat_pill` на 6 поверхностях, docs/16 §16.3a-bis | `test_prof_lib_notif.StoryMetricIsCalledAReaction` |
-| BR-14a (итог сходится с главами) | `Story.likes` ↔ `Chapter.likes` | `test_stub_data.StoryReactionsMatchTheirChapters` |
+| BR-14a (итог сходится с главами) | `Story.likes` ↔ `Chapter.likes` | `test_corpus.StoryReactionsMatchTheirChapters` |
 | Отметка «непрочитано» видна и озвучена | `components/notification_item.html` | `test_prof_lib_notif.UnreadIsVisibleAndAnnounced`, `test_template_lint.GenericElementsCarryNoAriaLabel` |
 
 Переключение вкладок — реальный `?tab=` через `components/segmented_control.html`, не псевдо-табы (DEC-15). Разметка сегментов навигационная (`<nav>` + `aria-current`), ролей `tablist`/`tab` в них нет — они обещают панель, которой при переходе по URL не бывает (`test_template_lint.TabRolesPromiseAPanel`). Списки людей передают сегментам готовый `href`: они различаются путём, а не состоянием страницы.
@@ -246,7 +246,7 @@
 | FR-CONT-01, 02 / BR-40, BR-40a / DEC-45 | `contest_list`, `OPEN_CONTESTS` / `FINISHED_CONTESTS` | `ContestList`, `ContestModel`, `ContestDatesAreTheSource`, `ContestListOrdersByWhatYouCanDo` |
 | FR-CONT-03 / BR-42, BR-43 | `contest_detail`, `components/contest_status.html` (4 фазы) | `ContestDetailKnown`, `ContestDetailFinished`, `DetailHeroSpeaksByPhase`, `PhaseLabelsAreOneRegistry` |
 | FR-CONT-04 / BR-22, BR-24 | `contest_submit` + `submission_checklist`, `submission_candidates`, живой пересчёт объёма на Alpine | `ChecklistHelpers`, `ContestSubmitForm`, `ChecklistFollowsTheChoice`, `ChecklistSurvivesWithoutAnEligibleWork` |
-| BR-24 (заметки, не запреты) | `stub_data.SUBMISSION_NOTES`, радио без `disabled` | `SubmissionNotesInformButDoNotBlock`, `NotesStandNextToTheirWork` |
+| BR-24 (заметки, не запреты) | `data.SUBMISSION_NOTES`, радио без `disabled` | `SubmissionNotesInformButDoNotBlock`, `NotesStandNextToTheirWork` |
 | Выбор работы на длинном списке | `views.PICKER_SEARCH_FROM` → поиск в `contest_submit.html` | `WorkPickerScalesToManyWorks` |
 | FR-CONT-05 / BR-23, BR-25 | `has_submission`, `eligible_for_contest`, `Contest.is_accepting` | `ContestSubmitAlreadyDone`, `ContestSubmitGuest`, `SubmitIsGatedByPhase` |
 | FR-CONT-06 / BR-41, BR-41a, BR-23b | `my_submissions`, `can_withdraw`, `Submission.submitted_on`, `Contest.timing_line`, `components/withdraw_confirm_modal.html` | `MySubmissionsAuthed`, `MySubmissionsEmpty`, `WithdrawSubmission`, `SubmissionsPageNamesTheDates`, `SubmissionDatesAreReal`, `ContestTimingLineIsOneImplementation` |
@@ -261,7 +261,7 @@
 | «Қабылданды» — только вердикт жюри | тост подачи говорит «жіберілді» | `AcceptedIsTheJuryWord` |
 | DEC-21 (AI-декларация) | радио + `<details>` в `contest_submit.html` | `ContestSubmitForm` |
 | BR-48 (вилка у конкурса) | `Contest.min_age`/`max_age` → `eligibility_line` | `AgeIsTheContestsRule` |
-| BR-48a / FR-CONT-15 (общие правила) | `stub_data.common_rules` → секция «Барлық байқауларға ортақ» + чек-лист | `CommonRulesAreWrittenOnce` |
+| BR-48a / FR-CONT-15 (общие правила) | `data.common_rules` → секция «Барлық байқауларға ортақ» + чек-лист | `CommonRulesAreWrittenOnce` |
 | DEC-47 (аудитория не называется) | подписи полей возраста, чекбокс подтверждения | `test_template_lint.PlatformDoesNotNameItsAudience`, `test_auth_links.SignupPage` |
 | DEC-24 (возраст) | чекбокс `confirm_age`, генерится из вилки конкурса | `ContestSubmitForm`, `CommonRulesAreWrittenOnce` |
 | FR-CONT-11 / BR-47a | `components/contest_poster.html`, `Contest.poster` | `ContestPosterIsItsOwn` |
@@ -325,9 +325,9 @@ Showcase-маршруты `/_design/tokens/`, `/_design/components/`, `/_design/
 | Состав/порядок секций `pages/home.html` | [05 §5.2](05-functional-spec.md) FR-HOME-*, эта карта §14.3 |
 | Состав/порядок секций `pages/story/story_detail.html` | [05 §5.4](05-functional-spec.md) FR-STORY-*, эта карта §14.5 |
 | `_render_catalog`, `filter_catalog` | [05](05-functional-spec.md) FR-CAT-07 (таблица параметров), [12 §12.3](12-domain-model-contract.md) |
-| Сигнатура хелпера в `stub_data.py` | [12 §12.3](12-domain-model-contract.md) |
+| Сигнатура хелпера в `core/queries/*` | [12 §12.3](12-domain-model-contract.md) — там же список того, что отдаёт фасад |
 | Новое имя в `core/domain/` | добавить строку в `core/data.py` — дверь одна (`test_data_facade`) |
-| Перенос хелпера из `stub_data` в модели | [19 §19.4](19-f14-migration-plan.md) — этап заканчивается удалением заменённого хелпера, а не сосуществованием двух источников |
+| Демо-корпус (`core/management/commands/_corpus.py`) | [19 §19.4](19-f14-migration-plan.md) — читает его только сид; страница, читающая литералы, показывает не то, что лежит в базе |
 | Поле/property на `Story` | [12 §12.4](12-domain-model-contract.md) |
 | Даты или фаза `Contest` | [08 BR-40/40a](08-business-rules.md), [12 §12.4](12-domain-model-contract.md), [05](05-functional-spec.md) FR-CONT-01…03 |
 | Поле `Notification` или `Submission` | [08 BR-70a / BR-72a / BR-41a](08-business-rules.md), [12 §12.4](12-domain-model-contract.md), [05](05-functional-spec.md) FR-NOTIF-05/06 |

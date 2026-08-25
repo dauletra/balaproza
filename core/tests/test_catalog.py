@@ -3,7 +3,8 @@
 from core.tests.base import TestCase, login_as
 from django.urls import reverse
 
-from core import stub_data
+from core import data
+from core.models import Story
 
 
 # ───────────────────────── Search ─────────────────────────
@@ -69,12 +70,12 @@ class GenreIndex(TestCase):
         self.assertEqual(self.response.status_code, 200)
 
     def test_lists_all_12_genres(self):
-        for g in stub_data.GENRES:
+        for g in data.all_genres():
             with self.subTest(genre=g.slug):
                 self.assertContains(self.response, g.name)
 
     def test_each_card_links_to_detail(self):
-        for g in stub_data.GENRES:
+        for g in data.all_genres():
             with self.subTest(genre=g.slug):
                 url = reverse('core:genre_detail', kwargs={'slug': g.slug})
                 self.assertContains(self.response, f'href="{url}"')
@@ -92,7 +93,7 @@ class GenreDetailKnown(TestCase):
         self.assertEqual(self.response.status_code, 200)
 
     def test_shows_genre_name_in_header(self):
-        g = stub_data.GENRES_BY_SLUG[self.SLUG]
+        g = data.genre_by_slug(self.SLUG)
         self.assertContains(self.response, g.name)
 
     def test_shows_filtered_stories(self):
@@ -120,14 +121,14 @@ class CollectionsList(TestCase):
         self.assertEqual(self.response.status_code, 200)
 
     def test_lists_all_collections(self):
-        for c in stub_data.COLLECTIONS:
+        for c in data.all_collections():
             with self.subTest(collection=c.slug):
                 self.assertContains(self.response, c.name)
                 # Куратор показан
                 self.assertContains(self.response, c.curator)
 
     def test_each_card_links_to_detail(self):
-        for c in stub_data.COLLECTIONS:
+        for c in data.all_collections():
             with self.subTest(collection=c.slug):
                 url = reverse('core:collection_detail', kwargs={'slug': c.slug})
                 self.assertContains(self.response, f'href="{url}"')
@@ -145,14 +146,14 @@ class CollectionDetailKnown(TestCase):
         self.assertEqual(self.response.status_code, 200)
 
     def test_shows_name_curator_description(self):
-        c = stub_data.COLLECTIONS_BY_SLUG[self.SLUG]
+        c = data.collection_by_slug(self.SLUG)
         self.assertContains(self.response, c.name)
         self.assertContains(self.response, c.curator)
         # Проверим хотя бы первые слова описания
         self.assertContains(self.response, c.description[:30])
 
     def test_lists_member_stories(self):
-        c = stub_data.COLLECTIONS_BY_SLUG[self.SLUG]
+        c = data.collection_by_slug(self.SLUG)
         for s in c.stories:
             with self.subTest(story=s.slug):
                 self.assertContains(self.response, s.title)
@@ -169,26 +170,26 @@ class CollectionDetailUnknown(TestCase):
 
 class HelperFunctions(TestCase):
     def test_stories_by_genre_returns_stories_with_that_genre(self):
-        result = stub_data.stories_by_genre('fantezi')
+        result = data.stories_by_genre('fantezi')
         self.assertGreater(len(result), 0)
         for s in result:
-            self.assertIn('fantezi', s.genres)
+            self.assertIn('fantezi', [g.slug for g in s.genres_resolved])
 
     def test_stories_by_unknown_genre_is_empty(self):
-        self.assertEqual(stub_data.stories_by_genre('no-such-genre'), [])
+        self.assertEqual(list(data.stories_by_genre('no-such-genre')), [])
 
     def test_search_empty_query_returns_empty(self):
-        self.assertEqual(stub_data.search_stories(''), [])
-        self.assertEqual(stub_data.search_stories('   '), [])
+        self.assertEqual(list(data.search_stories('')), [])
+        self.assertEqual(list(data.search_stories('   ')), [])
 
     def test_search_case_insensitive(self):
-        upper = stub_data.search_stories('РЫСҚАЛИ')
-        lower = stub_data.search_stories('рысқали')
+        upper = data.search_stories('РЫСҚАЛИ')
+        lower = data.search_stories('рысқали')
         self.assertEqual([s.slug for s in upper], [s.slug for s in lower])
         self.assertGreater(len(upper), 0)
 
     def test_search_finds_author_pen_name(self):
-        result = stub_data.search_stories('Rudazov')
+        result = data.search_stories('Rudazov')
         self.assertGreater(len(result), 0)
         self.assertTrue(any(s.author.public_name == 'Rudazov' for s in result))
 
@@ -257,45 +258,45 @@ class CatalogFilterCombination(TestCase):
 
 
 class CatalogFilterHelper(TestCase):
-    """filter_catalog helper из stub_data."""
+    """`filter_catalog` — движок выдачи каталога."""
 
     def test_query_only(self):
-        out = stub_data.filter_catalog(query='жағалау')
+        out = data.filter_catalog(query='жағалау')
         self.assertGreater(len(out), 0)
         self.assertTrue(any('жағалау' in s.title.lower() for s in out))
 
     def test_genre_only(self):
-        out = stub_data.filter_catalog(genre='fantezi')
+        out = data.filter_catalog(genre='fantezi')
         self.assertGreater(len(out), 0)
         for s in out:
-            self.assertIn('fantezi', s.genres)
+            self.assertIn('fantezi', [g.slug for g in s.genres_resolved])
 
     def test_tag_accepted_filters(self):
-        out = stub_data.filter_catalog(tag='mektep')
+        out = data.filter_catalog(tag='mektep')
         self.assertGreater(len(out), 0)
         for s in out:
-            self.assertIn('mektep', s.tags)
+            self.assertIn('mektep', [t.slug for t in s.tags_resolved])
 
     def test_tag_pending_returns_empty(self):
         """BR-TAG-07: pending-теги не фильтруют публичный каталог."""
-        out = stub_data.filter_catalog(tag='basqa-alem')
-        self.assertEqual(out, [])
+        out = data.filter_catalog(tag='basqa-alem')
+        self.assertEqual(list(out), [])
 
     def test_genre_and_tag_combination_is_and(self):
         """Жанр И тег — AND (DEC-27)."""
-        out = stub_data.filter_catalog(genre='fantezi', tag='mektep')
+        out = data.filter_catalog(genre='fantezi', tag='mektep')
         for s in out:
-            self.assertIn('fantezi', s.genres)
-            self.assertIn('mektep', s.tags)
+            self.assertIn('fantezi', [g.slug for g in s.genres_resolved])
+            self.assertIn('mektep', [t.slug for t in s.tags_resolved])
 
     def test_format_single_filters_one_shot_stories(self):
-        out = stub_data.filter_catalog(format='single')
+        out = data.filter_catalog(format='single')
         self.assertGreater(len(out), 0)
         for s in out:
             self.assertTrue(s.is_single)
 
     def test_length_and_format_combination_is_and(self):
-        out = stub_data.filter_catalog(format='single', length='short')
+        out = data.filter_catalog(format='single', length='short')
         for s in out:
             self.assertTrue(s.is_single)
             self.assertEqual(s.length_bucket, 'short')
@@ -365,11 +366,11 @@ class SearchIndexHasTags(TestCase):
     def test_tags_in_index_json(self):
         r = self.client.get(reverse('core:api_search_index'))
         self.assertEqual(r.status_code, 200)
-        data = r.json()
-        self.assertIn('tags', data)
-        self.assertGreater(len(data['tags']), 0)
+        payload = r.json()
+        self.assertIn('tags', payload)
+        self.assertGreater(len(payload['tags']), 0)
         # Только accepted-теги (basqa-alem pending → не должен быть)
-        names = [t['slug'] for t in data['tags']]
+        names = [t['slug'] for t in payload['tags']]
         self.assertIn('mektep', names)
         self.assertNotIn('basqa-alem', names)
 
@@ -412,9 +413,8 @@ class CollectionsAreAdminOnly(TestCase):
         self.assertContains(r, 'редакция')
 
     def test_counts_shown_match_actual_stories(self):
-        from core import stub_data
         r = self.client.get(reverse('core:collections'))
-        for c in stub_data.COLLECTIONS:
+        for c in data.all_collections():
             with self.subTest(collection=c.slug):
                 self.assertContains(r, f'{c.count} шығарма')
 
@@ -666,9 +666,9 @@ class QualityBadgeAxis(TestCase):
         self.assertIn('badge', names)
 
     def test_badge_combines_with_genre(self):
-        out = stub_data.filter_catalog(genre='fantastika', badge='editorial')
+        out = data.filter_catalog(genre='fantastika', badge='editorial')
         for s in out:
-            self.assertIn('fantastika', s.genres)
+            self.assertIn('fantastika', [g.slug for g in s.genres_resolved])
             self.assertIn('Редакция таңдауы', s.badges)
 
 
@@ -739,11 +739,11 @@ class DraftsAndModerationStayOutOfTheCatalog(TestCase):
         self.assertNotIn('aidana-erteg', [s.slug for s in r.context['results']])
 
     def test_only_public_statuses_survive_the_pipeline(self):
-        for s in stub_data.filter_catalog():
-            self.assertIn(s.status, stub_data.PUBLIC_STATUSES)
+        for s in data.filter_catalog():
+            self.assertIn(s.status, data.PUBLIC_STATUSES)
 
     def test_search_does_not_leak_unmoderated_work(self):
-        hidden = stub_data.STORIES_BY_SLUG['aidana-erteg']
+        hidden = data.story_by_slug('aidana-erteg')
         r = self.client.get(reverse('core:search_results') + '?q=' + hidden.title[:6])
         self.assertNotIn('aidana-erteg', [s.slug for s in r.context['results']])
 
@@ -757,7 +757,7 @@ class EmptyCatalogOffersAWayOut(TestCase):
         r = self.client.get(reverse('core:search_results') + '?q=zzzzqqq')
         self.assertEqual(len(r.context['results']), 0)
         self.assertContains(r, 'Мүмкін, мынау қызық болар')
-        self.assertContains(r, stub_data.COLLECTIONS[0].name)
+        self.assertContains(r, data.all_collections()[0].name)
 
     def test_rail_offers_collections_too(self):
         r = self.client.get(reverse('core:catalog'))
@@ -782,7 +782,7 @@ class ReadingTimeBuckets(TestCase):
         def __init__(self, minutes):
             self._m = minutes
         read_minutes = property(lambda self: self._m)
-        length_bucket = stub_data.Story.length_bucket
+        length_bucket = Story.length_bucket
 
     def _bucket(self, minutes):
         return self._Fake(minutes).length_bucket
@@ -794,20 +794,20 @@ class ReadingTimeBuckets(TestCase):
                 self.assertEqual(self._bucket(minutes), expected)
 
     def test_every_story_lands_in_exactly_one_bucket(self):
-        keys = {k for k, _ in stub_data.CATALOG_LENGTH_FILTERS if k}
-        for s in stub_data.STORIES:
+        keys = {k for k, _ in data.CATALOG_LENGTH_FILTERS if k}
+        for s in Story.objects.all():
             with self.subTest(story=s.slug):
                 self.assertIn(s.length_bucket, keys)
 
     def test_filter_agrees_with_the_bucket(self):
         for key in ('short', 'medium', 'long'):
             with self.subTest(bucket=key):
-                for s in stub_data.filter_catalog(length=key):
+                for s in data.filter_catalog(length=key):
                     self.assertEqual(s.length_bucket, key)
 
     def test_labels_name_the_actual_boundaries(self):
         """Подпись, разошедшаяся с порогом, врёт молча."""
-        labels = dict(stub_data.CATALOG_LENGTH_FILTERS)
+        labels = dict(data.CATALOG_LENGTH_FILTERS)
         self.assertIn('10', labels['short'])
         self.assertIn('30', labels['long'])
 
@@ -818,17 +818,17 @@ class NewAuthorsAxis(TestCase):
     построена вокруг растущего автора (docs/13 §13.2)."""
 
     def test_axis_filters_by_follower_count(self):
-        out = stub_data.filter_catalog(author_tier='new')
+        out = data.filter_catalog(author_tier='new')
         self.assertGreater(len(out), 0)
         for s in out:
-            self.assertLess(s.author.followers, stub_data.NEW_AUTHOR_FOLLOWERS)
+            self.assertLess(s.author.followers, data.NEW_AUTHOR_FOLLOWERS)
 
     def test_axis_excludes_the_established(self):
-        slugs = {s.slug for s in stub_data.filter_catalog(author_tier='new')}
-        loud = [a.username for a in stub_data.AUTHORS
-                if a.followers >= stub_data.NEW_AUTHOR_FOLLOWERS]
-        for s in stub_data.STORIES:
-            if s.author_username in loud:
+        slugs = {s.slug for s in data.filter_catalog(author_tier='new')}
+        loud = [a.username for a in data.all_authors()
+                if a.followers >= data.NEW_AUTHOR_FOLLOWERS]
+        for s in Story.objects.select_related('author'):
+            if s.author.username in loud:
                 self.assertNotIn(s.slug, slugs)
 
     def test_unknown_value_is_ignored(self):
@@ -848,10 +848,10 @@ class NewAuthorsAxis(TestCase):
         self.assertIn('author_tier', [g['name'] for g in r.context['filter_groups']])
 
     def test_it_combines_with_genre(self):
-        out = stub_data.filter_catalog(genre='balalar', author_tier='new')
+        out = data.filter_catalog(genre='balalar', author_tier='new')
         for s in out:
-            self.assertIn('balalar', s.genres)
-            self.assertLess(s.author.followers, stub_data.NEW_AUTHOR_FOLLOWERS)
+            self.assertIn('balalar', [g.slug for g in s.genres_resolved])
+            self.assertLess(s.author.followers, data.NEW_AUTHOR_FOLLOWERS)
 
 
 class AudienceIsCumulative(TestCase):
@@ -865,19 +865,19 @@ class AudienceIsCumulative(TestCase):
     """
 
     def test_older_bracket_includes_the_younger(self):
-        out = stub_data.filter_catalog(audience='14+')
-        self.assertEqual(len(out), len(stub_data.filter_catalog()))
+        out = data.filter_catalog(audience='14+')
+        self.assertEqual(len(out), len(data.filter_catalog()))
         self.assertSetEqual({s.audience for s in out}, {'10+', '14+'})
 
     def test_younger_bracket_still_hides_the_older(self):
         """Единственное, что этот фильтр обязан гарантировать."""
-        for s in stub_data.filter_catalog(audience='10+'):
+        for s in data.filter_catalog(audience='10+'):
             self.assertEqual(s.audience, '10+')
 
     def test_order_drives_the_comparison_not_equality(self):
-        self.assertEqual(stub_data.AUDIENCE_ORDER, ('10+', '14+'))
-        younger = stub_data.filter_catalog(audience='10+')
-        older = stub_data.filter_catalog(audience='14+')
+        self.assertEqual(data.AUDIENCE_ORDER, ('10+', '14+'))
+        younger = data.filter_catalog(audience='10+')
+        older = data.filter_catalog(audience='14+')
         self.assertLess(len(younger), len(older))
 
     def test_unknown_bracket_is_ignored(self):
@@ -888,7 +888,7 @@ class AudienceIsCumulative(TestCase):
 
     def test_label_names_the_reader_not_the_work(self):
         """«10+» в подписи повторяло ключ и читалось как отметка работы."""
-        labels = dict(stub_data.CATALOG_AUDIENCE_FILTERS)
+        labels = dict(data.CATALOG_AUDIENCE_FILTERS)
         self.assertEqual(labels['10+'], '10-13')
         r = self.client.get(reverse('core:catalog'))
         legend = next(g['legend'] for g in r.context['filter_groups']
@@ -896,7 +896,7 @@ class AudienceIsCumulative(TestCase):
         self.assertEqual(legend, 'Жасың')
 
     def test_it_combines_with_other_axes(self):
-        out = stub_data.filter_catalog(audience='10+', format='single')
+        out = data.filter_catalog(audience='10+', format='single')
         for s in out:
             self.assertEqual(s.audience, '10+')
             self.assertTrue(s.is_single)
@@ -912,24 +912,24 @@ class KindReplacesFormatAndStatus(TestCase):
     """
 
     def test_three_values_split_the_catalogue(self):
-        counts = {k: len(stub_data.filter_catalog(kind=k))
-                  for k, _ in stub_data.CATALOG_KIND_FILTERS if k}
-        self.assertEqual(sum(counts.values()), len(stub_data.filter_catalog()))
+        counts = {k: len(data.filter_catalog(kind=k))
+                  for k, _ in data.CATALOG_KIND_FILTERS if k}
+        self.assertEqual(sum(counts.values()), len(data.filter_catalog()))
         for key, n in counts.items():
             with self.subTest(kind=key):
                 self.assertGreater(n, 0)
 
     def test_single_means_one_whole_text(self):
-        for s in stub_data.filter_catalog(kind='single'):
+        for s in data.filter_catalog(kind='single'):
             self.assertTrue(s.is_single)
 
     def test_done_is_a_finished_serial(self):
-        for s in stub_data.filter_catalog(kind='done'):
+        for s in data.filter_catalog(kind='done'):
             self.assertTrue(s.is_serial)
             self.assertEqual(s.status, 'Completed')
 
     def test_ongoing_is_a_serial_still_being_written(self):
-        for s in stub_data.filter_catalog(kind='ongoing'):
+        for s in data.filter_catalog(kind='ongoing'):
             self.assertTrue(s.is_serial)
             self.assertEqual(s.status, 'OnProcess')
 
@@ -942,7 +942,7 @@ class KindReplacesFormatAndStatus(TestCase):
 
     def test_legacy_params_still_filter(self):
         """На `?format=` ведут ссылки, которые уже могли уйти наружу."""
-        out = stub_data.filter_catalog(format='single')
+        out = data.filter_catalog(format='single')
         self.assertGreater(len(out), 0)
         for s in out:
             self.assertTrue(s.is_single)
@@ -963,15 +963,15 @@ class SerialCompletionIsAlwaysKnown(TestCase):
     """
 
     def test_no_published_serial_is_left_unmarked(self):
-        for s in stub_data.STORIES:
-            if s.is_serial and s.status in stub_data.PUBLIC_STATUSES:
+        for s in Story.objects.all():
+            if s.is_serial and s.status in data.PUBLIC_STATUSES:
                 with self.subTest(story=s.slug):
                     self.assertIn(s.status, ('Completed', 'OnProcess'))
 
     def test_one_shots_are_not_marked_for_completion(self):
         """У цельного текста «дописан» и «пишется» не значат ничего."""
-        for s in stub_data.STORIES:
-            if s.is_single and s.status in stub_data.PUBLIC_STATUSES:
+        for s in Story.objects.all():
+            if s.is_single and s.status in data.PUBLIC_STATUSES:
                 with self.subTest(story=s.slug):
                     self.assertEqual(s.status, 'Published')
 
@@ -996,12 +996,12 @@ class PublicStatusesAreNotSpelledOut(TestCase):
             self.assertEqual(s.status, 'OnProcess')
 
     def test_search_index_still_contains_serials(self):
-        data = self.client.get(reverse('core:api_search_index')).json()
-        slugs = {s['slug'] for s in data['stories']}
-        serials = {s.slug for s in stub_data.STORIES
-                   if s.is_serial and s.status in stub_data.PUBLIC_STATUSES}
+        payload = self.client.get(reverse('core:api_search_index')).json()
+        slugs = {s['slug'] for s in payload['stories']}
+        serials = {s.slug for s in Story.objects.all()
+                   if s.is_serial and s.status in data.PUBLIC_STATUSES}
         self.assertTrue(serials <= slugs)
 
     def test_moderation_is_still_out_of_the_index(self):
-        data = self.client.get(reverse('core:api_search_index')).json()
-        self.assertNotIn('aidana-erteg', {s['slug'] for s in data['stories']})
+        payload = self.client.get(reverse('core:api_search_index')).json()
+        self.assertNotIn('aidana-erteg', {s['slug'] for s in payload['stories']})
