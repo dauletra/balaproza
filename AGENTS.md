@@ -13,7 +13,8 @@
 1. `AUTH_USER_MODEL`, справочники, первая миграция — **сделано**;
 2. `seed_demo` + корпус в тестовой базе — **сделано**;
 3-8. каталог, произведение, библиотека, кабинет, конкурсы, уведомления и награды — **сделано: чтение переведено целиком**;
-9. реальная авторизация; 10. админка; 11. удаление стаба.
+9. реальная авторизация (сессия и `request.user`) — **сделано**; провайдер личности (Telegram, NFR-25 ⛔) приезжает с деплоем;
+10. админка; 11. удаление стаба.
 
 **В Ф14 не входит запись**: формы создания и редактирования произведения, комментарии, реакции, подача на конкурс остаются заглушками до Ф15. Модерация в MVP идёт через Django admin (DEC-23).
 
@@ -175,7 +176,7 @@ balaproza_v1/
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
 │   │                             # domain.formatting.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 1047 тестов в 20 файлах (см. ниже)
+│   └── tests/                    # 1052 теста в 20 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -285,18 +286,21 @@ balaproza_v1/
 
   **На mobile**: липкая панель `sticky top-16` с сортировкой снаружи модалки, бейдж числа активных осей на кнопке, ряд чипов для снятия одной оси (docs/07 §7.9)
 
-## Стаб-авторизация
+## Авторизация
 
-- `core.views.login_view` ставит `session['signed_in']`, `user_name`, `user_username` (по умолчанию `aidana`)
-- Контекст-процессор `auth_state` отдаёт в шаблоны: `signed_in`, `current_user_name`, `current_user_username`, `unread_notifications` (читает из `stub_data.unread_count_for_user`)
+Вход настоящий (Ф14, этап 9): сессию собирает `django.contrib.auth`, «кто это» отвечает база через `request.user`. Своего флага в сессии нет — `signed_in` рядом с `is_authenticated` был бы вторым источником одного ответа.
+
+- Ник вошедшего берут views через `_current_username(request)` — `''` у гостя. Слой данных принимает ник строкой, объекты — отдельное решение (docs/19 §19.2)
+- Контекст-процессор `auth_state` отдаёт в шаблоны: `signed_in`, `current_user_name`, `current_user_username`, `unread_notifications`. Имена прежние, источник — `request.user`
+- `current_user_name` — обращение к самому человеку (`User.get_short_name()` — первое слово настоящего имени), **не** `public_name`: «Қайта қош келдің, Айдана», а не «, aidana». Читателю настоящее имя по-прежнему не показывается (BR-73)
 - Контекст-процессор `site_links` отдаёт `school_links_global` глобально (для footer)
 - Защита от open-redirect: `_safe_next(request)` принимает только относительные пути (отвергает `//evil.com/`)
-- Логин по 4-ой пользователю `aidana` — он же автор 4 стори с разными статусами для теста WRITE/PROF/LIB
+- **Провайдера личности нет.** Вход идёт через Telegram (FR-AUTH-01), проверка подписи Login Widget (NFR-25 ⛔) требует бота и токена — они заводятся при деплое. До тех пор `login_view` подписывает в демо-аккаунт `views.DEMO_USERNAME` (`aidana` — автор четырёх работ с разными статусами, на них смотрят WRITE/PROF/LIB). `signup` ведёт в ту же дверь и **аккаунт не создаёт**: его заводит первая авторизация (FR-AUTH-03). Заменить до публичного запуска — docs/17 §17.7, пункт 13
 
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 1047 тестов
+uv run python manage.py test core       # все 1052 теста
 uv run python manage.py test core.tests.test_<file>
 ```
 
@@ -304,8 +308,9 @@ uv run python manage.py test core.tests.test_<file>
 - `test_urls_smoke.py` — все маршруты в guest/auth + DEBUG-only design URLs
 - `test_auth.py`, `test_context.py`, `test_filters.py`, `test_stub_data.py`
 - `base.py` / `runner.py` — не тесты: общий `TestCase` для тех, кому нужен корпус,
-  и раннер, который кладёт корпус в тестовую базу **один раз за прогон** (сид на
-  каждом классе стоил трёх минут вместо минуты)
+  `login_as` / `login_as_newcomer` (вход, а не подделка сессии) и раннер, который
+  кладёт корпус в тестовую базу **один раз за прогон** (сид на каждом классе
+  стоил трёх минут вместо минуты)
 - `test_data_facade.py` — шов Ф14: `stub_data` импортирует только фасад `core.data`,
   домен не знает о хранилище, каждое доменное имя достаётся через фасад
 - `test_models.py` — модели Ф14: публичное и приватное имя автора, путь тега,
@@ -324,14 +329,11 @@ uv run python manage.py test core.tests.test_<file>
 - `test_template_lint.py` — статический лint шаблонов: запрещает многострочные `{# … #}`
   и `{% … %}` (Django молча выводит их как текст)
 
-Логин в тестах:
+Логин в тестах — один помощник на всю суиту (`core/tests/base.py`), подделывать сессию нельзя:
 ```python
-def _login_as_aidana(client):
-    s = client.session
-    s['signed_in'] = True
-    s['user_name'] = 'Айдана'
-    s['user_username'] = 'aidana'
-    s.save()
+login_as(client)                              # aidana — корпус, работы всех статусов
+login_as(client, 'bekzhan_t')                 # другой автор корпуса
+login_as_newcomer(client, 'lonely_reader')    # вошедший без единой строки: ЗАВОДИТ пользователя
 ```
 
 ## Шаблоны

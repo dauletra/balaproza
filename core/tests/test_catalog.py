@@ -1,6 +1,6 @@
 """CAT: search, genre index/detail, collections list/detail."""
 
-from core.tests.base import TestCase
+from core.tests.base import TestCase, login_as
 from django.urls import reverse
 
 from core import stub_data
@@ -403,11 +403,7 @@ class CollectionsAreAdminOnly(TestCase):
     """DEC-31: подборки создаёт только редакция. Личное хранение — «Кітапхана»."""
 
     def test_no_create_button_for_signed_in_user(self):
-        s = self.client.session
-        s['signed_in'] = True
-        s['user_name'] = 'Айдана'
-        s['user_username'] = 'aidana'
-        s.save()
+        login_as(self.client)
         r = self.client.get(reverse('core:collections'))
         self.assertNotContains(r, 'Өз жинағыңды құру')
 

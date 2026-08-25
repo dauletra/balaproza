@@ -10,21 +10,13 @@
  - прогресс чтения отображается только если slug совпадает с SAMPLE_PROGRESS.
 """
 
-from core.tests.base import TestCase
+from core.tests.base import TestCase, login_as
 from django.urls import reverse
 
 from core import data
 
 
 STORY_SLUG = 'dalney-berega'   # есть в STORIES_BY_SLUG и в CHAPTERS_BY_STORY
-
-
-def _login(client):
-    s = client.session
-    s['signed_in'] = True
-    s['user_name'] = 'Айдана'
-    s['user_username'] = 'aidana'
-    s.save()
 
 
 class StoryDetailUnknownSlug(TestCase):
@@ -194,7 +186,7 @@ class StoryDetailGuestVsAuth(TestCase):
         self.assertNotContains(r, '<textarea')
 
     def test_authed_sees_input_no_gate(self):
-        _login(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
         self.assertNotContains(r, 'Пікір қалдыру үшін')
         self.assertContains(r, '<textarea')
@@ -203,7 +195,7 @@ class StoryDetailGuestVsAuth(TestCase):
         r_guest = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
         self.assertNotContains(r_guest, "open-report")
 
-        _login(self.client)
+        login_as(self.client)
         r_auth = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
         self.assertContains(r_auth, "open-report")
 
@@ -214,12 +206,12 @@ class StoryDetailReadingProgress(TestCase):
     def test_authed_with_matching_progress_shows_indicator(self):
         # SAMPLE_PROGRESS привязан к 'dalney-berega'
         self.assertEqual(data.reading_progress_of('aidana').story.slug, STORY_SLUG)
-        _login(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
         self.assertContains(r, 'Оқылды:')
 
     def test_authed_other_story_no_progress_indicator(self):
-        _login(self.client)
+        login_as(self.client)
         # Другой slug — даже если у пользователя есть прогресс на dalney-berega,
         # на других страницах он не должен подсвечиваться.
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': 'arhimag'}))
@@ -253,14 +245,14 @@ class StoryDetailTags(TestCase):
 
     def test_pending_tag_hidden_from_other_authed_user(self):
         # Логинимся как aidana, смотрим чужое произведение с pending-тегом
-        _login(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': self.HAS_PENDING_SLUG}))
         self.assertNotContains(r, 'басқа әлем')
         self.assertNotContains(r, 'проверкада')
 
     def test_author_sees_own_pending_tag_with_badge(self):
         # aidana заходит на своё произведение → видит pending-тег с бейджем
-        _login(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': self.OWN_PENDING_SLUG}))
         self.assertContains(r, 'эксперимент')   # pending-тег
         self.assertContains(r, 'проверкада')    # бейдж модерации
@@ -298,12 +290,12 @@ class StoryDetailSaveButton(TestCase):
         self.assertContains(r, reverse('core:login'))
 
     def test_saved_state_reflects_library(self):
-        _login(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': self.IN_LIBRARY}))
         self.assertContains(r, 'saved: true')
 
     def test_unsaved_state_for_story_outside_library(self):
-        _login(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': self.NOT_IN_LIBRARY}))
         self.assertContains(r, 'saved: false')
 
@@ -316,7 +308,7 @@ class StoryDetailReadCta(TestCase):
         self.assertContains(r, 'Оқуды бастау')
 
     def test_reader_with_progress_sees_resume_label(self):
-        _login(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
         self.assertContains(r, 'Жалғастыру · ')
         self.assertNotContains(r, 'Оқуды бастау')
@@ -349,7 +341,7 @@ class StoryDetailReportPlacement(TestCase):
     """Жалоба — в подвале, а не в ряду действий рядом с кнопкой чтения."""
 
     def test_report_button_stands_below_recommendations(self):
-        _login(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
         html = r.content.decode()
         # Ищем именно жалобу на произведение: `open-report` теперь есть ещё и
@@ -427,7 +419,7 @@ class ChapterProgressNotDuplicated(TestCase):
     """Счётчик «N / M» в шапке главы и в панели чтения — один и тот же."""
 
     def test_header_progress_hidden_on_mobile(self):
-        _login(self.client)
+        login_as(self.client)
         url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=4'
         html = self.client.get(url).content.decode()
         idx = html.index('Оқылды:')
@@ -550,7 +542,7 @@ class ChapterPollStates(TestCase):
         self.assertContains(r, reverse('core:login'))
 
     def test_authed_gets_a_real_ballot(self):
-        _login(self.client)
+        login_as(self.client)
         r = self._get(self.OPEN_CHAPTER)
         self.assertContains(r, 'Дұрыс жауабы жоқ')
         self.assertNotContains(r, 'Жауап беру үшін')
@@ -630,14 +622,14 @@ class CommentMenu(TestCase):
         self.assertNotContains(r, 'target: \'comment:')
 
     def test_authed_can_report_someone_elses_comment(self):
-        _login(self.client)
+        login_as(self.client)
         r = self._get()
         self.assertContains(r, 'Шағым жіберу')
         self.assertContains(r, "target: 'comment:")
 
     def test_own_comment_offers_delete_not_report(self):
         """На свой комментарий жаловаться некому — его удаляют."""
-        _login(self.client)
+        login_as(self.client)
         html = self._get().content.decode()
         own = next(c for c in data.comments_of_chapter(STORY_SLUG, 3)
                    if c.belongs_to('aidana'))
@@ -667,7 +659,7 @@ class ReportUsesItsOwnIcon(TestCase):
     """
 
     def _html(self):
-        _login(self.client)
+        login_as(self.client)
         url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=3'
         return self.client.get(url).content.decode()
 
@@ -706,7 +698,7 @@ class CommentReplies(TestCase):
     """BR-30: один уровень ответов — на ответ ответить нельзя."""
 
     def test_authed_gets_a_reply_form(self):
-        _login(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
         self.assertContains(r, 'Жауап беру')
         self.assertContains(r, 'пікіріне жауап жаз')
@@ -718,7 +710,7 @@ class CommentReplies(TestCase):
 
     def test_reply_itself_has_no_reply_button(self):
         """Инвариант вложенности держит компонент, а не сторона вызова."""
-        _login(self.client)
+        login_as(self.client)
         url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=2'
         html = self.client.get(url).content.decode()
         reply = data.comments_of_chapter(STORY_SLUG, 2)[-1].replies[0]

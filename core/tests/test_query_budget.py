@@ -23,15 +23,7 @@
 
 from django.urls import reverse
 
-from core.tests.base import TestCase
-
-
-def _login(client):
-    s = client.session
-    s['signed_in'] = True
-    s['user_name'] = 'Айдана'
-    s['user_username'] = 'aidana'
-    s.save()
+from core.tests.base import TestCase, login_as
 
 
 class PagesStayWithinTheirQueryBudget(TestCase):
@@ -43,9 +35,15 @@ class PagesStayWithinTheirQueryBudget(TestCase):
             self.client.get(reverse('core:home'))
 
     def test_home_signed_in(self):
-        """Плюс прогресс чтения, свои работы и бейдж уведомлений."""
-        _login(self.client)
-        with self.assertNumQueries(22):
+        """Плюс прогресс чтения, свои работы, бейдж уведомлений и сам вошедший.
+
+        Последний — цена настоящего входа: сессия хранит только id, и кто
+        за ним стоит, спрашивают у базы. Запрос один на весь запрос
+        страницы (`request.user` кэширован), и он же приносит имя для
+        приветствия — отдельного обращения за автором у шапки нет.
+        """
+        login_as(self.client)
+        with self.assertNumQueries(23):
             self.client.get(reverse('core:home'))
 
     def test_catalog(self):

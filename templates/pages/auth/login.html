@@ -17,6 +17,11 @@
 
     {# ── Карточка с Telegram-кнопкой ── #}
     <div class="w-full rounded-hero border border-slate-200 bg-white p-7 shadow-sm sm:p-9">
+        {% if error %}
+            <div class="mb-5">
+                {% include "components/error_state.html" with title="Кіру сәтсіз аяқталды" message=error compact=True %}
+            </div>
+        {% endif %}
         <form method="post" action="{% url 'core:login' %}{% if next %}?next={{ next|urlencode }}{% endif %}"
               class="flex flex-col gap-4">
             {% csrf_token %}

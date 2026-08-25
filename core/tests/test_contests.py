@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path
 from unittest import mock
 
-from core.tests.base import TestCase
+from core.tests.base import TestCase, login_as, login_as_newcomer
 from django.urls import reverse
 
 from core import data, views
@@ -23,22 +23,6 @@ def _all_submissions() -> dict:
 from core.queries import contests as contest_queries
 
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
-
-
-def _login_as_aidana(client):
-    s = client.session
-    s['signed_in'] = True
-    s['user_name'] = 'Айдана'
-    s['user_username'] = 'aidana'
-    s.save()
-
-
-def _login_as(client, username):
-    s = client.session
-    s['signed_in'] = True
-    s['user_name'] = 'X'
-    s['user_username'] = username
-    s.save()
 
 
 # ════════════════════════════ stub_data helpers ════════════════════════════
@@ -237,7 +221,7 @@ class ContestList(TestCase):
                 )
 
     def test_my_submissions_link_for_authed(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:contest_list'))
         self.assertContains(r, reverse('core:my_submissions'))
 
@@ -294,7 +278,7 @@ class ContestDetailAlreadySubmitted(TestCase):
     SLUG = 'altyn-qalam'
 
     def setUp(self):
-        _login_as_aidana(self.client)   # aidana уже подала на altyn-qalam-2024
+        login_as(self.client)   # aidana уже подала на altyn-qalam-2024
         self.response = self.client.get(reverse('core:contest_detail', kwargs={'slug': self.SLUG}))
 
     def test_shows_already_submitted_badge(self):
@@ -341,7 +325,7 @@ class ContestSubmitForm(TestCase):
     SLUG = 'bolashak-mektebi'   # на этот aidana НЕ подавала
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:contest_submit', kwargs={'slug': self.SLUG}))
 
     def test_200(self):
@@ -386,7 +370,7 @@ class ContestSubmitAlreadyDone(TestCase):
     SLUG = 'altyn-qalam'   # aidana уже подала
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:contest_submit', kwargs={'slug': self.SLUG}))
 
     def test_shows_already_submitted_block(self):
@@ -403,7 +387,7 @@ class ContestSubmitAlreadyDone(TestCase):
 class ContestSubmitUnknown(TestCase):
 
     def test_unknown_slug_renders_not_found(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:contest_submit', kwargs={'slug': 'ghost'}))
         self.assertContains(r, 'Байқау табылмады')
 
@@ -420,7 +404,7 @@ class MySubmissionsGuest(TestCase):
 class MySubmissionsAuthed(TestCase):
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:my_submissions'))
 
     def test_200(self):
@@ -452,7 +436,7 @@ class MySubmissionsAuthed(TestCase):
 class MySubmissionsEmpty(TestCase):
 
     def setUp(self):
-        _login_as(self.client, 'lonely_writer')
+        login_as_newcomer(self.client, 'lonely_writer')
 
     def test_empty_state_shown(self):
         r = self.client.get(reverse('core:my_submissions'))
@@ -588,7 +572,7 @@ class ContestVocabulary(TestCase):
     )
 
     def test_contest_pages_never_say_konkurs(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         for url in self.URLS:
             with self.subTest(url=url):
                 html = self.client.get(url).content.decode()
@@ -628,7 +612,7 @@ class ContestRail(TestCase):
         self.assertEqual(r.content.decode().count(money), 1)
 
     def test_submit_page_rail_has_no_cta_to_itself(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:contest_submit', args=['bolashak-mektebi']))
         self.assertTrue(r.context['hide_submit_cta'])
         # Ссылка на подачу остаётся ровно одна — action самой формы.
@@ -745,7 +729,7 @@ class SubmitIsGatedByPhase(TestCase):
     def setUp(self):
         # Не aidana: у неё уже есть заявка в «Алтын қалам», и страница
         # показала бы блок «өтінім бергенсің» раньше, чем блок фазы.
-        _login_as(self.client, 'bekzhan_t')
+        login_as(self.client, 'bekzhan_t')
 
     # Голого `<form` мало: базовый шаблон несёт свои формы (поиск, жалоба).
     # Признак именно формы подачи — поле выбора произведения.
@@ -1031,7 +1015,7 @@ class SubmissionNotesInformButDoNotBlock(TestCase):
         self.assertEqual(self._items('bekzhan_t')['tunge-deiin']['notes'], [])
 
     def test_no_radio_is_disabled_and_the_button_stays_live(self):
-        _login_as(self.client, 'rudazov')   # все работы короче порога
+        login_as(self.client, 'rudazov')   # все работы короче порога
         html = self.client.get(
             reverse('core:contest_submit', args=['bolashak-mektebi'])).content.decode()
         picker = html[html.index('name="story_slug"'):html.index('Сәйкестік чек-листі')]
@@ -1043,7 +1027,7 @@ class ChecklistFollowsTheChoice(TestCase):
     """FR-CONT-04: чек-лист пересчитывается при смене работы, не застывает."""
 
     def setUp(self):
-        _login_as(self.client, 'bekzhan_t')
+        login_as(self.client, 'bekzhan_t')
         self.response = self.client.get(
             reverse('core:contest_submit', args=['bolashak-mektebi']))
 
@@ -1075,7 +1059,7 @@ class ChecklistSurvivesWithoutAnEligibleWork(TestCase):
     выглядела обрубленной."""
 
     def setUp(self):
-        _login_as(self.client, 'rudazov')   # все работы короче порога
+        login_as(self.client, 'rudazov')   # все работы короче порога
         self.response = self.client.get(
             reverse('core:contest_submit', args=['bolashak-mektebi']))
 
@@ -1112,13 +1096,13 @@ class WithdrawSubmission(TestCase):
         self.assertFalse(data.can_withdraw('bekzhan_t', 'bolashak-mektebi'))
 
     def test_button_and_modal_are_on_the_submissions_page(self):
-        _login_as(self.client, 'dina_books')
+        login_as(self.client, 'dina_books')
         r = self.client.get(reverse('core:my_submissions'))
         self.assertContains(r, 'Қайтарып алу')
         self.assertContains(r, 'open-withdraw-confirm')
 
     def test_button_absent_when_withdrawal_is_closed(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:my_submissions'))
         self.assertNotContains(r, 'open-withdraw-confirm')
 
@@ -1127,14 +1111,14 @@ class SubmissionsPageNamesTheDates(TestCase):
     """«Қаралуда» без даты не отвечает на «а когда узнаю»."""
 
     def test_accepting_contest_shows_both_dates(self):
-        _login_as(self.client, 'dina_books')
+        login_as(self.client, 'dina_books')
         r = self.client.get(reverse('core:my_submissions'))
         c = data.contest_by_slug('bolashak-mektebi')
         self.assertContains(r, c.closes_on_label)
         self.assertContains(r, c.results_on_label)
 
     def test_judging_contest_shows_the_results_date(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:my_submissions'))
         self.assertContains(r,
                             data.contest_by_slug('altyn-qalam').results_on_label)
@@ -1207,7 +1191,7 @@ class ContestTimingLineIsOneImplementation(TestCase):
                 self.assertNotIn('күн қалды', c.timing_line)
 
     def test_submissions_page_renders_the_shared_line(self):
-        _login_as(self.client, 'dina_books')
+        login_as(self.client, 'dina_books')
         r = self.client.get(reverse('core:my_submissions'))
         self.assertContains(r,
                             data.contest_by_slug('bolashak-mektebi').timing_line)
@@ -1221,14 +1205,14 @@ class AcceptedIsTheJuryWord(TestCase):
     """
 
     def test_submit_form_does_not_promise_acceptance(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         html = self.client.get(
             reverse('core:contest_submit', args=['bolashak-mektebi'])).content.decode()
         self.assertNotIn('Өтінім қабылданды', html)
         self.assertIn('Өтінім жіберілді', html)
 
     def test_word_survives_where_it_means_the_verdict(self):
-        _login_as(self.client, 'dina_books')
+        login_as(self.client, 'dina_books')
         r = self.client.get(reverse('core:my_submissions'))
         self.assertContains(r, data.CONTEST_RESULT_LABELS['accepted'])
 
@@ -1381,7 +1365,7 @@ class CommonRulesAreWrittenOnce(TestCase):
         который сейчас принимает заявки, в стабе не заведён, поэтому он
         собирается здесь из существующего.
         """
-        _login_as_aidana(self.client)
+        login_as(self.client)
         slug = 'bolashak-mektebi'
         with_age = self.client.get(reverse('core:contest_submit', args=[slug])).content.decode()
         self.assertIn('confirm_rules', with_age, 'форма не отрендерилась — проверка пуста')
@@ -1559,7 +1543,7 @@ class NotesStandNextToTheirWork(TestCase):
     """
 
     def test_every_note_is_rendered_inside_the_picker(self):
-        _login_as(self.client, 'rudazov')
+        login_as(self.client, 'rudazov')
         html = self.client.get(
             reverse('core:contest_submit', args=['bolashak-mektebi'])).content.decode()
         picker = html[html.index('name="story_slug"'):html.index('Сәйкестік чек-листі')]
@@ -1571,7 +1555,7 @@ class NotesStandNextToTheirWork(TestCase):
                     self.assertIn(note['text'], picker)
 
     def test_a_clean_choice_shows_no_note(self):
-        _login_as(self.client, 'bekzhan_t')
+        login_as(self.client, 'bekzhan_t')
         r = self.client.get(reverse('core:contest_submit', args=['bolashak-mektebi']))
         slug = r.context['initial_slug']
         item = next(i for i in r.context['candidates'] if i['story'].slug == slug)
@@ -1597,7 +1581,7 @@ class WorkPickerScalesToManyWorks(TestCase):
         return html[html.index('Шығарманы таңдау'):html.index('Сәйкестік чек-листі')]
 
     def _submit_html(self, username='aidana', stories=None):
-        _login_as(self.client, username)
+        login_as(self.client, username)
         ctx = (mock.patch.object(contest_queries, 'public_stories_of', lambda u: stories)
                if stories is not None else contextlib.nullcontext())
         with ctx:

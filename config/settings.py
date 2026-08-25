@@ -69,6 +69,12 @@ ROOT_URLCONF = 'config.urls'
 # роли не существует (DEC-01), любой зарегистрированный сразу и пишет.
 AUTH_USER_MODEL = 'core.User'
 
+# Куда Django отправляет за входом (`login_required`, админка при отказе).
+# Дефолт `/accounts/login/` в проекте не существует, и отказ уводил бы на 404.
+LOGIN_URL = 'core:login'
+LOGIN_REDIRECT_URL = 'core:home'
+LOGOUT_REDIRECT_URL = 'core:home'
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',

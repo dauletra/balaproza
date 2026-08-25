@@ -4,7 +4,7 @@
 которые специфичны для каждого режима.
 """
 
-from core.tests.base import TestCase
+from core.tests.base import TestCase, login_as
 from django.urls import reverse
 
 
@@ -279,10 +279,7 @@ class MobileBottomNav(TestCase):
         self.assertNotIn('#icon-adjustments', nav)
 
     def test_authed_fab_is_create_story(self):
-        session = self.client.session
-        session['signed_in'] = True
-        session['user_username'] = 'aidana'
-        session.save()
+        login_as(self.client)
         r = self.client.get(reverse('core:home'))
         html = r.content.decode()
         nav = html[html.index('aria-label="Мобильді мәзір"'):html.index('</nav>', html.index('aria-label="Мобильді мәзір"'))]
@@ -359,11 +356,7 @@ class GuestAuthorCta(TestCase):
 class HomeAuthedMode(TestCase):
 
     def setUp(self):
-        session = self.client.session
-        session['signed_in'] = True
-        session['user_name'] = 'Айдана'
-        session['user_username'] = 'aidana'
-        session.save()
+        login_as(self.client)
         self.response = self.client.get(reverse('core:home'))
 
     def test_returns_200(self):
@@ -475,8 +468,6 @@ class StoryDetailHasGate(TestCase):
         self.assertContains(response, 'Пікір қалдыру үшін')
 
     def test_authed_does_not_see_login_gate(self):
-        session = self.client.session
-        session['signed_in'] = True
-        session.save()
+        login_as(self.client)
         response = self.client.get(reverse('core:story_detail', kwargs={'slug': self.STORY_SLUG}))
         self.assertNotContains(response, 'Пікір қалдыру үшін')

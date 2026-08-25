@@ -11,7 +11,7 @@ import unittest
 from html.parser import HTMLParser
 from pathlib import Path
 
-from core.tests.base import TestCase
+from core.tests.base import TestCase, login_as
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "templates"
 
@@ -124,11 +124,7 @@ class AlpineDirectivesAreInScope(TestCase):
         from django.urls import reverse
         from core.tests.test_urls_smoke import PUBLIC_URLS
 
-        session = self.client.session
-        session['signed_in'] = True
-        session['user_name'] = 'Айдана'
-        session['user_username'] = 'aidana'
-        session.save()
+        login_as(self.client)
 
         offenders = []
         for name, kwargs, label in PUBLIC_URLS:
@@ -162,11 +158,7 @@ class TabRolesPromiseAPanel(TestCase):
         from django.urls import reverse
         from core.tests.test_urls_smoke import PUBLIC_URLS
 
-        session = self.client.session
-        session['signed_in'] = True
-        session['user_name'] = 'Айдана'
-        session['user_username'] = 'aidana'
-        session.save()
+        login_as(self.client)
 
         offenders = []
         for name, kwargs, label in PUBLIC_URLS:
@@ -247,11 +239,7 @@ class GenericElementsCarryNoAriaLabel(TestCase):
         from django.urls import reverse
         from core.tests.test_urls_smoke import PUBLIC_URLS
 
-        session = self.client.session
-        session['signed_in'] = True
-        session['user_name'] = 'Айдана'
-        session['user_username'] = 'aidana'
-        session.save()
+        login_as(self.client)
 
         offenders = []
         for name, kwargs, label in PUBLIC_URLS:
@@ -319,11 +307,7 @@ class IconLabelsDoNotDuplicateText(TestCase):
         from django.urls import reverse
         from core.tests.test_urls_smoke import PUBLIC_URLS
 
-        session = self.client.session
-        session['signed_in'] = True
-        session['user_name'] = 'Айдана'
-        session['user_username'] = 'aidana'
-        session.save()
+        login_as(self.client)
 
         offenders = []
         for name, kwargs, label in PUBLIC_URLS:

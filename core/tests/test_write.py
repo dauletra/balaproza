@@ -8,16 +8,8 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from core import stub_data
+from core.tests.base import login_as, login_as_newcomer
 from core.templatetags.balaproza import spaced
-
-
-def _login_as_aidana(client):
-    """Стандартный логин фейк-сессии: user_username='aidana'."""
-    s = client.session
-    s['signed_in'] = True
-    s['user_name'] = 'Айдана'
-    s['user_username'] = 'aidana'
-    s.save()
 
 
 # ───────────────────────── stub_data: my_stories_of / writer_stats ───────
@@ -63,7 +55,7 @@ class MyStoriesGuest(TestCase):
 class MyStoriesAuthedHasItems(TestCase):
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:my_stories'))
 
     def test_200(self):
@@ -102,11 +94,7 @@ class MyStoriesAuthedEmpty(TestCase):
     """Если у пользователя нет произведений (например другой username)."""
 
     def setUp(self):
-        s = self.client.session
-        s['signed_in'] = True
-        s['user_name'] = 'Тест'
-        s['user_username'] = 'no-such-user'
-        s.save()
+        login_as_newcomer(self.client, 'no-such-user', name='Тест')
         self.response = self.client.get(reverse('core:my_stories'))
 
     def test_shows_empty_state(self):
@@ -162,7 +150,7 @@ class SingleStoryTextButtonOpensExistingText(TestCase):
     SERIAL = 'aidana-tan'
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:my_stories'))
 
     def _edit_url(self, slug, number):
@@ -199,7 +187,7 @@ class MyStoryRowMetricsAreAnnounced(TestCase):
     """
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:my_stories'))
 
     def test_metrics_carry_spoken_labels(self):
@@ -240,7 +228,7 @@ class WriteHasNoAuthorStatsRail(TestCase):
     )
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
 
     def test_no_rail_on_any_write_page(self):
         for name, kwargs in self.WRITE_URLS:
@@ -279,7 +267,7 @@ class WriteHasNoAuthorStatsRail(TestCase):
 class NewStoryForm(TestCase):
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:new_story'))
 
     def test_200(self):
@@ -358,7 +346,7 @@ class ManageStoryKnown(TestCase):
     SLUG = 'aidana-tan'   # 8 глав у Айданы
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:manage_story', kwargs={'slug': self.SLUG}))
 
     def test_200(self):
@@ -410,7 +398,7 @@ class ManageStoryEmptyChapters(TestCase):
     SLUG = 'aidana-erteg'   # OnModeration, 3 chapters в .chapters но без записей в CHAPTERS_BY_STORY
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:manage_story', kwargs={'slug': self.SLUG}))
 
     def test_shows_empty_chapters_cta(self):
@@ -425,7 +413,7 @@ class StorySettingsForm(TestCase):
     SLUG = 'aidana-tan'
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:story_settings', kwargs={'slug': self.SLUG}))
 
     def test_200(self):
@@ -485,7 +473,7 @@ class StorySettingsStatusIsOnlyForPublicSerials(TestCase):
     """
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
 
     def _get(self, slug):
         return self.client.get(reverse('core:story_settings', kwargs={'slug': slug}))
@@ -554,7 +542,7 @@ class ManageStoryChecklistIsHonestAboutAudience(TestCase):
     """Пункт чек-листа не может быть зелёным за несделанное (BR-10b)."""
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
 
     def test_draft_without_a_mark_shows_it_as_missing(self):
         self.assertEqual(stub_data.STORIES_BY_SLUG['aidana-kus'].audience, '')
@@ -575,7 +563,7 @@ class PublishChecklistIsActionable(TestCase):
     """
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
 
     def test_every_unfinished_item_carries_a_link(self):
         story = stub_data.STORIES_BY_SLUG['aidana-kus']
@@ -618,7 +606,7 @@ class SubmitForReviewIsOnlyForReadyDrafts(TestCase):
     """BR-11: перевод в публичный статус начинается здесь и только отсюда."""
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
 
     def _get(self, slug):
         return self.client.get(reverse('core:manage_story', kwargs={'slug': slug}))
@@ -671,7 +659,7 @@ class ChapterEditorNew(TestCase):
     SLUG = 'aidana-tan'
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:chapter_new', kwargs={'slug': self.SLUG}))
 
     def test_200(self):
@@ -745,7 +733,7 @@ class ChapterEditorEdit(TestCase):
     CH = 1
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(
             reverse('core:chapter_edit', kwargs={'slug': self.SLUG, 'chapter': self.CH})
         )
@@ -766,7 +754,7 @@ class ChapterEditorEdit(TestCase):
 class ChapterEditorUnknownStory(TestCase):
 
     def test_unknown_slug_renders_not_found(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:chapter_new', kwargs={'slug': 'no-such-story'}))
         self.assertContains(r, 'Шығарма табылмады')
 
@@ -781,7 +769,7 @@ class TagInputMovedOffCreation(TestCase):
     """
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:new_story'))
 
     def test_renders(self):
@@ -810,7 +798,7 @@ class TagInputOnStorySettings(TestCase):
     SLUG = 'aidana-tan'
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:story_settings', kwargs={'slug': self.SLUG}))
 
     def test_renders(self):
@@ -842,13 +830,13 @@ class MyStoriesAreOrderedByLastTouch(TestCase):
             self.assertLess(max(known), min(unknown))
 
     def test_page_renders_them_in_that_order(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         body = self.client.get(reverse('core:my_stories')).content.decode()
         positions = [body.index(s.title) for s in stub_data.my_stories_of('aidana')]
         self.assertEqual(positions, sorted(positions))
 
     def test_row_shows_when_it_was_touched(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         response = self.client.get(reverse('core:my_stories'))
         self.assertContains(response, stub_data.STORIES_BY_SLUG['aidana-tan'].updated_label)
 
@@ -857,7 +845,7 @@ class AttentionStripAnswersWhatToDoNext(TestCase):
     """FR-WRITE-08: сигналы, которые лежали в данных и нигде не сходились."""
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:my_stories'))
 
     def test_moderation_is_surfaced(self):
@@ -882,9 +870,7 @@ class AttentionStripAnswersWhatToDoNext(TestCase):
             reverse('core:manage_story', kwargs={'slug': moderated[0].slug}))
 
     def test_author_without_signals_gets_no_strip(self):
-        session = self.client.session
-        session['user_username'] = 'no-such-user'
-        session.save()
+        login_as_newcomer(self.client, 'no-such-user')
         self.assertNotContains(
             self.client.get(reverse('core:my_stories')), 'Назарыңды күтеді')
 
@@ -897,7 +883,7 @@ class NonPublicRowsReplaceZeroesWithProgress(TestCase):
     """«0 · 0 · 0» — три нуля вместо ответа на единственный вопрос к работе."""
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:my_stories'))
 
     def test_moderation_says_how_long_it_waits(self):
@@ -918,7 +904,7 @@ class MyStoryMenuOffersTheMissingActions(TestCase):
     """Из списка нельзя было ни посмотреть работу, ни открыть баптаулар, ни удалить."""
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:my_stories'))
 
     def test_every_row_offers_settings_and_delete(self):

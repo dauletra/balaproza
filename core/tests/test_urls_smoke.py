@@ -10,7 +10,7 @@
 
 from django.test import override_settings
 
-from core.tests.base import TestCase
+from core.tests.base import TestCase, login_as_newcomer
 
 
 # (url_name, args_dict, описание для subTest)
@@ -70,11 +70,9 @@ class SmokeTestsAuthed(TestCase):
     """Все публичные URL рендерятся в авторизованном режиме."""
 
     def setUp(self):
-        session = self.client.session
-        session['signed_in'] = True
-        session['user_name'] = 'Test User'
-        session['user_username'] = 'tester'
-        session.save()
+        # Вошедший без единой строки контента: смоук отвечает на «страница
+        # рендерится», а не «у автора есть что показать».
+        login_as_newcomer(self.client, 'tester', name='Test User')
 
     def test_all_routes_authed(self):
         from django.urls import reverse

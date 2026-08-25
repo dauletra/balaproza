@@ -1,6 +1,6 @@
 """AUTH-полировка (login/signup/success) + LINKS (Авторлар мектебі)."""
 
-from core.tests.base import TestCase
+from core.tests.base import TestCase, login_as, login_as_newcomer
 from django.urls import reverse
 
 from core import data
@@ -88,12 +88,8 @@ class SignupPage(TestCase):
 class SignupSuccessPage(TestCase):
 
     def setUp(self):
-        # имитируем что юзер только что зарегился
-        s = self.client.session
-        s['signed_in'] = True
-        s['user_name'] = 'Ержан'
-        s['user_username'] = 'erzhan'
-        s.save()
+        # человек, только что прошедший регистрацию: в корпусе его нет
+        login_as_newcomer(self.client, 'erzhan', name='Ержан Сапаров')
         self.response = self.client.get(reverse('core:signup_success'))
 
     def test_200(self):
@@ -156,11 +152,7 @@ class SchoolLinksInFooter(TestCase):
 
     def test_footer_has_school_links_on_library(self):
         # Глобальный context processor → school_links_global доступен везде
-        s = self.client.session
-        s['signed_in'] = True
-        s['user_name'] = 'X'
-        s['user_username'] = 'aidana'
-        s.save()
+        login_as(self.client)
         r = self.client.get(reverse('core:library'))
         self.assertContains(r, 'Авторлар мектебі')
 
@@ -216,11 +208,7 @@ class AuthGateIsOneComponent(TestCase):
                     self.client.get(url), f"{reverse('core:login')}?next={url}")
 
     def test_the_gate_disappears_once_signed_in(self):
-        session = self.client.session
-        session['signed_in'] = True
-        session['user_name'] = 'Айдана'
-        session['user_username'] = 'aidana'
-        session.save()
+        login_as(self.client)
         for name, kwargs, reason in self._gated():
             with self.subTest(page=name):
                 self.assertNotContains(self.client.get(reverse(name, kwargs=kwargs)), reason)

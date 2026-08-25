@@ -13,6 +13,44 @@
 
 from django.test import TestCase as DjangoTestCase
 
+from core.models import User
+
 
 class TestCase(DjangoTestCase):
     pass
+
+
+def login_as(client, username='aidana'):
+    """Ввести тестового клиента под настоящим пользователем корпуса.
+
+    Раньше каждый файл писал свой `_login_as_aidana`, раскладывающий три
+    ключа в сессию руками. После этапа 9 (docs/19 §19.4) вход настоящий, и
+    сессию собирает `django.contrib.auth`: ключ там один и служебный, а
+    подделать его в тесте значит проверять не тот вход, которым пользуются.
+
+    Возвращает пользователя — тестам, которым нужны его работы или ник.
+    """
+    user = User.objects.get(username=username)
+    client.force_login(user)
+    return user
+
+
+def login_as_newcomer(client, username='newcomer', name=''):
+    """Ввести клиента под человеком, у которого на портале ещё ничего нет.
+
+    Пустые состояния — «Әлі өтінім жоқ», «Сақталғандар жоқ», профиль без
+    единой награды — проверялись под выдуманными никами вроде
+    `lonely_reader`: сессия объявляла вошедшим того, кого не существует.
+    Настоящему входу такой человек нужен в базе, и это к лучшему — пустой
+    экран теперь показывают настоящему пустому аккаунту, а не отсутствию
+    записи о нём.
+
+    Пароль нерабочий, как и у сидовых: входа по паролю на портале нет.
+    """
+    user, created = User.objects.get_or_create(
+        username=username, defaults={'pen_name': username, 'name': name})
+    if created:
+        user.set_unusable_password()
+        user.save(update_fields=['password'])
+    client.force_login(user)
+    return user

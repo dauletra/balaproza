@@ -1,6 +1,8 @@
+import logging
 from urllib.parse import urlencode
 
 from django.conf import settings
+from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import redirect, render
 from django.templatetags.static import static
@@ -8,6 +10,9 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from . import data
+from .models import User
+
+logger = logging.getLogger(__name__)
 
 
 # ───────────────────────── DEC-17: демо-состояния ────────────────────────
@@ -25,8 +30,8 @@ def _page_state(request) -> str:
 # HOME
 def home(request):
     """Главная — редакционная витрина. Гость vs возвращающийся (FR-HOME-01)."""
-    is_signed_in = bool(request.session.get('signed_in'))
-    username = request.session.get('user_username') if is_signed_in else None
+    username = _current_username(request)
+    is_signed_in = bool(username)
     my_stories = data.my_stories_of(username) if username else []
     active_work = next((s for s in my_stories if s.status == 'OnProcess'), my_stories[0] if my_stories else None)
     progress = data.reading_progress_of(username) if is_signed_in else None
@@ -83,9 +88,24 @@ def home(request):
     })
 
 
-# ───────────────────────── AUTH (фейк-сессия) ─────────────────────────
-# Простой переключатель «гость ↔ авторизованный» для проверки дизайна.
-# Никаких моделей: только session['signed_in'].
+# ───────────────────────── AUTH — вход и выход ─────────────────────────
+# Сессия настоящая: `django.contrib.auth` кладёт в неё пользователя, а
+# отвечает на «кто это» база через `request.user`. Флага `signed_in` рядом
+# больше нет — два источника ответа на один вопрос рано или поздно
+# расходятся, и тогда страница считает гостем того, кто вошёл.
+#
+# Чего здесь пока нет — **провайдера личности**. Вход на портал идёт через
+# Telegram (FR-AUTH-01), а проверка подписи Login Widget (NFR-25) требует
+# бота и его токена: их заводят при деплое (docs/17 §17.7). До тех пор
+# кнопка «Сайтқа кіру» подписывает в демо-аккаунт — тот самый, чьими
+# работами наполнен корпус. Подобрать пароль к нему нельзя: у сидовых
+# пользователей его нет вовсе (`set_unusable_password`).
+
+# Кого подписывает демо-кнопка входа. Ровно один аккаунт и ровно на время,
+# пока нет Telegram: у `aidana` есть работы во всех четырёх статусах, и
+# только под ней проверяются кабинет, профиль и библиотека.
+DEMO_USERNAME = 'aidana'
+
 
 def _safe_next(request, fallback='core:home'):
     """Защита от open-redirect: принимаем только относительные пути на нашем хосте.
@@ -98,30 +118,68 @@ def _safe_next(request, fallback='core:home'):
     return reverse(fallback)
 
 
+def _current_username(request) -> str:
+    """Ник вошедшего или '' у гостя.
+
+    Слой данных принимает ник строкой (docs/19 §19.2), поэтому здесь имя,
+    а не объект: переход на объекты — отдельное решение и отдельный проход
+    по всем вызовам.
+    """
+    return request.user.username if request.user.is_authenticated else ''
+
+
+def _sign_in_demo_user(request) -> bool:
+    """Подписать в демо-аккаунт. False — если его нет в базе.
+
+    `backend` передаётся явно: пользователь взят запросом, а не через
+    `authenticate()`, и Django неоткуда узнать, кто за него отвечает.
+    """
+    user = User.objects.filter(username=DEMO_USERNAME, is_active=True).first()
+    if user is None:
+        logger.warning(
+            'Демо-вход невозможен: пользователя %r нет в базе. '
+            'Корпус кладёт команда `manage.py seed_demo`.', DEMO_USERNAME)
+        return False
+    auth_login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+    return True
+
+
+# Что видит человек, когда демо-аккаунта нет. Причину — в лог, не на
+# страницу: «выполните seed_demo» адресовано не тому, кто это читает.
+_SIGN_IN_FAILED = 'Кіру уақытша мүмкін емес. Сәл кейінірек қайта көр.'
+
+
 def login_view(request):
-    if request.method == 'POST':
-        request.session['signed_in'] = True
-        request.session['user_name'] = 'Айдана'
-        request.session['user_username'] = 'aidana'
+    if request.method == 'POST' and _sign_in_demo_user(request):
         return HttpResponseRedirect(_safe_next(request))
-    return render(request, 'pages/auth/login.html', {'next': request.GET.get('next', '')})
+    return render(request, 'pages/auth/login.html', {
+        'next': request.POST.get('next') or request.GET.get('next', ''),
+        'error': _SIGN_IN_FAILED if request.method == 'POST' else '',
+    })
 
 
 @require_POST
 def logout_view(request):
-    request.session.pop('signed_in', None)
-    request.session.pop('user_name', None)
-    request.session.pop('user_username', None)
+    # Без проверки «а вошёл ли»: `logout` на анонимном запросе — no-op,
+    # и выход обязан оставаться идемпотентным.
+    auth_logout(request)
     return redirect('core:home')
 
 
 def signup(request):
-    if request.method == 'POST':
-        request.session['signed_in'] = True
-        request.session['user_name'] = request.POST.get('name') or 'Айдана'
-        request.session['user_username'] = 'aidana'
+    """Регистрация — та же дверь, что и вход (FR-AUTH-03).
+
+    Форма свёрстана, но ничего не записывает: профиль заводится при первой
+    авторизации через Telegram, а до неё придуманный ник некуда сохранять —
+    аккаунт создаётся не здесь. Поля формы поэтому не читаются, а не
+    читаются наполовину: `name` уезжал в сессию под видом имени автора и
+    показывался в приветствии человеку, которого в базе не существовало.
+    """
+    if request.method == 'POST' and _sign_in_demo_user(request):
         return redirect('core:signup_success')
-    return render(request, 'pages/auth/signup.html')
+    return render(request, 'pages/auth/signup.html', {
+        'error': _SIGN_IN_FAILED if request.method == 'POST' else '',
+    })
 
 
 def signup_success(request):
@@ -468,7 +526,7 @@ def story_detail(request, slug):
     story = data.story_by_slug(slug)
     chapters = data.chapters_of(slug)
     # Автор своего стори видит pending-теги (BR-TAG-07). Для прочих скрыты.
-    viewer = request.session.get('user_username') or ''
+    viewer = _current_username(request)
     is_author = bool(story and viewer and story.author.username == viewer)
 
     # Резолв текущей главы из ?chapter=N. Невалидное/отсутствующее значение:
@@ -535,11 +593,6 @@ def story_detail(request, slug):
 
 
 # ───────────────────────── WRITE — авторский кабинет ─────────────────────
-def _current_username(request) -> str:
-    """Имя из фейк-сессии (см. core.views.login_view). Для гостя — ''."""
-    return request.session.get('user_username', '') if request.session.get('signed_in') else ''
-
-
 def _attention_links(username: str) -> list:
     """Сигналы кабинета с готовыми ссылками (FR-WRITE-08).
 

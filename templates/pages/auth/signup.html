@@ -14,6 +14,12 @@
         </p>
     </header>
 
+    {% if error %}
+        <div class="mb-5">
+            {% include "components/error_state.html" with title="Тіркелу сәтсіз аяқталды" message=error compact=True %}
+        </div>
+    {% endif %}
+
     <form method="post" action="{% url 'core:signup' %}" x-data
           @submit.prevent="$dispatch('toast', { kind:'success', text:'Тіркеуің қабылданды (демо)' });
                            setTimeout(()=>$el.submit(), 250)"

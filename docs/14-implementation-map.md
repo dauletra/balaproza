@@ -1,6 +1,6 @@
 # 14 · Карта реализации: требование → код
 
-> `Обновлён: 2026-08-23` · `Сверен с кодом: 3888897`
+> `Обновлён: 2026-08-25` · `Сверен с кодом: 3161e64`
 
 Этот документ отвечает на два вопроса, на которые остальное ТЗ не отвечает: **где живёт то, что описано требованием**, и **что придётся обновить, если это изменить**.
 
@@ -59,7 +59,11 @@
 | FR-AUTH-03…06 | `signup`, `signup_success` | `pages/auth/signup.html`, `signup_success.html` | `test_auth.SignupFlow`, `test_auth_links.SignupPage/SignupSuccessPage` |
 | FR-AUTH-07 | context processor `auth_state` | `partials/header.html` | `test_context.AuthState` |
 
-**Стаб-авторизация.** Модели `User` нет. `login_view` кладёт в сессию `signed_in`, `user_name`, `user_username` (по умолчанию `aidana`). `auth_state` отдаёт в шаблоны `signed_in`, `current_user_name`, `current_user_username`, `unread_notifications`.
+**Вход настоящий** (Ф14, этап 9 — [19 §19.4](19-f14-migration-plan.md)). Сессию собирает `django.contrib.auth`, «кто это» отвечает база через `request.user`; собственного флага в сессии нет. `auth_state` по-прежнему отдаёт в шаблоны `signed_in`, `current_user_name`, `current_user_username`, `unread_notifications` — имена сохранены, источник сменился. Ник вошедшего берут views через `_current_username(request)`.
+
+**Провайдера личности пока нет.** Вход идёт через Telegram (FR-AUTH-01), проверка подписи Login Widget (NFR-25) требует бота и токена — они появляются при деплое. До тех пор `login_view` подписывает в демо-аккаунт `core.views.DEMO_USERNAME` (`aidana`), а `signup` ведёт в ту же дверь и **не создаёт аккаунт**: заводит его первая авторизация (FR-AUTH-03), а до неё введённые поля записывать некуда. Дверь обязана быть заменена до публичного запуска — [17 §17.7](17-deployment.md), пункт 13.
+
+`current_user_name` — обращение к самому человеку (`User.get_short_name()`, первое слово настоящего имени), а не `public_name`: приветствие «Қайта қош келдің» адресовано ему, а не читателю. Настоящее имя видит только он сам (BR-73).
 
 Защита от open-redirect — `_safe_next(request)`: принимает только относительные пути, отвергает `//evil.com/`. Это не декоративная проверка, а закрытый тестом инвариант (`test_auth`).
 

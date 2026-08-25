@@ -3,13 +3,25 @@ from . import data
 
 def auth_state(request):
     """Гость ↔ авторизованный для шаблонов (используется header/mobile-nav/right-rail).
-    Никаких моделей: только session-флаг, выставленный в core.views.login_view.
+
+    Отвечает `request.user`, а не session-флаг: после этапа 9 (docs/19 §19.4)
+    вход настоящий. Имена в контексте оставлены прежними — `signed_in` рядом
+    с `user.is_authenticated` выглядит вторым источником, но это один и тот
+    же ответ под привычным для шаблонов именем, и переименование тронуло бы
+    двадцать один файл разметки ради нуля изменений на экране.
+
+    `current_user_name` — как платформа обращается к самому человеку, и это
+    не `public_name`. Читателю автор известен под лақап аты («aidana»), а
+    приветствие «Қайта қош келдің» адресовано ему самому — там уместно имя,
+    которым его зовут. Настоящее имя видит только он сам (BR-73): в чужом
+    профиле его нет.
     """
-    is_in = bool(request.session.get('signed_in'))
-    username = request.session.get('user_username', '') if is_in else ''
+    user = getattr(request, 'user', None)
+    is_in = bool(user and user.is_authenticated)
+    username = user.username if is_in else ''
     return {
         'signed_in': is_in,
-        'current_user_name': request.session.get('user_name', ''),
+        'current_user_name': user.get_short_name() if is_in else '',
         'current_user_username': username,
         'unread_notifications': data.unread_count_for_user(username) if is_in else 0,
     }

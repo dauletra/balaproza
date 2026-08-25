@@ -5,7 +5,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from unittest import mock
 
-from core.tests.base import TestCase
+from core.tests.base import TestCase, login_as, login_as_newcomer
 from django.urls import reverse
 
 from datetime import timedelta
@@ -34,22 +34,6 @@ def _notification(username='ghost', **fields):
         user=user, created_at=timezone.now() - timedelta(days=days), **fields)
 
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
-
-
-def _login_as_aidana(client):
-    s = client.session
-    s['signed_in'] = True
-    s['user_name'] = 'Айдана'
-    s['user_username'] = 'aidana'
-    s.save()
-
-
-def _login_as(client, username, name='X'):
-    s = client.session
-    s['signed_in'] = True
-    s['user_name'] = name
-    s['user_username'] = username
-    s.save()
 
 
 # ════════════════════════════ stub_data helpers ════════════════════════════
@@ -282,7 +266,7 @@ class NotificationsLeadSomewhere(TestCase):
     """
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:notifications'))
 
     def test_contest_notification_links_to_its_contest(self):
@@ -345,7 +329,7 @@ class ProfileMeGuest(TestCase):
 class ProfileMeAuthed(TestCase):
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
 
     def test_default_tab_is_works(self):
         r = self.client.get(reverse('core:profile_me'))
@@ -437,14 +421,14 @@ class ProfileOtherKnown(TestCase):
         self.assertContains(r, '/auth/login/')
 
     def test_authed_sees_follow_button(self):
-        _login_as(self.client, 'bekzhan_t')   # bekzhan_t подписан на rudazov
+        login_as(self.client, 'bekzhan_t')   # bekzhan_t подписан на rudazov
         r = self.client.get(reverse('core:profile_other', kwargs={'username': self.USERNAME}))
         # «Уже подписан» — кнопка «Жазылдың» + toast «отписка»
         self.assertContains(r, 'Жазылдың')
         self.assertContains(r, 'Жазылудан бас тарттың')
 
     def test_authed_not_following_sees_subscribe(self):
-        _login_as(self.client, 'sayyn')       # sayyn НЕ подписан на rudazov
+        login_as(self.client, 'sayyn')       # sayyn НЕ подписан на rudazov
         r = self.client.get(reverse('core:profile_other', kwargs={'username': self.USERNAME}))
         # «Не подписан» — кнопка «Жазылу»; toast подписки тут есть («Жазылдың (демо)»),
         # но toast отписки — нет.
@@ -520,7 +504,7 @@ class ProfileIsNotASecondCabinet(TestCase):
     """
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
 
     def test_owner_sees_what_a_reader_sees(self):
         r = self.client.get(reverse('core:profile_me'))
@@ -621,7 +605,7 @@ class ProfileRailByViewer(TestCase):
         self.assertTrue(self.client.get(url + '?tab=about').context['has_right_rail'])
 
     def test_owner_still_gets_the_list_of_who_he_reads(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:profile_me'))
         self.assertContains(r, 'Жазылулар')
         self.assertNotContains(r, 'Ең көп оқылғаны')
@@ -693,7 +677,7 @@ class ProfileStatTilesLinkToLists(TestCase):
                                        kwargs={'username': 'rudazov', 'kind': 'followers'}))
 
     def test_works_tile_opens_the_segment(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:profile_me'))
         self.assertContains(r, '/me/?tab=works')
 
@@ -725,7 +709,7 @@ class ProfileAchievementsRender(TestCase):
 
     def test_owner_sees_the_same_badges(self):
         """Достижение публично по определению — набор не зависит от зрителя."""
-        _login_as_aidana(self.client)
+        login_as(self.client)
         mine = self.client.get(reverse('core:profile_me'))
         theirs = self.client.get(reverse('core:profile_other', kwargs={'username': 'aidana'}))
         for a in data.achievements_of('aidana'):
@@ -826,7 +810,7 @@ class ContestHistoryPrivacy(TestCase):
         self.assertNotContains(r, 'Қаралуда')
 
     def test_page_shows_own_result_and_note(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:profile_me') + '?tab=about')
         self.assertContains(r, self.JURY_NOTE)
         self.assertContains(r, 'Қабылданбады')
@@ -910,7 +894,7 @@ class ProfileStatsTab(TestCase):
     """Вкладка «Статистика» — приватная и не повторяет кабинет."""
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
 
     def test_segment_exists_for_owner(self):
         r = self.client.get(reverse('core:profile_me'))
@@ -967,7 +951,7 @@ class AwardSpriteIsIncludedOnce(TestCase):
         self.assertEqual(r.content.decode().count(self.MARKER), 1)
 
     def test_row_and_stats_tab_together(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:profile_me') + '?tab=stats')
         self.assertTrue(r.context['achievements'])
         self.assertEqual(r.content.decode().count(self.MARKER), 1)
@@ -975,7 +959,7 @@ class AwardSpriteIsIncludedOnce(TestCase):
     def test_stats_tab_without_any_award(self):
         # Автор без единой награды всё равно должен увидеть серые плитки:
         # спрятанная награда не отвечает на вопрос «что дальше».
-        _login_as(self.client, 'lonely_writer')
+        login_as_newcomer(self.client, 'lonely_writer')
         r = self.client.get(reverse('core:profile_me') + '?tab=stats')
         self.assertEqual(r.status_code, 200)
 
@@ -1037,7 +1021,7 @@ class LibraryGuest(TestCase):
 class LibraryAuthed(TestCase):
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
 
     def test_default_tab_is_saved(self):
         r = self.client.get(reverse('core:library'))
@@ -1079,7 +1063,7 @@ class LibraryAuthed(TestCase):
 class LibraryEmpty(TestCase):
 
     def setUp(self):
-        _login_as(self.client, 'lonely_reader')
+        login_as_newcomer(self.client, 'lonely_reader')
 
     def test_saved_empty_shows_empty_state_with_cta(self):
         r = self.client.get(reverse('core:library'))
@@ -1108,7 +1092,7 @@ class NotificationsGuest(TestCase):
 class NotificationsAuthed(TestCase):
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:notifications'))
 
     def test_200(self):
@@ -1146,7 +1130,7 @@ class NotificationsAuthed(TestCase):
 class NotificationsEmpty(TestCase):
 
     def setUp(self):
-        _login_as(self.client, 'lonely_user')
+        login_as_newcomer(self.client, 'lonely_user')
 
     def test_empty_state_shown(self):
         r = self.client.get(reverse('core:notifications'))
@@ -1166,7 +1150,7 @@ class ModerationNotificationNamesItsOutcome(TestCase):
     """
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:notifications'))
 
     def test_outcome_is_stored_not_derived(self):
@@ -1302,7 +1286,7 @@ class StoryMetricIsCalledAReaction(TestCase):
     ]
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
 
     def test_no_surface_calls_the_sum_a_like(self):
         for name, kwargs, label in self.SURFACES:
@@ -1343,7 +1327,7 @@ class ReactionNotificationDoesNotSayLike(TestCase):
     """
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:notifications'))
 
     def test_wording_is_neutral(self):
@@ -1377,7 +1361,7 @@ class NotificationsHeaderFollowsTheState(TestCase):
     """
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
 
     def _get(self, state=''):
         url = reverse('core:notifications') + (f'?state={state}' if state else '')
@@ -1413,7 +1397,7 @@ class NotificationsRenderFromTheRegistry(TestCase):
     """Секции строит реестр `NOTIF_BUCKETS`, а не три копии блока."""
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         self.response = self.client.get(reverse('core:notifications'))
 
     def test_sections_follow_the_registry_order(self):
@@ -1462,7 +1446,7 @@ class NotificationIconsFollowTheRegistry(TestCase):
         return body.split('{% endcomment %}\n    <span class="grid', 1)[1].split('</span>', 1)[0]
 
     def _rendered(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         return self.client.get(reverse('core:notifications')).content.decode()
 
     def test_contest_wears_the_trophy(self):
@@ -1513,7 +1497,7 @@ class UnreadIsVisibleAndAnnounced(TestCase):
         self.assertIn('{% if n.read %}bg-white{% else %}', opening)
 
     def test_unread_dot_is_announced_by_text(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         html = self.client.get(reverse('core:notifications')).content.decode()
         self.assertIn('<span class="sr-only">оқылмаған</span>', html)
         self.assertNotIn('aria-label="оқылмаған"', html)
@@ -1521,7 +1505,7 @@ class UnreadIsVisibleAndAnnounced(TestCase):
     def test_read_notification_carries_no_marker(self):
         """Отметка стоит только у непрочитанного — иначе она ничего не значит."""
         unread = data.unread_count_for_user('aidana')
-        _login_as_aidana(self.client)
+        login_as(self.client)
         html = self.client.get(reverse('core:notifications')).content.decode()
         self.assertEqual(html.count('<span class="sr-only">оқылмаған</span>'), unread)
 
@@ -1581,7 +1565,7 @@ class NotificationsReachableWithoutDesktopHeader(TestCase):
         return parser.reachable
 
     def test_link_survives_outside_the_desktop_cluster(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         for name in ('core:home', 'core:library', 'core:profile_me'):
             with self.subTest(page=name):
                 self.assertTrue(
@@ -1609,13 +1593,13 @@ class NotificationsReachableWithoutDesktopHeader(TestCase):
 class HeaderUnreadBadge(TestCase):
 
     def test_authed_aidana_sees_unread_badge(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         r = self.client.get(reverse('core:home'))
         # Бейдж непрочитанных — из data.unread_count_for_user
         self.assertContains(r, 'оқылмаған')
 
     def test_authed_no_notifs_no_badge_number(self):
-        _login_as(self.client, 'no_notifs_user')
+        login_as_newcomer(self.client, 'no_notifs_user')
         r = self.client.get(reverse('core:home'))
         # У этого юзера 0 — текст «оқылмаған» в aria-label не должен появиться
         self.assertNotContains(r, 'оқылмаған')

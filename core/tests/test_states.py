@@ -2,16 +2,8 @@
 
 from django.test import override_settings
 
-from core.tests.base import TestCase
+from core.tests.base import TestCase, login_as
 from django.urls import reverse
-
-
-def _login_as_aidana(client):
-    s = client.session
-    s['signed_in'] = True
-    s['user_name'] = 'Айдана'
-    s['user_username'] = 'aidana'
-    s.save()
 
 
 # ════════════════════════════ ?state= opt-in ═══════════════════════════════
@@ -47,7 +39,7 @@ class HomeStates(TestCase):
 class LibraryStates(TestCase):
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
 
     def test_loading_shows_skeletons(self):
         r = self.client.get(reverse('core:library') + '?state=loading')
@@ -69,7 +61,7 @@ class LibraryStates(TestCase):
 class NotificationsStates(TestCase):
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
 
     def test_loading_skeleton(self):
         r = self.client.get(reverse('core:notifications') + '?state=loading')
@@ -86,7 +78,7 @@ class NotificationsStates(TestCase):
 class MyStoriesStates(TestCase):
 
     def setUp(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
 
     def test_loading(self):
         r = self.client.get(reverse('core:my_stories') + '?state=loading')
@@ -137,7 +129,7 @@ class ContestStates(TestCase):
         self.assertNotContains(r, 'animate-pulse')
 
     def test_my_submissions_states(self):
-        _login_as_aidana(self.client)
+        login_as(self.client)
         loading = self.client.get(reverse('core:my_submissions') + '?state=loading')
         self.assertContains(loading, 'animate-pulse')
         self.assertNotContains(loading, 'Қаралуда')

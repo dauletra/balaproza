@@ -78,7 +78,19 @@ class User(AbstractUser):
         return self.name or self.username
 
     def get_short_name(self):
-        return self.pen_name or self.username
+        """Как обратиться к самому человеку: «Қайта қош келдің, Айдана».
+
+        Django зовёт этот метод там, где приветствует вошедшего, — и это
+        единственное место, где к нему обращаются, а не рассказывают о нём
+        третьему. Поэтому здесь имя, а не `public_name`: читателю автор
+        известен как «aidana», но здороваться с ним ником — то же самое,
+        что звать по фамилии.
+
+        Только первое слово: «Айдана Серікқызы» с обращением на «сен»
+        (docs/16) звучит как вызов к доске. Полного имени нет — остаётся
+        публичное, оно есть всегда.
+        """
+        return self.name.split()[0] if self.name.strip() else self.public_name
 
     @property
     def public_name(self) -> str:

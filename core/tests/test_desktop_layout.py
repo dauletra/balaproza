@@ -10,7 +10,7 @@ import re
 import unittest
 from pathlib import Path
 
-from core.tests.base import TestCase
+from core.tests.base import TestCase, login_as
 from django.urls import reverse
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "templates"
@@ -157,11 +157,7 @@ class RailContentHasMobileEquivalent(TestCase):
     ]
 
     def setUp(self):
-        session = self.client.session
-        session['signed_in'] = True
-        session['user_name'] = 'Айдана'
-        session['user_username'] = 'aidana'
-        session.save()
+        login_as(self.client)
 
     def test_no_widget_is_rail_exclusive(self):
         for url, labels in self.PAGES:
@@ -178,10 +174,7 @@ class ProfileStatsNotDuplicated(TestCase):
     """Четыре числа профиля рендерились и в теле (FR-PROF-01), и в рейле."""
 
     def setUp(self):
-        session = self.client.session
-        session['signed_in'] = True
-        session['user_username'] = 'aidana'
-        session.save()
+        login_as(self.client)
 
     def test_stats_render_once(self):
         html = self.client.get('/me/').content.decode()
