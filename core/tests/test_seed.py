@@ -50,6 +50,13 @@ from core.models import (
 
 
 def seed():
+    """Прогнать сид ещё раз — нужно только тем, кто проверяет повтор.
+
+    Остальным классам звать его незачем: корпус в базе уже лежит, его
+    кладёт раннер один раз на прогон. Тринадцать пересевов в
+    `setUpTestData` стоили тринадцати секунд и не проверяли ничего, чего
+    не проверял первый.
+    """
     call_command('seed_demo', quiet=True)
 
 
@@ -80,10 +87,6 @@ class SeedIsIdempotent(TestCase):
 
 class SeededUsersMatchTheStub(TestCase):
 
-    @classmethod
-    def setUpTestData(cls):
-        seed()
-
     def test_every_stub_author_became_a_user(self):
         self.assertEqual(User.objects.count(), len(_corpus.AUTHORS))
 
@@ -93,16 +96,6 @@ class SeededUsersMatchTheStub(TestCase):
                 user = User.objects.get(username=author.username)
                 self.assertEqual(user.name, author.name)
                 self.assertEqual(user.pen_name, author.pen_name)
-                self.assertEqual(user.bio, author.bio)
-
-    def test_both_names_are_transferred(self):
-        """Имён у автора два, и путать их нельзя: `pen_name` видит читатель,
-        `name` — модератор и жюри (BR-73). Сид обязан донести оба."""
-        for author in _corpus.AUTHORS:
-            with self.subTest(author=author.username):
-                user = User.objects.get(username=author.username)
-                self.assertEqual(user.pen_name, author.pen_name)
-                self.assertEqual(user.name, author.name)
                 self.assertEqual(user.bio, author.bio)
 
     def test_joined_year_survives(self):
@@ -120,10 +113,6 @@ class SeededUsersMatchTheStub(TestCase):
 
 
 class SeededTagsMatchTheStub(TestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        seed()
 
     def test_every_stub_tag_became_a_row(self):
         self.assertEqual(Tag.objects.count(), len(_corpus.TAGS))
@@ -168,10 +157,6 @@ class SeededStoriesMatchTheStub(TestCase):
     Поэтому сверяются не только колонки, но и то, что из них считается, —
     бакет объёма и время чтения решают, в какой фильтр работа попадёт.
     """
-
-    @classmethod
-    def setUpTestData(cls):
-        seed()
 
     def test_every_stub_story_became_a_row(self):
         self.assertEqual(Story.objects.count(), len(_corpus.STORIES))
@@ -272,10 +257,6 @@ class SeededStoriesMatchTheStub(TestCase):
 
 class SeededChaptersCarryTheirText(TestCase):
 
-    @classmethod
-    def setUpTestData(cls):
-        seed()
-
     def test_chapter_count_matches_the_stub(self):
         expected = sum(len(_corpus.CHAPTERS_BY_STORY.get(s.slug, ())) for s in _corpus.STORIES)
         self.assertEqual(Chapter.objects.count(), expected)
@@ -347,10 +328,6 @@ class SeededContestsMatchTheStub(TestCase):
     почти всё, что видит участник. Сверяются поэтому не колонки, а ответы:
     фаза, отсчёт, строка «что дальше», возрастная вилка.
     """
-
-    @classmethod
-    def setUpTestData(cls):
-        seed()
 
     def test_every_stub_contest_became_a_row(self):
         self.assertEqual(Contest.objects.count(), len(_corpus.CONTESTS))
@@ -475,10 +452,6 @@ class SeededContestsMatchTheStub(TestCase):
 
 class SeededSubmissionsMatchTheStub(TestCase):
 
-    @classmethod
-    def setUpTestData(cls):
-        seed()
-
     def test_every_stub_submission_became_a_row(self):
         expected = sum(len(v) for v in _corpus.SUBMISSIONS_BY_USER.values())
         self.assertEqual(Submission.objects.count(), expected)
@@ -526,10 +499,6 @@ class SeededSubmissionsMatchTheStub(TestCase):
 
 class SeededSocialGraphMatchesTheStub(TestCase):
 
-    @classmethod
-    def setUpTestData(cls):
-        seed()
-
     def test_follow_rows_match(self):
         for follower, targets in _corpus.FOLLOWING.items():
             with self.subTest(user=follower):
@@ -556,10 +525,6 @@ class SeededSocialGraphMatchesTheStub(TestCase):
 
 
 class SeededCollectionsMatchTheStub(TestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        seed()
 
     def test_every_stub_collection_became_a_row(self):
         self.assertEqual(Collection.objects.count(), len(_corpus.COLLECTIONS))
@@ -590,10 +555,6 @@ class SeededCollectionsMatchTheStub(TestCase):
 
 
 class SeededLibraryMatchesTheStub(TestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        seed()
 
     def test_entries_and_kinds_transferred(self):
         for username, entries in _corpus.LIBRARY_BY_USER.items():
@@ -635,10 +596,6 @@ class SeededLibraryMatchesTheStub(TestCase):
 
 
 class SeededCommentsMatchTheStub(TestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        seed()
 
     def test_threads_and_replies_transferred(self):
         for story_slug, comments in _corpus.COMMENTS_BY_STORY.items():
@@ -685,10 +642,6 @@ class SeededCommentsMatchTheStub(TestCase):
 
 class SeededPollsMatchTheStub(TestCase):
 
-    @classmethod
-    def setUpTestData(cls):
-        seed()
-
     def test_questions_and_options_transferred(self):
         for (story_slug, number), stub in _corpus.POLLS_BY_CHAPTER.items():
             with self.subTest(story=story_slug, chapter=number):
@@ -730,10 +683,6 @@ class SeededPollsMatchTheStub(TestCase):
 
 
 class SeededNotificationsMatchTheStub(TestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        seed()
 
     def test_every_stub_notification_became_a_row(self):
         expected = sum(len(v) for v in _corpus.NOTIFICATIONS_BY_USER.values())
@@ -784,10 +733,6 @@ class SeededNotificationsMatchTheStub(TestCase):
 
 
 class SeededSchoolLinksMatchTheStub(TestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        seed()
 
     def test_links_transferred_in_order(self):
         rows = list(SchoolLink.objects.all())

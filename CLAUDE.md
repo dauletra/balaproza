@@ -136,7 +136,7 @@ balaproza_v1/
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
 │   │                             # domain.formatting.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 1063 теста в 21 файле (см. ниже)
+│   └── tests/                    # 1062 теста в 21 файле (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -260,8 +260,10 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 1063 теста
+uv run python manage.py test core       # все 1062 теста, в четыре процесса
 uv run python manage.py test core.tests.test_<file>
+uv run python manage.py test core --parallel 1   # последовательно: нужен для --pdb
+uv run python manage.py test core --keepdb       # быстрый круг, базы не пересоздаются
 ```
 
 Тесты в `core/tests/`:
@@ -270,7 +272,11 @@ uv run python manage.py test core.tests.test_<file>
 - `base.py` / `runner.py` — не тесты: общий `TestCase` для тех, кому нужен корпус,
   `login_as` / `login_as_newcomer` (вход, а не подделка сессии) и раннер, который
   кладёт корпус в тестовую базу **один раз за прогон** (сид на каждом классе
-  стоил трёх минут вместо минуты)
+  стоил трёх минут вместо минуты) и только потом снимает клоны для параллельных
+  процессов: клон делается `TEMPLATE`, поэтому корпус приезжает в каждый готовым.
+  Порядок здесь свой не от вкуса — штатный Django клонирует базу до сида, и
+  процессы работали бы в пустых копиях. При `--keepdb` сид проходит по каждому
+  клону: он идемпотентен, и переиспользованная копия догоняется до эталона
 - `test_data_facade.py` — шов Ф14: читающая сторона ходит через `core.data`,
   домен не знает о хранилище, каждое доменное имя достаётся через фасад
 - `test_models.py` — модели Ф14: публичное и приватное имя автора, путь тега,

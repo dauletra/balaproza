@@ -97,11 +97,15 @@ Watch-режим Tailwind: пересобирает `static/css/output.css` пр
 uv run python manage.py test core
 ```
 
-1063 теста в 21 файле (`core/tests/`). Отдельный файл:
+1062 теста в 21 файле (`core/tests/`). Отдельный файл:
 
 ```bash
 uv run python manage.py test core.tests.test_catalog
 ```
+
+Прогон идёт в четыре процесса, корпус кладётся в базу один раз и приезжает
+в каждый клон готовым. Последовательно — `--parallel 1` (нужен для `--pdb`),
+быстрый круг без пересоздания баз — `--keepdb`.
 
 ## Стаб-авторизация
 
