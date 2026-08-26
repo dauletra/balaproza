@@ -1150,12 +1150,29 @@ SUBMISSIONS_BY_USER: dict = {
             submitted_on=date(2023, 10, 12), status="accepted",
             note="Қазылар алқасының таңдауы.",
         ),
+        # Идущий конкурс «Жас алдым — 2026»: приём открыт, жюри ещё не
+        # судит, но заявка уже прошла первичный отбор — участник виден в
+        # списке страницы конкурса до объявления итогов (FR-CONT-16).
+        Submission(
+            contest_slug="zhas-aldym-2026", story_slug="atam-aityp-berdi",
+            submitted_on=_d(-6), status="accepted",
+            note="Талаптарға сай, қабылданды.",
+        ),
     ],
     "bekzhan_t": [
         Submission(
             contest_slug="zhas-aldym-2023", story_slug="temniy-lord",
             submitted_on=date(2023, 10, 5), status="accepted",
             note="Қазылар алқасының таңдауы.",
+        ),
+    ],
+    # «Жас алдым — 2026» — единственный текущий конкурс с реальными
+    # участниками в корпусе (остальные идущие держат только `reviewing`).
+    "sayyn": [
+        Submission(
+            contest_slug="zhas-aldym-2026", story_slug="kunnin-songy-sagaty",
+            submitted_on=_d(-10), status="accepted",
+            note="Талаптарға сай, қабылданды.",
         ),
     ],
 }

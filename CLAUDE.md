@@ -175,7 +175,7 @@ balaproza_v1/
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
 │   │                             # domain.formatting.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 1054 тестов в 24 файлах (см. ниже)
+│   └── tests/                    # 1057 тестов в 24 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -318,7 +318,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 1054 тестов, в четыре процесса
+uv run python manage.py test core       # все 1057 тестов, в четыре процесса
 uv run python manage.py test core.tests.test_<file>
 uv run python manage.py test core --parallel 1   # последовательно: нужен для --pdb
 uv run python manage.py test core --keepdb       # быстрый круг, базы не пересоздаются

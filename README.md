@@ -97,7 +97,7 @@ Watch-режим Tailwind: пересобирает `static/css/output.css` пр
 uv run python manage.py test core
 ```
 
-1054 тестов в 24 файлах (`core/tests/`). Отдельный файл:
+1057 тестов в 24 файлах (`core/tests/`). Отдельный файл:
 
 ```bash
 uv run python manage.py test core.tests.test_catalog

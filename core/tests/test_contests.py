@@ -409,6 +409,32 @@ class ContestParticipants(TestCase):
         self.assertContains(r, 'Әзірге қатысушы жоқ')
 
 
+class ContestParticipantsWhileStillAccepting(TestCase):
+    """«Жас алдым — 2026» — идущий конкурс с реальными участниками, не
+    только завершённый. Приём открыт, победители ещё не названы, но
+    принятые работы уже видны — участие не ждёт итогов (FR-CONT-16).
+    """
+
+    def setUp(self):
+        self.contest = data.contest_by_slug('zhas-aldym-2026')
+        self.response = self.client.get(
+            reverse('core:contest_detail', args=['zhas-aldym-2026']))
+
+    def test_contest_is_still_accepting(self):
+        self.assertTrue(self.contest.is_accepting)
+
+    def test_accepted_stories_are_listed(self):
+        for slug in ('kunnin-songy-sagaty', 'atam-aityp-berdi'):
+            with self.subTest(story=slug):
+                self.assertContains(self.response, Story.objects.get(slug=slug).title)
+
+    def test_none_of_them_are_winners_yet(self):
+        for p in self.response.context['participants']:
+            with self.subTest(story=p['story'].slug):
+                self.assertEqual(p['result'], 'accepted')
+        self.assertEqual(self.contest.winners, ())
+
+
 class ContestWinnersOnCard(TestCase):
 
     def test_finished_card_names_its_winners(self):
