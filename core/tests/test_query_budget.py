@@ -29,9 +29,15 @@ from core.tests.base import TestCase, login_as
 class PagesStayWithinTheirQueryBudget(TestCase):
 
     def test_home_guest(self):
-        """Семнадцать: ряды, жинақтар, книга недели, полоса жанров, две
-        витрины тегов, баннер конкурса, счётчики масштаба и новые имена."""
-        with self.assertNumQueries(17):
+        """Двадцать два: ряды, жинақтар, книга недели, полоса жанров, две
+        витрины тегов, баннер конкурса, секция «Байқаулар», счётчики
+        масштаба и новые имена.
+
+        Секция добавляет пять: `open_contests`/`finished_contests` — по
+        два запроса каждая (выдача + присуждения), плюс один за
+        `winner_stories` карточки завершённого конкурса в ряду.
+        """
+        with self.assertNumQueries(22):
             self.client.get(reverse('core:home'))
 
     def test_home_signed_in(self):
@@ -43,7 +49,7 @@ class PagesStayWithinTheirQueryBudget(TestCase):
         приветствия — отдельного обращения за автором у шапки нет.
         """
         login_as(self.client)
-        with self.assertNumQueries(23):
+        with self.assertNumQueries(28):
             self.client.get(reverse('core:home'))
 
     def test_catalog(self):
@@ -108,8 +114,8 @@ class PagesStayWithinTheirQueryBudget(TestCase):
 
     def test_contest_detail(self):
         """Страница конкурса — наоборот, со всем составом: условия,
-        этапы, жюри, номинации и присуждения."""
-        with self.assertNumQueries(7):
+        этапы, жюри, номинации, присуждения и список участников."""
+        with self.assertNumQueries(8):
             self.client.get(reverse('core:contest_detail',
                                     kwargs={'slug': 'altyn-qalam'}))
 

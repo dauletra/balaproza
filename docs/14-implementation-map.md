@@ -87,6 +87,7 @@
 | FR-HOME-10 (CTA) | `partials/home/become_author.html` | `test_home.GuestAuthorCta` |
 | FR-HOME-11 (рейл) | `partials/right_rail/home.html` | `test_desktop_layout.RailContentHasMobileEquivalent` |
 | FR-HOME-12 (состояния) | скелетоны в `pages/home.html` | `test_states.HomeStates` |
+| FR-HOME-14 (секция «Байқаулар») / DEC-50 | `partials/home/contests_section.html`, `data.home_contests` | `test_home.HomeContestsSection` |
 
 **Инвариант дублей.** Всё, что показывает рейл, обязано быть доступно и без него: рейл виден только с `xl`. Дубли в потоке помечены `xl:hidden` (FR-HOME-04, FR-HOME-08). Ломается это тихо — блок либо пропадает на планшете, либо показывается дважды на десктопе, — поэтому оба направления закрыты тестами `RailContentHasMobileEquivalent` и `ProfileStatsNotDuplicated`.
 
@@ -253,6 +254,7 @@
 | FR-CONT-06 / BR-41, BR-41a, BR-23b | `my_submissions`, `can_withdraw`, `Submission.submitted_on`, `Contest.timing_line`, `components/withdraw_confirm_modal.html` | `MySubmissionsAuthed`, `MySubmissionsEmpty`, `WithdrawSubmission`, `SubmissionsPageNamesTheDates`, `SubmissionDatesAreReal`, `ContestTimingLineIsOneImplementation` |
 | FR-CONT-07 / BR-24 | порог объёма из `Contest.min_chars`/`max_chars` | `SubmissionCandidates`, `ChecklistNumbers` |
 | FR-CONT-08 / BR-45 | `partials/contest/_winners.html`, `_timeline.html`, `contest_card` | `ContestWinnersOnDetail`, `ContestWinnersOnCard`, `ContestAwardsOnDetail` |
+| FR-CONT-16 / BR-74a / DEC-50 | `partials/contest/_participants.html`, `data.contest_participants` | `test_contests.ContestParticipants` |
 | FR-CONT-10 / BR-44, BR-46 / DEC-46 | `partials/contest/_awards.html`, `ContestAward`, `AwardGrant`, `components/award_art.html` | `ContestAwardsData`, `ContestAwardImages`, `SystemWinnerAwardIsRetired` |
 | FR-CONT-09 / DEC-25 | `partials/right_rail/contest.html`, `_contest_rail_has_content` | `ContestRail`, `ContestStages` |
 | Словарь: «байқау», не «конкурс» ([16 §16.4](16-content-voice.md)) | шаблоны CONT + подсказка возраста в регистрации | `ContestVocabulary` |

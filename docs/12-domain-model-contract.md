@@ -144,6 +144,8 @@ Contests:
 - `busy_contest_of(username, story_slug, *, besides='') -> Contest | None` — незавершённый конкурс, который уже держит эту работу (BR-23a)
 - `contest_history` добирает присуждения `prefetch_related_objects` сама: их читает только она, и `submissions_of` за чужой вопрос не платит
 - `can_withdraw(username, contest) -> bool` — можно ли отозвать заявку (BR-23b): идёт приём и статус `reviewing`. Принимает и готовый конкурс, и слаг. Готовый — потому что список заявок спрашивает это по строке, а через слаг ответ стоил полной выборки конкурса **со всем составом**: номинации, этапы, жюри, условия и присуждения, шесть лишних запросов на каждую строку
+- `contest_participants(contest: Contest) -> list[dict]` — список участников (FR-CONT-16, DEC-50): `{story, result, label}`, где `result` — `'accepted'` или `'winner'` (победа читается через `contest.grants`, не отдельный статус заявки), `label` — название номинации у победителя или подпись «Қабылданды». Видимость — BR-74a: только `status='accepted'` и публичная работа (`PUBLIC_STATUSES`). Принимает **готовый** конкурс, полученный через `contest_by_slug`, а не слаг — иначе `contest.grants` тянет присуждения отдельным запросом
+- `home_contests(limit: int = 4) -> list[Contest]` — конкурсы для секции «Байқаулар» на главной (FR-HOME-14): открытые (`open_contests`, DEC-45) перед недавно завершёнными (`finished_contests`)
 
 Tags (module 11):
 - `tag_by_slug(slug: str) -> Tag | None`

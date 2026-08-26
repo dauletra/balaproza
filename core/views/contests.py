@@ -59,6 +59,9 @@ def contest_detail(request, slug):
         # Присуждения, а не просто работы: строка победителя называет
         # номинацию, а её знает только грант (DEC-46).
         'grants':         contest.grants if contest else [],
+        # Все допущенные работы, не только победители — «список
+        # участников» после описания (BR-74a решает видимость).
+        'participants':   data.contest_participants(contest) if contest else [],
         'already_submitted': submitted,
     })
 

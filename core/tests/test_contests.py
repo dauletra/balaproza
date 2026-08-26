@@ -14,7 +14,7 @@ from core.tests.base import TestCase, login_as
 from django.urls import reverse
 
 from core import data
-from core.models import AwardGrant, Contest, Submission
+from core.models import AwardGrant, Contest, Story, Submission
 
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
 
@@ -372,6 +372,41 @@ class ContestWinnersOnDetail(TestCase):
         r = self.client.get(reverse('core:contest_detail', args=['bolashak-mektebi']))
         self.assertEqual(r.context['grants'], [])
         self.assertNotContains(r, '>Жеңімпаздар</h2>')
+
+
+class ContestParticipants(TestCase):
+    """Список участников после описания — все допущенные работы, не
+    только победители (BR-74a). Это и есть чтение байқауды как коллекции
+    произведений, без отдельной сущности Collection под конкурс.
+    """
+
+    def setUp(self):
+        self.response = self.client.get(
+            reverse('core:contest_detail', args=['zhas-aldym-2023']))
+
+    def test_section_is_present(self):
+        self.assertContains(self.response, 'Қатысушылар')
+
+    def test_accepted_stories_are_listed(self):
+        for slug in ('temniy-lord', 'igra-kuklovoda'):
+            with self.subTest(story=slug):
+                self.assertContains(self.response, Story.objects.get(slug=slug).title)
+
+    def test_rejected_submission_is_not_listed(self):
+        # aidana подавала «aidana-kysh» на этот же конкурс, и её отклонили —
+        # BR-74a запрещает публично показывать отказ.
+        self.assertNotContains(self.response, Story.objects.get(slug='aidana-kysh').title)
+
+    def test_winners_carry_their_nomination_label(self):
+        contest = data.contest_by_slug('zhas-aldym-2023')
+        for grant in contest.grants:
+            with self.subTest(award=grant.award.slug):
+                self.assertContains(self.response, grant.award.title)
+
+    def test_contest_without_accepted_work_shows_empty_state(self):
+        r = self.client.get(reverse('core:contest_detail', args=['altyn-qalam']))
+        self.assertEqual(r.context['participants'], [])
+        self.assertContains(r, 'Әзірге қатысушы жоқ')
 
 
 class ContestWinnersOnCard(TestCase):

@@ -1,0 +1,35 @@
+{% comment %}
+    HomeContestsSection — секция «Байқаулар» на главной.
+
+    Отдельно от жинақтар (DEC-31 остаётся про читательское намерение):
+    карточка ведёт прямо на страницу конкурса, а не оборачивается в
+    Collection. Карусель, а не сетка — на мобильном третья обрезанная
+    карточка сама показывает, что ряд листается (тот же приём, что у
+    HomeEditorialCollections).
+
+    Контекст: home_contests (list of Contest, до :4)
+{% endcomment %}
+{% if home_contests %}
+<section>
+    {% url 'core:contest_list' as contests_url %}
+    {% include "components/section_header.html" with title="Байқаулар" link="барлығы →" link_href=contests_url %}
+
+    <div class="-mx-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
+        <div class="flex w-max gap-3.5">
+            {% for c in home_contests %}
+                <div class="w-[268px] shrink-0 sm:w-[300px]">
+                    {% include "components/contest_card.html" with contest=c %}
+                </div>
+            {% endfor %}
+
+            <a href="{{ contests_url }}"
+               class="group relative flex h-full min-h-[212px] w-[268px] shrink-0 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 text-center transition-colors hover:border-brand hover:bg-brand/5 sm:w-[300px]">
+                <span class="flex h-10 w-10 items-center justify-center rounded-pill bg-slate-100 text-slate-600 group-hover:bg-brand/10 group-hover:text-brand-dark">
+                    {% include "components/icon.html" with name="arrow-right" size=18 only %}
+                </span>
+                <span class="font-display text-[14px] font-semibold text-slate-900">Барлық байқаулар</span>
+            </a>
+        </div>
+    </div>
+</section>
+{% endif %}

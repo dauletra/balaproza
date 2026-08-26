@@ -16,6 +16,7 @@
 from django.db.models import Count, prefetch_related_objects
 from django.utils import timezone
 
+from ..domain.catalog import PUBLIC_STATUSES
 from ..domain.contests import (
     CONTEST_RESULT_LABELS,
     PUBLIC_CONTEST_RESULTS,
@@ -66,6 +67,33 @@ def contest_by_slug(slug: str):
     return _base().filter(slug=slug).first()
 
 
+def contest_participants(contest) -> list:
+    """Работы конкурса, доступные читателю (BR-74a): accepted + победители.
+
+    Победа не отдельный статус заявки — она читается через `contest.grants`
+    (тот же приём, что в `contest_history`), поэтому фильтр по
+    status='accepted' уже покрывает весь `PUBLIC_CONTEST_RESULTS`.
+
+    Принимает конкурс, полученный через `contest_by_slug` (`_base()`):
+    иначе `contest.grants` тянет присуждения отдельным запросом на каждый
+    вызов.
+    """
+    grants_by_story = {g.story_id: g for g in contest.grants}
+    subs = (Submission.objects
+            .filter(contest=contest, status='accepted',
+                    story__status__in=PUBLIC_STATUSES)
+            .select_related('story', 'story__author', 'story__primary_genre')
+            .order_by('story__title'))
+    out = []
+    for sub in subs:
+        grant = grants_by_story.get(sub.story_id)
+        out.append({'story': sub.story,
+                    'result': 'winner' if grant else 'accepted',
+                    'label': grant.award.title if grant
+                             else CONTEST_RESULT_LABELS['accepted']})
+    return out
+
+
 # Фазы, выраженные для базы. Тот же календарь, что у `Contest.phase`, и
 # расходиться им нельзя: свойство отвечает на странице, эти условия — в
 # выдаче, и разное «идёт ли приём» в двух местах читатель увидит сразу.
@@ -86,6 +114,16 @@ def accepting_contests() -> list:
 
 def finished_contests() -> list:
     return list(_list_base().filter(results_on__lte=timezone.localdate()))
+
+
+def home_contests(limit: int = 4) -> list:
+    """Конкурсы для секции «Байқаулар» на главной.
+
+    Тот же порядок, что у `open_contests` (DEC-45: сначала куда можно
+    подать/что уже судят), хвост добирают недавно завершённые — иначе
+    секция пустеет в межсезонье, когда нет ни одного открытого конкурса.
+    """
+    return (open_contests() + finished_contests())[:limit]
 
 
 def hero_contest():

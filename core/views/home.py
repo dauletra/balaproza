@@ -50,6 +50,7 @@ def home(request):
         'active_work':     active_work,
         'hero_focus':      hero_focus,
         'hero_contest':    data.hero_contest(),
+        'home_contests':   data.home_contests(),
         'collections':     data.all_collections(),
         'genres':          data.all_genres(),
         'book_of_week':    data.book_of_week(),

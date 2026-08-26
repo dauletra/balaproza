@@ -193,6 +193,42 @@ class HomeMobileSecondFold(TestCase):
                 self.assertTrue(data.filter_catalog(genre=genre.slug))
 
 
+class HomeContestsSection(TestCase):
+    """Секция «Байқаулар» — обзор нескольких конкурсов, не только
+    ближайшего по дедлайну (тот показывает `contest_banner` рядом).
+
+    Карточка ведёт прямо на страницу конкурса: отдельной сущности
+    Collection под конкурс нет, «коллекцией» служит сама detail-страница
+    со списком участников.
+    """
+
+    def setUp(self):
+        self.response = self.client.get(reverse('core:home'))
+        self.html = self.response.content.decode()
+
+    def test_section_header_is_present(self):
+        self.assertContains(self.response, 'Байқаулар')
+
+    def test_cards_link_to_contest_detail_not_a_collection(self):
+        contests = self.response.context['home_contests']
+        self.assertTrue(contests)
+        for c in contests:
+            with self.subTest(contest=c.slug):
+                self.assertIn(reverse('core:contest_detail', args=[c.slug]), self.html)
+
+    def test_open_contests_are_shown_before_finished_ones(self):
+        contests = self.response.context['home_contests']
+        finished_seen = False
+        for c in contests:
+            if c.is_finished:
+                finished_seen = True
+            else:
+                self.assertFalse(finished_seen, 'завершённый конкурс встретился раньше открытого')
+
+    def test_section_is_capped(self):
+        self.assertLessEqual(len(self.response.context['home_contests']), 4)
+
+
 class HomeMobileThirdFold(TestCase):
     """Фолд 3: содержимое правого рейла не должно теряться на телефоне."""
 

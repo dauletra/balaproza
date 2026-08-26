@@ -1,0 +1,33 @@
+{% comment %}
+    Список участников конкурса — все допущенные работы (BR-74a), а не
+    только победители: `_winners.html` выше уже называет их по
+    номинациям, здесь — общий состав. Это и есть «прочитать байқауды
+    жинақ ретінде», без отдельной сущности Collection под конкурс.
+
+    Контекст:
+      participants — list[{'story': Story, 'result': 'accepted'|'winner', 'label': str}]
+{% endcomment %}
+<section class="mb-8">
+    <h2 class="mb-4 font-display text-lg font-bold text-slate-900">
+        Қатысушылар
+        {% if participants %}
+            <span class="font-sans text-sm font-normal text-slate-500">— {{ participants|length }} жұмыс</span>
+        {% endif %}
+    </h2>
+    {% if participants %}
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            {% for p in participants %}
+                <div class="relative">
+                    {% if p.result == 'winner' %}
+                        <span class="absolute -top-1.5 left-1.5 z-10 inline-flex h-5 items-center rounded-chip bg-status-published-bg px-1.5 font-sans text-[10px] font-bold text-status-published-fg">
+                            {{ p.label }}
+                        </span>
+                    {% endif %}
+                    {% include "components/book_card_small.html" with story=p.story only %}
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        {% include "components/empty_state.html" with icon="paper-plane" title="Әзірге қатысушы жоқ" text="Өтінімдер қабылданған соң, жұмыстар осында көрінеді." only %}
+    {% endif %}
+</section>

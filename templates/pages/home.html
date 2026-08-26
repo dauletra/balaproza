@@ -57,6 +57,11 @@
             </div>
             {% include "components/skeleton_box.html" with h="h-[340px]" radius="hero" %}
             {% include "components/skeleton_box.html" with h="h-[185px]" radius="lg" cls="xl:hidden" %}
+            <div class="flex gap-3.5 overflow-hidden">
+                {% for _ in '123'|make_list %}
+                    {% include "components/skeleton_box.html" with h="h-[212px]" radius="lg" cls="w-[268px] shrink-0 sm:w-[300px]" %}
+                {% endfor %}
+            </div>
             <div>
                 {% include "components/skeleton_box.html" with w="w-[140px]" h="h-[22px]" radius="sm" %}
                 <div class="mt-3 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
@@ -90,6 +95,15 @@
             <div class="xl:hidden">
                 {% include "partials/home/contest_banner.html" %}
             </div>
+
+            {% comment %}
+                Секция нескольких конкурсов — не дубль баннера выше: баннер
+                зовёт участвовать в ближайшем по дедлайну и прячется на xl,
+                потому что его дублирует рейл; здесь — обзор нескольких
+                байқаулар сразу, и аналога в рейле у него нет, поэтому
+                секция видна на всех ширинах.
+            {% endcomment %}
+            {% include "partials/home/contests_section.html" %}
 
             {% include "partials/home/book_row.html" with title="Көп оқылған шығармалар" books=top_stories link_href="/catalog/?sort=popularity" %}
 
