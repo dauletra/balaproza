@@ -19,6 +19,7 @@
 from pathlib import Path
 
 from django.contrib.auth.models import AbstractUser
+from django.contrib.postgres.indexes import GinIndex
 from django.core.validators import FileExtensionValidator, MaxValueValidator
 from django.db import models, transaction
 from django.utils import timezone
@@ -116,6 +117,20 @@ class User(AbstractUser):
     class Meta:
         verbose_name = 'пайдаланушы'
         verbose_name_plural = 'пайдаланушылар'
+        indexes = [
+            # Поиск по каталогу ищет автора всеми тремя именами сразу:
+            # публичным, ником и настоящим (ищут и так, и так). Это
+            # `ILIKE '%…%'`, и обычный B-tree его не берёт — подстрока
+            # начинается не с начала строки. Триграммный берёт, и он же
+            # сам складывает регистр, поэтому «РЫСҚАЛИ» и «рысқали» идут
+            # по одному индексу.
+            GinIndex(fields=['pen_name'], name='user_pen_name_trgm',
+                     opclasses=['gin_trgm_ops']),
+            GinIndex(fields=['username'], name='user_username_trgm',
+                     opclasses=['gin_trgm_ops']),
+            GinIndex(fields=['name'], name='user_name_trgm',
+                     opclasses=['gin_trgm_ops']),
+        ]
 
     def __str__(self):
         return self.public_name
@@ -247,6 +262,13 @@ class Tag(models.Model):
         ordering = ('name',)
         verbose_name = 'тег'
         verbose_name_plural = 'тегтер'
+        indexes = [
+            # «Танымал тегтер» и автокомплит формы: `accepted` по убыванию
+            # использования. Витрина «Осы аптада» ходит тем же путём по
+            # своему счётчику — два разных вопроса (DEC-31), два индекса.
+            models.Index(fields=['status', '-usage_count']),
+            models.Index(fields=['status', '-weekly_count']),
+        ]
 
     def __str__(self):
         return self.name
@@ -367,7 +389,15 @@ class Story(models.Model):
         verbose_name_plural = 'шығармалар'
         indexes = [
             models.Index(fields=['status']),
+            # По одному на каждую ось сортировки каталога: «Қазір танымал»
+            # (дефолт), «Ең көп оқылған» и «Жаңалары» — последняя ещё и
+            # дефолт страницы тега (DEC-31).
             models.Index(fields=['-recent_views']),
+            models.Index(fields=['-views']),
+            models.Index(fields=['-created_at']),
+            # Поиск по названию — тот же `ILIKE '%…%'`, что и по автору.
+            GinIndex(fields=['title'], name='story_title_trgm',
+                     opclasses=['gin_trgm_ops']),
         ]
 
     def __str__(self):
@@ -398,6 +428,23 @@ class Story(models.Model):
     @property
     def format_badge_label(self) -> str:
         return 'Бір оқылым' if self.is_single else 'Серия'
+
+    @property
+    def has_chapters(self) -> bool:
+        """Написана ли у работы хоть одна глава.
+
+        Не «есть ли текст»: глава с пустым телом даёт ноль знаков, но
+        работа при этом уже начата. Полоса внимания кабинета зовёт
+        дописать именно **пустой** черновик, и спутать эти два состояния
+        значит позвать автора начинать то, что он начал.
+
+        Выдача подставляет ответ аннотацией `has_any_chapter`: без неё
+        кабинет спрашивал базу на каждую работу автора.
+        """
+        annotated = getattr(self, 'has_any_chapter', None)
+        if annotated is not None:
+            return annotated
+        return self.chapter_set.exists()
 
     @property
     def text_chapter(self):
@@ -806,7 +853,15 @@ class Contest(models.Model):
     # ── Производное от состава ───────────────────────────────────────────
     @property
     def submissions(self) -> int:
-        """Число поданных работ — по самим заявкам, а не хранимым числом."""
+        """Число поданных работ — по самим заявкам, а не хранимым числом.
+
+        Списки подставляют готовую аннотацию `submission_count`: без неё
+        десять карточек раздела — это десять отдельных `COUNT`, и растёт
+        их число вместе с разделом.
+        """
+        annotated = getattr(self, 'submission_count', None)
+        if annotated is not None:
+            return annotated
         return self.submission_set.count()
 
     @property
@@ -1232,6 +1287,11 @@ class LibraryEntry(models.Model):
 
     class Meta:
         ordering = ('-added_on', 'pk')
+        indexes = [
+            # «Полка такого-то читателя» — единственный способ, которым в
+            # эту таблицу ходят.
+            models.Index(fields=['user', 'kind']),
+        ]
         constraints = [
             models.UniqueConstraint(fields=('user', 'story'),
                                     name='one_library_entry_per_story'),
@@ -1473,6 +1533,13 @@ class Notification(models.Model):
         ordering = ('-created_at',)
         verbose_name = 'хабарлама'
         verbose_name_plural = 'хабарламалар'
+        indexes = [
+            # Оба обращения к уведомлениям — «этого автора за последнюю
+            # неделю»: лента и бейдж в шапке. Бейдж считается на **каждой**
+            # странице у каждого вошедшего, так что этот индекс из всех
+            # пяти трогают чаще прочих.
+            models.Index(fields=['user', '-created_at']),
+        ]
 
     def __str__(self):
         return f'{self.user.username} · {self.kind}'

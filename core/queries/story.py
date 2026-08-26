@@ -40,14 +40,6 @@ def reactions_of(chapter) -> list:
     ]
 
 
-def reaction_breakdown(story_slug: str) -> list:
-    """«Чем зацепила каждая глава» — для авторского кабинета."""
-    return [
-        {'chapter': c, 'top': c.top_reaction, 'total': c.likes}
-        for c in chapters_of(story_slug)
-    ]
-
-
 def poll_of(story_slug: str, chapter_number: int):
     """Опрос главы или None: опрос необязателен (BR-POLL-01)."""
     chapter = (Chapter.objects

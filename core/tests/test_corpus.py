@@ -505,8 +505,13 @@ class Achievements(TestCase):
             with self.subTest(author=a.username):
                 self.assertEqual("editorial_choice" in keys, has_public)
 
-    def test_winning_stories_belong_to_author(self):
+    def test_award_belongs_to_the_author_it_is_shown_under(self):
+        """Награда конкурса приходит через работу (DEC-46), и работа обязана
+        быть авторской: второе имя разошлось бы с первым."""
         for a in data.all_authors():
-            for s in data.winning_stories_of(a.username):
-                with self.subTest(author=a.username, story=s.slug):
-                    self.assertEqual(s.author.username, a.username)
+            for item in data.contest_awards_of(a.username):
+                story = item['story']
+                if story is None:      # снята с публикации — не называется (BR-73)
+                    continue
+                with self.subTest(author=a.username, story=story.slug):
+                    self.assertEqual(story.author.username, a.username)

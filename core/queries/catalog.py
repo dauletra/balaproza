@@ -18,6 +18,7 @@
 когда в каталоге появится третья страница.
 """
 
+from django.core.cache import cache
 from django.db.models import (
     Case,
     Count,
@@ -41,6 +42,7 @@ from ..domain.catalog import (
     PUBLIC_STATUSES,
 )
 from ..models import Chapter, Genre, Story, Submission, Tag, User
+from .site import REFERENCE_TTL
 
 # Знаков в минуту: темп, комфортный для казахской прозы. Живёт рядом с
 # моделью (`Story.read_minutes`) и здесь — одно и то же число в двух
@@ -85,6 +87,12 @@ def _reading_effort(qs):
             Submission.objects.filter(
                 story=OuterRef('pk'),
                 contest__results_on__gt=timezone.localdate())),
+        # Есть ли хоть одна записанная глава — подхватывает
+        # `Story.has_chapters`. Отдельно от объёма намеренно: глава с
+        # пустым телом даёт ноль знаков, но работа при этом уже не пустой
+        # черновик, и полоса внимания в кабинете позвала бы автора писать
+        # то, что он начал.
+        has_any_chapter=Exists(Chapter.objects.filter(story=OuterRef('pk'))),
     )
 
 
@@ -120,10 +128,7 @@ def story_by_slug(slug: str):
     return all_stories().filter(slug=slug).first()
 
 
-def stories_by_genre(genre_slug: str) -> list:
-    """Произведения, где жанр основной **или** дополнительный."""
-    return list(all_stories().filter(Q(primary_genre__slug=genre_slug)
-                                     | Q(secondary_genre__slug=genre_slug)))
+_GENRES_KEY = 'catalog:genres'
 
 
 def all_genres() -> list:
@@ -132,20 +137,34 @@ def all_genres() -> list:
     `count` считается, а не хранится: колонка разошлась бы с выдачей на
     первой же смене статуса работы. Считаются только публичные — читатель
     не должен по счётчику догадываться, что у кого-то есть черновик.
+
+    Кэшируется на те же пять минут, что и остальные справочники: запрос с
+    двумя агрегатами по всему каталогу спрашивается **трижды** на странице
+    каталога — полосой жанров, списком опций панели и резолвом жанра, — и
+    справочник из двенадцати строк этого не стоит. Счётчик отстаёт на
+    минуты; это тот же порядок, что у самой выдачи с её `recent_views`.
     """
-    return list(
-        Genre.objects.annotate(
-            primary_count=Count('primary_stories',
-                                filter=Q(primary_stories__status__in=PUBLIC_STATUSES),
-                                distinct=True),
-            secondary_count=Count('secondary_stories',
-                                  filter=Q(secondary_stories__status__in=PUBLIC_STATUSES),
-                                  distinct=True),
-        ).annotate(count=F('primary_count') + F('secondary_count'))
-    )
+    genres = cache.get(_GENRES_KEY)
+    if genres is None:
+        genres = list(
+            Genre.objects.annotate(
+                primary_count=Count('primary_stories',
+                                    filter=Q(primary_stories__status__in=PUBLIC_STATUSES),
+                                    distinct=True),
+                secondary_count=Count('secondary_stories',
+                                      filter=Q(secondary_stories__status__in=PUBLIC_STATUSES),
+                                      distinct=True),
+            ).annotate(count=F('primary_count') + F('secondary_count'))
+        )
+        cache.set(_GENRES_KEY, genres, REFERENCE_TTL)
+    return genres
 
 
 def genre_by_slug(slug: str):
+    """Жанр по слагу или None. Пустой слаг в базу не идёт: `tag_by_slug('')`
+    честно делал `SELECT`, и каталог платил за него дважды на страницу."""
+    if not slug:
+        return None
     return next((g for g in all_genres() if g.slug == slug), None)
 
 
@@ -155,46 +174,9 @@ def all_authors() -> list:
     return list(with_works(User.objects.order_by('username')))
 
 
-def is_new_author(username: str) -> bool:
-    """Автор, которого ещё не читают: подписчиков меньше порога.
-
-    Порог — стаб-условная величина, а не правило (docs/12 §12.2): на
-    портале из двухсот авторов и из двадцати тысяч он означает разное.
-    Заменить его перцентилем — отдельная задача, не миграция.
-    """
-    return User.objects.filter(username=username,
-                               followers__lt=NEW_AUTHOR_FOLLOWERS).exists()
-
-
-def search_stories(query: str) -> list:
-    """Поиск по названию и по автору — тому, как его зовут читателю и как
-    он назван в паспорте (ищут и так, и так)."""
-    q = (query or '').strip()
-    if not q:
-        return []
-    return list(all_stories().filter(
-        Q(title__icontains=q)
-        | Q(author__pen_name__icontains=q)
-        | Q(author__username__icontains=q)
-        | Q(author__name__icontains=q)
-    ))
-
-
-def search_authors(query: str, limit: int = 5) -> list:
-    from .profile import with_works
-
-    q = (query or '').strip()
-    if not q:
-        return []
-    return list(with_works(User.objects.filter(
-        Q(pen_name__icontains=q) | Q(username__icontains=q)
-        | Q(name__icontains=q)
-    ).order_by('username'))[:limit])
-
-
 def apply_catalog_filters(stories, sort: str = CATALOG_DEFAULT_SORT,
                           status: str = '', audience: str = '',
-                          length: str = '', format: str = '', badge: str = '',
+                          length: str = '', badge: str = '',
                           author_tier: str = '', kind: str = ''):
     """Оси каталога поверх готовой выдачи. Пустая ось — no-op."""
     qs = stories
@@ -212,8 +194,6 @@ def apply_catalog_filters(stories, sort: str = CATALOG_DEFAULT_SORT,
         qs = qs.filter(read_minutes_db__gt=10, read_minutes_db__lte=30)
     elif length == 'long':
         qs = qs.filter(read_minutes_db__gt=30)
-    if format:
-        qs = qs.filter(format=format)
     if kind == 'single':
         qs = qs.filter(format='single')
     elif kind == 'done':
@@ -252,7 +232,7 @@ def _sorted(qs, sort: str):
 
 def filter_catalog(*, query: str = '', genre: str = '', tag: str = '',
                    status: str = '', sort: str = CATALOG_DEFAULT_SORT,
-                   audience: str = '', length: str = '', format: str = '',
+                   audience: str = '', length: str = '',
                    badge: str = '', author_tier: str = '', kind: str = ''):
     """Единый пайплайн каталога, поиска, жанра и тега (DEC-27).
 
@@ -285,8 +265,8 @@ def filter_catalog(*, query: str = '', genre: str = '', tag: str = '',
 
     return apply_catalog_filters(qs, sort=sort, status=status,
                                  audience=audience, length=length,
-                                 format=format, badge=badge,
-                                 author_tier=author_tier, kind=kind)
+                                 badge=badge, author_tier=author_tier,
+                                 kind=kind)
 
 
 def related_stories(slug: str, limit: int = 6) -> list:

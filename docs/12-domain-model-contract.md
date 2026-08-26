@@ -54,20 +54,20 @@ What the table carries instead is the part a field list cannot state: what had t
 
 Views полагаются на эти хелперы; после Ф14 они живут в `core/queries/*` и отдаются через фасад `core.data`. В шаблоны эта логика не спускается.
 
-**Signatures below are the actual ones in the code.** Каждый хелпер принимает **строковый ключ** (`username`, `story_slug`, `genre_slug`, `contest_slug`), а не объект модели. Так было в стабе, и так осталось намеренно: перевод на объекты — отдельное решение и отдельный проход по всем вызовам, а смешанный с миграцией он лишил бы возможности понять, что сломалось — модель или вызов.
+**Список — поверхность фасада, а не архив.** Хелпер, которого не зовёт ни один view и ни один шаблон, снимается отсюда вместе с кодом: контракт, называющий то, чем никто не пользуется, читается как обещание. Так ушли восемь имён — отдельные `stories_by_genre` и `search_stories` (после DEC-27 на оба вопроса отвечает `filter_catalog`), `search_authors`, `is_new_author`, `next_read_tier`, `winning_stories_of`, `reaction_breakdown` и `KIND_PREDICATES`; `apply_catalog_filters` и `catalog_base` остались в модуле, но с фасада сняты — их зовёт только `filter_catalog`.
+
+**Signatures below are the actual ones in the code.** Хелпер принимает **строковый ключ** (`username`, `story_slug`, `genre_slug`, `contest_slug`), а не объект модели. Так было в стабе, и так осталось намеренно: перевод на объекты — отдельное решение и отдельный проход по всем вызовам, а смешанный с миграцией он лишил бы возможности понять, что сломалось — модель или вызов.
+
+Исключение одно и заведено по цене, а не по вкусу: `can_withdraw` и `submission_candidates` принимают **и слаг, и готовый конкурс**. Через слаг ответ стоил полной выборки конкурса со всем составом, и список заявок платил её на каждой строке. Слаг остаётся ради вызовов, у которых объекта на руках нет.
 
 Catalog and search:
-- `filter_catalog(*, query="", genre="", tag="", status="", sort="trending", audience="", length="", format="", badge="", author_tier="", kind="") -> list[Story]`
-- `apply_catalog_filters(stories, sort="trending", status="", ..., badge="", author_tier="", kind="") -> list[Story]`
-- `stories_by_genre(genre_slug: str) -> list[Story]`
+- `filter_catalog(*, query="", genre="", tag="", status="", sort="trending", audience="", length="", format="", badge="", author_tier="", kind="") -> QuerySet[Story]` — **queryset, а не список**: чипы пресетов спрашивают у него `.count()`, и `len` вместо этого выполняет выдачу целиком, материализуя список ORM-объектов со всеми тегами (шесть раз за страницу каталога)
 - `PUBLIC_STATUSES` — статусы, видимые публике (DEC-23). `filter_catalog` режет по ним на входе
-- `is_new_author(username) -> bool`, `NEW_AUTHOR_FOLLOWERS`, `CATALOG_AUTHOR_FILTERS` — ось «Автор» (FR-CAT-13)
+- `NEW_AUTHOR_FOLLOWERS`, `CATALOG_AUTHOR_FILTERS` — ось «Автор» (FR-CAT-13). Порог применяется в `WHERE`; отдельного `is_new_author` нет — предикат над одним автором отвечал на вопрос, которого никто не задавал
 - `AUDIENCE_ORDER` — отметки от младшей к старшей; ось «Жасың» сравнивает по индексу, не по равенству (DEC-38)
 - `STORY_AUDIENCES` — те же ключи для формы автора: `(key, mark, hint)`. Отдельная константа от `CATALOG_AUDIENCE_FILTERS` потому, что подписи там про **читателя** (вилка «10-13», ось накопительная), а в форме автор ставит отметку **работе**. Дефолта у `Story.audience` нет — пустая строка значит «не выбрана» (BR-10b)
-- `CATALOG_KIND_FILTERS`, `KIND_PREDICATES` — ось «Түрі» (DEC-37). Правило «у публичного сериала не бывает `Published`» — BR-10a; `writer_stats` считает `published` как `Published` + `Completed`, ключ `ongoing` (бывший `drafts`) считает `OnProcess`
+- `CATALOG_KIND_FILTERS` — ось «Түрі» (DEC-37); предикатов рядом нет, оси выражены в SQL, и вторая их копия лямбдами разошлась бы с выдачей. Правило «у публичного сериала не бывает `Published`» — BR-10a; `writer_stats` считает `published` как `Published` + `Completed`, ключ `ongoing` (бывший `drafts`) считает `OnProcess`
 - `CATALOG_PRESETS`, `STORY_BADGES` / `BADGE_LABELS`, `CATALOG_BADGE_FILTERS`, `CATALOG_DEFAULT_SORT` — справочники осей каталога
-- `search_stories(query: str) -> list[Story]`
-- `search_authors(query: str, limit=5) -> list[Author]`
 - `related_stories(slug: str, limit=6) -> list[Story]`
 
 Story and chapters:
@@ -75,7 +75,7 @@ Story and chapters:
 - `chapter_of(story_slug: str, number: int) -> Chapter | None`
 - `Story.is_public -> bool` — видна ли работа читателю. По `PUBLIC_STATUSES`, а не по литералу `'Published'` (DEC-37)
 - `Story.updated_label -> str` — «кеше», «3 күн бұрын»; пусто, когда `updated_days_ago` не задан
-- `writer_attention(username: str) -> list[dict]` — сигналы кабинета (FR-WRITE-08): `kind` / `count` / `slug`. Только данные; ссылку строит view (`_attention_links`), как и в каталоге
+- `writer_attention(username: str, *, facts=None) -> list[dict]` — сигналы кабинета (FR-WRITE-08): `kind` / `count` / `slug`. Только данные; ссылку строит view (`_attention_links`), как и в каталоге
 - `publish_checklist(story) -> list[dict]` — готовность работы к модерации (FR-WRITE-09): `key` / `ok` / `required` / `target`. Порядок — порядок работы автора, задан `PUBLISH_CHECKLIST`. Ссылку строит view (`_checklist_links`), тексты — шаблон
 - `missing_for_review(story) -> list[str]` — незакрытые **обязательные** пункты
 - `can_submit_for_review(story) -> bool` — «готова» **и** «ещё не отправлена» (BR-11). Два разных вопроса: у работы на модерации кнопка означала бы повторную заявку, у публичной — откат в непубличное
@@ -83,45 +83,67 @@ Story and chapters:
 - `comments_of(story_slug: str) -> list[StoryComment]`
 - `comments_of_chapter(story_slug: str, chapter_number: int) -> list[StoryComment]`
 - `reactions_of(chapter: Chapter) -> list[dict]` — полный ряд из пяти реакций, включая нулевые (BR-REACT-01)
-- `reaction_breakdown(story_slug: str) -> list[dict]` — «чем зацепила каждая глава», для авторского кабинета
 - `poll_of(story_slug: str, chapter_number: int) -> ChapterPoll | None` — опрос необязателен (BR-POLL-01)
 
 Author workspace, library, social:
+
+**`AuthorFacts` — снимок автора на один запрос.** Хелперы этого слоя
+возвращают `list`, а не `QuerySet`: у списка нет кэша, и каждый вызов идёт
+в базу заново. Вызывающая сторона об этом не знала и звала их столько раз,
+сколько было удобно читать, — свой профиль спрашивал `my_stories_of`
+**шестнадцать раз** за один рендер, и из этого складывались 59 запросов на
+страницу. Поэтому view собирает снимок один раз и раздаёт его дальше.
+
+- `author_facts(username: str) -> AuthorFacts` — снимок. Поля ленивые
+  (`cached_property`): объект создаётся заранее, а платит только за то,
+  что странице понадобилось — заявки на конкурс нужны профилю и не нужны
+  кабинету
+- Поля: `stories` (все, любого статуса), `public_stories` (режется из
+  `stories` по тому же правилу публичности — второй запрос с тем же
+  `WHERE` это просто второй запрос), `submissions`, `library`,
+  `user`, `reads`; метод `facts.shelf(kind)` — одна полка из общей выборки
+- **Живёт ровно один запрос.** Это снимок, а не кэш: между запросами его
+  не переиспользуют, иначе страница показывала бы вчерашние работы
+- Хелперы ниже принимают его именованным `facts=` и, если не дан, строят
+  свой. Сигнатура с `username` первым аргументом сохранена везде
+
+<!-- -->
+
 - `my_stories_of(username: str) -> list[Story]` — **любой** статус: выдача авторского кабинета, не публичная
 - `public_stories_of(username: str) -> list[Story]` — только `is_public` (BR-73). Публичный профиль строится на ней; на `my_stories_of` он показывал посторонним черновики
-- `top_stories_of(username: str, limit: int = 3) -> list[Story]` — самые читаемые публичные работы автора, для рейла чужого профиля (FR-PROF-09). Сортировка по накопленному `views`, а не по `recent_views`: рейл отвечает «с чего начать», а не «что сейчас в моде». Не `related_stories` — тот, наоборот, исключает того же автора
-- `writer_stats(username: str) -> dict`
-- `library_of(username: str, kind: str = "") -> list[LibraryEntry]`
+- `top_stories_of(username: str, limit: int = 3, *, facts=None) -> list[Story]` — самые читаемые публичные работы автора, для рейла чужого профиля (FR-PROF-09). Сортировка по накопленному `views`, а не по `recent_views`: рейл отвечает «с чего начать», а не «что сейчас в моде». Не `related_stories` — тот, наоборот, исключает того же автора
+- `writer_stats(username: str, *, facts=None) -> dict`
+- `library_of(username: str, kind: str = "") -> list[LibraryEntry]` — со снимком полка берётся как `facts.shelf(kind)`: три вкладки библиотеки стоили трёх выборок ради трёх счётчиков
 - `in_library(username: str, story_slug: str) -> bool`
-- `public_stats(username: str) -> dict` — `works` / `reads` / `likes` / `followers` по публичным работам (FR-PROF-01). `works` совпадает с `Author.works` по построению
-- `reader_stats(username: str) -> dict` — `public_stats` плюс приватное: `works_total` (с черновиками), `finished` (дочитано, из библиотеки). Ключ `read` переименован в `finished`, чтобы не путаться с `reads`
-- `AWARDS` — реестр наград: `key` / `label` / `art` / `tier` / `hint` и предикат `earned`, принимающий username. **Условие лежит рядом с наградой**, а не в отдельном списке «как получить»: два описания одного правила однажды разошлись бы
-- `award_catalog(username: str) -> list[dict]` — все награды с `earned` и `dim` (FR-PROF-08). Тот же реестр, что у публичного ряда, поэтому «что можно получить» не может разойтись с «что получено»
-- `read_ladder(username: str) -> list[dict]` — ступени оқылым: `earned`, `is_next`, `left`
-- `achievements_of(username: str) -> list[dict]` — награды автора (FR-PROF-06, BR-ACH-01): `key` / `label` / `art` / `tier`. `art` — слаг иллюстрации в `components/awards/_sprite.html`, `tier` — металл ступени (`AWARD_TIERS`). **Выводятся, не хранятся**; URL-ы слой данных не отдаёт
+- `public_stats(username: str, *, facts=None) -> dict` — `works` / `reads` / `likes` / `followers` по публичным работам (FR-PROF-01). `works` совпадает с `Author.works` по построению
+- `reader_stats(username: str, *, facts=None) -> dict` — `public_stats` плюс приватное: `works_total` (с черновиками), `finished` (дочитано, из библиотеки). Ключ `read` переименован в `finished`, чтобы не путаться с `reads`
+- `AWARDS` — реестр наград: `key` / `label` / `art` / `tier` / `hint` и предикат `earned`, принимающий **`AuthorFacts`**. **Условие лежит рядом с наградой**, а не в отдельном списке «как получить»: два описания одного правила однажды разошлись бы. Предикат читает снимок, а не ник: пока он принимал ник, каждая из пяти наград шла в базу за работами автора сама
+- `award_catalog(username: str, *, facts=None) -> list[dict]` — все награды с `earned` и `dim` (FR-PROF-08). Тот же реестр, что у публичного ряда, поэтому «что можно получить» не может разойтись с «что получено». `earned` вычисляется **один раз** на награду: `dim` это его отрицание, а не второй расчёт
+- `read_ladder(username: str, *, facts=None) -> list[dict]` — ступени оқылым: `earned`, `is_next`, `left`
+- `achievements_of(username: str, *, facts=None) -> list[dict]` — награды автора (FR-PROF-06, BR-ACH-01): `key` / `label` / `art` / `tier`. `art` — слаг иллюстрации в `components/awards/_sprite.html`, `tier` — металл ступени (`AWARD_TIERS`). **Выводятся, не хранятся**; URL-ы слой данных не отдаёт
 - `READ_TIER_ART` — ступень оқылым → (слаг рисунка, металл). Один рисунок-стела на четыре ступени: меняются число на табличке и металл
-- `reads_total(username: str) -> int` — прочтения по публичным работам
+- `reads_total(username: str, *, facts=None) -> int` — прочтения по публичным работам. Со снимком считается из уже загруженных работ; без него остаётся агрегатом — сам по себе он дешевле выборки всех работ ради суммы
 - `tier_for(total: int) -> tuple | None`, `next_tier_for(total: int) -> tuple | None` — чистые функции над `READ_TIERS`, чтобы границы проверялись напрямую
-- `read_tier(username: str)`, `next_read_tier(username: str)` — они же для автора
-- `winning_stories_of(username: str) -> list[Story]` — работы автора, отмеченные наградой конкурса (по `AWARD_GRANTS`)
+- `read_tier(username: str, *, facts=None)` — высшая взятая ступень; «что дальше» отдаёт `read_ladder` флагом `is_next`
 - `contest_awards_of(username: str) -> list[dict]` — награды конкурсов автора (DEC-46), свежие сверху: `key` / `title` / `image` / `contest` / `story` / `year` / `note`. Работа названа только пока публична (BR-73); сама награда остаётся — она принадлежит автору, а не видимости текста
 - `is_following(me: str, them: str) -> bool`
 - `following_of(username: str) -> list[Author]` — оба списка публичны (BR-75), страницу собирает `profile_people`
 - `followers_of(username: str) -> list[Author]`
 - `notifications_for_user(username: str) -> dict` — три бакета FR-NOTIF-01; событие старше недели не попадает ни в один (BR-70a)
-- `unread_count_for_user(username: str) -> int` — считает то же, что показывается: скрытое старое уведомление в бейдж не идёт
+- `unread_count_for_user(username: str) -> int` — считает то же, что показывается: скрытое старое уведомление в бейдж не идёт. Считает **база**: окно ленты в семь дней (`FEED_DAYS`) выражено условием по `created_at`, а не отбором по свойству `bucket` в Python. Число зовёт контекст-процессор на каждой странице, и у автора с двухлетней историей прежний вариант вёз всю историю ради семи дней
 - `kk_ago(days: int, hours: int | None = None) -> str` — «как давно» словами, одна формулировка на проект: её берут `Notification.when` и `Submission.submitted_label`
 
 Contests:
 - `submissions_of(username: str) -> list[Submission]`
 - `has_submission(username: str, contest_slug: str) -> bool`
-- `contest_history(username: str, *, is_self: bool = False) -> list[dict]` — конкурсная биография (FR-PROF-07). Правило видимости живёт здесь, а не в шаблоне (BR-74a): при `is_self=False` результат режется до победы/принятия, `note` приходит пустым, непубличная работа не называется. Второе место с тем же правилом однажды разошлось бы с первым
+- `contest_history(username: str, *, is_self: bool = False, facts=None) -> list[dict]` — конкурсная биография (FR-PROF-07). Правило видимости живёт здесь, а не в шаблоне (BR-74a): при `is_self=False` результат режется до победы/принятия, `note` приходит пустым, непубличная работа не называется. Второе место с тем же правилом однажды разошлось бы с первым
 - `common_rules(contest: Contest) -> list[dict]` — правила, действующие на любом конкурсе: `{key, label, hint, per_work}`. Один источник для списка «Шарттар» на странице конкурса и для чек-листа подачи (BR-48a). `per_work=False` у правил про автора, а не про текст («Бір автор — бір өтінім»)
-- `submission_checklist(story: Story, contest: Contest) -> list` — общая часть из `common_rules`, возрастной пункт только при непустом `eligibility_line` (BR-48). Пороги объёма берутся у конкурса, а не вписаны в подпись литералом (FR-CONT-07); числа проходят через `spaced_number`
+- `submission_checklist(story: Story, contest: Contest, *, chars: int = None) -> list` — объём берётся из аннотации выдачи (`written_chars`, не `effective_chars`: второй дорисовывает ненаписанные части по заявленному числу глав, а на конкурс идёт текст, который прочтёт жюри). `chars` это уже посчитанный объём: страница подачи считает его каждому кандидату в `submission_candidates`, и без него объём шёл в базу за главами по второму разу. — общая часть из `common_rules`, возрастной пункт только при непустом `eligibility_line` (BR-48). Пороги объёма берутся у конкурса, а не вписаны в подпись литералом (FR-CONT-07); числа проходят через `spaced_number`
 - `spaced_number(value) -> str` — разряды через неразрывный пробел, канонический вид числа для автора. Живёт в слое данных, а не в фильтре `balaproza.spaced`: те же числа собираются и в подсказках чек-листа. Фильтр вызывает эту функцию — двух реализаций одной формы записи быть не должно
-- `submission_candidates(username: str, contest_slug: str) -> list[dict]` — работы автора как кандидаты и что о них стоит знать: `{story, chars, notes}`, где `notes` — `[{key, text}, …]`, ключи из `SUBMISSION_NOTES` (`too_short` · `too_long` · `busy`). **Заметки, не запреты** (BR-24): форма ничего не отклоняет, решение принимает человек. Заметок бывает несколько сразу — прежняя цепочка `elif` называла первую и молчала об остальных. Кандидатами остаются только публичные работы: черновик на конкурс не выставляется (BR-10, DEC-23)
+- `submission_candidates(username: str, contest, *, facts=None) -> list[dict]` — вторым аргументом принимает и готовый конкурс, и слаг: — работы автора как кандидаты и что о них стоит знать: `{story, chars, notes}`, где `notes` — `[{key, text}, …]`, ключи из `SUBMISSION_NOTES` (`too_short` · `too_long` · `busy`). **Заметки, не запреты** (BR-24): форма ничего не отклоняет, решение принимает человек. Заметок бывает несколько сразу — прежняя цепочка `elif` называла первую и молчала об остальных. Кандидатами остаются только публичные работы: черновик на конкурс не выставляется (BR-10, DEC-23)
 - `busy_contest_of(username, story_slug, *, besides='') -> Contest | None` — незавершённый конкурс, который уже держит эту работу (BR-23a)
-- `can_withdraw(username, contest_slug) -> bool` — можно ли отозвать заявку (BR-23b): идёт приём и статус `reviewing`
+- `contest_history` добирает присуждения `prefetch_related_objects` сама: их читает только она, и `submissions_of` за чужой вопрос не платит
+- `can_withdraw(username, contest) -> bool` — можно ли отозвать заявку (BR-23b): идёт приём и статус `reviewing`. Принимает и готовый конкурс, и слаг. Готовый — потому что список заявок спрашивает это по строке, а через слаг ответ стоил полной выборки конкурса **со всем составом**: номинации, этапы, жюри, условия и присуждения, шесть лишних запросов на каждую строку
 
 Tags (module 11):
 - `tag_by_slug(slug: str) -> Tag | None`

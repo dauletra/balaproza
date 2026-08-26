@@ -1,4 +1,4 @@
-"""Вход и выход (core.views.login_view / logout_view / signup).
+"""Вход и выход (`core/views/auth.py`).
 
 Вход настоящий: сессию собирает `django.contrib.auth`, отвечает на «кто
 это» база. Провайдера личности пока нет — до Telegram (FR-AUTH-01, NFR-25)
@@ -64,7 +64,7 @@ class LoginFlow(TestCase):
                 self.assertEqual(response.status_code, 302)
                 self.assertEqual(response.url, reverse('core:home'))
 
-    @mock.patch('core.views.DEMO_USERNAME', 'no-such-account')
+    @mock.patch('core.views.auth.DEMO_USERNAME', 'no-such-account')
     def test_login_without_the_demo_account_says_so_and_stays_out(self):
         """Пустая база — не 500 и не «вошёл никем».
 
@@ -78,7 +78,7 @@ class LoginFlow(TestCase):
         self.assertContains(response, 'Кіру уақытша мүмкін емес')
         self.assertFalse(get_user(self.client).is_authenticated)
 
-    @mock.patch('core.views.DEMO_USERNAME', 'no-such-account')
+    @mock.patch('core.views.auth.DEMO_USERNAME', 'no-such-account')
     def test_failed_login_keeps_the_next_target(self):
         """`next` не теряется при неудаче — иначе повтор уводит не туда."""
         target = reverse('core:library')

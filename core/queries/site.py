@@ -1,6 +1,17 @@
 """Мелочи портала, у которых нет своего раздела."""
 
+from django.core.cache import cache
+
 from ..models import SchoolLink
+
+# Справочники кэшируются на пять минут. Не «на всякий случай»: ссылки
+# школы отдаёт глобальный контекст-процессор, то есть они стоили запроса
+# на **каждой** странице портала — включая те, где подвал никто не
+# домотает. Пять минут — это цена «поправил в админке и не увидел»; для
+# списка, который меняется реже релиза, она приемлема.
+REFERENCE_TTL = 300
+
+_SCHOOL_LINKS_KEY = 'site:school_links'
 
 
 def school_links() -> list:
@@ -10,4 +21,8 @@ def school_links() -> list:
     уже написано другими. Список меняется чаще, чем выходит релиз, поэтому
     живёт в базе и правится в админке.
     """
-    return list(SchoolLink.objects.all())
+    links = cache.get(_SCHOOL_LINKS_KEY)
+    if links is None:
+        links = list(SchoolLink.objects.all())
+        cache.set(_SCHOOL_LINKS_KEY, links, REFERENCE_TTL)
+    return links

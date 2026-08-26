@@ -47,21 +47,25 @@ class PagesStayWithinTheirQueryBudget(TestCase):
             self.client.get(reverse('core:home'))
 
     def test_catalog(self):
-        """Двадцать шесть: выдача, счётчики шести пресетов, чипы, рейл.
+        """Двадцать один: выдача, счётчики шести пресетов, чипы, рейл.
 
-        Пресеты и есть основная статья расхода — каждый считает свою
-        выдачу. Это осознанно: счётчик пресета обязан быть настоящим
-        (DEC-36), а неправдивый счётчик хуже отсутствующего.
+        Счётчик пресета обязан быть настоящим (DEC-36) — неправдивый хуже
+        отсутствующего, — но настоящий он и от `COUNT`. Пока пресеты
+        считались через `len()`, каждый выполнял выдачу целиком и строил
+        список ORM-объектов со всеми тегами: шесть раз ради шести цифр.
+
+        Ещё два запроса ушли вместе с `CatalogState`: резолв жанра и тега
+        вызывался с пустым слагом и всё равно шёл в базу.
         """
-        with self.assertNumQueries(27):
+        with self.assertNumQueries(18):
             self.client.get(reverse('core:catalog'))
 
     def test_genre_page(self):
-        with self.assertNumQueries(24):
+        with self.assertNumQueries(18):
             self.client.get(reverse('core:genre_detail', kwargs={'slug': 'fantezi'}))
 
     def test_search(self):
-        with self.assertNumQueries(24):
+        with self.assertNumQueries(18):
             self.client.get(reverse('core:search_results') + '?q=жағалау')
 
     def test_story_page(self):
@@ -89,3 +93,90 @@ class PagesStayWithinTheirQueryBudget(TestCase):
         агрегат в том же SELECT, а не отдельный COUNT на строку."""
         with self.assertNumQueries(2):
             self.client.get(reverse('core:genre_index'))
+
+    def test_contest_list(self):
+        """Раздел конкурсов: две выборки (идущие и завершённые) плюс
+        победители к ним.
+
+        Карточка называет фазу, приз и победителей — номинации, этапы,
+        жюри и условия ей не нужны, и список за них не платит. Число
+        заявок приходит агрегатом: `COUNT` на карточку рос вместе с
+        разделом, и это была половина всех запросов страницы.
+        """
+        with self.assertNumQueries(6):
+            self.client.get(reverse('core:contest_list'))
+
+    def test_contest_detail(self):
+        """Страница конкурса — наоборот, со всем составом: условия,
+        этапы, жюри, номинации и присуждения."""
+        with self.assertNumQueries(7):
+            self.client.get(reverse('core:contest_detail',
+                                    kwargs={'slug': 'altyn-qalam'}))
+
+
+class PersonalPagesStayWithinTheirQueryBudget(TestCase):
+    """Страницы вошедшего: профиль, кабинет, библиотека, конкурсные заявки.
+
+    Их здесь не было, и потому именно они разъехались сильнее всего. Свой
+    профиль спрашивал список работ автора **шестнадцать раз** за один
+    рендер: хелперы этого слоя отдают список, а не QuerySet, кэша у списка
+    нет, и каждый сегмент, каждая сводка и каждая из пяти наград ходили в
+    базу заново. Пятьдесят девять запросов на страницу — из этого. Ни один
+    тест про содержимое такого не видел: все они оставались зелёными.
+
+    Границы держат правило «посчитать один раз и передать»: работы автора,
+    его заявки и полки библиотеки собираются в `AuthorFacts` и дальше
+    только читаются.
+    """
+
+    def test_profile_me(self):
+        """Свой профиль — самая дорогая страница портала: сегменты, четыре
+        сводки, ряд знаков, каталог знаков, ступени оқылым, библиотека и
+        конкурсная биография. Было 59."""
+        login_as(self.client)
+        with self.assertNumQueries(14):
+            self.client.get(reverse('core:profile_me'))
+
+    def test_profile_me_stats_tab(self):
+        """Вкладка «Статистика» не добавляет запросов: своя статистика
+        считается из тех же работ, что и публичная."""
+        login_as(self.client)
+        with self.assertNumQueries(14):
+            self.client.get(reverse('core:profile_me') + '?tab=stats')
+
+    def test_profile_other(self):
+        """Чужой профиль дешевле своего: библиотеки и приватной сводки нет.
+        Было 24."""
+        with self.assertNumQueries(9):
+            self.client.get(reverse('core:profile_other',
+                                    kwargs={'username': 'aidana'}))
+
+    def test_my_stories(self):
+        """Кабинет: работы и полоса внимания по одному и тому же списку."""
+        login_as(self.client)
+        with self.assertNumQueries(11):
+            self.client.get(reverse('core:my_stories'))
+
+    def test_library(self):
+        """Три вкладки — одна выборка: полки режутся из неё, а не
+        спрашиваются по одной на вкладку ради счётчика в сегменте."""
+        login_as(self.client)
+        with self.assertNumQueries(8):
+            self.client.get(reverse('core:library'))
+
+    def test_my_submissions(self):
+        """«Можно ли отозвать» больше не тянет конкурс со всем составом на
+        каждую строку: `can_withdraw` принимает готовый объект. Было 20."""
+        login_as(self.client)
+        with self.assertNumQueries(5):
+            self.client.get(reverse('core:my_submissions'))
+
+    def test_contest_submit(self):
+        """Форма подачи: конкурс берётся один раз вместо трёх, объём
+        кандидата — из аннотации выдачи, а не походом за главами на
+        каждую работу автора. Было 35.
+        """
+        login_as(self.client)
+        with self.assertNumQueries(16):
+            self.client.get(reverse('core:contest_submit',
+                                    kwargs={'slug': 'altyn-qalam'}))

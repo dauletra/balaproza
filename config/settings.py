@@ -25,19 +25,55 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+# ── Режим: одна переменная, а не набор совпадений ────────────────────────
+#
+# `DJANGO_ENV=production` — единственный переключатель. Раньше прод
+# отличался от разработки тремя независимыми переменными, и любая забытая
+# давала «почти прод»: `DEBUG=1` раздавал трейсбэки, пустой `SECRET_KEY`
+# молча подставлял ключ из репозитория, пустой `ALLOWED_HOSTS` ронял
+# первый же запрос.
+#
+# Дефолт — разработка, и это осознанно. Забытая переменная должна давать
+# **безопасно неработающий** прод, а не незаметно работающий: ниже стоят
+# три проверки, каждая из которых валит запуск, а не подменяет значение.
+DJANGO_ENV = os.environ.get('DJANGO_ENV', 'dev')
+PRODUCTION = DJANGO_ENV == 'production'
+
+# `DEBUG` читается отдельно: под тестами Django выставляет его в `False`
+# уже после импорта, и разработке нужен `True` без лишней переменной.
+DEBUG = os.environ.get('DJANGO_DEBUG', '0' if PRODUCTION else '1') == '1'
+
+if PRODUCTION and DEBUG:
+    raise ImproperlyConfigured(
+        'DJANGO_ENV=production вместе с DJANGO_DEBUG=1: прод с трейсбэками '
+        'на странице — не прод. Убери DJANGO_DEBUG.'
+    )
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get(
-    'SECRET_KEY',
-    'django-insecure-wa*es)k#sjqb-j=bl70+0#p_1bm9t0x%sp2s6_hou2wr$!*^6y',
-)
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DJANGO_DEBUG', '1') == '1'
+#
+# В проде ключ обязателен и падает громко — как `DATABASE_URL` строкой
+# ниже. Дефолт из репозитория подписывал бы сессии и CSRF ключом, который
+# лежит в открытом доступе, и заметить это было бы нечем.
+SECRET_KEY = os.environ.get('SECRET_KEY', '')
+if not SECRET_KEY:
+    if PRODUCTION:
+        raise ImproperlyConfigured(
+            'Не задан SECRET_KEY. В проде он обязателен: им подписываются '
+            'сессии и CSRF-токены.'
+        )
+    SECRET_KEY = 'django-insecure-wa*es)k#sjqb-j=bl70+0#p_1bm9t0x%sp2s6_hou2wr$!*^6y'
 
 ALLOWED_HOSTS = [h for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if h]
+if PRODUCTION and not ALLOWED_HOSTS:
+    raise ImproperlyConfigured(
+        'Не задан DJANGO_ALLOWED_HOSTS. Пустой список в проде означает, что '
+        'ни один запрос не пройдёт, — лучше узнать об этом при запуске.'
+    )
+if not ALLOWED_HOSTS:
+    # Разработка: `runserver` и тестовый клиент. При `DEBUG=True` Django
+    # подставляет первые три сам, но `testserver` — только под раннером,
+    # и разовый скрипт с `django.test.Client` об этом спотыкался.
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]', 'testserver']
 
 
 # Application definition
@@ -49,6 +85,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # Ради `GinIndex` с `gin_trgm_ops` и операции `TrigramExtension` в
+    # миграции 0009: поиск по каталогу — это `ILIKE '%…%'`, и без
+    # триграммного индекса он читает таблицу целиком.
+    'django.contrib.postgres',
     'core'
 ]
 
@@ -161,13 +201,144 @@ STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 
+# Куда `collectstatic` складывает собранное. Без этой строки команда
+# отказывается работать вовсе, и обнаруживалось бы это в день деплоя:
+# gunicorn отдал бы страницы без единого стиля.
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
 # Media files (user-uploaded; в стабе — placeholder обложки)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+
+# Cache
+#
+# Кэшируются **редакционные справочники**, а не выдача: жанры со
+# счётчиками, ссылки «Авторлар мектебі» и индекс Cmd+K. Все три меняются
+# раз в месяц, а спрашиваются на каждой странице — ссылки школы отдаёт
+# глобальный контекст-процессор.
+#
+# Бэкенд локальный, то есть **свой у каждого процесса**. Для справочников
+# с коротким TTL это приемлемо: расхождение между воркерами живёт минуты и
+# касается списка ссылок в подвале. Как только понадобится кэшировать
+# что-то, где расхождение видно пользователю, сюда встанет Redis — и
+# менять придётся только эти пять строк.
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'balaproza',
+        'TIMEOUT': 300,
+    },
+}
+
+
+# Logging
+#
+# Без этого блока `logger.warning` из `views/auth.py` уходил в никуда:
+# у Django есть дефолтная конфигурация, но она показывает записи только
+# при `DEBUG=True`. Единственное предупреждение проекта — «демо-аккаунта
+# нет в базе» — сообщает ровно о том, из-за чего не работает вход.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'plain': {'format': '{asctime} {levelname} {name}: {message}',
+                  'style': '{'},
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'plain'},
+    },
+    'root': {'handlers': ['console'], 'level': 'INFO'},
+    'loggers': {
+        'django.request': {'handlers': ['console'], 'level': 'WARNING',
+                           'propagate': False},
+    },
+}
+
+
+# ── Прод: то, чего не видно в разработке ─────────────────────────────────
+#
+# Всё под одним условием и ничего — под `DEBUG`. Разница принципиальная:
+# тестовый раннер выставляет `DEBUG = False` уже после импорта настроек, и
+# блок «если не DEBUG» включил бы в тестах редирект на https, то есть
+# уронил бы суиту целиком. `PRODUCTION` читается из окружения и под
+# тестами остаётся ложным.
+if PRODUCTION:
+    # За прокси Django узнаёт про https только из заголовка. Без этой
+    # пары `SECURE_SSL_REDIRECT` уводит в бесконечный редирект.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = True
+    # Год и поддомены — рекомендация Django; включать HSTS постепенно
+    # (60 → 3600 → год) имеет смысл на живом домене, до запуска незачем.
+    SECURE_HSTS_SECONDS = 31_536_000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # Домены, с которых принимается POST. Без них форма за прокси падает
+    # на проверке CSRF — с сообщением, которое не называет причину.
+    CSRF_TRUSTED_ORIGINS = [f'https://{h}' for h in ALLOWED_HOSTS]
+
+    # Статику отдаёт whitenoise, если он установлен (группа `prod`).
+    # Хранилище **без манифеста**: манифестное требует, чтобы каждый файл,
+    # упомянутый в `{% static %}`, лежал в `STATIC_ROOT`, и падает на
+    # рендере, если `collectstatic` не прошёл. Отдавать страницу без
+    # одного шрифта лучше, чем не отдавать вовсе.
+    try:
+        import whitenoise  # noqa: F401
+    except ImportError:
+        pass
+    else:
+        MIDDLEWARE.insert(
+            MIDDLEWARE.index('django.middleware.security.SecurityMiddleware') + 1,
+            'whitenoise.middleware.WhiteNoiseMiddleware')
+        STORAGES = {
+            'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+            'staticfiles': {
+                'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'},
+        }
+
 # Демо-корпус кладётся в тестовую базу один раз за прогон, сразу после
 # миграций: страницы читают базу, и корпус нужен почти каждому тесту.
 # Подробности и цена решения — в `core/tests/runner.py`.
 TEST_RUNNER = 'core.tests.runner.SeededTestRunner'
+
+# ── django-debug-toolbar: только в разработке ────────────────────────────
+# Пакет лежал в зависимостях и не был подключён никуда. Подключён он стоит
+# больше, чем удалён: панель SQL показывает число запросов и сам их текст
+# на живой странице — то, ради чего иначе пишется разовый скрипт с
+# `CaptureQueriesContext`. Ровно этим и нашлись 59 запросов на своём
+# профиле.
+#
+# Под тестами панели нет и без флага: Django выставляет `DEBUG = False`.
+# `DEBUG_TOOLBAR=0` нужен для другого — выключить её в разработке, когда
+# она мешает (снимок вёрстки, замер времени ответа), не трогая `DEBUG`.
+if DEBUG and os.environ.get('DEBUG_TOOLBAR', '1') == '1':
+    try:
+        import debug_toolbar  # noqa: F401
+    except ImportError:
+        # Группа `dev` не установлена — это нормально в проде и в CI.
+        pass
+    else:
+        INSTALLED_APPS.append('debug_toolbar')
+        # Перед CommonMiddleware, как требует документация пакета.
+        MIDDLEWARE.insert(
+            MIDDLEWARE.index('django.middleware.common.CommonMiddleware'),
+            'debug_toolbar.middleware.DebugToolbarMiddleware')
+        # Показывать не по IP, а по DEBUG: адрес разработки бывает не
+        # localhost (WSL, docker, телефон в той же сети), и дефолтная
+        # проверка `INTERNAL_IPS` молча прячет панель.
+        #
+        # `DEBUG` читается **в момент запроса**, а не здесь. Тестовый раннер
+        # выставляет его в `False` уже после импорта настроек, поэтому
+        # константа `True` оставила бы панель включённой под тестами: её
+        # middleware оборачивает курсор и ходит в базу само, и бюджет
+        # запросов вырос на треть — страница при этом ничего не меняла.
+        def _show_toolbar(request):
+            from django.conf import settings as live
+
+            return live.DEBUG
+
+        DEBUG_TOOLBAR_CONFIG = {'SHOW_TOOLBAR_CALLBACK': _show_toolbar}

@@ -14,14 +14,14 @@
 
 | Настройка | Сейчас | Для прода |
 |-----------|--------|-----------|
-| `SECRET_KEY` | `SECRET_KEY` из окружения, иначе dev-литерал `django-insecure-…` | ⚠️ Задать в окружении. Ключ из git считается скомпрометированным — сгенерировать новый |
+| `SECRET_KEY` | обязателен при `DJANGO_ENV=production`: без него запуск падает с объяснением. В разработке подставляется dev-литерал | ✅ Закрыто. Ключ из git считается скомпрометированным — в проде генерируется свой |
 | `DEBUG` | `DJANGO_DEBUG`, по умолчанию `1` | ⚠️ `DJANGO_DEBUG=0`. При `True` Django отдаёт трейсбеки с содержимым настроек |
 | `ALLOWED_HOSTS` | `DJANGO_ALLOWED_HOSTS` через запятую, по умолчанию пусто | ⚠️ Список доменов. При `DEBUG=False` пустой список отдаёт 400 на любой запрос |
 | `DATABASES` | PostgreSQL, строка подключения в `DATABASE_URL` (обязательна) | Тот же код, другое значение переменной. Бэкап — `pg_dump` по расписанию |
 | `LANGUAGE_CODE` | `kk` | Без изменений |
 | `TIME_ZONE` | `Asia/Almaty` | Без изменений |
 | `USE_TZ` | `True` | Без изменений |
-| `STATIC_URL` | `static/` | Добавить `STATIC_ROOT` — без него `collectstatic` не работает |
+| `STATIC_URL` | `static/`, `STATIC_ROOT = BASE_DIR/'staticfiles'` | ✅ Закрыто. Раздаёт whitenoise при `DJANGO_ENV=production`, если установлен (группа `prod`); иначе — веб-сервер |
 | `STATICFILES_DIRS` | `[BASE_DIR / 'static']` | Без изменений |
 | `MEDIA_URL` / `MEDIA_ROOT` | `/media/`, `BASE_DIR / 'media'` | Раздаёт веб-сервер, не Django (см. 17.4) |
 | Security-заголовки | **отсутствуют** | Блок из 17.3 обязателен |
@@ -48,7 +48,7 @@
 |--------|--------|-------|
 | основная | `django>=6.0.5`, `psycopg[binary]`, `dj-database-url`, `python-dotenv` | всегда |
 | `dev` | `django-debug-toolbar>=6.3.0` | локальная разработка |
-| `prod` | `gunicorn>=26.0.0` | сервер |
+| `prod` | `gunicorn>=26.0.0`, `whitenoise>=6.11.0` | сервер и раздача статики |
 
 `psycopg[binary]` тянет собранный драйвер и не требует компилятора — это то, что нужно на dev-машинах и в контейнере. Если политика сервера запрещает бинарные колёса, ставится `psycopg[c]`, и тогда нужны `libpq-dev` и компилятор.
 
@@ -201,7 +201,7 @@ Gunicorn запускается на `config.wsgi:application` под менед
 
 | # | Что | Ссылка |
 |---|-----|--------|
-| 1 | `DEBUG=False`, `SECRET_KEY` из окружения, `ALLOWED_HOSTS` заполнен | 17.1 |
+| 1 | `DJANGO_ENV=production` — один переключатель: он выключает `DEBUG`, включает https-редирект, HSTS, secure-куки и `CSRF_TRUSTED_ORIGINS`, и делает `SECRET_KEY` с `DJANGO_ALLOWED_HOSTS` обязательными. Забытая переменная роняет запуск с объяснением, а не подменяет значение | 17.1 |
 | 2 | `check --deploy` без предупреждений | 17.3 |
 | 3 | HTTPS, HSTS, secure-куки | NFR-65 |
 | 4 | `/_design/*` недоступны (следует из `DEBUG=False`, закрыто `test_urls_smoke.DebugOnlyEnforcement`) | [15](15-testing-contract.md) |

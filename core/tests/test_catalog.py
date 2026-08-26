@@ -4,6 +4,7 @@ from core.tests.base import TestCase, login_as
 from django.urls import reverse
 
 from core import data
+from core.views.catalog import PAGE_SIZE
 from core.models import Story
 
 
@@ -166,30 +167,45 @@ class CollectionDetailUnknown(TestCase):
         self.assertContains(r, 'Жинақ табылмады')
 
 
-# ───────────────────────── Stub-data helpers ─────────────────────────
+# ────────────────── Выдача: жанр и запрос одним движком ──────────────────
 
-class HelperFunctions(TestCase):
-    def test_stories_by_genre_returns_stories_with_that_genre(self):
-        result = data.stories_by_genre('fantezi')
+class CatalogEngineAnswersGenreAndQuery(TestCase):
+    """Спрашивается `filter_catalog` — то, чем отвечают страницы.
+
+    Раньше здесь стояли `stories_by_genre` и `search_stories`: отдельные
+    хелперы под жанр и под поиск, которых после DEC-27 не звал никто, кроме
+    этого файла. Тест, живущий на своей ветке кода, сторожит не продукт, а
+    себя: сломать выдачу поиска можно было, не тронув его.
+    """
+
+    def test_genre_returns_stories_with_that_genre(self):
+        result = data.filter_catalog(genre='fantezi')
         self.assertGreater(len(result), 0)
         for s in result:
             self.assertIn('fantezi', [g.slug for g in s.genres_resolved])
 
-    def test_stories_by_unknown_genre_is_empty(self):
-        self.assertEqual(list(data.stories_by_genre('no-such-genre')), [])
+    def test_unknown_genre_is_empty(self):
+        self.assertEqual(list(data.filter_catalog(genre='no-such-genre')), [])
 
-    def test_search_empty_query_returns_empty(self):
-        self.assertEqual(list(data.search_stories('')), [])
-        self.assertEqual(list(data.search_stories('   ')), [])
+    def test_empty_query_does_not_filter(self):
+        """Пустой запрос — не «ничего не найдено», а «ось не выставлена»:
+        страница поиска решает сама, показывать ли idle-состояние."""
+        everything = list(data.filter_catalog())
+        self.assertEqual([s.slug for s in data.filter_catalog(query='')],
+                         [s.slug for s in everything])
+        self.assertEqual([s.slug for s in data.filter_catalog(query='   ')],
+                         [s.slug for s in everything])
 
     def test_search_case_insensitive(self):
-        upper = data.search_stories('РЫСҚАЛИ')
-        lower = data.search_stories('рысқали')
+        """Ради этого и выбран Postgres: у SQLite `LIKE` складывает регистр
+        только для ASCII, и «РЫСҚАЛИ» не нашло бы «Рысқали»."""
+        upper = data.filter_catalog(query='РЫСҚАЛИ')
+        lower = data.filter_catalog(query='рысқали')
         self.assertEqual([s.slug for s in upper], [s.slug for s in lower])
         self.assertGreater(len(upper), 0)
 
     def test_search_finds_author_pen_name(self):
-        result = data.search_stories('Rudazov')
+        result = data.filter_catalog(query='Rudazov')
         self.assertGreater(len(result), 0)
         self.assertTrue(any(s.author.public_name == 'Rudazov' for s in result))
 
@@ -289,14 +305,14 @@ class CatalogFilterHelper(TestCase):
             self.assertIn('fantezi', [g.slug for g in s.genres_resolved])
             self.assertIn('mektep', [t.slug for t in s.tags_resolved])
 
-    def test_format_single_filters_one_shot_stories(self):
-        out = data.filter_catalog(format='single')
+    def test_kind_single_filters_one_shot_stories(self):
+        out = data.filter_catalog(kind='single')
         self.assertGreater(len(out), 0)
         for s in out:
             self.assertTrue(s.is_single)
 
-    def test_length_and_format_combination_is_and(self):
-        out = data.filter_catalog(format='single', length='short')
+    def test_length_and_kind_combination_is_and(self):
+        out = data.filter_catalog(kind='single', length='short')
         for s in out:
             self.assertTrue(s.is_single)
             self.assertEqual(s.length_bucket, 'short')
@@ -429,12 +445,12 @@ class CatalogStateIsCarried(TestCase):
     """
 
     def test_genre_link_keeps_other_axes(self):
-        r = self.client.get(reverse('core:catalog') + '?audience=14%2B&format=serial')
+        r = self.client.get(reverse('core:catalog') + '?audience=14%2B&kind=ongoing')
         href = next(o['href'] for o in r.context['genre_options']
                     if o['genre'].slug == 'triller')
         self.assertIn('/genres/triller/', href)
         self.assertIn('audience=14%2B', href)
-        self.assertIn('format=serial', href)
+        self.assertIn('kind=ongoing', href)
 
     def test_tag_link_keeps_other_axes(self):
         r = self.client.get(reverse('core:catalog') + '?audience=14%2B')
@@ -526,10 +542,10 @@ class CatalogActiveChips(TestCase):
         self.assertEqual(r.context['active_count'], 3)
 
     def test_chip_href_drops_only_its_own_axis(self):
-        r = self.client.get(reverse('core:catalog') + '?audience=14%2B&format=serial')
+        r = self.client.get(reverse('core:catalog') + '?audience=14%2B&kind=ongoing')
         href = next(c['href'] for c in r.context['active_chips'] if c['label'] == '14+')
         self.assertNotIn('audience=', href)
-        self.assertIn('format=serial', href)
+        self.assertIn('kind=ongoing', href)
 
     def test_no_chips_on_a_bare_catalog(self):
         r = self.client.get(reverse('core:catalog'))
@@ -551,7 +567,7 @@ class CatalogMobileControls(TestCase):
         self.assertContains(self.response, 'id="sort-mobile"')
 
     def test_filter_button_shows_how_many_axes_are_on(self):
-        r = self.client.get(reverse('core:catalog') + '?audience=14%2B&format=serial')
+        r = self.client.get(reverse('core:catalog') + '?audience=14%2B&kind=ongoing')
         self.assertEqual(r.context['active_count'], 2)
         self.assertContains(r, '>2</span>')
 
@@ -896,7 +912,7 @@ class AudienceIsCumulative(TestCase):
         self.assertEqual(legend, 'Жасың')
 
     def test_it_combines_with_other_axes(self):
-        out = data.filter_catalog(audience='10+', format='single')
+        out = data.filter_catalog(audience='10+', kind='single')
         for s in out:
             self.assertEqual(s.audience, '10+')
             self.assertTrue(s.is_single)
@@ -940,12 +956,20 @@ class KindReplacesFormatAndStatus(TestCase):
         self.assertNotIn('format', names)
         self.assertNotIn('status', names)
 
-    def test_legacy_params_still_filter(self):
-        """На `?format=` ведут ссылки, которые уже могли уйти наружу."""
-        out = data.filter_catalog(format='single')
-        self.assertGreater(len(out), 0)
-        for s in out:
-            self.assertTrue(s.is_single)
+    def test_format_axis_is_gone_entirely(self):
+        """Ось «Формат» снята и как параметр (DEC-49).
+
+        DEC-37 убрал её из панели и оставил `?format=` ради ссылок, которые
+        могли уйти наружу. Ссылок не было: портал не публиковался, а
+        единственная внутренняя (ряд «Қысқа оқылатын әңгімелер» на главной)
+        переведена на `?kind=single`. Параметр же тянулся через восемь мест
+        каталога и требовал внимания при каждой правке.
+        """
+        self.assertFalse(hasattr(data, 'CATALOG_FORMAT_FILTERS'))
+        # Неизвестный параметр не ломает страницу — он просто ничего не значит.
+        r = self.client.get(reverse('core:catalog') + '?format=single')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context['total_results'], data.filter_catalog().count())
 
     def test_unknown_kind_is_ignored(self):
         plain = self.client.get(reverse('core:catalog'))
@@ -1005,3 +1029,57 @@ class PublicStatusesAreNotSpelledOut(TestCase):
     def test_moderation_is_still_out_of_the_index(self):
         payload = self.client.get(reverse('core:api_search_index')).json()
         self.assertNotIn('aidana-erteg', {s['slug'] for s in payload['stories']})
+
+
+class CatalogIsPaginated(TestCase):
+    """NFR-13: длинный список не грузится разом.
+
+    До этого каталог отдавал **всю** публичную выдачу в одном ответе — на
+    двадцати трёх работах незаметно, на десяти тысячах это полная выборка
+    со всеми join'ами. Компонент пагинации при этом был написан и лежал
+    неподключённым: единственным его вызовом была витрина `/_design/`.
+    """
+
+    def test_first_page_holds_no_more_than_the_page_size(self):
+        r = self.client.get(reverse('core:catalog'))
+        self.assertLessEqual(len(r.context['results']), PAGE_SIZE)
+        self.assertEqual(r.context['page'].number, 1)
+
+    def test_count_under_the_header_is_about_the_whole_result(self):
+        """«20 шығарма» на первой странице из двух было бы неправдой."""
+        r = self.client.get(reverse('core:catalog'))
+        total = data.filter_catalog().count()
+        self.assertEqual(r.context['total_results'], total)
+        self.assertContains(r, f'{total} шығарма')
+
+    def test_second_page_continues_the_same_order(self):
+        first = self.client.get(reverse('core:catalog'))
+        if first.context['page'].paginator.num_pages < 2:
+            self.skipTest('в корпусе меньше двух страниц')
+        second = self.client.get(reverse('core:catalog') + '?page=2')
+        whole = [s.slug for s in data.filter_catalog()]
+        shown = ([s.slug for s in first.context['results']]
+                 + [s.slug for s in second.context['results']])
+        self.assertEqual(shown, whole)
+
+    def test_page_links_carry_the_filter_state(self):
+        """Вторая страница жанра обязана остаться в жанре — иначе пагинация
+        сбрасывает сүзгі так же, как это делали чипы до FR-CAT-08."""
+        r = self.client.get(reverse('core:catalog') + '?audience=14%2B')
+        self.assertEqual(r.context['page_base'], reverse('core:catalog'))
+        self.assertIn('audience=14%2B', r.context['page_qs'])
+        self.assertNotIn('page=', r.context['page_qs'])
+
+    def test_junk_page_opens_the_first_one(self):
+        """`?page=99` — старая ссылка или опечатка, а не 404."""
+        for junk in ('99', '0', '-1', 'нет', ''):
+            with self.subTest(page=junk):
+                r = self.client.get(reverse('core:catalog') + f'?page={junk}')
+                self.assertEqual(r.status_code, 200)
+                self.assertGreaterEqual(r.context['page'].number, 1)
+
+    def test_nav_is_absent_while_everything_fits(self):
+        """Пагинация из одной страницы — это шум, а не навигация."""
+        r = self.client.get(reverse('core:collection_detail',
+                                    kwargs={'slug': data.all_collections()[0].slug}))
+        self.assertNotContains(r, 'aria-label="Беттер"')

@@ -11,6 +11,8 @@
 однажды разъедутся — так и случилось с хранимым `Author.works`.
 """
 
+from functools import cached_property
+
 from django.db.models import F
 
 from ..domain.catalog import PUBLIC_STATUSES
@@ -18,6 +20,81 @@ from ..domain.library import LIBRARY_KINDS
 from ..domain.story import PUBLISH_CHECKLIST
 from ..models import LibraryEntry, Notification, Story, User
 from .catalog import all_stories
+
+
+class AuthorFacts:
+    """Всё об одном авторе, посчитанное один раз за запрос.
+
+    Заведено не ради стройности. Хелперы этого слоя возвращают `list`, а
+    не `QuerySet`, — у списка нет кэша, и каждый вызов идёт в базу заново.
+    Вызывающая сторона об этом не знала и звала их столько раз, сколько
+    было удобно читать: свой профиль спрашивал `my_stories_of`
+    **шестнадцать раз** за один рендер, и из этого складывались
+    пятьдесят девять запросов на страницу.
+
+    Поля ленивые: объект можно создать заранее и не заплатить за то, что
+    странице не понадобилось. Заявки на конкурс нужны профилю и не нужны
+    кабинету — и кабинет за них не платит.
+
+    Живёт ровно один запрос: это снимок, а не кэш. Между запросами его не
+    переиспользуют — иначе страница показывала бы вчерашние работы.
+    """
+
+    def __init__(self, username: str):
+        self.username = username
+
+    def __repr__(self):
+        return f'AuthorFacts({self.username!r})'
+
+    @cached_property
+    def stories(self) -> list:
+        """Все работы автора, любого статуса (кабинет)."""
+        return my_stories_of(self.username)
+
+    @cached_property
+    def public_stories(self) -> list:
+        """Работы, которые видит посторонний (BR-73).
+
+        Режется из уже загруженного списка, а не спрашивается отдельно:
+        правило публичности одно и то же, и второй запрос с тем же
+        `WHERE` — это просто второй запрос.
+        """
+        return [s for s in self.stories if s.is_public]
+
+    @cached_property
+    def submissions(self) -> list:
+        # Импорт внутри: `contests` читает `public_stories_of` отсюда, и на
+        # верхнем уровне это был бы цикл. Тот же приём, что в `catalog.py`.
+        from .contests import submissions_of
+
+        return submissions_of(self.username)
+
+    @cached_property
+    def library(self) -> list:
+        """Вся библиотека читателя — все три полки одной выборкой."""
+        return library_of(self.username)
+
+    @cached_property
+    def user(self):
+        """Сам пользователь или None. Нужен ради `followers` в сводках."""
+        if not self.username:
+            return None
+        return User.objects.filter(username=self.username).first()
+
+    def shelf(self, kind: str) -> list:
+        """Одна полка. Из общего списка, а не запросом на вкладку: три
+        вкладки библиотеки стоили трёх выборок ради трёх счётчиков."""
+        return [e for e in self.library if e.kind == kind]
+
+    @cached_property
+    def reads(self) -> int:
+        """Сколько раз прочитали автора — по публичным работам (BR-73)."""
+        return sum(s.views for s in self.public_stories)
+
+
+def author_facts(username: str) -> AuthorFacts:
+    """Снимок автора для одного запроса. Ничего не читает до обращения."""
+    return AuthorFacts(username)
 
 
 def my_stories_of(username: str) -> list:
@@ -44,25 +121,27 @@ def public_stories_of(username: str) -> list:
     return [s for s in my_stories_of(username) if s.status in PUBLIC_STATUSES]
 
 
-def top_stories_of(username: str, limit: int = 3) -> list:
+def top_stories_of(username: str, limit: int = 3, *,
+                   facts: AuthorFacts = None) -> list:
     """Самые читаемые публичные работы — для рейла чужого профиля.
 
     По накопленному `views`, а не по окну в 14 дней: рейл отвечает «с чего
     начать знакомство с автором», а не «что у него сейчас в моде». Автор
     с одной старой сильной работой иначе остался бы без ответа.
     """
-    return sorted(public_stories_of(username),
+    facts = facts or author_facts(username)
+    return sorted(facts.public_stories,
                   key=lambda s: s.views, reverse=True)[:limit]
 
 
-def writer_attention(username: str) -> list:
+def writer_attention(username: str, *, facts: AuthorFacts = None) -> list:
     """Что ждёт автора — короткая строка над списком (FR-WRITE-08).
 
     Отдаёт `kind` / `count` / `slug`; тексты и ссылки собирает вызывающая
     сторона. `slug` заполнен только когда элемент один: вести «3 шығарма
     модерацияда» в одну из трёх было бы враньём.
     """
-    mine = my_stories_of(username)
+    mine = (facts or author_facts(username)).stories
     items = []
 
     def _one(kind, stories):
@@ -80,8 +159,10 @@ def writer_attention(username: str) -> list:
     if unread:
         items.append({'kind': 'comments', 'count': unread, 'slug': ''})
 
+    # `has_chapters` приезжает аннотацией выдачи — прежний
+    # `chapter_set.exists()` был запросом на каждую работу автора.
     _one('draft', [s for s in mine
-                   if s.status == 'NotPublished' and not s.chapter_set.exists()])
+                   if s.status == 'NotPublished' and not s.has_chapters])
     return items
 
 
@@ -94,7 +175,7 @@ def publish_checklist(story) -> list:
     if story is None:
         return []
     done = {
-        'text':       story.chapter_set.exists(),
+        'text':       story.has_chapters,
         'annotation': bool(story.annotation),
         'audience':   bool(story.audience),
         'cover':      bool(story.cover),
@@ -124,12 +205,18 @@ def can_submit_for_review(story) -> bool:
             and not missing_for_review(story))
 
 
-def writer_stats(username: str) -> dict:
+def writer_stats(username: str, *, facts: AuthorFacts = None) -> dict:
     """Сводка кабинета. Разбивка по статусам обязана давать в сумме
     `total`: разбивка, не сходящаяся с целым, — то же враньё, что и
-    хранимый счётчик."""
-    mine = my_stories_of(username)
-    user = User.objects.filter(username=username).first()
+    хранимый счётчик.
+
+    `facts` — уже собранный снимок автора. Страница профиля показывает
+    рядом четыре сводки по одному и тому же списку работ, и без снимка
+    каждая тянула его заново.
+    """
+    facts = facts or author_facts(username)
+    mine = facts.stories
+    user = facts.user
     return {
         'total':         len(mine),
         'published':     sum(1 for s in mine
@@ -144,33 +231,36 @@ def writer_stats(username: str) -> dict:
     }
 
 
-def public_stats(username: str) -> dict:
+def public_stats(username: str, *, facts: AuthorFacts = None) -> dict:
     """Четыре числа публичного профиля (FR-PROF-01).
 
     `works` совпадает с `User.works` по построению: одно правило
     публичности, посчитанное один раз.
     """
-    pub = public_stories_of(username)
-    user = User.objects.filter(username=username).first()
+    facts = facts or author_facts(username)
+    pub = facts.public_stories
+    user = facts.user
     return {
         'works':     len(pub),
-        'reads':     sum(s.views for s in pub),
+        'reads':     facts.reads,
         'likes':     sum(s.likes for s in pub),
         'followers': user.followers if user else 0,
     }
 
 
-def reader_stats(username: str) -> dict:
+def reader_stats(username: str, *, facts: AuthorFacts = None) -> dict:
     """Свой профиль: те же числа плюс приватное.
 
     Публичная часть берётся из `public_stats` — владелец не должен видеть
     другую арифметику, чем читатель.
     """
-    stats = dict(public_stats(username))
+    facts = facts or author_facts(username)
+    stats = dict(public_stats(username, facts=facts))
     stats.update({
-        'works_total': len(my_stories_of(username)),
-        'finished':    LibraryEntry.objects.filter(user__username=username,
-                                                   kind='done').count(),
+        'works_total': len(facts.stories),
+        # Из общей выборки библиотеки, а не отдельным COUNT: полки на этой
+        # же странице уже прочитаны целиком.
+        'finished':    len(facts.shelf('done')),
     })
     return stats
 

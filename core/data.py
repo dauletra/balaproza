@@ -31,13 +31,11 @@ from .domain.catalog import (
     CATALOG_AUTHOR_FILTERS,
     CATALOG_BADGE_FILTERS,
     CATALOG_DEFAULT_SORT,
-    CATALOG_FORMAT_FILTERS,
     CATALOG_KIND_FILTERS,
     CATALOG_LENGTH_FILTERS,
     CATALOG_PRESETS,
     CATALOG_SORTS,
     CATALOG_STATUS_FILTERS,
-    KIND_PREDICATES,
     NEW_AUTHOR_FOLLOWERS,
     PUBLIC_STATUSES,
     STORY_AUDIENCES,
@@ -83,21 +81,17 @@ from .domain.tags import TAG_STATUSES
 from .queries.catalog import (
     all_authors,
     all_genres,
-    apply_catalog_filters,
-    catalog_base,
     filter_catalog,
     genre_by_slug,
-    is_new_author,
     public_stories,
     related_stories,
-    search_authors,
-    search_stories,
-    stories_by_genre,
     story_by_slug,
 )
 
 # ── Кабинет автора, профиль, библиотека ──────────────────────────────────
 from .queries.author import (
+    AuthorFacts,
+    author_facts,
     can_submit_for_review,
     in_library,
     library_of,
@@ -125,7 +119,6 @@ from .queries.story import (
     comments_of,
     comments_of_chapter,
     poll_of,
-    reaction_breakdown,
     reactions_of,
 )
 
@@ -152,14 +145,12 @@ from .queries.profile import (
     following_of,
     is_following,
     new_authors,
-    next_read_tier,
     notifications_for_user,
     portal_stats,
     read_ladder,
     read_tier,
     reads_total,
     unread_count_for_user,
-    winning_stories_of,
 )
 
 # ── Конкурсы (DEC-45, DEC-46) ────────────────────────────────────────────

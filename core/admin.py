@@ -15,6 +15,7 @@
 
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+from django.db.models import Count
 from django.shortcuts import render
 
 from .domain.notifications import MODERATION_OUTCOME_LABELS
@@ -342,11 +343,18 @@ class ContestAdmin(admin.ModelAdmin):
         ('Басқа', {'fields': ('prize_kzt', 'poster', 'series')}),
     )
 
+    def get_queryset(self, request):
+        # Число заявок в колонке — агрегат, а не `COUNT` на строку:
+        # `Contest.submissions` подхватывает аннотацию. Без неё список
+        # конкурсов делал по запросу на каждый.
+        return super().get_queryset(request).annotate(
+            submission_count=Count('submission_set'))
+
     @admin.display(description='кезеңі')
     def phase_label(self, obj):
         return obj.phase_label
 
-    @admin.display(description='өтінім')
+    @admin.display(description='өтінім', ordering='submission_count')
     def submissions(self, obj):
         return obj.submissions
 
@@ -398,6 +406,11 @@ class CollectionAdmin(admin.ModelAdmin):
     list_editable = ('position',)
     prepopulated_fields = {'slug': ('name',)}
     inlines = (CollectionItemInline,)
+
+    def get_queryset(self, request):
+        # `Collection.count` считает `len(item_set.all())` — с prefetch это
+        # один запрос на весь список вместо одного на подборку.
+        return super().get_queryset(request).prefetch_related('item_set')
 
     @admin.display(description='шығарма саны')
     def count(self, obj):

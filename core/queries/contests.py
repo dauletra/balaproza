@@ -13,6 +13,7 @@
 конкурса до всякого жюри.
 """
 
+from django.db.models import Count, prefetch_related_objects
 from django.utils import timezone
 
 from ..domain.contests import (
@@ -22,7 +23,7 @@ from ..domain.contests import (
 )
 from ..domain.formatting import spaced_number
 from ..models import Contest, Submission
-from .author import public_stories_of
+from .author import author_facts
 
 # Порядок открытых конкурсов — по тому, что читатель может сделать:
 # сначала куда можно подать прямо сейчас, потом что откроется, потом что
@@ -30,14 +31,35 @@ from .author import public_stories_of
 _OPEN_ORDER = ('accepting', 'upcoming', 'judging')
 
 
+def _counted(qs):
+    """Число заявок аннотацией — его подхватывает `Contest.submissions`.
+
+    Без неё каждая карточка списка спрашивала своё `COUNT`: десять
+    запросов на десять конкурсов, и растут они вместе с разделом.
+    """
+    return qs.annotate(submission_count=Count('submission_set'))
+
+
+def _list_base():
+    """Конкурс для списка карточек.
+
+    Номинации, этапы, жюри и условия карточка не показывает — она
+    называет фазу, приз и победителей. Тянуть состав списком значит
+    платить четыре запроса за то, чего на экране нет; победители нужны,
+    поэтому присуждения остаются.
+    """
+    return _counted(Contest.objects.prefetch_related('grant_set__story'))
+
+
 def _base():
-    return Contest.objects.prefetch_related(
+    """Конкурс со всем составом — для его собственной страницы."""
+    return _counted(Contest.objects.prefetch_related(
         'award_set', 'stage_set', 'jury_set', 'condition_set',
-        'grant_set__award', 'grant_set__story__author')
+        'grant_set__award', 'grant_set__story__author'))
 
 
 def all_contests() -> list:
-    return list(_base())
+    return list(_list_base())
 
 
 def contest_by_slug(slug: str):
@@ -54,16 +76,16 @@ def _accepting_q():
 
 def open_contests() -> list:
     """Незавершённые — в порядке того, что с ними можно сделать."""
-    return sorted(_base().filter(results_on__gt=timezone.localdate()),
+    return sorted(_list_base().filter(results_on__gt=timezone.localdate()),
                   key=lambda c: _OPEN_ORDER.index(c.phase))
 
 
 def accepting_contests() -> list:
-    return list(_base().filter(**_accepting_q()))
+    return list(_list_base().filter(**_accepting_q()))
 
 
 def finished_contests() -> list:
-    return list(_base().filter(results_on__lte=timezone.localdate()))
+    return list(_list_base().filter(results_on__lte=timezone.localdate()))
 
 
 def hero_contest():
@@ -85,6 +107,12 @@ def hero_contest():
 
 
 def submissions_of(username: str) -> list:
+    """Заявки автора.
+
+    Присуждений здесь нет намеренно: они нужны одной `contest_history`, и
+    она добирает их сама. Список заявок в кабинете спрашивает только «можно
+    ли отозвать», и платить за чужой вопрос ему незачем.
+    """
     if not username:
         return []
     return list(Submission.objects.filter(author__username=username)
@@ -113,13 +141,21 @@ def busy_contest_of(username: str, story_slug: str, *, besides: str = ''):
     return row.contest if row else None
 
 
-def can_withdraw(username: str, contest_slug: str) -> bool:
+def can_withdraw(username: str, contest) -> bool:
     """Можно ли отозвать заявку (BR-23b).
 
     Пока идёт приём и жюри не вынесло решения. Без отзыва «одна работа на
     конкурс» означало бы: ошибся работой — и всё.
+
+    Принимает и готовый конкурс, и слаг. Готовый — потому что список
+    заявок спрашивает это по строке, а через слаг ответ стоил полной
+    выборки конкурса **со всем составом**: номинации, этапы, жюри,
+    условия и присуждения — шесть лишних запросов на каждую строку.
+    Слаг остаётся ради вызовов, у которых объекта на руках нет.
     """
-    contest = contest_by_slug(contest_slug)
+    if isinstance(contest, str):
+        # Без `contest_by_slug`: здесь нужны три даты, а не состав.
+        contest = Contest.objects.filter(slug=contest).first()
     if not contest or not contest.is_accepting:
         return False
     return Submission.objects.filter(author__username=username,
@@ -166,12 +202,21 @@ def _total_chars(story) -> int:
     """Объём по написанному тексту.
 
     Именно по главам, без оценки по заявленным частям: на конкурс идёт
-    текст, который прочтёт жюри, а не обещание его дописать.
+    текст, который прочтёт жюри, а не обещание его дописать. Поэтому
+    берётся `written_chars`, а не `effective_chars`: второй дорисовывает
+    ненаписанные части по заявленному числу глав.
+
+    Число уже приезжает аннотацией выдачи (`_reading_effort`) — без неё
+    страница подачи шла за главами на каждого кандидата, а список
+    кандидатов это все публичные работы автора.
     """
+    annotated = getattr(story, 'written_chars', None)
+    if annotated is not None:
+        return annotated
     return sum(c.char_count for c in story.chapter_set.all())
 
 
-def submission_checklist(story, contest) -> list:
+def submission_checklist(story, contest, *, chars: int = None) -> list:
     """Соответствие работы требованиям конкурса (BR-22).
 
     Общая часть приходит из `common_rules`: второй рукописной копии тех же
@@ -180,8 +225,12 @@ def submission_checklist(story, contest) -> list:
     не сообщает.
 
     «Объём» — единственная авто-проверка, остальное требует ответа автора.
+
+    `chars` — уже посчитанный объём. Страница подачи считает его для
+    каждого кандидата в `submission_candidates`, а потом просила чек-лист
+    у каждого же — и объём шёл в базу за главами по второму разу.
     """
-    total = _total_chars(story)
+    total = _total_chars(story) if chars is None else chars
     have = spaced_number(total)
     lo, hi = spaced_number(contest.min_chars), spaced_number(contest.max_chars)
     if total < contest.min_chars:
@@ -207,7 +256,7 @@ def submission_checklist(story, contest) -> list:
     return items
 
 
-def submission_candidates(username: str, contest_slug: str) -> list:
+def submission_candidates(username: str, contest_slug, *, facts=None) -> list:
     """Работы автора как кандидаты и что о них стоит знать (BR-24).
 
     **Заметки, а не запреты.** Короткий текст бывает намеренно короткой
@@ -217,12 +266,18 @@ def submission_candidates(username: str, contest_slug: str) -> list:
     В список идут только публичные работы: черновик на конкурс не
     выставляется — его нельзя ни дать жюри, ни показать рядом с
     победителями (BR-10, DEC-23).
+
+    Принимает готовый конкурс наравне со слагом: страница подачи уже
+    держит его на руках, и второй `contest_by_slug` тянул бы весь состав
+    заново.
     """
-    contest = contest_by_slug(contest_slug)
+    contest = (contest_slug if not isinstance(contest_slug, str)
+               else contest_by_slug(contest_slug))
     if not contest:
         return []
+    facts = facts or author_facts(username)
     result = []
-    for story in public_stories_of(username):
+    for story in facts.public_stories:
         total = _total_chars(story)
         notes = []
         if total < contest.min_chars:
@@ -233,7 +288,7 @@ def submission_candidates(username: str, contest_slug: str) -> list:
             notes.append({'key': 'too_long',
                           'text': f"{SUBMISSION_NOTES['too_long']} — "
                                   f"макс. {spaced_number(contest.max_chars)}"})
-        busy = busy_contest_of(username, story.slug, besides=contest_slug)
+        busy = busy_contest_of(username, story.slug, besides=contest.slug)
         if busy:
             notes.append({'key': 'busy',
                           'text': f"{SUBMISSION_NOTES['busy']}: «{busy.name}»"})
@@ -241,7 +296,8 @@ def submission_candidates(username: str, contest_slug: str) -> list:
     return result
 
 
-def contest_history(username: str, *, is_self: bool = False) -> list:
+def contest_history(username: str, *, is_self: bool = False,
+                    facts=None) -> list:
     """Конкурсная биография автора (FR-PROF-07), свежие сверху.
 
     Правило приватности живёт здесь, а не в шаблоне (BR-74a): публично
@@ -253,8 +309,16 @@ def contest_history(username: str, *, is_self: bool = False) -> list:
     только пока публична (BR-73): подача не должна раскрывать снятое с
     публикации произведение.
     """
+    subs = (facts or author_facts(username)).submissions
+    # Присуждения — одним запросом на все конкурсы сразу. Ниже цикл ищет
+    # среди них работу этой заявки, и без prefetch каждая строка биографии
+    # стоила запроса за присуждениями плюс запроса за номинацией на
+    # каждое из них. Добирается здесь, а не в `submissions_of`: больше их
+    # никто не читает.
+    prefetch_related_objects(subs, 'contest__grant_set__award')
+
     out = []
-    for sub in submissions_of(username):
+    for sub in subs:
         contest, story = sub.contest, sub.story
         titles = [g.award.title for g in contest.grants
                   if g.story_id == story.pk and g.award]

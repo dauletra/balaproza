@@ -187,11 +187,10 @@ class HomeMobileSecondFold(TestCase):
         """Пустой чип — тупик: подросток тапает жанр и упирается в заглушку."""
         for genre in data.all_genres():
             with self.subTest(genre=genre.slug):
-                # Не литерал 'Published': после DEC-37 опубликованный сериал
-                # носит OnProcess или Completed, и проверка ловила бы не то.
-                published = [s for s in data.stories_by_genre(genre.slug)
-                             if s.status in data.PUBLIC_STATUSES]
-                self.assertTrue(published)
+                # `filter_catalog` режет по PUBLIC_STATUSES сам (DEC-23):
+                # по литералу 'Published' проверка ловила бы не то — после
+                # DEC-37 опубликованный сериал носит OnProcess или Completed.
+                self.assertTrue(data.filter_catalog(genre=genre.slug))
 
 
 class HomeMobileThirdFold(TestCase):

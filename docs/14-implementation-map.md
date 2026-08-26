@@ -17,7 +17,8 @@
 | Слой | Где | Правило |
 |------|-----|---------|
 | Данные | `core/models.py` + `core/queries/*` + `core/story_texts/` | Django-модели; правила — в `core/domain/`, что миграция была обязана сохранить — [12](12-domain-model-contract.md). Демо-содержимое кладёт `seed_demo`; его литералы (`core/management/commands/_corpus.py`) читает только она |
-| View | `core/views.py` (≈40 функций) | **Тонкие**: читают через фасад `core/data.py`, собирают контекст, рендерят. Бизнес-логики нет |
+| View | пакет `core/views/` — модуль на раздел, имена собраны в `core/views/__init__.py` | **Тонкие**: читают через фасад `core/data.py`, собирают контекст, рендерят. Бизнес-логики нет |
+| Ссылки | `core/links.py` | «Данные из queries плюс URL»: `CatalogState`, чипы и пресеты каталога, полоса внимания кабинета, чек-лист готовности. URL-ы не спускаются ни в слой данных, ни в шаблон |
 | Маршруты | `core/urls.py`, `app_name='core'` | Все URL проекта, кроме `/admin/` — админка это инструмент модерации, §14.9a |
 | Общий контекст | `core/context_processors.py` | `auth_state`, `nav_state`, `site_links` |
 | Фильтры | `core/templatetags/balaproza.py` | `compact_count`, `spaced`, `page_range`, `belongs_to` |
@@ -91,7 +92,7 @@
 
 ## 14.4 CAT · Каталог, поиск, теги
 
-**Один движок на четыре режима** (DEC-27). Это главное архитектурное решение раздела: `_render_catalog(request, *, mode, genre_slug='', tag_slug='')` в `core/views.py`, поверх него четыре тонкие обёртки.
+**Один движок на четыре режима** (DEC-27). Это главное архитектурное решение раздела: `_render_catalog(request, *, mode, genre_slug='', tag_slug='')` в `core/views/catalog.py`, поверх него четыре тонкие обёртки. Выбор читателя несёт `links.CatalogState` — неизменяемый объект, из которого строятся и выдача, и все ссылки страницы.
 
 | URL | View-обёртка | `mode` | Hero-партиал |
 |-----|--------------|--------|--------------|
@@ -107,10 +108,10 @@
 | FR-CAT-01, 02 | `filter_catalog(query=, genre=)` | `test_catalog.SearchResults*`, `SearchByAuthorName` |
 | FR-CAT-03 | `genre_index` → `pages/catalog/genre_index.html` | `test_catalog.GenreIndex` |
 | FR-CAT-04 | `collections`, `collection_detail` | `test_catalog.CollectionsList`, `CollectionDetail*` |
-| FR-CAT-05 | фильтр `page_range` | `test_filters.PageRange` |
+| FR-CAT-05 | `Paginator` в `core/views/catalog.py` (`PAGE_SIZE = 20`), `CatalogState.page_base` / `page_qs`, компонент `pagination.html`, фильтр `page_range` | `test_catalog.CatalogIsPaginated`, `test_filters.PageRange` |
 | FR-CAT-06 | `search_index_json` → `/api/search-index.json` | `test_catalog.SearchIndexHasTags` |
 | FR-CAT-07 | `partials/catalog/_filter_panel.html` (`variant='rail'\|'sheet'`) + `_filter_sheet.html` | `test_catalog.CatalogFilterHelper`, `TagsInFilterPanel`, `CatalogMobileControls` |
-| FR-CAT-08 | `_catalog_href` / `_catalog_links` в `core/views.py` | `test_catalog.CatalogStateIsCarried`, `CatalogActiveChips` |
+| FR-CAT-08 | `CatalogState.href()` / `catalog_links` в `core/links.py` | `test_catalog.CatalogStateIsCarried`, `CatalogActiveChips` |
 | Комбинации фильтров | `/genres/triller/?tag=mektep` | `test_catalog.CatalogFilterCombination`, `CatalogSecondAxisFromQuery` |
 | FR-CAT-09 (дефолт «Қазір танымал») | `Story.recent_views`, `_catalog_default_sort` | `test_catalog.TrendingIsTheDefaultSort` |
 | FR-CAT-10 (пресеты) | `data.CATALOG_PRESETS`, `_catalog_presets` | `test_catalog.CatalogPresets` |

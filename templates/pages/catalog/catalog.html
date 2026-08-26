@@ -87,14 +87,13 @@
         top-16 — высота липкой шапки, z ниже её z-30.
     {% endcomment %}
     <div class="sticky top-16 z-20 -mx-4 mb-4 flex items-center gap-2 border-b border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 xl:hidden">
-        <span class="shrink-0 font-sans text-xs text-slate-500">{{ results|length }} шығарма</span>
+        <span class="shrink-0 font-sans text-xs text-slate-500">{{ total_results }} шығарма</span>
 
         <form method="get" x-data class="ml-auto flex min-w-0 items-center">
             {% if mode != 'genre' and current_genre_slug %}<input type="hidden" name="genre" value="{{ current_genre_slug }}">{% endif %}
             {% if mode != 'tag' and current_tag_slug %}<input type="hidden" name="tag" value="{{ current_tag_slug }}">{% endif %}
             <input type="hidden" name="q" value="{{ query }}">
             <input type="hidden" name="status" value="{{ status }}">
-            <input type="hidden" name="format" value="{{ format }}">
             <input type="hidden" name="audience" value="{{ audience }}">
             <input type="hidden" name="length" value="{{ length }}">
             <label for="sort-mobile" class="sr-only">Сұрыптау</label>
@@ -120,7 +119,7 @@
 
     {# ── Desktop: счётчик результатов + текущая сортировка-метка над списком ── #}
     <div class="mb-4 hidden items-baseline justify-between border-b border-slate-200 pb-3 xl:flex">
-        <span class="font-sans text-sm text-slate-600">{{ results|length }} шығарма</span>
+        <span class="font-sans text-sm text-slate-600">{{ total_results }} шығарма</span>
         <span class="font-sans text-xs text-slate-500">Сұрыпталу: {{ sort_label }}</span>
     </div>
 
@@ -149,6 +148,12 @@
 
     {# ── Список + empty state ── #}
     {% include "partials/catalog/_book_list.html" with results=results empty_title=empty_title empty_text=empty_text empty_collections=rail_collections %}
+
+    {% if page.paginator.num_pages > 1 %}
+        <div class="mt-8">
+            {% include "components/pagination.html" with current=page.number total=page.paginator.num_pages base=page_base qs=page_qs %}
+        </div>
+    {% endif %}
 
     {# ── Mobile bottom-sheet с тем же filter_panel ── #}
     {% include "partials/catalog/_filter_sheet.html" %}
