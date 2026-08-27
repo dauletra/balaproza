@@ -362,9 +362,9 @@ class Story(models.Model):
     работ автора, счётчик жанра, «сколько дней назад трогали» и знак
     «участвует в байқау» считаются, а не лежат колонкой.
 
-    Что хранится вопреки правилу — отмечено на месте. Таких полей три, и
-    у каждого своя причина: счётчики просмотров и комментариев дороги
-    как агрегаты, а `chapters` пока просто честнее источника.
+    Что хранится вопреки правилу — отмечено на месте: счётчики просмотров
+    и комментариев дороги как агрегаты. Число частей в этом списке было
+    третьим и из него ушло — см. `chapters`.
     """
 
     STATUS_CHOICES = [(s, s) for s in STORY_STATUSES]
@@ -403,12 +403,6 @@ class Story(models.Model):
     audience = models.CharField('жас белгісі', max_length=8, blank=True)
     format = models.CharField('түрі', max_length=8, choices=FORMAT_CHOICES,
                               default='serial')
-
-    # Заявленное число частей. Пока хранится, потому что у четырёх сериалов
-    # каталога текст не написан вовсе (`KNOWN_TEXTLESS`): вычисление из
-    # записей обнулило бы им «17 бөлім» на карточке. Когда пробел закроется,
-    # поле уступает место `chapter_set.count()`.
-    chapters = models.PositiveSmallIntegerField('бөлім саны', default=0)
 
     views = models.PositiveIntegerField('оқылым', default=0)
     # Просмотры за 14 дней — ось «Қазір танымал» (DEC-36). Денормализовано
@@ -482,6 +476,26 @@ class Story(models.Model):
     @property
     def format_badge_label(self) -> str:
         return 'Бір оқылым' if self.is_single else 'Серия'
+
+    @property
+    def chapters(self) -> int:
+        """Сколько частей у работы. Считается по записям глав.
+
+        Раньше это была колонка «бөлім саны», которую автор объявлял при
+        создании. Она разошлась с текстом сразу: `save_chapter` её не
+        обновлял, и работа с пятью написанными главами показывала на
+        карточке «0 бөлім». Обещание частей, которых никто не написал,
+        портал больше не даёт.
+
+        Выдача подставляет ответ аннотацией `chapter_count`
+        (`queries/catalog.chapter_count_subquery`); одиночный объект вне
+        такой выдачи честно спрашивает базу. Молча неверного ответа здесь
+        не бывает — бывает лишний запрос, и его ловит `test_query_budget`.
+        """
+        annotated = getattr(self, 'chapter_count', None)
+        if annotated is not None:
+            return annotated
+        return self.chapter_set.count()
 
     @property
     def has_chapters(self) -> bool:
@@ -595,9 +609,11 @@ class Story(models.Model):
     # ── Объём чтения ─────────────────────────────────────────────────────
     @property
     def total_chars(self) -> int:
-        """Объём текста. Без написанных глав — оценка по заявленным частям:
-        у четырёх сериалов каталога текста нет, и ноль знаков превратил бы
-        их в «3 минут оқу».
+        """Объём написанного текста.
+
+        Оценки по заявленным частям здесь больше нет: вместе с колонкой
+        `chapters` ушло и само заявление. Ненаписанная работа честно
+        показывает нижнюю границу времени чтения.
 
         Выдача каталога считает то же самое аннотацией и подставляет её
         сюда: карточка спрашивает время чтения, и без подстановки страница
@@ -607,8 +623,7 @@ class Story(models.Model):
         annotated = getattr(self, 'effective_chars', None)
         if annotated is not None:
             return annotated
-        total = sum(c.char_count for c in self.chapter_set.all())
-        return total or self.chapters * 1800
+        return sum(c.char_count for c in self.chapter_set.all())
 
     @property
     def read_minutes(self) -> int:

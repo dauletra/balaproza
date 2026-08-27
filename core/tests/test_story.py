@@ -723,6 +723,33 @@ class ChapterPollVoting(TestCase):
         self.assertNotContains(r, 'Дұрыс жауабы жоқ — тек сенің болжамың.')
 
 
+class RelatedStoriesCoverAllPublicStatuses(TestCase):
+    """«Басқа шығармалар» не должен состоять из одних `Published`.
+
+    Блок сужался литералом `status='Published'` поверх уже публичной
+    выдачи, и после DEC-37 это выкидывало из рекомендаций **все** сериалы —
+    почти половину публичного корпуса. Тест смотрит на весь корпус, а не на
+    один слаг: сужение возвращается незаметно и не в одной работе.
+    """
+
+    def test_recommendations_are_public_foreign_and_include_serials(self):
+        seen_statuses = set()
+        for source in Story.objects.filter(status__in=data.PUBLIC_STATUSES):
+            related = data.related_stories(source.slug)
+            with self.subTest(story=source.slug):
+                for other in related:
+                    self.assertIn(other.status, data.PUBLIC_STATUSES)
+                    self.assertNotEqual(other.slug, source.slug)
+                    self.assertNotEqual(other.author_id, source.author_id)
+            seen_statuses.update(s.status for s in related)
+
+        self.assertTrue(
+            seen_statuses - {'Published'},
+            'в рекомендациях по всему корпусу нет ни одного сериала — '
+            'выдача снова сужена до литерала Published (DEC-37)',
+        )
+
+
 class WhatsNextPlacement(TestCase):
     """Позиция блока «что дальше» зависит от того, дочитано ли произведение.
 

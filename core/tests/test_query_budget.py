@@ -81,16 +81,20 @@ class PagesStayWithinTheirQueryBudget(TestCase):
         Было 21 — `StoryComment.replies` стал `cached_property` (Ф15,
         Этап 2): раньше он звал `.select_related('author')` на каждый
         топ-уровневый комментарий и рвал кэш `prefetch_related`, то есть
-        сам себе устраивал N+1 поверх уже сделанного prefetch."""
-        with self.assertNumQueries(19):
+        сам себе устраивал N+1 поверх уже сделанного prefetch.
+
+        Стало 18: `related_stories` перестал делать две выборки («тот же
+        жанр» и «добор популярным») — порядок выражен ключом сортировки, и
+        второй `prefetch_related('tags')` ушёл вместе со вторым запросом."""
+        with self.assertNumQueries(18):
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'dalney-berega'}))
 
     def test_story_chapter_with_comments_and_poll(self):
         """Глава дороже произведения: к ней добавляются комментарии с
-        ответами, ряд реакций и опрос. Было 34, стало 31 — та же причина,
-        что у `test_story_page`."""
-        with self.assertNumQueries(31):
+        ответами, ряд реакций и опрос. Было 34, стало 30 — те же две
+        причины, что у `test_story_page`."""
+        with self.assertNumQueries(30):
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'dalney-berega'}) + '?chapter=3')
 

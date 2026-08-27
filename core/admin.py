@@ -179,7 +179,7 @@ class StoryAdmin(admin.ModelAdmin):
         (None, {'fields': ('title', 'slug', 'author', 'annotation', 'cover')}),
         ('Сипаттамасы', {
             'fields': ('primary_genre', 'secondary_genre',
-                       'format', 'chapters', 'audience'),
+                       'format', 'audience'),
             'description': '«Жас белгісі» бос болса — автор әлі таңдамаған. '
                            'Оны автордың орнына қоюға болмайды (BR-10b).',
         }),

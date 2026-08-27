@@ -1203,6 +1203,27 @@ class ChapterEditorSavesADraft(TestCase):
         story = Story.objects.get(slug=self.SLUG)
         self.assertEqual(story.chapter_set.count(), 0)
 
+    def test_written_chapters_show_up_in_the_count(self):
+        """«N бөлім» на карточке — то, что автор написал.
+
+        Раньше число было колонкой, которую заполняли при создании работы,
+        а запись главы её не трогала: автор писал три бөлім и видел «0».
+        Проверяется в обоих видах — у одиночного объекта и в выдаче
+        каталога, где число приезжает аннотацией.
+        """
+        for number in (1, 2, 3):
+            self.client.post(
+                reverse('core:chapter_new', kwargs={'slug': self.SLUG}),
+                {'title': f'{number}-бөлім', 'body': 'Мәтін.', 'action': 'draft'})
+
+        story = Story.objects.get(slug=self.SLUG)
+        self.assertEqual(story.chapters, 3)
+        self.assertEqual(story.reading_meta_label, '3 бөлім')
+
+        from_feed = next(s for s in data.my_stories_of('aidana')
+                         if s.slug == self.SLUG)
+        self.assertEqual(from_feed.chapters, 3)
+
     def test_editing_an_existing_chapter_does_not_duplicate_it(self):
         self.client.post(
             reverse('core:chapter_new', kwargs={'slug': self.SLUG}),

@@ -37,7 +37,7 @@ def _story(author, **kwargs):
     fields = {
         'slug': 'test-work', 'title': 'Сынақ шығармасы',
         'primary_genre': Genre.objects.first(),
-        'status': 'OnModeration', 'format': 'single', 'chapters': 1,
+        'status': 'OnModeration', 'format': 'single',
     }
     fields.update(kwargs)
     return Story.objects.create(author=author, **fields)
@@ -62,7 +62,7 @@ class ModerationChangesStatusAndTellsTheAuthor(TestCase):
         модерации сериал перестаёт отвечать на вопрос «дописан ли он»:
         обе читательские метки — `OnProcess` и `Completed`.
         """
-        story = _story(self.author, format='serial', chapters=4)
+        story = _story(self.author, format='serial')
         story.apply_moderation('approved')
         story.refresh_from_db()
         self.assertEqual(story.status, 'OnProcess')
@@ -185,7 +185,7 @@ class ModerationThroughTheAdmin(TestCase):
             'author': self.author.pk, 'annotation': '',
             'primary_genre': self.story.primary_genre_id,
             'secondary_genre': '', 'tags': [],
-            'format': 'single', 'chapters': 1, 'audience': '',
+            'format': 'single', 'audience': '',
             'status': 'Published', 'views': 0, 'recent_views': 0,
             'likes': 0, 'comments': 0,
             'chapter_set-TOTAL_FORMS': '0', 'chapter_set-INITIAL_FORMS': '0',

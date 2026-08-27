@@ -177,7 +177,6 @@ class Command(BaseCommand):
                     'status':          stub.status,
                     'audience':        stub.audience,
                     'format':          stub.format,
-                    'chapters':        stub.chapters,
                     'views':           stub.views,
                     'recent_views':    stub.recent_views,
                     'likes':           stub.likes,

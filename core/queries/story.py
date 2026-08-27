@@ -27,6 +27,7 @@ from ..models import (
     Story,
     StoryComment,
 )
+from .catalog import chapter_count_subquery
 
 
 def chapters_of(story_slug: str) -> list:
@@ -260,7 +261,16 @@ def book_of_week():
 
     Берётся последняя запись, а не флаг у произведения: неделя проходит, и
     выбор становится историей, а флаг пришлось бы снимать руками.
+
+    Число частей едет той же строкой (тот же приём, что в `library_of`):
+    блок главной показывает «N бөлім», и без подсказки `Story.chapters`
+    спрашивал бы базу — причём дважды, потому что блок рисуется и в
+    первом фолде, и в ряду ниже.
     """
-    return (BookOfWeek.objects.select_related('story', 'story__author',
+    pick = (BookOfWeek.objects.select_related('story', 'story__author',
                                               'story__primary_genre')
+            .annotate(story_chapters=chapter_count_subquery('story'))
             .order_by('-published_on').first())
+    if pick is not None:
+        pick.story.chapter_count = pick.story_chapters
+    return pick

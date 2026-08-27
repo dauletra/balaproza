@@ -19,7 +19,7 @@ from ..domain.catalog import PUBLIC_STATUSES
 from ..domain.library import LIBRARY_KINDS
 from ..domain.story import PUBLISH_CHECKLIST
 from ..models import LibraryEntry, Notification, Story, User
-from .catalog import all_stories
+from .catalog import all_stories, chapter_count_subquery
 
 
 class AuthorFacts:
@@ -266,15 +266,26 @@ def reader_stats(username: str, *, facts: AuthorFacts = None) -> dict:
 
 
 def library_of(username: str, kind: str = '') -> list:
-    """Полки читателя. Пустой `kind` — вся библиотека."""
+    """Полки читателя. Пустой `kind` — вся библиотека.
+
+    Число частей приезжает той же строкой (`story_chapters`) и садится на
+    произведение вручную: строка полки говорит «3 / 12 бөлім», а
+    `select_related` аннотировать связанный объект не умеет. Через
+    `Prefetch` это стоило бы второго запроса, через `Story.chapters` без
+    подсказки — по запросу на каждую строку полки.
+    """
     if not username:
         return []
     entries = (LibraryEntry.objects.filter(user__username=username)
                .select_related('story', 'story__author',
-                               'story__primary_genre'))
+                               'story__primary_genre')
+               .annotate(story_chapters=chapter_count_subquery('story')))
     if kind in LIBRARY_KINDS:
         entries = entries.filter(kind=kind)
-    return list(entries)
+    rows = list(entries)
+    for entry in rows:
+        entry.story.chapter_count = entry.story_chapters
+    return rows
 
 
 def in_library(username: str, story_slug: str) -> bool:
@@ -293,5 +304,9 @@ def story_by_slug_for_author(slug: str, username: str):
     снаружи — оба дают `None` и одну и ту же карточку «не найдено», а не
     403: подтверждать постороннему, что slug вообще существует, незачем.
     """
-    return Story.objects.filter(slug=slug, author__username=username).select_related(
-        'author', 'primary_genre', 'secondary_genre').first()
+    return (Story.objects.filter(slug=slug, author__username=username)
+            .select_related('author', 'primary_genre', 'secondary_genre')
+            # Кабинет показывает «N бөлім» — без аннотации это отдельный
+            # запрос за счётом глав (`Story.chapters`).
+            .annotate(chapter_count=chapter_count_subquery())
+            .first())

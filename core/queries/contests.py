@@ -239,16 +239,16 @@ def common_rules(contest) -> list:
 def _total_chars(story) -> int:
     """Объём по написанному тексту.
 
-    Именно по главам, без оценки по заявленным частям: на конкурс идёт
-    текст, который прочтёт жюри, а не обещание его дописать. Поэтому
-    берётся `written_chars`, а не `effective_chars`: второй дорисовывает
-    ненаписанные части по заявленному числу глав.
+    Именно по главам: на конкурс идёт текст, который прочтёт жюри, а не
+    обещание его дописать. Отдельного `written_chars` для этого больше не
+    нужно — с удалением `Story.chapters` оценивать ненаписанное нечем, и
+    `effective_chars` считает ровно написанное.
 
     Число уже приезжает аннотацией выдачи (`_reading_effort`) — без неё
     страница подачи шла за главами на каждого кандидата, а список
     кандидатов это все публичные работы автора.
     """
-    annotated = getattr(story, 'written_chars', None)
+    annotated = getattr(story, 'effective_chars', None)
     if annotated is not None:
         return annotated
     return sum(c.char_count for c in story.chapter_set.all())

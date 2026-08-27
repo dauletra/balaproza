@@ -7,6 +7,7 @@
 """
 
 from ..models import ReadingProgress
+from .catalog import chapter_count_subquery
 
 
 def reading_progress_of(username: str):
@@ -14,10 +15,19 @@ def reading_progress_of(username: str):
 
     Одна запись, а не список: «Оқуды жалғастыру» отвечает на «что открыть
     сейчас», и выбор из пяти вариантов — это уже библиотека.
+
+    Число частей едет той же строкой: хиро главной рисует полосу
+    «3 / 12 бөлім», и без подсказки `Story.chapters` спросил бы базу
+    отдельно (тот же приём, что в `library_of`).
     """
     if not username:
         return None
-    return (ReadingProgress.objects
-            .filter(user__username=username)
-            .select_related('story', 'story__author', 'story__primary_genre')
-            .first())
+    progress = (ReadingProgress.objects
+                .filter(user__username=username)
+                .select_related('story', 'story__author',
+                                'story__primary_genre')
+                .annotate(story_chapters=chapter_count_subquery('story'))
+                .first())
+    if progress is not None:
+        progress.story.chapter_count = progress.story_chapters
+    return progress

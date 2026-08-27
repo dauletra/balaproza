@@ -48,9 +48,33 @@ from .site import REFERENCE_TTL
 # моделью (`Story.read_minutes`) и здесь — одно и то же число в двух
 # видах, потому что одна форма нужна объекту, вторая базе.
 CHARS_PER_MINUTE = 900
-# Оценка объёма ненаписанной части: у четырёх сериалов каталога текста
-# нет вовсе, и ноль знаков превратил бы их в «3 минут оқу».
-CHARS_PER_DECLARED_CHAPTER = 1800
+
+
+def chapter_count_subquery(story_ref: str = 'pk'):
+    """Сколько частей у работы — подзапросом, для аннотации `chapter_count`.
+
+    `story_ref` — чем внешняя выдача ссылается на произведение. По
+    умолчанию это сама работа; выдачам, где строка **про** работу (полка
+    библиотеки, прогресс чтения), передаётся `'story'`, и число едет с их
+    собственной строкой, не добавляя запроса.
+
+    Число частей больше не хранится колонкой: она объявлялась автором и
+    расходилась с тем, что он написал (`save_chapter` её не трогал вовсе,
+    и работа с пятью главами показывала «0 бөлім»). Подхватывает
+    `Story.chapters`.
+
+    Подзапросом, а не `Count` по join, — по той же причине, что и объём:
+    фильтр по тегам размножил бы строки и посчитал каждую главу столько
+    раз, сколько у работы тегов.
+    """
+    return Coalesce(
+        Subquery(
+            Chapter.objects.filter(story=OuterRef(story_ref)).values('story')
+            .annotate(n=Count('pk')).values('n')[:1],
+            output_field=IntegerField(),
+        ),
+        Value(0),
+    )
 
 
 def _reading_effort(qs):
@@ -67,13 +91,11 @@ def _reading_effort(qs):
         output_field=IntegerField(),
     )
     return qs.annotate(
-        written_chars=Coalesce(written, Value(0)),
-    ).annotate(
-        effective_chars=Case(
-            When(written_chars__gt=0, then=F('written_chars')),
-            default=F('chapters') * Value(CHARS_PER_DECLARED_CHAPTER),
-            output_field=IntegerField(),
-        ),
+        # Прежде здесь стояла оценка «объявленных частей на 1800 знаков»
+        # для работ без текста. Оценивать больше нечего: части, которых
+        # никто не написал, портал больше не обещает.
+        effective_chars=Coalesce(written, Value(0)),
+        chapter_count=chapter_count_subquery(),
     ).annotate(
         # Округление вверх целочисленным делением — тот же расчёт, что в
         # `Story.read_minutes`; нижняя граница в три минуты на бакеты не
@@ -274,20 +296,30 @@ def related_stories(slug: str, limit: int = 6) -> list:
 
     Тот же основной жанр, **чужой автор** — знакомство с новым именем
     ценнее ещё одной книги того же; не хватило — добираем популярным.
+
+    Публичность приходит из `catalog_base()`, то есть по `PUBLIC_STATUSES`.
+    Своего сужения до литерала `'Published'` здесь быть не должно: после
+    DEC-37 публичный сериал носит `Completed` или `OnProcess`, и такое
+    сужение молча выкидывало из блока **все** сериалы портала.
+
+    «Сначала жанр, потом остальное» выражено ключом сортировки, а не двумя
+    выборками. Порядок тот же, а запрос один: у второй выборки был свой
+    `prefetch_related('tags')`, и блок из шести карточек стоил четырёх
+    запросов вместо двух.
     """
     source = Story.objects.filter(slug=slug).first()
     if not source:
         return []
 
-    others = (catalog_base().filter(status='Published')
-              .exclude(slug=slug).exclude(author=source.author))
-    same_genre = list(others.filter(
-        Q(primary_genre=source.primary_genre)
-        | Q(secondary_genre=source.primary_genre)
-    ).order_by('-views', 'pk')[:limit])
-
-    if len(same_genre) < limit:
-        fillers = (others.exclude(pk__in=[s.pk for s in same_genre])
-                   .order_by('-views', 'pk')[:limit - len(same_genre)])
-        same_genre += list(fillers)
-    return same_genre
+    return list(
+        catalog_base()
+        .exclude(slug=slug)
+        .exclude(author=source.author)
+        .annotate(other_genre=Case(
+            When(Q(primary_genre=source.primary_genre)
+                 | Q(secondary_genre=source.primary_genre), then=Value(0)),
+            default=Value(1),
+            output_field=IntegerField(),
+        ))
+        .order_by('other_genre', '-views', 'pk')[:limit]
+    )

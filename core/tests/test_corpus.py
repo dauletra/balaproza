@@ -262,41 +262,29 @@ class StoryReactionsMatchTheirChapters(TestCase):
                     self.assertIn(slug, data.REACTIONS_BY_SLUG)
 
 
-class DeclaredChapterCountMatchesLoadedChapters(TestCase):
-    """`Story.chapters` не должен обещать больше, чем корпус умеет показать.
+class ChapterCountIsDerived(TestCase):
+    """«N бөлім» считается по записям глав, а не объявляется колонкой.
 
-    `aidana-erteg` объявляла 3 бөлім без единой написанной главы: список
-    «Менің шығармаларым» показывал «3 бөлім», а «Басқару» открывалась
-    пустой. Запись главы обязана нести текст (см.
-    `StoriesCarryTheirText`), поэтому честное значение там — ноль, а не
-    три пустые главы.
+    Прежде здесь стоял сторож расхождения: `Story.chapters` была полем, её
+    заполнял автор при создании, и `save_chapter` её не обновлял. Тест
+    держал список известных лжецов (`KNOWN_TEXTLESS` — четыре сериала,
+    обещавших до 19 бөлім без единой написанной главы) и следил, чтобы он
+    не рос. Поля больше нет: расходиться нечему, и сторожить нечего —
+    осталось проверить, что считается именно написанное.
     """
 
-    # Каталожные сериалы, у которых текст глав не написан вовсе. В авторском
-    # кабинете их никто не открывает, но публичная страница произведения
-    # обещает бөлім, которых нет. Гэп известен и ждёт наполнения story_texts/;
-    # список заморожен, чтобы к нему не добавилось новых произведений.
-    KNOWN_TEXTLESS = {
-        "zhuldyz-kartasy", "kokjal-anyzy", "keiipkerge-hat", "arqadagy-jaz",
-    }
-
-    def test_counts_match_wherever_text_is_authored(self):
+    def test_count_equals_the_number_of_written_chapters(self):
         for story in Story.objects.all():
-            if story.slug in self.KNOWN_TEXTLESS:
-                continue
             with self.subTest(story=story.slug):
                 self.assertEqual(story.chapters, len(data.chapters_of(story.slug)))
 
-    def test_the_list_of_textless_stories_has_not_grown(self):
-        textless = {
-            s.slug for s in Story.objects.all()
-            if s.chapters and not data.chapters_of(s.slug)
-        }
-        self.assertEqual(
-            textless, self.KNOWN_TEXTLESS,
-            "Произведение обещает бөлім, которых нет в базе. "
-            "Либо напиши текст в core/story_texts/, либо поставь chapters=0.",
-        )
+    def test_annotated_and_unannotated_agree(self):
+        """Аннотация выдачи и одиночный объект обязаны давать одно число:
+        иначе карточка каталога и страница произведения расходятся."""
+        annotated = {s.slug: s.chapters for s in data.public_stories()}
+        for slug, n in annotated.items():
+            with self.subTest(story=slug):
+                self.assertEqual(n, Story.objects.get(slug=slug).chapters)
 
 
 class AuthorWorkCountIsDerived(TestCase):
