@@ -283,11 +283,15 @@ def in_library(username: str, story_slug: str) -> bool:
         user__username=username, story__slug=story_slug).exists()
 
 
-def story_by_slug_for_author(slug: str):
-    """Работа для кабинета: любой статус, вместе с автором.
+def story_by_slug_for_author(slug: str, username: str):
+    """Работа для кабинета: любой статус, но только своя, вместе с автором.
 
     Отдельно от каталожного резолва: тот режет по публичности, и свой
-    черновик автор в кабинете не открыл бы.
+    черновик автор в кабинете не открыл бы. Фильтр по `username` — не
+    только удобство: без него любой вошедший открывал бы чужой черновик
+    по прямому URL (Ф15, IDOR). Чужой и несуществующий slug неотличимы
+    снаружи — оба дают `None` и одну и ту же карточку «не найдено», а не
+    403: подтверждать постороннему, что slug вообще существует, незачем.
     """
-    return Story.objects.filter(slug=slug).select_related(
+    return Story.objects.filter(slug=slug, author__username=username).select_related(
         'author', 'primary_genre', 'secondary_genre').first()

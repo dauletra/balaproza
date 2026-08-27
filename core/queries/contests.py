@@ -334,6 +334,42 @@ def submission_candidates(username: str, contest_slug, *, facts=None) -> list:
     return result
 
 
+def create_submission(user, contest, story, *, ai_declaration: str,
+                      age_confirmed: bool, rules_confirmed: bool):
+    """Новая заявка (BR-23, Ф15 Этап 5).
+
+    `get_or_create` по (contest, author) вместо голого `create`: один
+    автор — одна работа на конкретный конкурс — это ограничение базы
+    (`UniqueConstraint`), и без `get_or_create` гонка двух кликов подряд
+    падала бы 500 вместо тихого «уже подано». Возвращает `(submission,
+    created)` — вызывающая сторона решает, что сказать автору.
+    """
+    return Submission.objects.get_or_create(
+        contest=contest, author=user,
+        defaults={
+            'story':           story,
+            'submitted_on':    timezone.localdate(),
+            'ai_declaration':  ai_declaration,
+            'age_confirmed':   age_confirmed,
+            'rules_confirmed': rules_confirmed,
+        },
+    )
+
+
+def withdraw_submission(username: str, contest) -> bool:
+    """Отзыв заявки (BR-23b, Ф15 Этап 5).
+
+    Условие то же, что у `can_withdraw` — приём ещё идёт, жюри ещё не
+    решило, — и проверяется здесь заново: `can_withdraw` решает, показать
+    ли кнопку, а не охраняет сам POST.
+    """
+    if not can_withdraw(username, contest):
+        return False
+    deleted, _ = Submission.objects.filter(
+        author__username=username, contest=contest, status='reviewing').delete()
+    return bool(deleted)
+
+
 def contest_history(username: str, *, is_self: bool = False,
                     facts=None) -> list:
     """Конкурсная биография автора (FR-PROF-07), свежие сверху.

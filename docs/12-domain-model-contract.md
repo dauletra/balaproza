@@ -72,7 +72,7 @@ Catalog and search:
 
 Story and chapters:
 - `chapters_of(story_slug: str) -> list[Chapter]`
-- `chapter_of(story_slug: str, number: int) -> Chapter | None`
+- `chapter_of(story_slug: str, number: int, viewer: str = '') -> Chapter | None` — с `viewer` аннотирует `Chapter.my_reaction` (BR-REACT-02/03, Ф15 Этап 3)
 - `Story.is_public -> bool` — видна ли работа читателю. По `PUBLIC_STATUSES`, а не по литералу `'Published'` (DEC-37)
 - `Story.updated_label -> str` — «кеше», «3 күн бұрын»; пусто, когда `updated_days_ago` не задан
 - `writer_attention(username: str, *, facts=None) -> list[dict]` — сигналы кабинета (FR-WRITE-08): `kind` / `count` / `slug`. Только данные; ссылку строит view (`_attention_links`), как и в каталоге
@@ -82,8 +82,10 @@ Story and chapters:
 - `Story.text_chapter -> int | None` — номер главы с текстом одночастного произведения; None у сериала и у `single` без текста. Кнопка «Мәтін» / «Мәтінді өңдеу» обязана вести туда, а не в `chapter_new`: у `single` глава ровно одна, и пустой редактор давал автору сохранить вторую
 - `comments_of(story_slug: str) -> list[StoryComment]`
 - `comments_of_chapter(story_slug: str, chapter_number: int) -> list[StoryComment]`
-- `reactions_of(chapter: Chapter) -> list[dict]` — полный ряд из пяти реакций, включая нулевые (BR-REACT-01)
-- `poll_of(story_slug: str, chapter_number: int) -> ChapterPoll | None` — опрос необязателен (BR-POLL-01)
+- `reactions_of(chapter: Chapter, viewer: str = '') -> list[dict]` — полный ряд из пяти реакций, включая нулевые (BR-REACT-01); `mine` отвечает на голос `viewer`
+- `toggle_chapter_reaction(chapter, user, kind: str) -> str` — ставит/снимает/меняет реакцию (BR-REACT-02/03, Ф15 Этап 3); возвращает новый slug, `''` — если снята. `Story.likes` — агрегат по числу голосов, не по сумме реакций (BR-14a): смена вида его не трогает
+- `poll_of(story_slug: str, chapter_number: int, viewer: str = '') -> ChapterPoll | None` — опрос необязателен (BR-POLL-01); с `viewer` аннотирует `ChapterPoll.my_vote` (Ф15 Этап 4)
+- `cast_poll_vote(poll, user, option_slug: str) -> bool` — голос: одна ставка на опрос, не на вариант, не меняется (docs/20 §20.2); закрытый опрос (BR-POLL-05) и невалидный/повторный вариант — no-op, возвращает `False`
 
 Author workspace, library, social:
 

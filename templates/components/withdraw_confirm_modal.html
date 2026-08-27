@@ -1,6 +1,6 @@
 {% comment %}
     Подтверждение отзыва заявки с конкурса (BR-23b).
-    Триггер: $dispatch('open-withdraw-confirm', { contest: '…', story: '…' })
+    Триггер: $dispatch('open-withdraw-confirm', { contest: '…', story: '…', withdraw_url: '…' })
 
     Отдельный компонент, а не параметр `delete_confirm_modal`: тот
     спрашивает «өшіру керек пе?» красной кнопкой с корзиной, и его копия
@@ -9,11 +9,12 @@
     подать другую работу. Одеть это в красную корзину значило бы напугать
     там, где пугать нечем.
 
-    Сейчас (дизайн-фаза) подтверждение закрывает модалку и шлёт тост.
-    В Ф14 сюда придут csrf-токен и настоящий POST.
+    Настоящий POST (Ф15, Этап 5): csrf-токен один на форму, `:action`
+    меняется под адрес конкретной заявки из события — тот же приём, что у
+    `delete_confirm_modal.html`.
 {% endcomment %}
-<div x-data="{ open: false, contest: '', story: '' }"
-     @open-withdraw-confirm.window="open = true; contest = $event.detail?.contest || ''; story = $event.detail?.story || ''"
+<div x-data="{ open: false, contest: '', story: '', withdraw_url: '' }"
+     @open-withdraw-confirm.window="open = true; contest = $event.detail?.contest || ''; story = $event.detail?.story || ''; withdraw_url = $event.detail?.withdraw_url || ''"
      @keydown.escape.window="open = false"
      x-show="open" x-cloak
      class="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -40,16 +41,16 @@
             Шығарма өшпейді — қабылдау жабылғанша басқа жұмысты жібере аласың.
         </p>
 
-        <div class="mt-6 flex justify-end gap-2.5">
+        <form method="post" :action="withdraw_url" class="mt-6 flex justify-end gap-2.5">
+            {% csrf_token %}
             <button type="button" @click="open = false"
                     class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
                 Қалдыру
             </button>
-            <button type="button"
-                    @click="open = false; $dispatch('toast', { kind: 'info', text: 'Өтінім қайтарып алынды (демо)' })"
+            <button type="submit"
                     class="inline-flex h-9 items-center gap-2 rounded-md bg-slate-900 px-5 font-sans text-sm font-bold text-white hover:bg-slate-700">
                 Қайтарып алу
             </button>
-        </div>
+        </form>
     </div>
 </div>

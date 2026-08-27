@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest import mock
 
 from core.tests.base import TestCase, login_as, login_as_newcomer
+from django.test import Client
 from django.urls import reverse
 
 from core import data, views
@@ -590,8 +591,12 @@ class AcceptedIsTheJuryWord(TestCase):
 
     def test_submit_form_does_not_promise_acceptance(self):
         login_as(self.client)
-        html = self.client.get(
-            reverse('core:contest_submit', args=['bolashak-mektebi'])).content.decode()
+        story = data.public_stories_of('aidana')[0]
+        r = self.client.post(reverse('core:contest_submit', args=['bolashak-mektebi']), {
+            'story_slug': story.slug, 'ai_used': 'no',
+            'confirm_age': 'on', 'confirm_rules': 'on',
+        }, follow=True)
+        html = r.content.decode()
         self.assertNotIn('Өтінім қабылданды', html)
         self.assertIn('Өтінім жіберілді', html)
 
@@ -789,3 +794,230 @@ class WorkPickerScalesToManyWorks(TestCase):
         for s in data.public_stories_of('aidana'):
             self.assertIn(s.title, picker)
         self.assertNotIn('style="display:none"', picker)
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Ф15, Этап 5: настоящий POST. Формы больше не гасятся Alpine-заглушкой —
+# `contest_submit` создаёт `Submission`, `contest_withdraw` её удаляет.
+# ───────────────────────────────────────────────────────────────────────
+
+class ContestSubmitCreatesSubmission(TestCase):
+
+    SLUG = 'bolashak-mektebi'   # accepting, eligibility_line непустой
+    STORY_SLUG = 'tunge-deiin'  # bekzhan_t-нікі, кандидат бойынша тазa
+
+    def setUp(self):
+        login_as(self.client, 'bekzhan_t')
+
+    def _post(self, **overrides):
+        payload = {
+            'story_slug':   self.STORY_SLUG,
+            'ai_used':      'no',
+            'confirm_age':  'on',
+            'confirm_rules': 'on',
+        }
+        payload.update(overrides)
+        return self.client.post(
+            reverse('core:contest_submit', kwargs={'slug': self.SLUG}), payload)
+
+    def test_creates_submission_with_posted_fields(self):
+        self._post()
+        sub = Submission.objects.get(contest__slug=self.SLUG,
+                                     author__username='bekzhan_t')
+        self.assertEqual(sub.story.slug, self.STORY_SLUG)
+        self.assertEqual(sub.status, 'reviewing')
+        self.assertEqual(sub.submitted_on, date.today())
+        self.assertEqual(sub.ai_declaration, 'no')
+        self.assertTrue(sub.age_confirmed)
+        self.assertTrue(sub.rules_confirmed)
+
+    def test_redirects_back_to_the_submit_page(self):
+        r = self._post()
+        self.assertRedirects(
+            r, reverse('core:contest_submit', kwargs={'slug': self.SLUG}))
+
+    def test_ai_declaration_value_is_stored_as_posted(self):
+        self._post(ai_used='partial')
+        sub = Submission.objects.get(contest__slug=self.SLUG,
+                                     author__username='bekzhan_t')
+        self.assertEqual(sub.ai_declaration, 'partial')
+
+
+class ContestSubmitValidation(TestCase):
+    """BR-24 не блокирует выбор работы, но не отменяет обязательные поля."""
+
+    SLUG = 'bolashak-mektebi'
+    STORY_SLUG = 'tunge-deiin'
+
+    def setUp(self):
+        login_as(self.client, 'bekzhan_t')
+
+    def _post(self, **overrides):
+        payload = {
+            'story_slug':   self.STORY_SLUG,
+            'ai_used':      'no',
+            'confirm_age':  'on',
+            'confirm_rules': 'on',
+        }
+        payload.update(overrides)
+        return self.client.post(
+            reverse('core:contest_submit', kwargs={'slug': self.SLUG}), payload)
+
+    def _count(self):
+        return Submission.objects.filter(
+            contest__slug=self.SLUG, author__username='bekzhan_t').count()
+
+    def test_missing_story_creates_nothing(self):
+        self._post(story_slug='')
+        self.assertEqual(self._count(), 0)
+
+    def test_unowned_story_is_not_a_valid_candidate(self):
+        # 'aidana-tan' aidana-ныкі — bekzhan_t-тың кандидаттар тізімінде жоқ.
+        self._post(story_slug='aidana-tan')
+        self.assertEqual(self._count(), 0)
+
+    def test_missing_ai_declaration_creates_nothing(self):
+        self._post(ai_used='')
+        self.assertEqual(self._count(), 0)
+
+    def test_invalid_ai_declaration_creates_nothing(self):
+        self._post(ai_used='garbage')
+        self.assertEqual(self._count(), 0)
+
+    def test_missing_rules_confirmation_creates_nothing(self):
+        self._post(confirm_rules='')
+        self.assertEqual(self._count(), 0)
+
+    def test_missing_age_confirmation_creates_nothing_when_contest_requires_it(self):
+        self.assertTrue(Contest.objects.get(slug=self.SLUG).eligibility_line)
+        self._post(confirm_age='')
+        self.assertEqual(self._count(), 0)
+
+    def test_age_confirmation_not_required_when_contest_has_no_eligibility_line(self):
+        Contest.objects.filter(slug=self.SLUG).update(min_age=None, max_age=None)
+        self._post(confirm_age='')
+        self.assertEqual(self._count(), 1)
+
+    def test_all_errors_redirect_back_without_crashing(self):
+        r = self._post(story_slug='', ai_used='', confirm_rules='')
+        self.assertRedirects(
+            r, reverse('core:contest_submit', kwargs={'slug': self.SLUG}))
+
+
+class ContestSubmitOutsideAcceptingPhaseIsRejected(TestCase):
+    """DEC-45: прямой POST не должен обойти то, что форма уже прячет."""
+
+    def test_judging_phase_creates_nothing(self):
+        login_as(self.client, 'bekzhan_t')
+        self.client.post(reverse('core:contest_submit', args=['altyn-qalam']), {
+            'story_slug': 'tunge-deiin', 'ai_used': 'no',
+            'confirm_age': 'on', 'confirm_rules': 'on',
+        })
+        self.assertFalse(Submission.objects.filter(
+            contest__slug='altyn-qalam', author__username='bekzhan_t').exists())
+
+    def test_upcoming_phase_creates_nothing(self):
+        login_as(self.client, 'bekzhan_t')
+        self.client.post(reverse('core:contest_submit', args=['qys-ertegisi']), {
+            'story_slug': 'tunge-deiin', 'ai_used': 'no',
+            'confirm_age': 'on', 'confirm_rules': 'on',
+        })
+        self.assertFalse(Submission.objects.filter(
+            contest__slug='qys-ertegisi', author__username='bekzhan_t').exists())
+
+
+class ContestSubmitDuplicateIsRejected(TestCase):
+    """BR-23: один автор — одна работа на конкретный конкурс, даже если
+    форма всё равно не показывалась бы (already_submitted) — прямой POST
+    не должен породить вторую строку."""
+
+    SLUG = 'altyn-qalam'   # aidana уже подала
+
+    def test_second_post_does_not_create_a_second_row(self):
+        login_as(self.client)
+        before = Submission.objects.filter(
+            contest__slug=self.SLUG, author__username='aidana').count()
+        self.assertEqual(before, 1)
+        self.client.post(reverse('core:contest_submit', kwargs={'slug': self.SLUG}), {
+            'story_slug': 'aidana-tan', 'ai_used': 'no',
+            'confirm_age': 'on', 'confirm_rules': 'on',
+        })
+        after = Submission.objects.filter(
+            contest__slug=self.SLUG, author__username='aidana').count()
+        self.assertEqual(after, 1)
+
+
+class ContestSubmitGuestPostCreatesNothing(TestCase):
+
+    def test_guest_post_creates_nothing(self):
+        guest = Client()
+        before = Submission.objects.filter(contest__slug='bolashak-mektebi').count()
+        guest.post(reverse('core:contest_submit', args=['bolashak-mektebi']), {
+            'story_slug': 'tunge-deiin', 'ai_used': 'no',
+            'confirm_age': 'on', 'confirm_rules': 'on',
+        })
+        self.assertEqual(
+            Submission.objects.filter(contest__slug='bolashak-mektebi').count(), before)
+
+
+class ContestWithdrawRemovesSubmission(TestCase):
+    """BR-23b: пока приём идёт и жюри не решило, заявку можно забрать."""
+
+    def test_post_deletes_the_submission_and_redirects(self):
+        login_as(self.client, 'dina_books')
+        self.assertTrue(data.can_withdraw('dina_books', 'bolashak-mektebi'))
+        r = self.client.post(
+            reverse('core:contest_withdraw', args=['bolashak-mektebi']))
+        self.assertRedirects(r, reverse('core:my_submissions'))
+        self.assertFalse(Submission.objects.filter(
+            contest__slug='bolashak-mektebi', author__username='dina_books').exists())
+
+    def test_get_is_safe_and_deletes_nothing(self):
+        login_as(self.client, 'dina_books')
+        self.client.get(reverse('core:contest_withdraw', args=['bolashak-mektebi']))
+        self.assertTrue(Submission.objects.filter(
+            contest__slug='bolashak-mektebi', author__username='dina_books').exists())
+
+    def test_does_not_touch_another_authors_submission(self):
+        # Заводим вторую заявку на тот же конкурс — отзыв dina_books не
+        # должен задеть чужую строку.
+        from core.models import User
+        contest = Contest.objects.get(slug='bolashak-mektebi')
+        story = data.story_by_slug('aidana-tan')
+        data.create_submission(
+            User.objects.get(username='aidana'), contest, story,
+            ai_declaration='no', age_confirmed=True, rules_confirmed=True)
+
+        login_as(self.client, 'dina_books')
+        self.client.post(reverse('core:contest_withdraw', args=['bolashak-mektebi']))
+        self.assertTrue(Submission.objects.filter(
+            contest__slug='bolashak-mektebi', author__username='aidana').exists())
+
+
+class ContestWithdrawDeniedOutsideWindow(TestCase):
+
+    def test_post_after_judging_started_changes_nothing(self):
+        login_as(self.client)   # aidana → altyn-qalam, судейство уже идёт
+        before = Submission.objects.filter(
+            contest__slug='altyn-qalam', author__username='aidana').count()
+        self.assertEqual(before, 1)
+        r = self.client.post(reverse('core:contest_withdraw', args=['altyn-qalam']))
+        self.assertRedirects(r, reverse('core:my_submissions'))
+        after = Submission.objects.filter(
+            contest__slug='altyn-qalam', author__username='aidana').count()
+        self.assertEqual(after, 1)
+
+    def test_post_without_a_submission_changes_nothing(self):
+        login_as(self.client, 'bekzhan_t')   # заявки на bolashak-mektebi нет
+        self.client.post(reverse('core:contest_withdraw', args=['bolashak-mektebi']))
+        self.assertFalse(Submission.objects.filter(
+            contest__slug='bolashak-mektebi', author__username='bekzhan_t').exists())
+
+
+class ContestWithdrawGuestPostChangesNothing(TestCase):
+
+    def test_guest_post_does_not_withdraw(self):
+        guest = Client()
+        guest.post(reverse('core:contest_withdraw', args=['bolashak-mektebi']))
+        self.assertTrue(Submission.objects.filter(
+            contest__slug='bolashak-mektebi', author__username='dina_books').exists())

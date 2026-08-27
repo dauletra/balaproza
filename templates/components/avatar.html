@@ -1,9 +1,9 @@
 {% comment %}
-    Avatar (docs/04.6). Заглушка: буквенные инициалы на цветном OKLCH-фоне.
-    Hue стабильно выводится из длины seed (username|name) — один и тот же
-    автор всегда получает один и тот же цвет.
-
-    В продакшене подставится фото пользователя.
+    Avatar (docs/04.6). Двухрежимный, как cover_placeholder.html (Ф15, Этап 6):
+      • Если задан `avatar` (значение User.avatar, файл в MEDIA_ROOT) — <img>.
+      • Иначе — буквенные инициалы на цветном OKLCH-фоне. Hue стабильно
+        выводится из длины seed (username|name) — один и тот же автор
+        всегда получает один и тот же цвет заглушки.
 
     **Аватар декоративен.** Раньше на нём висел `aria-label` с именем
     автора — и не работал: у `<span>` роль `generic`, имя ей не
@@ -18,17 +18,24 @@
       size      — px (default 36)
       name      — отображаемое имя (для инициалов и цвета)
       username  — стабильный идентификатор для выбора цвета (опц.)
+      avatar    — User.avatar (опц.) — файл, если автор его загрузил
 {% endcomment %}
 {% with s=size|default:36 disp=name|default:"" uname=username|default:"" %}
 {% with seed=uname|add:disp|default:"?" letter=disp|default:"?"|slice:":1" %}
-<span class="inline-grid shrink-0 place-items-center rounded-pill font-display font-bold"
-      style="width:{{ s }}px;
-             height:{{ s }}px;
-             background: oklch(0.86 0.08 {% widthratio seed|length 1 31 %});
-             color: oklch(0.32 0.14 {% widthratio seed|length 1 31 %});
-             font-size: {% widthratio s 5 2 %}px;"
-      aria-hidden="true">
-    {{ letter|upper }}
-</span>
+{% if avatar %}
+    <img src="/media/{{ avatar }}" alt="" loading="lazy" aria-hidden="true"
+         class="inline-block shrink-0 rounded-pill object-cover"
+         style="width:{{ s }}px; height:{{ s }}px;">
+{% else %}
+    <span class="inline-grid shrink-0 place-items-center rounded-pill font-display font-bold"
+          style="width:{{ s }}px;
+                 height:{{ s }}px;
+                 background: oklch(0.86 0.08 {% widthratio seed|length 1 31 %});
+                 color: oklch(0.32 0.14 {% widthratio seed|length 1 31 %});
+                 font-size: {% widthratio s 5 2 %}px;"
+          aria-hidden="true">
+        {{ letter|upper }}
+    </span>
+{% endif %}
 {% endwith %}
 {% endwith %}

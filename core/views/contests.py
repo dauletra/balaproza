@@ -1,6 +1,7 @@
 """Конкурсы: список, страница, подача, свои заявки (FR-CONT-*)."""
 
-from django.shortcuts import render
+from django.contrib import messages
+from django.shortcuts import redirect, render
 
 from .. import data
 from .common import _current_username, _page_state
@@ -69,6 +70,45 @@ def contest_detail(request, slug):
 def contest_submit(request, slug):
     contest = data.contest_by_slug(slug)
     username = _current_username(request)
+
+    if request.method == 'POST' and username and contest:
+        # Кандидаты — те же публичные работы автора, что и на GET (BR-10,
+        # DEC-23): чужой или непубличный slug просто не найдётся здесь,
+        # и отдельной проверки владения форме не нужно.
+        candidates = {c['story'].slug: c['story']
+                     for c in data.submission_candidates(username, contest)}
+        story = candidates.get(request.POST.get('story_slug', ''))
+        ai_declaration = request.POST.get('ai_used', '')
+        age_confirmed = bool(request.POST.get('confirm_age'))
+        rules_confirmed = bool(request.POST.get('confirm_rules'))
+
+        errors = []
+        if not contest.is_accepting:
+            errors.append('Өтінім қабылдау аяқталды.')
+        if story is None:
+            errors.append('Шығарманы таңда.')
+        if ai_declaration not in data.AI_DECLARATIONS:
+            errors.append('AI-декларацияға жауап бер.')
+        if contest.eligibility_line and not age_confirmed:
+            errors.append('Жас талабына сай екеніңді раста.')
+        if not rules_confirmed:
+            errors.append('Байқау ережелерімен келісуді раста.')
+
+        if errors:
+            for err in errors:
+                messages.error(request, err)
+        else:
+            _, created = data.create_submission(
+                request.user, contest, story, ai_declaration=ai_declaration,
+                age_confirmed=age_confirmed, rules_confirmed=rules_confirmed)
+            if created:
+                messages.success(request, 'Өтінім жіберілді.')
+            else:
+                # Екінші рет басу немесе тікелей POST — BR-23 бір автордан
+                # бір өтінім алдын ала тексерілсе де, жарыс жағдайынан.
+                messages.error(request, 'Сен бұл байқауға өтінім бергенсің.')
+        return redirect('core:contest_submit', slug=slug)
+
     submitted = data.has_submission(username, slug) if username else False
     # Конкурс и работы автора берутся по одному разу и раздаются дальше:
     # через слаг и `submission_candidates`, и `can_withdraw` тянули бы
@@ -147,3 +187,18 @@ def my_submissions(request):
         # послать.
         'any_withdrawable': any(i['can_withdraw'] for i in items),
     })
+
+
+def contest_withdraw(request, slug):
+    """Отзыв заявки (BR-23b). GET безопасен — ничего не отзывает: настоящий
+    POST приходит из `withdraw_confirm_modal.html`. Условие (приём ещё
+    идёт, жюри ещё не решило) проверяет `data.withdraw_submission` заново —
+    `can_withdraw` на странице решает только, показать ли кнопку."""
+    username = _current_username(request)
+    contest = data.contest_by_slug(slug)
+    if request.method == 'POST' and contest is not None and username:
+        if data.withdraw_submission(username, contest):
+            messages.success(request, 'Өтінім қайтарып алынды.')
+        else:
+            messages.error(request, 'Өтінімді қайтарып алу мүмкін болмады.')
+    return redirect('core:my_submissions')

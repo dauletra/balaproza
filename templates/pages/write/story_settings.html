@@ -24,8 +24,7 @@
         {% include "components/status_badge.html" with key=story.status %}
     </header>
 
-    <form method="post" x-data
-          @submit.prevent="$dispatch('toast', { kind:'success', text:'Өзгертулер сақталды (демо)' })"
+    <form method="post" enctype="multipart/form-data"
           class="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
         {% csrf_token %}
 

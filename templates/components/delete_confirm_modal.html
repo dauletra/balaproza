@@ -1,9 +1,10 @@
 {% comment %}
     DeleteConfirm (docs/04.8 + FR-WRITE-06). Подтверждение удаления.
-    Триггер: $dispatch('open-delete-confirm', { name: 'X', confirm_text: '...', confirm_url: '/path/' })
+    Триггер: $dispatch('open-delete-confirm', { name: 'X', confirm_url: '/path/' })
 
-    Сейчас (дизайн-фаза) — submit фейково закрывает модалку и шлёт success-toast.
-    В Ф14, когда появятся реальные ORM-actions, сюда добавится {% csrf_token %} и POST на confirm_url.
+    Настоящий POST на `confirm_url` (Ф15, Этап 1): csrf-токен один на форму,
+    `:action` меняется под адрес конкретной цели из события. Вид ответа
+    (редирект + toast) решает view на другом конце — здесь только запрос.
 {% endcomment %}
 <div x-data="{ open: false, name: '', confirm_url: '' }"
      @open-delete-confirm.window="open = true; name = $event.detail?.name || ''; confirm_url = $event.detail?.confirm_url || ''"
@@ -33,17 +34,17 @@
             «<span x-text="name"></span>» қайтарылмастай өшіріледі. Барлық бөлімдер, пікірлер және статистика жоғалады.
         </p>
 
-        <div class="mt-6 flex justify-end gap-2.5">
+        <form method="post" :action="confirm_url" class="mt-6 flex justify-end gap-2.5">
+            {% csrf_token %}
             <button type="button" @click="open = false"
                     class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
                 Болдырмау
             </button>
-            <button type="button"
-                    @click="open = false; $dispatch('toast', { kind: 'error', text: name + ' өшірілді' })"
+            <button type="submit"
                     class="inline-flex h-9 items-center gap-2 rounded-md bg-status-error-fg px-5 font-sans text-sm font-bold text-white hover:opacity-90">
                 {% include "components/icon.html" with name="trash" size=14 only %}
                 Өшіру
             </button>
-        </div>
+        </form>
     </div>
 </div>

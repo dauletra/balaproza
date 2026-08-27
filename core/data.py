@@ -42,6 +42,7 @@ from .domain.catalog import (
     STORY_BADGES,
 )
 from .domain.contests import (
+    AI_DECLARATIONS,
     CONTEST_PHASE_BADGE,
     CONTEST_PHASE_LABELS,
     CONTEST_PHASES,
@@ -66,6 +67,7 @@ from .domain.notifications import (
     NOTIF_BUCKETS,
     NOTIF_KINDS,
 )
+from .domain.profile import GENDERS, GENDER_LABELS
 from .domain.story import (
     PUBLISH_CHECKLIST,
     REACTIONS,
@@ -75,6 +77,7 @@ from .domain.story import (
     Reaction,
     status_after_moderation,
 )
+from .domain.slugs import slugify_kz
 from .domain.tags import TAG_STATUSES
 
 # ── Каталог, поиск, жанры: уже на моделях ────────────────────────────────
@@ -110,16 +113,23 @@ from .queries.author import (
 # ── Произведение: главы, отклик, комментарии, подборки ───────────────────
 from .queries.library import reading_progress_of
 from .queries.story import (
+    add_comment,
     all_collections,
     book_of_week,
+    cast_poll_vote,
     chapter_of,
     chapters_of,
     collection_by_slug,
     collections_of,
+    comment_of,
     comments_of,
     comments_of_chapter,
+    delete_comment,
     poll_of,
     reactions_of,
+    toggle_chapter_reaction,
+    toggle_comment_like,
+    top_level_comment_of,
 )
 
 # ── Теги (docs/11) ───────────────────────────────────────────────────────
@@ -129,9 +139,19 @@ from .queries.tags import (
     blocked_tag_patterns_list,
     is_blocked,
     popular_tags,
+    resolve_story_tags,
     tag_by_slug,
     tags_of,
     trending_tags,
+)
+
+# ── Запись: произведение, глава, опрос (Ф15, docs/20) ────────────────────
+from .queries.write import (
+    create_story,
+    save_chapter,
+    save_chapter_poll,
+    submit_story_for_review,
+    update_story_settings,
 )
 
 # ── Награды, подписки, уведомления, витрины портала ──────────────────────
@@ -151,6 +171,7 @@ from .queries.profile import (
     read_tier,
     reads_total,
     unread_count_for_user,
+    update_profile,
 )
 
 # ── Конкурсы (DEC-45, DEC-46) ────────────────────────────────────────────
@@ -163,6 +184,7 @@ from .queries.contests import (
     contest_by_slug,
     contest_history,
     contest_participants,
+    create_submission,
     finished_contests,
     has_submission,
     hero_contest,
@@ -171,6 +193,7 @@ from .queries.contests import (
     submission_candidates,
     submission_checklist,
     submissions_of,
+    withdraw_submission,
 )
 
 # ── Ссылки «Авторлар мектебі» (DEC-22) ───────────────────────────────────

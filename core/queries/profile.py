@@ -57,6 +57,24 @@ def author_by_username(username: str):
     return with_works(User.objects.filter(username=username)).first()
 
 
+def update_profile(user, *, pen_name: str, name: str, bio: str,
+                   age, gender: str, avatar) -> None:
+    """Сохранить свой профиль (FR-PROF-01, Ф15 Этап 6).
+
+    `age`/`gender` — самодекларация (DEC-24), без верификации. `avatar` —
+    пусто значит «не меняем»: тот же приём, что у `update_story_settings`
+    и его `cover` — автор не переизбирает файл при каждом сохранении.
+    """
+    user.pen_name = pen_name
+    user.name = name
+    user.bio = bio
+    user.age = age
+    user.gender = gender
+    if avatar:
+        user.avatar = avatar
+    user.save()
+
+
 def new_authors(limit: int = 4) -> list:
     """«Жаңа авторлар» для главной — те, у кого меньше всего подписчиков.
 

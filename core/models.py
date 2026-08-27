@@ -16,6 +16,7 @@
 агрегат по логу слишком дорог — и тогда рядом стоит его пересчёт.
 """
 
+from functools import cached_property
 from pathlib import Path
 
 from django.contrib.auth.models import AbstractUser
@@ -25,7 +26,11 @@ from django.db import models, transaction
 from django.utils import timezone
 
 from .domain.catalog import BADGE_LABELS, PUBLIC_STATUSES
-from .domain.contests import CONTEST_PHASE_LABELS, SUBMISSION_STATUSES
+from .domain.contests import (
+    AI_DECLARATIONS,
+    CONTEST_PHASE_LABELS,
+    SUBMISSION_STATUSES,
+)
 from .domain.formatting import kk_ago, kk_date, kk_period, kk_updated
 from .domain.library import LIBRARY_KINDS
 from .domain.notifications import (
@@ -33,6 +38,7 @@ from .domain.notifications import (
     MODERATION_OUTCOMES,
     NOTIF_KINDS,
 )
+from .domain.profile import GENDERS, GENDER_LABELS
 from .domain.story import (
     REACTIONS,
     REACTIONS_BY_SLUG,
@@ -67,6 +73,12 @@ def story_cover_path(instance, filename):
     return f'covers/{instance.slug}{_ext(filename)}'
 
 
+def user_avatar_path(instance, filename):
+    """`avatars/<username>.<ext>` — тот же приём, что у `story_cover_path`:
+    имя файла из ника, а не из машины автора, и ник уникален и стабилен."""
+    return f'avatars/{instance.username}{_ext(filename)}'
+
+
 def contest_poster_path(instance, filename):
     return f'contests/{instance.slug}{_ext(filename)}'
 
@@ -99,6 +111,8 @@ class User(AbstractUser):
     first_name = None
     last_name = None
 
+    GENDER_CHOICES = [(g, GENDER_LABELS[g]) for g in GENDERS]
+
     # Настоящее имя. Публично не показывается: в профиле стоит `public_name`,
     # а это поле нужно модератору и жюри конкурса.
     name = models.CharField('нақты аты', max_length=120, blank=True)
@@ -107,6 +121,14 @@ class User(AbstractUser):
     # молча проставленным за человека.
     pen_name = models.CharField('лақап аты', max_length=60, blank=True)
     bio = models.CharField('өзі туралы', max_length=200, blank=True)
+    # Самодекларация (DEC-24) — без верификации документами. Ни одно
+    # бизнес-правило их пока не читает: возрастную вилку конкурса решает
+    # отдельный чекбокс формы подачи (BR-48, docs/20 §20.2).
+    age = models.PositiveSmallIntegerField('жасы', null=True, blank=True)
+    gender = models.CharField('жынысы', max_length=4, choices=GENDER_CHOICES,
+                              blank=True)
+    avatar = models.FileField('аватар', upload_to=user_avatar_path, blank=True,
+                              max_length=200, validators=[RASTER_ONLY])
     # Число подписчиков. Колонка, а не `follower_set.count()`, по той же
     # причине, что `Story.likes`: у демо-корпуса счётчик есть, а строк под
     # ним нет — восемь тысяч подписчиков `rudazov` некому создать. Строки
@@ -241,9 +263,11 @@ class Tag(models.Model):
     «Танымал тегтер». Вычислить одно и хранить другое нельзя — недельный
     счётчик оказался бы больше общего.
 
-    Правильный ответ — дата в связке «работа-тег»; она появится вместе с
-    возможностью проставлять теги (Ф15), и тогда оба числа станут
-    агрегатами. Пока это та же уступка демо-корпусу, что `User.followers`.
+    Правильный ответ — дата в связке «работа-тег»; она появилась
+    (`StoryTag.created_at`, Ф15 Этап 1), но `usage_count`/`weekly_count`
+    здесь пока не пересчитываются по ней — превращение в агрегаты
+    осталось отдельной задачей (docs/20 §20.4). Пока это та же уступка
+    демо-корпусу, что `User.followers`.
     """
 
     STATUS_CHOICES = [(s, s) for s in TAG_STATUSES]
@@ -305,6 +329,32 @@ class BlockedTagPattern(models.Model):
         super().save(*args, **kwargs)
 
 
+class StoryTag(models.Model):
+    """Связка «работа — тег», с датой (Ф15, DEC-31).
+
+    Голое M2M не может нести момент, когда автор поставил тег на работу —
+    ровно тот пробел, из-за которого `Tag.weekly_count` не был агрегатом
+    (см. docstring `Tag`). `created_at` закрывает его: «Осы аптада» теперь
+    можно посчитать по этой таблице, а не хранить отдельным счётчиком.
+    """
+
+    story = models.ForeignKey('core.Story', verbose_name='шығарма',
+                              on_delete=models.CASCADE)
+    tag = models.ForeignKey(Tag, verbose_name='тег', on_delete=models.CASCADE)
+    created_at = models.DateTimeField('қосылған', auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=('story', 'tag'),
+                                    name='unique_tag_per_story'),
+        ]
+        verbose_name = 'жұмыс тегі'
+        verbose_name_plural = 'жұмыс тегтері'
+
+    def __str__(self):
+        return f'{self.story.slug} · #{self.tag.name}'
+
+
 class Story(models.Model):
     """Произведение. Центральный объект портала.
 
@@ -340,8 +390,9 @@ class Story(models.Model):
                                         null=True, blank=True)
     # До 10 на произведение (BR-TAG-01). Лимит — правило формы, а не схемы:
     # база не то место, где автору отказывают в одиннадцатом теге.
-    tags = models.ManyToManyField(Tag, verbose_name='тегтер', blank=True,
-                                  related_name='stories')
+    # `through=StoryTag`, а не голое M2M — DEC-31 держится на дате связки.
+    tags = models.ManyToManyField(Tag, through=StoryTag, verbose_name='тегтер',
+                                  blank=True, related_name='stories')
 
     status = models.CharField('мәртебесі', max_length=16,
                               choices=STATUS_CHOICES, default='NotPublished')
@@ -365,9 +416,12 @@ class Story(models.Model):
     # странице каталога. Инвариант `recent_views <= views`; пересчёт — по
     # логу, когда он появится, а не «примерно от views».
     recent_views = models.PositiveIntegerField('14 күндегі оқылым', default=0)
-    # Сумма реакций по главам (BR-14, DEC-32) и число комментариев. Оба —
-    # агрегаты, оба пока колонки: у произведений без текста глав нет вовсе,
-    # и вычисление обнулило бы им метрику в каталоге (BR-14a).
+    # Число голосов за реакции по всем главам (BR-14, DEC-32) и число
+    # комментариев. Оба — агрегаты, оба колонки: у произведений без текста
+    # глав нет вовсе, и вычисление обнулило бы им метрику в каталоге
+    # (BR-14a). `likes` обновляется транзакционно при появлении/снятии
+    # голоса (`queries/story.py::toggle_chapter_reaction`, Ф15 Этап 3) —
+    # смена вида реакции его не трогает, только сам факт голоса.
     likes = models.PositiveIntegerField('лайк', default=0)
     comments = models.PositiveIntegerField('пікір', default=0)
 
@@ -640,15 +694,26 @@ class Chapter(models.Model):
             return None
         return REACTIONS_BY_SLUG.get(max(rows, key=lambda r: r.count).kind)
 
+    @property
+    def my_reaction(self) -> str:
+        """Slug реакции текущего читателя, '' — если голоса нет.
+
+        Подставляется `chapter_of`/`reactions_of` (`_attach_my_reaction`,
+        Ф15 Этап 3) аннотацией `_my_reaction`: без явного `viewer` в
+        запросе (гость, объект вне контекста страницы) свойство молча
+        отвечает «нет голоса» — тот же контракт, что у `has_chapters`.
+        """
+        return getattr(self, '_my_reaction', '')
+
 
 class ChapterReaction(models.Model):
     """Счётчик одной реакции на главе (DEC-32, BR-REACT-01).
 
-    Счётчик, а не голос конкретного читателя, и это осознанно. Ф14 —
-    только чтение: реакцию поставить пока негде, значит строки «кто и что
-    нажал» никто не создаёт, а показывать надо итог. Когда появится
-    запись (Ф15), рядом встанет таблица голосов, и это поле станет её
-    агрегатом — ровно так же, как `Story.likes` станет суммой глав.
+    Агрегат по `ChapterReactionVote` (Ф15 Этап 3) — колонка, а не
+    подзапрос на каждый рендер главы: обновляется в момент голосования
+    (`queries/story.py::toggle_chapter_reaction`), не на чтении. Ряд из
+    пяти кнопок остаётся полным и у ненажатой реакции — строка заводится
+    первым голосом, а не заранее пятью нулями на каждую главу.
     """
 
     KIND_CHOICES = [(r.slug, r.label) for r in REACTIONS]
@@ -670,6 +735,38 @@ class ChapterReaction(models.Model):
 
     def __str__(self):
         return f'{self.kind}: {self.count}'
+
+
+class ChapterReactionVote(models.Model):
+    """Кто поставил какую реакцию на главе (BR-REACT-02/03, Ф15 Этап 3).
+
+    Одна активная реакция на пользователя и главу — `UniqueConstraint`,
+    не только правило формы: повторный клик по той же реакции снимает её,
+    клик по другой — заменяет (BR-REACT-02). `ChapterReaction.count` —
+    агрегат по этой таблице, `Story.likes` — по числу голосов (BR-14a):
+    смена вида реакции его не трогает, только появление и снятие голоса.
+    """
+
+    user = models.ForeignKey('core.User', verbose_name='оқырман',
+                             on_delete=models.CASCADE,
+                             related_name='chapter_reaction_votes')
+    chapter = models.ForeignKey(Chapter, verbose_name='бөлім',
+                                on_delete=models.CASCADE,
+                                related_name='reaction_votes')
+    kind = models.CharField('реакция', max_length=16,
+                            choices=ChapterReaction.KIND_CHOICES)
+    created_at = models.DateTimeField('басылған', auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=('user', 'chapter'),
+                                    name='one_reaction_per_user_per_chapter'),
+        ]
+        verbose_name = 'бөлім реакциясының дауысы'
+        verbose_name_plural = 'бөлім реакцияларының дауыстары'
+
+    def __str__(self):
+        return f'{self.user.username} · {self.chapter_id} · {self.kind}'
 
 
 class Contest(models.Model):
@@ -1089,6 +1186,7 @@ class Submission(models.Model):
     """
 
     STATUS_CHOICES = [(s, s) for s in SUBMISSION_STATUSES]
+    AI_DECLARATION_CHOICES = [(v, v) for v in AI_DECLARATIONS]
 
     contest = models.ForeignKey(Contest, verbose_name='байқау',
                                 on_delete=models.CASCADE,
@@ -1105,6 +1203,13 @@ class Submission(models.Model):
     # Комментарий жюри. Личный кабинет автора его показывает, чужой
     # профиль — никогда (BR-74a).
     note = models.CharField('қазылар пікірі', max_length=300, blank=True)
+    # Ответы формы подачи (DEC-21, DEC-24) — пишутся один раз при создании
+    # заявки и дальше не редактируются автором, только видны жюри/модератору.
+    ai_declaration = models.CharField('AI көмегі', max_length=8,
+                                      choices=AI_DECLARATION_CHOICES,
+                                      default='no')
+    age_confirmed = models.BooleanField('жасын растады', default=False)
+    rules_confirmed = models.BooleanField('ережені растады', default=False)
 
     class Meta:
         ordering = ('-submitted_on',)
@@ -1369,8 +1474,9 @@ class StoryComment(models.Model):
                                on_delete=models.CASCADE, null=True, blank=True,
                                related_name='reply_set')
     text = models.TextField('мәтіні')
-    # Лайки комментария — счётчик по той же причине, что реакции главы:
-    # ставить их пока негде (Ф15), а показывать надо.
+    # Агрегат по `CommentLike` (Ф15 Этап 2) — колонка, а не подзапрос на
+    # каждый комментарий страницы: пересчитывается при каждом toggle
+    # (`queries/story.py::toggle_comment_like`), не на чтении.
     likes = models.PositiveIntegerField('ұнату', default=0)
     created_at = models.DateTimeField('жазылған', default=timezone.now)
 
@@ -1382,9 +1488,20 @@ class StoryComment(models.Model):
     def __str__(self):
         return f'{self.author.username}: {self.text[:40]}'
 
-    @property
+    @cached_property
     def replies(self) -> list:
-        return list(self.reply_set.select_related('author'))
+        """Ответы на комментарий, свежие сверху нет — по `pk` (`Meta.ordering`).
+
+        `cached_property`, не `property` (Ф15): `.liked` для отклика
+        (BR-31) проставляется на уже полученных объектах в
+        `queries/story.py`, а не пересчитывается — второй вызов, идущий
+        новым запросом, вернул бы другие Python-объекты без этой метки.
+        `reply_set.all()`, а не `.select_related('author')`: второе рвёт
+        кэш `prefetch_related('reply_set__author')` из `_comments()` и
+        превращает один запрос на все ответы страницы в один на каждый
+        комментарий.
+        """
+        return list(self.reply_set.all())
 
     @property
     def is_author_badge(self) -> bool:
@@ -1401,6 +1518,31 @@ class StoryComment(models.Model):
     def belongs_to(self, username: str) -> bool:
         """Свой комментарий: меню предлагает «Жою», а не «Шағым» (BR-33)."""
         return bool(username) and self.author.username == username
+
+
+class CommentLike(models.Model):
+    """Кто лайкнул какой комментарий (BR-31, Ф15 Этап 2).
+
+    Toggle-семантика («повторный клик снимает») требует знать, кто уже
+    нажимал — `StoryComment.likes` этого не несёт, это чистый счётчик.
+    """
+
+    user = models.ForeignKey('core.User', verbose_name='оқырман',
+                             on_delete=models.CASCADE, related_name='comment_likes')
+    comment = models.ForeignKey(StoryComment, verbose_name='пікір',
+                                on_delete=models.CASCADE, related_name='like_set')
+    created_at = models.DateTimeField('басылған', auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=('user', 'comment'),
+                                    name='unique_like_per_user_per_comment'),
+        ]
+        verbose_name = 'пікір ұнатуы'
+        verbose_name_plural = 'пікір ұнатулары'
+
+    def __str__(self):
+        return f'{self.user.username} ♥ #{self.comment_id}'
 
 
 class ChapterPoll(models.Model):
@@ -1445,17 +1587,24 @@ class ChapterPoll(models.Model):
         return sum(o.votes for o in self.options)
 
     @property
+    def my_vote(self) -> str:
+        """Slug варианта, за который проголосовал текущий читатель, '' —
+        если не голосовал. Подставляется `poll_of` (`_attach_my_vote`,
+        Ф15 Этап 4) аннотацией `_my_vote` — тот же контракт, что у
+        `Chapter.my_reaction`."""
+        return getattr(self, '_my_vote', '')
+
+    @property
     def results(self) -> list:
         total = self.total_votes or 1
+        mine = self.my_vote
         return [
             {
                 'slug':    o.slug,
                 'text':    o.text,
                 'count':   o.votes,
                 'percent': round(o.votes * 100 / total),
-                # Свой голос появится вместе с возможностью голосовать (Ф15):
-                # сейчас его негде поставить, и «мой вариант» ничей.
-                'mine':    False,
+                'mine':    o.slug == mine,
             }
             for o in self.options
         ]
@@ -1470,8 +1619,8 @@ class PollOption(models.Model):
                              related_name='option_set')
     slug = models.SlugField('slug', max_length=32)
     text = models.CharField('мәтіні', max_length=160)
-    # Счётчик, а не голоса: голосовать пока негде (та же причина, что у
-    # реакций главы).
+    # Агрегат по `PollVote` (Ф15 Этап 4) — колонка, обновляемая в момент
+    # голосования (`queries/story.py::cast_poll_vote`), не на чтении.
     votes = models.PositiveIntegerField('дауыс', default=0)
     position = models.PositiveSmallIntegerField('реті', default=0)
 
@@ -1486,6 +1635,38 @@ class PollOption(models.Model):
 
     def __str__(self):
         return self.text
+
+
+class PollVote(models.Model):
+    """Голос читателя в опросе главы (Ф15 Этап 4, docs/20 §20.2).
+
+    Одна ставка на весь опрос, не на вариант, и голос не меняется после
+    отправки — `UniqueConstraint(user, poll)`, не только правило формы.
+    BR-POLL не оговаривает смену голоса; выбран самый простой вариант.
+    `PollOption.votes` — агрегат по этой таблице.
+    """
+
+    user = models.ForeignKey('core.User', verbose_name='оқырман',
+                             on_delete=models.CASCADE,
+                             related_name='poll_votes')
+    poll = models.ForeignKey(ChapterPoll, verbose_name='сауалнама',
+                             on_delete=models.CASCADE,
+                             related_name='vote_set')
+    option = models.ForeignKey(PollOption, verbose_name='нұсқа',
+                               on_delete=models.CASCADE,
+                               related_name='vote_set')
+    created_at = models.DateTimeField('дауыс берген', auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=('user', 'poll'),
+                                    name='one_vote_per_user_per_poll'),
+        ]
+        verbose_name = 'сауалнама дауысы'
+        verbose_name_plural = 'сауалнама дауыстары'
+
+    def __str__(self):
+        return f'{self.user.username} · {self.poll_id} · {self.option.slug}'
 
 
 class Notification(models.Model):

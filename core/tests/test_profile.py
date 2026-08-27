@@ -8,6 +8,8 @@
 from pathlib import Path
 
 from core.tests.base import TestCase, login_as, login_as_newcomer
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import Client
 from django.urls import reverse
 
 from core import data
@@ -859,3 +861,161 @@ class ContestAwardsInProfile(TestCase):
         r = self.client.get(reverse('core:profile_other',
                                     kwargs={'username': 'aidana'}))
         self.assertNotContains(r, '/media/awards/')
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Ф15, Этап 6: редактирование профиля — настоящий POST.
+# ───────────────────────────────────────────────────────────────────────
+
+class ProfileEditSavesFields(TestCase):
+
+    def setUp(self):
+        login_as(self.client)
+
+    def _post(self, **overrides):
+        payload = {
+            'pen_name': 'Жаңа лақап', 'name': 'Жаңа есім',
+            'bio': 'Жаңа био.', 'gender': 'girl', 'age': '16',
+        }
+        payload.update(overrides)
+        return self.client.post(reverse('core:profile_me_edit'), payload)
+
+    def test_saves_all_fields(self):
+        self._post()
+        user = User.objects.get(username='aidana')
+        self.assertEqual(user.pen_name, 'Жаңа лақап')
+        self.assertEqual(user.name, 'Жаңа есім')
+        self.assertEqual(user.bio, 'Жаңа био.')
+        self.assertEqual(user.gender, 'girl')
+        self.assertEqual(user.age, 16)
+
+    def test_redirects_to_the_profile(self):
+        r = self._post()
+        self.assertRedirects(r, reverse('core:profile_me'))
+
+    def test_blank_age_and_gender_are_allowed(self):
+        self._post(age='', gender='')
+        user = User.objects.get(username='aidana')
+        self.assertIsNone(user.age)
+        self.assertEqual(user.gender, '')
+
+    def test_bio_may_be_cleared(self):
+        self._post(bio='')
+        self.assertEqual(User.objects.get(username='aidana').bio, '')
+
+
+class ProfileEditValidation(TestCase):
+
+    def setUp(self):
+        login_as(self.client)
+
+    def _post(self, **overrides):
+        payload = {
+            'pen_name': 'Аты', 'name': 'Есім', 'bio': '', 'gender': '', 'age': '',
+        }
+        payload.update(overrides)
+        return self.client.post(reverse('core:profile_me_edit'), payload)
+
+    def _pen_name(self):
+        return User.objects.get(username='aidana').pen_name
+
+    def test_missing_pen_name_saves_nothing(self):
+        before = self._pen_name()
+        self._post(pen_name='')
+        self.assertEqual(self._pen_name(), before)
+
+    def test_missing_name_saves_nothing(self):
+        before = User.objects.get(username='aidana').name
+        self._post(name='')
+        self.assertEqual(User.objects.get(username='aidana').name, before)
+
+    def test_too_long_pen_name_saves_nothing(self):
+        before = self._pen_name()
+        self._post(pen_name='ә' * 61)
+        self.assertEqual(self._pen_name(), before)
+
+    def test_too_long_bio_saves_nothing(self):
+        before = User.objects.get(username='aidana').bio
+        self._post(bio='ә' * 201)
+        self.assertEqual(User.objects.get(username='aidana').bio, before)
+
+    def test_invalid_gender_saves_nothing(self):
+        before = User.objects.get(username='aidana').gender
+        self._post(gender='alien')
+        self.assertEqual(User.objects.get(username='aidana').gender, before)
+
+    def test_non_numeric_age_saves_nothing(self):
+        before = User.objects.get(username='aidana').age
+        self._post(age='abc')
+        self.assertEqual(User.objects.get(username='aidana').age, before)
+
+    def test_out_of_range_age_saves_nothing(self):
+        before = User.objects.get(username='aidana').age
+        self._post(age='999')
+        self.assertEqual(User.objects.get(username='aidana').age, before)
+
+    def test_validation_error_redirects_back_to_the_form(self):
+        r = self._post(pen_name='')
+        self.assertRedirects(r, reverse('core:profile_me_edit'))
+
+
+class ProfileEditAvatarUpload(TestCase):
+    """Тот же валидатор, что у Story.cover (BR-46) — SVG не проходит."""
+
+    def setUp(self):
+        login_as(self.client)
+
+    def _post(self, avatar):
+        return self.client.post(reverse('core:profile_me_edit'), {
+            'pen_name': 'Аты', 'name': 'Есім', 'bio': '', 'gender': '',
+            'age': '', 'avatar': avatar,
+        })
+
+    def test_png_is_accepted_and_lands_under_the_username(self):
+        avatar = SimpleUploadedFile('фото.png', b'\x89PNG demo',
+                                    content_type='image/png')
+        self._post(avatar)
+        user = User.objects.get(username='aidana')
+        self.assertTrue(user.avatar.name.startswith('avatars/aidana'))
+        self.assertTrue(user.avatar.name.endswith('.png'))
+
+    def test_svg_is_refused(self):
+        avatar = SimpleUploadedFile('фото.svg', b'<svg/>',
+                                    content_type='image/svg+xml')
+        self._post(avatar)
+        self.assertFalse(User.objects.get(username='aidana').avatar)
+
+    def test_svg_refusal_also_blocks_the_rest_of_the_form(self):
+        """Ошибка одного поля — весь POST no-op, не частичное сохранение."""
+        before = User.objects.get(username='aidana').pen_name
+        avatar = SimpleUploadedFile('фото.svg', b'<svg/>',
+                                    content_type='image/svg+xml')
+        self.client.post(reverse('core:profile_me_edit'), {
+            'pen_name': 'Басқа аты', 'name': 'Есім', 'bio': '',
+            'gender': '', 'age': '', 'avatar': avatar,
+        })
+        self.assertEqual(User.objects.get(username='aidana').pen_name, before)
+
+
+class ProfileEditGuestPostChangesNothing(TestCase):
+
+    def test_guest_post_creates_nothing(self):
+        guest = Client()
+        before = User.objects.get(username='aidana').pen_name
+        guest.post(reverse('core:profile_me_edit'), {
+            'pen_name': 'Бөгде', 'name': 'Бөгде', 'bio': '', 'gender': '', 'age': '',
+        })
+        self.assertEqual(User.objects.get(username='aidana').pen_name, before)
+
+
+class ProfileEditPrefillsRawPenName(TestCase):
+    """`value=` раньше показывал `public_name` (pen_name or '@username'),
+    не сырое поле: пустой pen_name автора отрисовался бы как «@username»,
+    и несохранённая форма сохранила бы это буквально при первом же POST."""
+
+    def test_blank_pen_name_shows_empty_not_at_username(self):
+        user = User.objects.create_user(username='blankpen', password='x')
+        self.assertEqual(user.pen_name, '')
+        self.client.force_login(user)
+        html = self.client.get(reverse('core:profile_me_edit')).content.decode()
+        self.assertNotIn('value="@blankpen"', html)

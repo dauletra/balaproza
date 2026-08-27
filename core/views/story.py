@@ -1,9 +1,22 @@
 """Страница произведения и инлайн-чтение главы (FR-STORY-*)."""
 
-from django.shortcuts import render
+from django.contrib import messages
+from django.shortcuts import redirect, render
+from django.urls import reverse
 
 from .. import data
 from .common import _current_username
+
+def _back_to_story(slug, chapter_number=None, anchor=None):
+    """PRG-редирект обратно на страницу произведения, к той же главе и,
+    если есть на что, к якорю нового/задетого комментария."""
+    url = reverse('core:story_detail', kwargs={'slug': slug})
+    if chapter_number:
+        url = f'{url}?chapter={chapter_number}'
+    if anchor:
+        url = f'{url}#{anchor}'
+    return redirect(url)
+
 
 # ───────────────────────── STORY — произведение и чтение ─────────────────
 def story_detail(request, slug):
@@ -31,7 +44,7 @@ def story_detail(request, slug):
             chapter_number = (
                 progress.current_chapter if has_progress_here else 1
             )
-        current = data.chapter_of(slug, chapter_number)
+        current = data.chapter_of(slug, chapter_number, viewer)
     else:
         chapter_number = None
         current = None
@@ -53,11 +66,12 @@ def story_detail(request, slug):
         'has_prev': bool(current) and chapter_number > 1,
         'has_next': bool(current) and chapter_number < len(chapters),
         'is_teaser': is_teaser,
-        'comments': data.comments_of_chapter(slug, chapter_number) if chapter_number else [],
+        'comments': (data.comments_of_chapter(slug, chapter_number, viewer)
+                    if chapter_number else []),
         # FR-STORY-12 / DEC-32: пять реакций на главу вместо одиночного лайка
         'reactions': data.reactions_of(current) if current else [],
         # FR-STORY-13: опрос автора — необязателен, чаще всего его нет
-        'poll': data.poll_of(slug, chapter_number) if chapter_number else None,
+        'poll': data.poll_of(slug, chapter_number, viewer) if chapter_number else None,
         # Подсветка в правом рейле — текущая отображаемая глава.
         'current_chapter_number': chapter_number,
         # FR-STORY-02: блок «Басқа шығармалар» внизу страницы
@@ -76,3 +90,95 @@ def story_detail(request, slug):
             if viewer and story else False
         ),
     })
+
+
+# ────────────────────── Комментарии (BR-30/31/33, Ф15 Этап 2) ────────────
+
+def _chapter_from_post(request) -> int | None:
+    raw = request.POST.get('chapter')
+    try:
+        return int(raw) if raw else None
+    except ValueError:
+        return None
+
+
+def comment_create(request, slug):
+    """Новый комментарий или ответ. Гость и несуществующий slug молча
+    возвращаются на страницу — форма для них и так не рендерится."""
+    story = data.story_by_slug(slug)
+    username = _current_username(request)
+    chapter_number = _chapter_from_post(request)
+    if request.method != 'POST' or story is None or not username:
+        return _back_to_story(slug, chapter_number)
+
+    text = request.POST.get('text', '').strip()
+    parent = None
+    parent_id = request.POST.get('parent')
+    if parent_id:
+        # BR-30: ответ — только на верхнеуровневый комментарий этой же
+        # работы. Чужой/несуществующий/уже-ответ id — не создаём ничего.
+        parent = data.top_level_comment_of(slug, parent_id)
+        if parent is None:
+            messages.error(request, 'Бұл пікірге жауап беруге болмайды.')
+            return _back_to_story(slug, chapter_number)
+
+    if not text:
+        messages.error(request, 'Пікір мәтінін жаз.')
+        return _back_to_story(slug, chapter_number)
+
+    comment = data.add_comment(story, request.user, text=text,
+                               chapter_number=chapter_number, parent=parent)
+    messages.success(request, 'Пікірің қосылды.')
+    return _back_to_story(slug, chapter_number, anchor=f'comment-{comment.pk}')
+
+
+def comment_delete(request, slug, comment_id):
+    """GET безопасен — ничего не удаляет. Владение — `belongs_to` (BR-33),
+    та же проверка, что уже решает, показывать «Жою» или «Шағым»."""
+    username = _current_username(request)
+    comment = data.comment_of(slug, comment_id)
+    if (request.method == 'POST' and comment is not None
+            and comment.belongs_to(username)):
+        chapter_number = comment.chapter_number
+        data.delete_comment(comment)
+        messages.success(request, 'Пікір өшірілді.')
+        return _back_to_story(slug, chapter_number)
+    return _back_to_story(slug, _chapter_from_post(request))
+
+
+def comment_like(request, slug, comment_id):
+    """Toggle (BR-31) — авторизованный обязателен, на свой комментарий
+    лайк тоже можно поставить (правило не запрещает)."""
+    username = _current_username(request)
+    comment = data.comment_of(slug, comment_id)
+    if request.method == 'POST' and comment is not None and username:
+        data.toggle_comment_like(comment, request.user)
+        return _back_to_story(slug, comment.chapter_number, anchor=f'comment-{comment.pk}')
+    return _back_to_story(slug, _chapter_from_post(request))
+
+
+# ───────────────────── Реакции на главу (BR-REACT-02/03, Ф15 Этап 3) ──────
+
+def chapter_react(request, slug, chapter):
+    """Ставит/снимает/меняет реакцию на главе — авторизованный обязателен,
+    `kind` — один из пяти закрытого списка (BR-REACT-01)."""
+    username = _current_username(request)
+    ch = data.chapter_of(slug, chapter)
+    kind = request.POST.get('kind', '')
+    if (request.method == 'POST' and ch is not None and username
+            and kind in data.REACTIONS_BY_SLUG):
+        data.toggle_chapter_reaction(ch, request.user, kind)
+    return _back_to_story(slug, chapter)
+
+
+# ───────────────────── Опрос главы (BR-POLL-03/05, Ф15 Этап 4) ────────────
+
+def poll_vote(request, slug, chapter):
+    """Голос в опросе — авторизованный обязателен; закрытый опрос и
+    невалидный/повторный вариант `data.cast_poll_vote` тихо отклоняет."""
+    username = _current_username(request)
+    poll = data.poll_of(slug, chapter)
+    option_slug = request.POST.get('option', '')
+    if request.method == 'POST' and poll is not None and username and option_slug:
+        data.cast_poll_vote(poll, request.user, option_slug)
+    return _back_to_story(slug, chapter)

@@ -9,6 +9,7 @@
 автокомплите: он ещё не прошёл модератора.
 """
 
+from ..domain.slugs import slugify_kz
 from ..models import BlockedTagPattern, Tag
 
 
@@ -66,3 +67,46 @@ def accepted_tags_json() -> list:
 
 def blocked_tag_patterns_list() -> list:
     return sorted(BlockedTagPattern.objects.values_list('pattern', flat=True))
+
+
+def _unique_tag_slug(name: str) -> str:
+    base = slugify_kz(name, max_length=44, fallback='tag')
+    slug = base
+    n = 2
+    while Tag.objects.filter(slug=slug).exists():
+        slug = f'{base}-{n}'
+        n += 1
+    return slug
+
+
+def resolve_story_tags(names) -> list:
+    """Имена из `tag_input.html` (BR-TAG-01/02/03/06) -> список `Tag`.
+
+    Существующий тег (любого статуса) переиспользуется по имени без учёта
+    регистра — вторая строка с тем же именем и другим `pending`/`accepted`
+    была бы дублем. Новый тег заводится `pending`: путь к `accepted`
+    решает модератор, не форма.
+
+    Лимит (10, BR-TAG-01) и блок-лист (BR-TAG-05) уже проверяет
+    `tag_input.html` на клиенте — здесь та же пара правил серверной
+    копией, на случай POST в обход JS.
+    """
+    result = []
+    seen = set()
+    for raw in names:
+        if len(result) >= 10:
+            break
+        name = (raw or '').strip()
+        if len(name) < 2 or len(name) > 30:
+            continue
+        key = name.lower()
+        if key in seen or is_blocked(name):
+            continue
+        seen.add(key)
+        existing = Tag.objects.filter(name__iexact=name).first()
+        if existing:
+            result.append(existing)
+            continue
+        result.append(Tag.objects.create(
+            name=name, slug=_unique_tag_slug(name), status='pending'))
+    return result

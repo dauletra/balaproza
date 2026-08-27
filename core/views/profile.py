@@ -5,11 +5,14 @@
 между двумя выдачами делается здесь.
 """
 
+from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.http import Http404
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from .. import data
+from ..models import RASTER_ONLY
 from .common import _current_username
 
 # ───────────────────────── PROF — профиль ────────────────────────────────
@@ -100,9 +103,53 @@ def profile_me(request):
 
 
 def profile_me_edit(request):
-    """Редактирование своего профиля (FR-PROF-01). Stub: рендерит форму, без сабмита."""
+    """Редактирование своего профиля (FR-PROF-01, Ф15 Этап 6)."""
     username = _current_username(request)
     author = data.author_by_username(username)
+
+    if request.method == 'POST' and author is not None:
+        pen_name = request.POST.get('pen_name', '').strip()
+        name = request.POST.get('name', '').strip()
+        bio = request.POST.get('bio', '').strip()
+        gender = request.POST.get('gender', '')
+        age_raw = request.POST.get('age', '').strip()
+        avatar = request.FILES.get('avatar')
+
+        errors = []
+        if not pen_name:
+            errors.append('Авторлық атыңды жаз.')
+        elif len(pen_name) > 60:
+            errors.append('Авторлық атың тым ұзын — 60 таңбадан аспасын.')
+        if not name:
+            errors.append('Ресми атыңды жаз.')
+        elif len(name) > 120:
+            errors.append('Ресми атың тым ұзын — 120 таңбадан аспасын.')
+        if len(bio) > 200:
+            errors.append('Өзің туралы мәтін тым ұзын — 200 таңбадан аспасын.')
+        if gender and gender not in data.GENDERS:
+            errors.append('Жынысын дұрыс таңда.')
+        age = None
+        if age_raw:
+            if not age_raw.isdigit() or not (1 <= int(age_raw) <= 120):
+                errors.append('Жасын дұрыс жаз.')
+            else:
+                age = int(age_raw)
+        if avatar:
+            try:
+                RASTER_ONLY(avatar)
+            except ValidationError as exc:
+                errors.extend(exc.messages)
+
+        if errors:
+            for err in errors:
+                messages.error(request, err)
+            return redirect('core:profile_me_edit')
+
+        data.update_profile(request.user, pen_name=pen_name, name=name,
+                            bio=bio, age=age, gender=gender, avatar=avatar)
+        messages.success(request, 'Өзгертулер сақталды.')
+        return redirect('core:profile_me')
+
     return render(request, 'pages/profile/profile_me_edit.html', {
         'profile_user': author,
         'username':     username,

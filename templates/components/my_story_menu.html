@@ -45,7 +45,7 @@
         </a>
 
         <button type="button" role="menuitem"
-                @click="open = false; $dispatch('open-delete-confirm', { name: '{{ story.title|escapejs }}', confirm_url: '#' })"
+                @click="open = false; $dispatch('open-delete-confirm', { name: '{{ story.title|escapejs }}', confirm_url: '{% url 'core:delete_story' slug=story.slug %}' })"
                 class="flex min-h-11 w-full items-center gap-2.5 border-t border-slate-100 px-4 text-left font-sans text-sm text-status-error-fg hover:bg-slate-50">
             {% include "components/icon.html" with name="trash" size=15 only %}
             Жою

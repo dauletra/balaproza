@@ -28,8 +28,7 @@
         отправке на модерацию (FR-WRITE-09), а не при создании черновика.
         Черновику быть неполным можно, публичной работе нельзя.
     {% endcomment %}
-    <form method="post" action="{% url 'core:new_story' %}" x-data
-          @submit.prevent="$dispatch('toast', { kind:'success', text:'Шығарма құрылды — енді мәтін (демо)' })"
+    <form method="post" action="{% url 'core:new_story' %}"
           class="flex flex-col gap-7 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
         {% csrf_token %}
 

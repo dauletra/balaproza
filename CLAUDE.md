@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Заметки для Claude Code по проекту `balaproza_v1`. Платформа — Balaproza, казахоязычный детский литературный портал. Подробное ТЗ — в [`docs/`](docs/) (модули 00-19, 06 выведен из обращения).
+Заметки для Claude Code по проекту `balaproza_v1`. Платформа — Balaproza, казахоязычный детский литературный портал. Подробное ТЗ — в [`docs/`](docs/) (модули 00-20, 06 выведен из обращения).
 
 ## Текущий фокус
 
@@ -8,7 +8,7 @@
 
 Как это устроено: правила — `core/domain/` (замену хранилища пережили, не изменившись), записи — `core/queries/*`, наружу и то и другое отдаётся через фасад `core/data.py`. Вход настоящий (`django.contrib.auth`), модерация — в Django admin (DEC-23), демо-содержимое кладёт идемпотентная команда `seed_demo`.
 
-**Следующая фаза — Ф15, запись.** Формы создания и редактирования произведения, комментарии, реакции, подача на конкурс, редактирование профиля: страницы свёрстаны, кнопки на месте, за ними ничего не происходит. Вместе с записью приезжают три отложенных долга — `Story.likes` становится агрегатом (BR-14a), счётчики тега получают дату в связке «работа-тег» (DEC-31), Telegram Login Widget — настоящую проверку подписи (NFR-25 ⛔; до неё кнопка входа подписывает в демо-аккаунт, см. docs/17 §17.7 пункт 13).
+**Ф15 (запись) завершена по своей границе** — все шесть этапов сделаны: создание/редактирование произведения и главы, теги, отправка на модерацию, удаление, комментарии (топ-уровень + ответ, BR-30 на сервере, а не только в шаблоне) и их лайк (`CommentLike`, BR-31), реакции на главу (`ChapterReactionVote`, BR-REACT-02/03, `Story.likes` теперь настоящий агрегат по голосам — BR-14a закрыт), опрос главы (`PollVote` — одна ставка на опрос, не меняется), подача на конкурс и её отзыв (`Submission.ai_declaration`/`age_confirmed`/`rules_confirmed`, DEC-21/DEC-24; `contest_withdraw`, BR-23b), редактирование профиля (`User.age`/`gender`/`avatar`, DEC-24; `components/avatar.html` — двухрежимный, как `cover_placeholder.html`) — везде настоящий POST, IDOR закрыт. План по этапам, принятые решения и статус каждого — [`docs/20`](docs/20-f15-write-plan.md). Долг DEC-31 закрыт частично: `StoryTag.created_at` есть, но `Tag.usage_count`/`weekly_count` ещё не пересчитываются по нему (см. docs/20 §20.4, конец Этапа 1). Вне границы Ф15 (§20.1) — автосохранение черновика по debounce и объединение конкурсов в Collection. Telegram-подпись (NFR-25 ⛔) — как и раньше, впереди.
 
 ## Технический стек
 
@@ -95,7 +95,8 @@ balaproza_v1/
 │   │                             # Story (badges — производное, кроме редакционного знака;
 │   │                             # updated_at вместо дельты в днях), Chapter (несёт текст,
 │   │                             # char_count денормализован от body),
-│   │                             # ChapterReaction (счётчик, не голос: писать некому до Ф15),
+│   │                             # ChapterReaction (счётчик — агрегат по
+│   │                             # ChapterReactionVote, BR-REACT-02/03),
 │   │                             # Contest (три даты; фаза/отсчёт/год/число заявок —
 │   │                             # производные, колонок нет) + ContestCondition/
 │   │                             # TimelineStage/JuryMember/ContestAward отдельными
@@ -104,8 +105,10 @@ balaproza_v1/
 │   │                             # Follow, Collection + CollectionItem, BookOfWeek,
 │   │                             # LibraryEntry (три непересекающихся полки),
 │   │                             # ReadingProgress, StoryComment (один уровень ответов;
-│   │                             # подпись времени выводится из created_at),
-│   │                             # ChapterPoll + PollOption, Notification, SchoolLink.
+│   │                             # подпись времени выводится из created_at) + CommentLike
+│   │                             # (BR-31, toggle), ChapterPoll + PollOption + PollVote
+│   │                             # (одна ставка на опрос, не на вариант — не меняется),
+│   │                             # Notification, SchoolLink.
 │   │                             # Производное не хранится: ни Genre.count, ни usage_count
 │   │                             # (кроме двух витринных счётчиков тега — см. Tag)
 │   ├── migrations/               # 0001_initial + 0002_reference_data (жанры и блок-лист
@@ -175,7 +178,7 @@ balaproza_v1/
 │   ├── templatetags/balaproza.py # filters: compact_count, spaced (тонкая обёртка над
 │   │                             # domain.formatting.spaced_number), page_range,
 │   │                             # belongs_to (свой ли комментарий — BR-33)
-│   └── tests/                    # 1057 тестов в 24 файлах (см. ниже)
+│   └── tests/                    # 1156 тестов в 25 файлах (см. ниже)
 ├── templates/
 │   ├── base.html                 # sprite + alpine/htmx defer + toast_host + search_popup +
 │   │                             # favicon + theme-color + right_rail (опт., см. has_right_rail)
@@ -318,7 +321,7 @@ balaproza_v1/
 ## Тестирование
 
 ```
-uv run python manage.py test core       # все 1057 тестов, в четыре процесса
+uv run python manage.py test core       # все 1156 тестов, в четыре процесса
 uv run python manage.py test core.tests.test_<file>
 uv run python manage.py test core --parallel 1   # последовательно: нужен для --pdb
 uv run python manage.py test core --keepdb       # быстрый круг, базы не пересоздаются
@@ -364,6 +367,9 @@ uv run python manage.py test core --keepdb       # быстрый круг, ба
   контейнер шапки = контейнер страницы, скелетон повторяет сетку контента, деньги через `spaced`
 - `test_template_lint.py` — статический лint шаблонов: запрещает многострочные `{# … #}`
   и `{% … %}` (Django молча выводит их как текст)
+- `test_toast_bridge.py` — Ф15, Этап 0 ([`docs/20`](docs/20-f15-write-plan.md)): мост
+  `django.contrib.messages` → window-событие `toast` в `base.html`, которым формы
+  записи начиная с Этапа 1 будут отвечать на POST после редиректа
 
 Логин в тестах — один помощник на всю суиту (`core/tests/base.py`), подделывать сессию нельзя:
 ```python
@@ -376,7 +382,7 @@ login_as_newcomer(client, 'lonely_reader')    # вошедший без един
 
 - **Все шаблоны в корневой `templates/`** (не в `core/templates/`)
 - `base.html` определяет блоки `title`, `content`, `right_rail` — каждая страница может переопределить рейл
-- `base.html` глобально подключает: sprite, alpine/htmx, toast_host, **search_popup** (Cmd+K), favicon, theme-color
+- `base.html` глобально подключает: sprite, alpine/htmx, toast_host, **search_popup** (Cmd+K), **delete_confirm_modal**, favicon, theme-color. Начиная с Ф15 сюда же встроен мост `django.contrib.messages` → window-событие `toast` (Этап 0, `core/tests/test_toast_bridge.py`): формы записи отвечают на POST редиректом + сообщением, а не Alpine-заглушкой
 - **`has_right_rail` флаг** (DEC-25): `<aside>` правого рейла рендерится только если view передал `'has_right_rail': True` в контекст. Иначе контент тянется на всю ширину контейнера. См. `home`, `story_detail`, `profile_me/other`, `contest_detail/submit`.
   **Флаг ставится по наличию данных рейла, а не безусловно.** `contest_detail` и `contest_submit` слали `True` даже на неизвестный slug — теперь считает `_contest_rail_has_content` (FR-CONT-09), закрыто `test_contests.ContestRail`.
   **У WRITE-страниц рейла нет вовсе** (DEC-48). Статистика писателя повторяла `partials/profile/_stats.html`, а на страницах одного произведения читалась как статистика этого произведения: в шапке «1 042 оқылым» работы, в рейле «Оқылым 2 117» по портфелю. Агрегаты живут в профиле (`/me/?tab=stats`), кабинет отвечает на «что делать». Закрыто `test_write.WriteHasNoAuthorStatsRail`
@@ -478,7 +484,7 @@ login_as_newcomer(client, 'lonely_reader')    # вошедший без един
 
 ## Что НЕ делать
 
-- **НЕ создавать** реальные формы записи и бизнес-логику вокруг них — это Ф15, а не Ф14 (модели и миграции теперь можно: идёт Ф14, порядок — docs/19)
+- **НЕ писать** в модели из views напрямую в обход `core.data` — мутации формы записи (Ф15) идут через `core/queries/write.py`, тем же фасадом, что и чтение; вызывающая сторона знает одну дверь, а не две
 - **НЕ читать** демо-корпус (`_corpus.py`) ниоткуда, кроме `seed_demo`; **НЕ импортировать** хранилище в `core/domain`; читающая сторона ходит через фасад `core.data`
 - **НЕ запускать** `npm run dev`/`npm run build` — пользователь сам
 - **НЕ запускать** `python manage.py runserver` для smoke-проверок — пользователь поднимает дев-сервер сам в своём терминале

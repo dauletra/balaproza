@@ -79,7 +79,9 @@
 
             Тост говорит «жіберілді», а не «қабылданды»: «Қабылданды» —
             решение жюри (BR-41), и автор читал отправку формы как победу
-            в первом же круге.
+            в первом же круге. Настоящий POST (Ф15, Этап 5) — Alpine здесь
+            только пересчитывает чек-лист объёма при смене выбранной
+            работы, отправку формы больше не перехватывает.
         {% endcomment %}
         <form method="post" action="{% url 'core:contest_submit' slug=contest.slug %}"
               x-data="{
@@ -90,7 +92,6 @@
                   match(t) { return !this.q || t.toLowerCase().includes(this.q.toLowerCase()); },
                   shown() { return Object.values(this.vols).some(v => this.match(v.title)); }
               }"
-              @submit.prevent="$dispatch('toast', { kind:'success', text:'Өтінім жіберілді (демо)' })"
               class="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
             {% csrf_token %}
 

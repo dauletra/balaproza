@@ -84,10 +84,11 @@
                             {% comment %}
                                 BR-23b. Без отзыва правило «одна работа на конкурс»
                                 означало: ошибся работой — и всё, ни заменить, ни
-                                отказаться. Демо-действие: подтверждение и тост.
+                                отказаться. Настоящий POST (Ф15, Этап 5) —
+                                подтверждение в withdraw_confirm_modal.html.
                             {% endcomment %}
                             <button type="button" x-data
-                                    @click="$dispatch('open-withdraw-confirm', { contest: '{{ c.name|escapejs }}', story: '{{ sub.story.title|escapejs }}' })"
+                                    @click="$dispatch('open-withdraw-confirm', { contest: '{{ c.name|escapejs }}', story: '{{ sub.story.title|escapejs }}', withdraw_url: '{% url "core:contest_withdraw" slug=c.slug %}' })"
                                     class="font-sans text-xs font-semibold text-slate-500 underline underline-offset-2 hover:text-status-error-fg">
                                 Қайтарып алу
                             </button>

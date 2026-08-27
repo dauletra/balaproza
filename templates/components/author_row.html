@@ -18,7 +18,7 @@
 {% endcomment %}
 <li class="flex items-center gap-3 {{ cls }}">
     <a href="{% url 'core:profile_other' username=author.username %}" class="shrink-0">
-        {% include "components/avatar.html" with size=size|default:40 name=author.public_name username=author.username %}
+        {% include "components/avatar.html" with size=size|default:40 name=author.public_name username=author.username avatar=author.avatar %}
     </a>
     <div class="min-w-0 flex-1">
         <a href="{% url 'core:profile_other' username=author.username %}"

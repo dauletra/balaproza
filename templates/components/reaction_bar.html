@@ -11,69 +11,61 @@
     неразличима — «күлдім» и «таңғалдым» в линиях выглядят одинаково.
     Тот же довод, по которому в mobile nav вернули подписи слотов.
 
-    Выбор один: новая реакция заменяет прежнюю (BR-REACT-03).
+    Выбор один: новая реакция заменяет прежнюю, повтор своей — снимает
+    (BR-REACT-02/03).
 
     Параметры:
-      items      — reactions_of(chapter): [{reaction, count, mine}, …]
-      picked     — slug реакции текущего пользователя ("" — ничего)
-      signed_in  — boolean, для гостя клик ведёт на login
-      login_href — URL для гостя (default /auth/login/)
+      items          — reactions_of(chapter): [{reaction, count, mine}, …]
+      picked         — slug реакции текущего пользователя ("" — ничего)
+      signed_in      — boolean, для гостя клик ведёт на login
+      login_href     — URL для гостя (default /auth/login/)
+      story_slug     — slug произведения (нужен для action формы)
+      chapter_number — номер главы (нужен для action формы)
 
     Раскладка: пять карточек по 88px переносятся на 375px как 3 + 2 по
     центру — так подпись помещается целиком, а тач-цель остаётся крупной.
 
-    Локальное состояние Alpine. После Ф14 — submit к /api/chapter/<id>/react.
+    Настоящий POST (Ф15 Этап 3): одна форма, пять submit-кнопок с общим
+    `name="kind"` — PRG-редирект обратно на страницу, без своего транспорта.
 {% endcomment %}
 {% with login_href=login_href|default:'/auth/login/' %}
-<div class="my-10"
-     x-data="{
-        picked: '{{ picked|default:'' }}',
-        counts: { {% for item in items %}'{{ item.reaction.slug }}': {{ item.count }}{% if not forloop.last %}, {% endif %}{% endfor %} },
-        bursting: '',
-        react(slug) {
-            {% if not signed_in %}
-                window.location = '{{ login_href }}?next=' + encodeURIComponent(window.location.pathname + window.location.search);
-                return;
-            {% endif %}
-            if (this.picked === slug) {
-                this.counts[slug] -= 1;
-                this.picked = '';
-                return;
-            }
-            if (this.picked) { this.counts[this.picked] -= 1; }
-            this.counts[slug] += 1;
-            this.picked = slug;
-            this.bursting = slug;
-            setTimeout(() => { this.bursting = ''; }, 400);
-            this.$dispatch('toast', { kind: 'success', text: 'Алғыс үшін рахмет!' });
-        }
-     }">
-
+<div class="my-10">
     <p class="mb-3 text-center font-sans text-sm text-slate-500">
-        <span x-show="!picked">Бұл бөлім саған қалай әсер етті?</span>
-        <span x-show="picked" x-cloak>Автор сенің реакцияңды көреді.</span>
+        {% if picked %}Автор сенің реакцияңды көреді.{% else %}Бұл бөлім саған қалай әсер етті?{% endif %}
     </p>
 
-    <div role="group" aria-label="Бөлімге реакция"
-         class="flex flex-wrap items-stretch justify-center gap-2">
-        {% for item in items %}
-            <button type="button" @click="react('{{ item.reaction.slug }}')"
-                    :aria-pressed="picked === '{{ item.reaction.slug }}'"
-                    :class="picked === '{{ item.reaction.slug }}'
-                        ? 'border-brand bg-brand/5 text-brand-dark'
-                        : 'border-slate-300 bg-white text-slate-600 hover:border-brand hover:text-brand'"
-                    class="relative flex min-h-[72px] w-[88px] flex-col items-center justify-center gap-1 rounded-md border px-1 font-sans transition-colors">
-                <span class="relative grid h-6 w-6 place-items-center">
-                    {% include "components/icon.html" with name=item.reaction.icon size=20 only %}
-                    <span x-show="bursting === '{{ item.reaction.slug }}'" x-cloak
-                          class="absolute inset-0 animate-ping rounded-pill bg-brand opacity-40"></span>
-                </span>
-                <span class="text-[11px] font-semibold leading-none">{{ item.reaction.label }}</span>
-                <span class="text-[11px] leading-none text-slate-400"
-                      x-text="counts['{{ item.reaction.slug }}']">{{ item.count }}</span>
-            </button>
-        {% endfor %}
-    </div>
+    {% if signed_in and story_slug and chapter_number %}
+        <form method="post" action="{% url 'core:chapter_react' slug=story_slug chapter=chapter_number %}"
+              role="group" aria-label="Бөлімге реакция"
+              class="flex flex-wrap items-stretch justify-center gap-2">
+            {% csrf_token %}
+            {% for item in items %}
+                <button type="submit" name="kind" value="{{ item.reaction.slug }}"
+                        aria-pressed="{{ item.mine|yesno:'true,false' }}"
+                        class="flex min-h-[72px] w-[88px] flex-col items-center justify-center gap-1 rounded-md border px-1 font-sans transition-colors
+                            {% if item.mine %}border-brand bg-brand/5 text-brand-dark{% else %}border-slate-300 bg-white text-slate-600 hover:border-brand hover:text-brand{% endif %}">
+                    <span class="grid h-6 w-6 place-items-center">
+                        {% include "components/icon.html" with name=item.reaction.icon size=20 only %}
+                    </span>
+                    <span class="text-[11px] font-semibold leading-none">{{ item.reaction.label }}</span>
+                    <span class="text-[11px] leading-none text-slate-400">{{ item.count }}</span>
+                </button>
+            {% endfor %}
+        </form>
+    {% else %}
+        <div role="group" aria-label="Бөлімге реакция" class="flex flex-wrap items-stretch justify-center gap-2">
+            {% for item in items %}
+                <a href="{{ login_href }}?next={{ request.get_full_path|urlencode }}"
+                   class="flex min-h-[72px] w-[88px] flex-col items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-1 font-sans text-slate-600 transition-colors hover:border-brand hover:text-brand">
+                    <span class="grid h-6 w-6 place-items-center">
+                        {% include "components/icon.html" with name=item.reaction.icon size=20 only %}
+                    </span>
+                    <span class="text-[11px] font-semibold leading-none">{{ item.reaction.label }}</span>
+                    <span class="text-[11px] leading-none text-slate-400">{{ item.count }}</span>
+                </a>
+            {% endfor %}
+        </div>
+    {% endif %}
 
     <p class="mt-3 text-center font-sans text-xs text-slate-400">
         Авторды қолдау — бір рет басу ғана

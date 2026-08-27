@@ -189,6 +189,9 @@ class ModerationThroughTheAdmin(TestCase):
             'status': 'Published', 'views': 0, 'recent_views': 0,
             'likes': 0, 'comments': 0,
             'chapter_set-TOTAL_FORMS': '0', 'chapter_set-INITIAL_FORMS': '0',
+            # StoryTagInline (Ф15): tags — M2M через `through`, вне
+            # fieldsets, редактируется только этим формсетом.
+            'storytag_set-TOTAL_FORMS': '0', 'storytag_set-INITIAL_FORMS': '0',
         }
         r = self.client.post(url, form, follow=True)
         self.story.refresh_from_db()

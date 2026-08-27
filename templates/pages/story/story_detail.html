@@ -53,7 +53,7 @@
 
                 <a href="{% url 'core:profile_other' username=story.author.username %}"
                    class="inline-flex items-center gap-2 self-start font-sans text-sm font-semibold text-slate-700 hover:text-brand">
-                    {% include "components/avatar.html" with size=24 name=story.author.public_name username=story.author.username %}
+                    {% include "components/avatar.html" with size=24 name=story.author.public_name username=story.author.username avatar=story.author.avatar %}
                     <span class="truncate">{{ story.author.public_name }}</span>
                 </a>
 
@@ -318,11 +318,11 @@
             {% endif %}
 
             {# FR-STORY-12 / DEC-32: реакции на главу вместо одиночного лайка #}
-            {% include "components/reaction_bar.html" with items=reactions picked=current.my_reaction %}
+            {% include "components/reaction_bar.html" with items=reactions picked=current.my_reaction story_slug=story.slug chapter_number=chapter_number %}
 
             {# FR-STORY-13: опрос автора — необязательный, рендерится если создан #}
             {% if poll %}
-                {% include "components/chapter_poll.html" with poll=poll story=story %}
+                {% include "components/chapter_poll.html" with poll=poll story_slug=story.slug chapter_number=chapter_number %}
             {% endif %}
 
             {# Навигация между главами — full reload на ?chapter=N±1 с якорем на тексте #}
@@ -389,12 +389,13 @@
             </h2>
 
             {% if signed_in %}
-                {# Заглушка submit; реальная логика появится в Ф14 #}
-                <form @submit.prevent="$dispatch('toast', { kind:'success', text:'Пікірің қосылды' })"
+                <form method="post" action="{% url 'core:comment_create' slug=story.slug %}"
                       class="mb-6 flex items-start gap-3">
-                    {% include "components/avatar.html" with size=36 name=current_user_name %}
+                    {% csrf_token %}
+                    {% if chapter_number %}<input type="hidden" name="chapter" value="{{ chapter_number }}">{% endif %}
+                    {% include "components/avatar.html" with size=36 name=current_user_name avatar=user.avatar %}
                     <div class="flex-1">
-                        <textarea rows="2" placeholder="{% if story.is_single %}Осы шығарма туралы пікіріңді жаз…{% else %}Осы бөлім туралы пікіріңді жаз…{% endif %}"
+                        <textarea name="text" rows="2" required placeholder="{% if story.is_single %}Осы шығарма туралы пікіріңді жаз…{% else %}Осы бөлім туралы пікіріңді жаз…{% endif %}"
                                   class="w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-2.5 font-sans text-sm placeholder:text-slate-500 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30"></textarea>
                         <div class="mt-2 flex justify-end">
                             {% include "components/button.html" with kind="primary" label="Жіберу" type="submit" icon="paper-plane" %}
@@ -411,12 +412,12 @@
                 {% for cm in comments %}
                     {% if cm.author %}
                         <div>
-                            {% include "components/comment.html" with comment_id=cm.id author_name=cm.author.public_name author_username=cm.author.username date=cm.date text=cm.text likes=cm.likes liked=cm.liked badge=cm.is_author_badge|yesno:"Автор," own=cm|belongs_to:current_user_username allow_reply=True reply_avatar_name=current_user_name %}
+                            {% include "components/comment.html" with story_slug=story.slug chapter_number=chapter_number comment_id=cm.id author_name=cm.author.public_name author_username=cm.author.username author_avatar=cm.author.avatar date=cm.date text=cm.text likes=cm.likes liked=cm.liked badge=cm.is_author_badge|yesno:"Автор," own=cm|belongs_to:current_user_username allow_reply=True reply_avatar_name=current_user_name %}
 
                             {# Replies (BR-30: один уровень — реплай-форма у реплая отсутствует) #}
                             {% for rp in cm.replies %}
                                 {% if rp.author %}
-                                    {% include "components/comment.html" with comment_id=rp.id author_name=rp.author.public_name author_username=rp.author.username date=rp.date text=rp.text likes=rp.likes liked=rp.liked badge=rp.is_author_badge|yesno:"Автор," own=rp|belongs_to:current_user_username depth=1 allow_reply=False %}
+                                    {% include "components/comment.html" with story_slug=story.slug chapter_number=chapter_number comment_id=rp.id author_name=rp.author.public_name author_username=rp.author.username author_avatar=rp.author.avatar date=rp.date text=rp.text likes=rp.likes liked=rp.liked badge=rp.is_author_badge|yesno:"Автор," own=rp|belongs_to:current_user_username depth=1 allow_reply=False %}
                                 {% endif %}
                             {% endfor %}
                         </div>

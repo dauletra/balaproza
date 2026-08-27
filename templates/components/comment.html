@@ -17,12 +17,17 @@
 
     Параметры:
       comment_id    — id для якоря `#comment-<id>` и целей модалок
+      story_slug    — работа: строит action у форм лайка/ответа/удаления
+      chapter_number — глава, под которой открыт комментарий (может быть
+                      пусто — общий комментарий); нужна, чтобы после
+                      POST редирект вернул на ту же главу
       author_name   — имя
       author_username — @username: ссылка на профиль и стабильный цвет аватара
+      author_avatar — comment.author.avatar (опц.)
       date          — строка «2 сағат бұрын»
       text          — текст комментария
       likes         — int (default 0)
-      liked         — boolean (текущий пользователь лайкнул)
+      liked         — boolean (текущий пользователь лайкнул, серверная истина)
       badge         — «Автор» (опц.) — показывается если непустая строка
       own           — boolean, комментарий принадлежит текущему пользователю
       depth         — 0 (default) | 1 — ответ смещается влево
@@ -34,7 +39,7 @@
 {% with d=depth|default:0 login_href=login_href|default:'/auth/login/' %}
 <article id="comment-{{ comment_id }}"
          class="flex scroll-mt-24 gap-3 {% if d == 1 %}ml-10 mt-3 border-l border-slate-100 pl-4 opacity-90{% endif %}">
-    {% include "components/avatar.html" with size=36 name=author_name username=author_username %}
+    {% include "components/avatar.html" with size=36 name=author_name username=author_username avatar=author_avatar %}
 
     <div class="min-w-0 flex-1">
         {# Шапка: имя + бейдж + дата + меню #}
@@ -83,7 +88,7 @@
 
                     {% if own %}
                         <button type="button" role="menuitem"
-                                @click="open = false; $dispatch('open-delete-confirm', { name: 'Пікір', confirm_url: '#' })"
+                                @click="open = false; $dispatch('open-delete-confirm', { name: 'Пікір', confirm_url: '{% url 'core:comment_delete' slug=story_slug comment_id=comment_id %}' })"
                                 class="flex min-h-11 w-full items-center gap-2.5 border-t border-slate-100 px-4 text-left font-sans text-sm text-status-error-fg hover:bg-slate-50">
                             {% include "components/icon.html" with name="trash" size=15 only %}
                             Жою
@@ -104,29 +109,40 @@
         <p class="mt-1 font-sans text-sm leading-relaxed text-slate-800">{{ text }}</p>
 
         {# ── Действия: лайк (BR-31) и ответ (BR-30) ── #}
-        <div class="mt-1"
-             x-data="{
-                liked: {{ liked|yesno:'true,false' }},
-                count: {{ likes|default:0 }},
-                replying: false,
-                toggle() {
-                    {% if not signed_in %}
-                        window.location = '{{ login_href }}?next='
-                            + encodeURIComponent(window.location.pathname + window.location.search);
-                        return;
-                    {% endif %}
-                    this.liked = !this.liked;
-                    this.count += this.liked ? 1 : -1;
-                }
-             }">
+        <div class="mt-1" x-data="{ replying: false }">
           <div class="flex items-center gap-1 font-sans text-xs">
-            <button type="button" @click="toggle()" :aria-pressed="liked" aria-label="Ұнату"
-                    :class="liked ? 'text-status-error-fg' : 'text-slate-500 hover:text-slate-700'"
-                    class="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2">
-                <template x-if="liked">{% include "components/icon.html" with name="heart-filled" size=14 only %}</template>
-                <template x-if="!liked">{% include "components/icon.html" with name="heart" size=14 only %}</template>
-                <span x-text="count">{{ likes|default:0 }}</span>
-            </button>
+            {% if not signed_in %}
+                <a href="{{ login_href }}?next={{ request.get_full_path|urlencode }}" aria-label="Ұнату"
+                   class="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-slate-500 hover:text-slate-700">
+                    {% include "components/icon.html" with name="heart" size=14 only %}
+                    <span>{{ likes|default:0 }}</span>
+                </a>
+            {% elif story_slug and comment_id %}
+                <form method="post" action="{% url 'core:comment_like' slug=story_slug comment_id=comment_id %}" class="contents">
+                    {% csrf_token %}
+                    {% if chapter_number %}<input type="hidden" name="chapter" value="{{ chapter_number }}">{% endif %}
+                    <button type="submit" aria-pressed="{{ liked|yesno:'true,false' }}" aria-label="Ұнату"
+                            class="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 {% if liked %}text-status-error-fg{% else %}text-slate-500 hover:text-slate-700{% endif %}">
+                        {% if liked %}
+                            {% include "components/icon.html" with name="heart-filled" size=14 only %}
+                        {% else %}
+                            {% include "components/icon.html" with name="heart" size=14 only %}
+                        {% endif %}
+                        <span>{{ likes|default:0 }}</span>
+                    </button>
+                </form>
+            {% else %}
+                {# Показ вне страницы произведения (_design showcase) — некуда слать POST #}
+                <span aria-label="Ұнату" aria-pressed="{{ liked|yesno:'true,false' }}"
+                      class="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 {% if liked %}text-status-error-fg{% else %}text-slate-500{% endif %}">
+                    {% if liked %}
+                        {% include "components/icon.html" with name="heart-filled" size=14 only %}
+                    {% else %}
+                        {% include "components/icon.html" with name="heart" size=14 only %}
+                    {% endif %}
+                    <span>{{ likes|default:0 }}</span>
+                </span>
+            {% endif %}
 
             {% comment %}
                 На ответ ответить нельзя — это и есть BR-30. Условие стоит
@@ -148,14 +164,16 @@
             {% endif %}
           </div>
 
-            {% if allow_reply and d == 0 and signed_in %}
-                {# Форма ответа — стаб; реальная отправка появится в Ф14 #}
-                <form x-show="replying" x-cloak x-transition
-                      @submit.prevent="replying = false; $dispatch('toast', { kind:'success', text:'Жауабың қосылды' })"
+            {% if allow_reply and d == 0 and signed_in and story_slug %}
+                <form method="post" action="{% url 'core:comment_create' slug=story_slug %}"
+                      x-show="replying" x-cloak x-transition
                       class="mt-2 flex items-start gap-2.5">
-                    {% include "components/avatar.html" with size=28 name=reply_avatar_name %}
+                    {% csrf_token %}
+                    <input type="hidden" name="parent" value="{{ comment_id }}">
+                    {% if chapter_number %}<input type="hidden" name="chapter" value="{{ chapter_number }}">{% endif %}
+                    {% include "components/avatar.html" with size=28 name=reply_avatar_name avatar=user.avatar %}
                     <div class="flex-1">
-                        <textarea rows="2" required
+                        <textarea name="text" rows="2" required
                                   placeholder="{{ author_name }} пікіріне жауап жаз…"
                                   class="w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-2 font-sans text-sm placeholder:text-slate-500 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30"></textarea>
                         <div class="mt-1.5 flex justify-end gap-2">

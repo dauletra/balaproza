@@ -38,6 +38,7 @@ from .models import (
     SchoolLink,
     Story,
     StoryComment,
+    StoryTag,
     Submission,
     Tag,
     TimelineStage,
@@ -62,9 +63,11 @@ class UserAdmin(DjangoUserAdmin):
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         ('Аты-жөні', {
-            'fields': ('name', 'pen_name', 'bio', 'email'),
+            'fields': ('name', 'pen_name', 'bio', 'avatar', 'age', 'gender', 'email'),
             'description': '«Нақты аты» көпшілікке көрінбейді — оны '
-                           'модерация мен байқау қазылары ғана көреді.',
+                           'модерация мен байқау қазылары ғана көреді. '
+                           '«Жасы»/«Жынысы» — өзі толтырған, құжатпен '
+                           'расталмаған (DEC-24).',
         }),
         ('Рұқсаттар', {'fields': ('is_active', 'is_staff', 'is_superuser',
                                   'groups', 'user_permissions')}),
@@ -136,6 +139,17 @@ class ChapterInline(admin.TabularInline):
     show_change_link = True
 
 
+class StoryTagInline(admin.TabularInline):
+    """Теги работы. `tags` — M2M через `StoryTag` (Ф15, DEC-31) и потому
+    не рендерится обычным виджетом в fieldsets — только инлайном."""
+
+    model = StoryTag
+    extra = 0
+    fields = ('tag', 'created_at')
+    readonly_fields = ('created_at',)
+    autocomplete_fields = ('tag',)
+
+
 @admin.register(Story)
 class StoryAdmin(admin.ModelAdmin):
     """Карточка работы и рабочий стол модератора (DEC-23, BR-11).
@@ -146,10 +160,10 @@ class StoryAdmin(admin.ModelAdmin):
     не происходит ничего. Действие меняет статус и пишет уведомление
     одним движением (`Story.apply_moderation`).
 
-    Поле статуса при этом остаётся редактируемым: сериал, который автор
-    дописал, переводит в `Completed` тоже админ — это не модерация, а
-    состояние работы, и запрещать его правку значило бы отнять
-    единственный доступный способ (форм автора нет до Ф15). Ручная
+    Поле статуса при этом остаётся редактируемым: у автора с Ф15 Этапа 1
+    есть свой способ перевести публичный сериал `OnProcess ⇄ Completed`
+    (`story_settings`), но админский тоже нужен — как путь модератора,
+    когда автор недоступен, и запасной канал на случай сбоя формы. Ручная
     правка, уводящая работу с модерации, сопровождается предупреждением.
     """
 
@@ -157,14 +171,14 @@ class StoryAdmin(admin.ModelAdmin):
                     'is_editorial_pick', 'views', 'updated_at')
     list_filter = ('status', 'format', 'is_editorial_pick', 'primary_genre')
     search_fields = ('title', 'slug', 'author__username', 'author__pen_name')
-    autocomplete_fields = ('author', 'tags')
+    autocomplete_fields = ('author',)
     prepopulated_fields = {'slug': ('title',)}
-    inlines = (ChapterInline,)
+    inlines = (ChapterInline, StoryTagInline)
     actions = ('approve', 'send_back', 'reject')
     fieldsets = (
         (None, {'fields': ('title', 'slug', 'author', 'annotation', 'cover')}),
         ('Сипаттамасы', {
-            'fields': ('primary_genre', 'secondary_genre', 'tags',
+            'fields': ('primary_genre', 'secondary_genre',
                        'format', 'chapters', 'audience'),
             'description': '«Жас белгісі» бос болса — автор әлі таңдамаған. '
                            'Оны автордың орнына қоюға болмайды (BR-10b).',
@@ -374,10 +388,14 @@ class AwardGrantAdmin(admin.ModelAdmin):
 
 @admin.register(Submission)
 class SubmissionAdmin(admin.ModelAdmin):
-    list_display = ('author', 'contest', 'story', 'submitted_on', 'status')
-    list_filter = ('status', 'contest')
+    list_display = ('author', 'contest', 'story', 'submitted_on', 'status',
+                    'ai_declaration')
+    list_filter = ('status', 'contest', 'ai_declaration')
     search_fields = ('author__username', 'story__title')
     autocomplete_fields = ('author', 'story')
+    # Ответы формы подачи (DEC-21/DEC-24) — жюри и модератору видны,
+    # автор их повторно не редактирует (docs/20 §20.2).
+    readonly_fields = ('ai_declaration', 'age_confirmed', 'rules_confirmed')
 
 
 class CollectionItemInline(admin.TabularInline):

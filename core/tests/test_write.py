@@ -3,12 +3,13 @@
 import re
 from dataclasses import replace
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.template.loader import render_to_string
 from django.test import Client, TestCase
 from django.urls import reverse
 
 from core import data
-from core.models import Story
+from core.models import Chapter, Story, Tag
 from core.tests.base import login_as, login_as_newcomer
 from core.templatetags.balaproza import spaced
 
@@ -442,11 +443,15 @@ class StorySettingsForm(TestCase):
         фоном: то, что встречается на каждом шагу, перестаёт читаться как
         необратимое. Вход в удаление остаётся из manage_story и из меню
         строки списка (my_story_menu).
+
+        Сама модалка (Ф15) смонтирована глобально в base.html и слушает
+        событие на каждой странице — имя события само по себе больше не
+        отличает «есть кнопка» от «нет». Проверяем триггер (`$dispatch`).
         """
-        self.assertNotContains(self.response, 'open-delete-confirm')
+        self.assertNotContains(self.response, "$dispatch('open-delete-confirm'")
         manage = self.client.get(
             reverse('core:manage_story', kwargs={'slug': self.SLUG}))
-        self.assertContains(manage, 'open-delete-confirm')
+        self.assertContains(manage, "$dispatch('open-delete-confirm'")
 
     def test_audience_radios_are_offered(self):
         """BR-10b: отметку выбирает автор, и выбирает он её здесь."""
@@ -718,14 +723,18 @@ class ChapterEditorNew(TestCase):
     def test_unsaved_state_is_reported_not_faked(self):
         """Индикатор отчитывается о вводе, а не изображает автосохранение.
 
-        Реального запроса до Ф14 нет; таймер, сам рисующий «Жоба сақталды»,
-        обещал бы сохранность текста, которой сейчас нет.
+        «Жоба сақталды» на этой странице не должно быть вовсе (Ф15): это
+        первый заход в редактор ещё не созданной главы, и сообщать про
+        сохранение того, что ни разу не сохранялось, — та же ложь, что
+        рисовал прежний фейковый submit. Появляется текст только на
+        уже существующей главе (`ChapterEditorEdit.test_shows_saved_state`)
+        — это серверная истина, а не таймер, изображающий автосохранение.
         """
         body = self.response.content.decode()
         self.assertIn('dirty: false', body)
         self.assertIn('@input="dirty = true"', body)
         self.assertIn('Сақталмаған өзгеріс бар', body)
-        self.assertIn('Жоба сақталды', body)
+        self.assertNotIn('Жоба сақталды', body)
         # Ничего похожего на таймер, который «сохраняет» сам.
         self.assertNotIn('setInterval', body)
 
@@ -752,6 +761,11 @@ class ChapterEditorEdit(TestCase):
         ch = data.chapter_of(self.SLUG, self.CH)
         # Первые слова длинного текста из core/story_texts
         self.assertContains(self.response, 'Бірде ерте таңда')
+
+    def test_shows_saved_state(self):
+        """У существующей главы «Жоба сақталды» — серверная истина, не
+        таймер: глава лежит в базе, значит она уже была сохранена."""
+        self.assertContains(self.response, 'Жоба сақталды')
 
 
 class ChapterEditorUnknownStory(TestCase):
@@ -965,3 +979,368 @@ class WriterStatsBreakdownSumsToTotal(TestCase):
             set(covered),
             {'Published', 'Completed', 'OnProcess', 'OnModeration', 'NotPublished'},
         )
+
+
+# ═════════════════════ Ф15, Этап 1: запись (POST) ══════════════════════════
+# До этой точки в файле — только GET/рендер. Ни один из этих тестов не
+# существовал до Этапа 1: до него формы ничего не сохраняли (docs/20).
+
+class NewStoryCreatesADraft(TestCase):
+
+    def setUp(self):
+        login_as(self.client)
+        self.genre = data.all_genres()[0]
+
+    def test_creates_a_draft_owned_by_the_author_and_redirects_to_the_editor(self):
+        r = self.client.post(reverse('core:new_story'), {
+            'title': 'Сынақ шығармасы', 'format': 'serial',
+            'genre_primary': self.genre.slug,
+        })
+        story = Story.objects.get(title='Сынақ шығармасы')
+        self.assertEqual(story.author.username, 'aidana')
+        self.assertEqual(story.status, 'NotPublished')
+        self.assertEqual(story.format, 'serial')
+        self.assertEqual(story.primary_genre_id, self.genre.pk)
+        self.assertRedirects(
+            r, reverse('core:chapter_new', kwargs={'slug': story.slug}))
+
+    def test_slug_is_transliterated_and_url_safe(self):
+        # Story.slug — ASCII (маршрут <slug:slug> кириллицу не матчит),
+        # заголовок — казахский (domain/slugs.py).
+        self.client.post(reverse('core:new_story'), {
+            'title': 'Тау бөктеріндегі үй', 'format': 'single',
+            'genre_primary': self.genre.slug,
+        })
+        story = Story.objects.get(title='Тау бөктеріндегі үй')
+        self.assertRegex(story.slug, r'^[-a-zA-Z0-9_]+$')
+        self.assertTrue(story.slug)
+
+    def test_a_second_story_with_the_same_title_gets_a_distinct_slug(self):
+        for _ in range(2):
+            self.client.post(reverse('core:new_story'), {
+                'title': 'Қайталанған атау', 'format': 'serial',
+                'genre_primary': self.genre.slug,
+            })
+        slugs = set(Story.objects.filter(title='Қайталанған атау')
+                    .values_list('slug', flat=True))
+        self.assertEqual(len(slugs), 2)
+
+    def test_missing_required_field_creates_nothing(self):
+        before = Story.objects.count()
+        r = self.client.post(reverse('core:new_story'), {
+            'title': '', 'format': 'serial', 'genre_primary': self.genre.slug,
+        })
+        self.assertEqual(Story.objects.count(), before)
+        self.assertRedirects(r, reverse('core:new_story'))
+
+    def test_guest_post_creates_nothing(self):
+        guest = Client()
+        before = Story.objects.count()
+        guest.post(reverse('core:new_story'), {
+            'title': 'Қонақтың шығармасы', 'format': 'serial',
+            'genre_primary': self.genre.slug,
+        })
+        self.assertEqual(Story.objects.count(), before)
+
+
+class StorySettingsSavesFields(TestCase):
+
+    SLUG = 'aidana-kus'  # NotPublished, 0 бөлім, audience='' — aidana-нікі
+
+    def setUp(self):
+        login_as(self.client)
+        self.genre = data.all_genres()[0]
+
+    def _post(self, **overrides):
+        payload = {
+            'title': 'Жаңа атау', 'annotation': 'Жаңа аннотация мәтіні.',
+            'format': 'serial', 'genre_primary': self.genre.slug,
+            'genre_secondary': '', 'audience': '10+', 'tags': '',
+        }
+        payload.update(overrides)
+        return self.client.post(
+            reverse('core:story_settings', kwargs={'slug': self.SLUG}), payload)
+
+    def test_saves_title_annotation_and_audience(self):
+        r = self._post()
+        story = Story.objects.get(slug=self.SLUG)
+        self.assertEqual(story.title, 'Жаңа атау')
+        self.assertEqual(story.annotation, 'Жаңа аннотация мәтіні.')
+        self.assertEqual(story.audience, '10+')
+        self.assertRedirects(
+            r, reverse('core:story_settings', kwargs={'slug': self.SLUG}))
+
+    def test_missing_title_saves_nothing(self):
+        self._post(title='')
+        story = Story.objects.get(slug=self.SLUG)
+        self.assertNotEqual(story.title, '')
+        self.assertNotEqual(story.audience, '10+')
+
+    def test_cannot_switch_to_single_with_more_than_one_chapter(self):
+        story = Story.objects.get(slug=self.SLUG)
+        Chapter.objects.create(story=story, number=1, title='1', body='т')
+        Chapter.objects.create(story=story, number=2, title='2', body='т')
+        self._post(format='single')
+        story.refresh_from_db()
+        self.assertEqual(story.format, 'serial')
+
+    def test_status_field_outside_the_allowed_set_is_ignored(self):
+        # 'aidana-kus' — черновик, радио «Мәртебесі» на этой странице у
+        # него вообще не рендерится (BR-10a) — POST в обход формы не
+        # должен провести статус мимо модерации.
+        self._post(status='Published')
+        story = Story.objects.get(slug=self.SLUG)
+        self.assertEqual(story.status, 'NotPublished')
+
+
+class StorySettingsCoverUpload(TestCase):
+    """Тот же валидатор, что у User.avatar (BR-46) — SVG не проходит.
+
+    `story.cover = cover; story.save()` — прямое присваивание, не
+    ModelForm, поэтому `RASTER_ONLY` не срабатывает сам по себе (тот же
+    пробел, что был у `avatar` до Ф15 Этапа 6) — закрыто явным вызовом
+    во view.
+    """
+
+    SLUG = 'aidana-kus'
+
+    def setUp(self):
+        login_as(self.client)
+        self.genre = data.all_genres()[0]
+
+    def _post(self, **overrides):
+        payload = {
+            'title': 'Жаңа атау', 'annotation': 'Жаңа аннотация мәтіні.',
+            'format': 'serial', 'genre_primary': self.genre.slug,
+            'genre_secondary': '', 'audience': '10+', 'tags': '',
+        }
+        payload.update(overrides)
+        return self.client.post(
+            reverse('core:story_settings', kwargs={'slug': self.SLUG}), payload)
+
+    def test_svg_is_refused(self):
+        cover = SimpleUploadedFile('мұқаба.svg', b'<svg/>',
+                                   content_type='image/svg+xml')
+        self._post(cover=cover)
+        story = Story.objects.get(slug=self.SLUG)
+        self.assertFalse(story.cover)
+
+    def test_svg_refusal_also_blocks_the_rest_of_the_form(self):
+        """Ошибка одного поля — весь POST no-op, не частичное сохранение."""
+        before = Story.objects.get(slug=self.SLUG).title
+        cover = SimpleUploadedFile('мұқаба.svg', b'<svg/>',
+                                   content_type='image/svg+xml')
+        self._post(cover=cover, title='Басқа атау')
+        self.assertEqual(Story.objects.get(slug=self.SLUG).title, before)
+
+    def test_png_is_accepted(self):
+        cover = SimpleUploadedFile('мұқаба.png', b'\x89PNG demo',
+                                   content_type='image/png')
+        self._post(cover=cover)
+        story = Story.objects.get(slug=self.SLUG)
+        self.assertTrue(story.cover.name.startswith(f'covers/{self.SLUG}'))
+
+
+class StorySettingsTagResolution(TestCase):
+
+    SLUG = 'aidana-kus'
+
+    def setUp(self):
+        login_as(self.client)
+        self.genre = data.all_genres()[0]
+
+    def _post(self, tags):
+        return self.client.post(
+            reverse('core:story_settings', kwargs={'slug': self.SLUG}),
+            {'title': 'Атау', 'annotation': 'Аннотация.', 'format': 'serial',
+             'genre_primary': self.genre.slug, 'audience': '10+', 'tags': tags})
+
+    def test_existing_accepted_tag_is_reused_not_duplicated(self):
+        before = Tag.objects.filter(slug='mektep').count()
+        self._post('мектеп')
+        story = Story.objects.get(slug=self.SLUG)
+        self.assertEqual(Tag.objects.filter(slug='mektep').count(), before)
+        self.assertIn('mektep', story.tags.values_list('slug', flat=True))
+
+    def test_new_name_creates_a_pending_tag(self):
+        self._post('жаңа-тег-осында')
+        story = Story.objects.get(slug=self.SLUG)
+        tag = story.tags.get(name='жаңа-тег-осында')
+        self.assertEqual(tag.status, 'pending')
+
+    def test_blocked_pattern_is_dropped_silently(self):
+        patterns = data.blocked_tag_patterns_list()
+        if not patterns:
+            self.skipTest('блок-лист демо-корпуса пуст')
+        self._post(patterns[0])
+        story = Story.objects.get(slug=self.SLUG)
+        self.assertEqual(story.tags.count(), 0)
+
+
+class ChapterEditorSavesADraft(TestCase):
+
+    SLUG = 'aidana-kus'
+
+    def setUp(self):
+        login_as(self.client)
+
+    def test_draft_action_creates_a_chapter_without_changing_status(self):
+        r = self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.SLUG}),
+            {'title': '1-бөлім', 'body': 'Бір кездері...', 'action': 'draft'})
+        story = Story.objects.get(slug=self.SLUG)
+        chapter = story.chapter_set.get(number=1)
+        self.assertEqual(chapter.title, '1-бөлім')
+        self.assertEqual(chapter.char_count, len('Бір кездері...'))
+        self.assertEqual(story.status, 'NotPublished')
+        self.assertRedirects(r, reverse(
+            'core:chapter_edit', kwargs={'slug': self.SLUG, 'chapter': 1}))
+
+    def test_empty_body_saves_nothing(self):
+        self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.SLUG}),
+            {'title': '1-бөлім', 'body': '  ', 'action': 'draft'})
+        story = Story.objects.get(slug=self.SLUG)
+        self.assertEqual(story.chapter_set.count(), 0)
+
+    def test_editing_an_existing_chapter_does_not_duplicate_it(self):
+        self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.SLUG}),
+            {'title': '1-бөлім', 'body': 'Бастапқы мәтін.', 'action': 'draft'})
+        self.client.post(
+            reverse('core:chapter_edit', kwargs={'slug': self.SLUG, 'chapter': 1}),
+            {'title': '1-бөлім (өңделген)', 'body': 'Жаңа мәтін.', 'action': 'draft'})
+        story = Story.objects.get(slug=self.SLUG)
+        self.assertEqual(story.chapter_set.count(), 1)
+        self.assertEqual(story.chapter_set.get(number=1).title, '1-бөлім (өңделген)')
+
+
+class ChapterEditorSavesAPoll(TestCase):
+
+    SLUG = 'aidana-kus'
+
+    def setUp(self):
+        login_as(self.client)
+
+    def test_two_or_more_options_create_a_poll(self):
+        self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.SLUG}), {
+                'title': '1-бөлім', 'body': 'Мәтін.', 'action': 'draft',
+                'poll_question': 'Кім жеңеді?',
+                'poll_option': ['Біріншісі', 'Екіншісі'],
+            })
+        chapter = Story.objects.get(slug=self.SLUG).chapter_set.get(number=1)
+        self.assertEqual(chapter.poll.question, 'Кім жеңеді?')
+        self.assertEqual(chapter.poll.option_set.count(), 2)
+
+    def test_a_single_option_does_not_create_a_poll(self):
+        # BR-POLL-02: кемінде екі нұсқа — біреуімен таңдау мағынасыз.
+        self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.SLUG}), {
+                'title': '1-бөлім', 'body': 'Мәтін.', 'action': 'draft',
+                'poll_question': 'Сұрақ?', 'poll_option': ['Жалғыз нұсқа'],
+            })
+        chapter = Story.objects.get(slug=self.SLUG).chapter_set.get(number=1)
+        self.assertFalse(hasattr(chapter, 'poll'))
+
+
+class ChapterEditorSubmitsForReview(TestCase):
+
+    SLUG = 'aidana-kus'
+
+    def setUp(self):
+        login_as(self.client)
+
+    def test_incomplete_checklist_keeps_the_draft(self):
+        # 'aidana-kus' без жас белгісі — чек-лист толық емес БЖ.
+        self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.SLUG}),
+            {'title': '1-бөлім', 'body': 'Мәтін.', 'action': 'submit_review'})
+        story = Story.objects.get(slug=self.SLUG)
+        self.assertEqual(story.status, 'NotPublished')
+        self.assertTrue(story.has_chapters)  # глава при этом сохранилась
+
+    def test_complete_checklist_sends_it_to_moderation(self):
+        Story.objects.filter(slug=self.SLUG).update(audience='10+')
+        self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.SLUG}),
+            {'title': '1-бөлім', 'body': 'Мәтін.', 'action': 'submit_review'})
+        story = Story.objects.get(slug=self.SLUG)
+        self.assertEqual(story.status, 'OnModeration')
+
+
+class ManageStorySubmitsForReview(TestCase):
+
+    SLUG = 'aidana-kus'
+
+    def setUp(self):
+        login_as(self.client)
+
+    def test_post_without_a_ready_checklist_keeps_the_draft(self):
+        r = self.client.post(reverse('core:manage_story', kwargs={'slug': self.SLUG}))
+        story = Story.objects.get(slug=self.SLUG)
+        self.assertEqual(story.status, 'NotPublished')
+        self.assertRedirects(
+            r, reverse('core:manage_story', kwargs={'slug': self.SLUG}))
+
+    def test_post_with_a_ready_checklist_sends_it_to_moderation(self):
+        story = Story.objects.get(slug=self.SLUG)
+        story.audience = '10+'
+        story.save(update_fields=['audience'])
+        Chapter.objects.create(story=story, number=1, title='1-бөлім', body='Мәтін бар.')
+        self.client.post(reverse('core:manage_story', kwargs={'slug': self.SLUG}))
+        story.refresh_from_db()
+        self.assertEqual(story.status, 'OnModeration')
+
+
+class DeleteStoryRemovesIt(TestCase):
+
+    SLUG = 'aidana-kus'
+
+    def setUp(self):
+        login_as(self.client)
+
+    def test_get_does_not_delete(self):
+        self.client.get(reverse('core:delete_story', kwargs={'slug': self.SLUG}))
+        self.assertTrue(Story.objects.filter(slug=self.SLUG).exists())
+
+    def test_post_deletes_and_redirects_to_my_stories(self):
+        r = self.client.post(reverse('core:delete_story', kwargs={'slug': self.SLUG}))
+        self.assertFalse(Story.objects.filter(slug=self.SLUG).exists())
+        self.assertRedirects(r, reverse('core:my_stories'))
+
+
+class OwnershipIsEnforced(TestCase):
+    """Ф15, Этап 1: `story_by_slug_for_author` фильтрует по автору — чужой
+    slug и несуществующий неотличимы снаружи (IDOR)."""
+
+    def setUp(self):
+        login_as(self.client)  # aidana
+        self.foreign = Story.objects.exclude(author__username='aidana').first()
+
+    def test_manage_story_of_a_foreign_slug_shows_not_found(self):
+        r = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.foreign.slug}))
+        self.assertContains(r, 'Шығарма табылмады')
+
+    def test_story_settings_post_does_not_touch_a_foreign_story(self):
+        original_title = self.foreign.title
+        self.client.post(
+            reverse('core:story_settings', kwargs={'slug': self.foreign.slug}),
+            {'title': 'Басып алынды', 'annotation': '', 'format': 'serial',
+             'genre_primary': self.foreign.primary_genre.slug,
+             'audience': '10+', 'tags': ''})
+        self.foreign.refresh_from_db()
+        self.assertEqual(self.foreign.title, original_title)
+
+    def test_chapter_editor_post_does_not_create_a_chapter_on_a_foreign_story(self):
+        before = self.foreign.chapter_set.count()
+        self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.foreign.slug}),
+            {'title': 'Бөтен бөлім', 'body': 'Мәтін', 'action': 'draft'})
+        self.assertEqual(self.foreign.chapter_set.count(), before)
+
+    def test_delete_post_does_not_remove_a_foreign_story(self):
+        self.client.post(
+            reverse('core:delete_story', kwargs={'slug': self.foreign.slug}))
+        self.assertTrue(Story.objects.filter(pk=self.foreign.pk).exists())

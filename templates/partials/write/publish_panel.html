@@ -98,12 +98,14 @@
     {% if story.status == "NotPublished" %}
         <div class="mt-5 border-t border-slate-100 pt-5">
             {% if can_submit %}
-                <button type="button" x-data
-                        @click="$dispatch('toast', { kind:'success', text:'Шығарма модерацияға жіберілді (демо)' })"
-                        class="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-5 font-sans text-sm font-bold text-white hover:bg-brand-dark">
-                    {% include "components/icon.html" with name="paper-plane" size=16 only %}
-                    Модерацияға жіберу
-                </button>
+                <form method="post" action="{% url 'core:manage_story' slug=story.slug %}">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-5 font-sans text-sm font-bold text-white hover:bg-brand-dark">
+                        {% include "components/icon.html" with name="paper-plane" size=16 only %}
+                        Модерацияға жіберу
+                    </button>
+                </form>
                 <p class="mt-2 font-sans text-xs leading-relaxed text-slate-500">
                     Модератор оқып шығады. Жарияланған соң шығарма каталогта көрінеді.
                 </p>

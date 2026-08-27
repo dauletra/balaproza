@@ -43,6 +43,7 @@ from .contests import (
     contest_detail,
     contest_list,
     contest_submit,
+    contest_withdraw,
     my_submissions,
 )
 from .design import design_components, design_states, design_tokens
@@ -62,9 +63,17 @@ from .profile import (
     profile_other,
     profile_people,
 )
-from .story import story_detail
+from .story import (
+    chapter_react,
+    comment_create,
+    comment_delete,
+    comment_like,
+    poll_vote,
+    story_detail,
+)
 from .write import (
     chapter_editor,
+    delete_story,
     manage_story,
     my_stories,
     new_story,

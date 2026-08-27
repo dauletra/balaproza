@@ -14,6 +14,7 @@ from core.tests.base import TestCase, login_as
 from django.urls import reverse
 
 from core import data
+from core.models import ChapterReactionVote, PollVote, Story, StoryComment
 
 
 STORY_SLUG = 'dalney-berega'   # есть в STORIES_BY_SLUG и в CHAPTERS_BY_STORY
@@ -506,6 +507,94 @@ class ChapterReactions(TestCase):
         self.assertEqual('jyladym', data.chapter_of(STORY_SLUG, 4).top_reaction.slug)
 
 
+class ChapterReactionVoting(TestCase):
+    """BR-REACT-02/03 (Ф15, Этап 3): реакция ставится, повтор снимает,
+    другой вид заменяет; Story.likes — агрегат по числу голосов, а не по
+    сумме реакций (BR-14a) — смена вида его не трогает."""
+
+    CHAPTER = 1
+
+    def _url(self):
+        return reverse('core:chapter_react',
+                       kwargs={'slug': STORY_SLUG, 'chapter': self.CHAPTER})
+
+    def _kind_count(self, kind):
+        chapter = data.chapter_of(STORY_SLUG, self.CHAPTER)
+        return chapter.reaction_counts.get(kind, 0)
+
+    def _story_likes(self):
+        return Story.objects.get(slug=STORY_SLUG).likes
+
+    def test_first_vote_creates_it_and_bumps_story_likes(self):
+        login_as(self.client)
+        likes_before, kind_before = self._story_likes(), self._kind_count('kuldim')
+
+        self.client.post(self._url(), {'kind': 'kuldim'})
+
+        self.assertEqual(self._kind_count('kuldim'), kind_before + 1)
+        self.assertEqual(self._story_likes(), likes_before + 1)
+        self.assertTrue(ChapterReactionVote.objects.filter(
+            user__username='aidana', chapter__story__slug=STORY_SLUG,
+            chapter__number=self.CHAPTER, kind='kuldim').exists())
+
+    def test_repeat_click_removes_the_vote(self):
+        login_as(self.client)
+        likes_before, kind_before = self._story_likes(), self._kind_count('kuldim')
+
+        self.client.post(self._url(), {'kind': 'kuldim'})
+        self.client.post(self._url(), {'kind': 'kuldim'})  # повтор снимает
+
+        self.assertEqual(self._kind_count('kuldim'), kind_before)
+        self.assertEqual(self._story_likes(), likes_before)
+        self.assertFalse(ChapterReactionVote.objects.filter(
+            user__username='aidana', chapter__story__slug=STORY_SLUG,
+            chapter__number=self.CHAPTER).exists())
+
+    def test_different_kind_replaces_without_changing_story_likes(self):
+        login_as(self.client)
+        likes_before = self._story_likes()
+        kuldim_before, jyladym_before = self._kind_count('kuldim'), self._kind_count('jyladym')
+
+        self.client.post(self._url(), {'kind': 'kuldim'})
+        self.client.post(self._url(), {'kind': 'jyladym'})  # другой вид — замена
+
+        self.assertEqual(self._kind_count('kuldim'), kuldim_before)
+        self.assertEqual(self._kind_count('jyladym'), jyladym_before + 1)
+        self.assertEqual(self._story_likes(), likes_before + 1)  # один голос, не два
+        vote = ChapterReactionVote.objects.get(
+            user__username='aidana', chapter__story__slug=STORY_SLUG,
+            chapter__number=self.CHAPTER)
+        self.assertEqual(vote.kind, 'jyladym')
+
+    def test_guest_post_does_not_vote(self):
+        likes_before = self._story_likes()
+        self.client.post(self._url(), {'kind': 'kuldim'})
+        self.assertEqual(self._story_likes(), likes_before)
+        self.assertFalse(ChapterReactionVote.objects.exists())
+
+    def test_invalid_kind_is_rejected(self):
+        login_as(self.client)
+        self.client.post(self._url(), {'kind': 'not-a-real-reaction'})
+        self.assertFalse(ChapterReactionVote.objects.exists())
+
+    def test_reactions_of_reports_the_picked_kind(self):
+        """`Chapter.my_reaction` и `mine` в `reactions_of` отражают голос
+        именно вошедшего — не жёсткий `False`, как до записи."""
+        login_as(self.client)
+        self.client.post(self._url(), {'kind': 'shabyt'})
+
+        chapter = data.chapter_of(STORY_SLUG, self.CHAPTER, 'aidana')
+        self.assertEqual(chapter.my_reaction, 'shabyt')
+        picked = [i['reaction'].slug for i in data.reactions_of(chapter) if i['mine']]
+        self.assertEqual(picked, ['shabyt'])
+
+    def test_picked_reaction_shows_the_seen_message(self):
+        login_as(self.client)
+        self.client.post(self._url(), {'kind': 'shabyt'})
+        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + f'?chapter={self.CHAPTER}'
+        self.assertContains(self.client.get(url), 'Автор сенің реакцияңды көреді.')
+
+
 class ChapterPollStates(TestCase):
     """FR-STORY-13 / DEC-33: необязательный опрос автора под главой."""
 
@@ -560,6 +649,78 @@ class ChapterPollStates(TestCase):
     def test_single_work_can_have_a_poll_too(self):
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': 'tunge-deiin'}))
         self.assertContains(r, 'Автордың сұрағы')
+
+
+class ChapterPollVoting(TestCase):
+    """Ф15 Этап 4: голос в открытом опросе — один на опрос, не меняется
+    (docs/20 §20.2); закрытый опрос голос не принимает (BR-POLL-05)."""
+
+    OPEN_CHAPTER = 12    # последняя вышедшая — ответа ещё нет
+    CLOSED_CHAPTER = 3   # следующая глава вышла, опрос закрыт
+
+    def _url(self, chapter):
+        return reverse('core:poll_vote', kwargs={'slug': STORY_SLUG, 'chapter': chapter})
+
+    def test_first_vote_is_recorded_and_bumps_the_option(self):
+        login_as(self.client)
+        poll = data.poll_of(STORY_SLUG, self.OPEN_CHAPTER)
+        option = poll.options[0]
+        before = option.votes
+
+        self.client.post(self._url(self.OPEN_CHAPTER), {'option': option.slug})
+
+        poll = data.poll_of(STORY_SLUG, self.OPEN_CHAPTER, 'aidana')
+        self.assertEqual(poll.my_vote, option.slug)
+        self.assertEqual(poll.option_set.get(slug=option.slug).votes, before + 1)
+        self.assertTrue(PollVote.objects.filter(
+            user__username='aidana', poll=poll, option__slug=option.slug).exists())
+
+    def test_second_vote_does_not_change_the_first(self):
+        login_as(self.client)
+        poll = data.poll_of(STORY_SLUG, self.OPEN_CHAPTER)
+        first, second = poll.options[0], poll.options[1]
+        second_before = second.votes
+
+        self.client.post(self._url(self.OPEN_CHAPTER), {'option': first.slug})
+        self.client.post(self._url(self.OPEN_CHAPTER), {'option': second.slug})
+
+        poll = data.poll_of(STORY_SLUG, self.OPEN_CHAPTER, 'aidana')
+        self.assertEqual(poll.my_vote, first.slug)
+        self.assertEqual(poll.option_set.get(slug=second.slug).votes, second_before)
+        self.assertEqual(
+            PollVote.objects.filter(user__username='aidana', poll=poll).count(), 1)
+
+    def test_guest_post_does_not_vote(self):
+        poll = data.poll_of(STORY_SLUG, self.OPEN_CHAPTER)
+        self.client.post(self._url(self.OPEN_CHAPTER), {'option': poll.options[0].slug})
+        self.assertFalse(PollVote.objects.exists())
+
+    def test_closed_poll_rejects_the_vote(self):
+        login_as(self.client)
+        poll = data.poll_of(STORY_SLUG, self.CLOSED_CHAPTER)
+        self.assertTrue(poll.closed)
+        option = poll.options[0]
+        before = option.votes
+
+        self.client.post(self._url(self.CLOSED_CHAPTER), {'option': option.slug})
+
+        self.assertFalse(PollVote.objects.exists())
+        self.assertEqual(poll.option_set.get(slug=option.slug).votes, before)
+
+    def test_invalid_option_is_rejected(self):
+        login_as(self.client)
+        self.client.post(self._url(self.OPEN_CHAPTER), {'option': 'not-a-real-option'})
+        self.assertFalse(PollVote.objects.exists())
+
+    def test_voted_ballot_shows_results_instead_of_the_form(self):
+        login_as(self.client)
+        poll = data.poll_of(STORY_SLUG, self.OPEN_CHAPTER)
+        self.client.post(self._url(self.OPEN_CHAPTER), {'option': poll.options[0].slug})
+
+        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + f'?chapter={self.OPEN_CHAPTER}'
+        r = self.client.get(url)
+        self.assertContains(r, 'сенің жауабың')
+        self.assertNotContains(r, 'Дұрыс жауабы жоқ — тек сенің болжамың.')
 
 
 class WhatsNextPlacement(TestCase):
@@ -682,16 +843,44 @@ class ReportUsesItsOwnIcon(TestCase):
 
 
 class CommentLike(TestCase):
-    """BR-31: лайк комментария переключается, гость уходит на логин."""
+    """BR-31: лайк комментария переключается (Ф15, POST), гость уходит на логин."""
 
     def test_like_is_interactive(self):
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
         self.assertContains(r, 'aria-label="Ұнату"')
-        self.assertContains(r, 'toggle()')
 
     def test_guest_is_gated_to_login(self):
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
         self.assertContains(r, reverse('core:login'))
+
+    def test_post_toggles_the_like_and_the_count(self):
+        # `likes` — пересчёт по настоящим CommentLike (не +1 к сид-числу):
+        # у демо-комментария «87 ұнату» ни разу не было настоящей строки
+        # голоса, и первый реальный лайк отвечает правде, а не сумме с
+        # выдуманной историей.
+        login_as(self.client, 'aidana')
+        comment = data.comments_of_chapter(STORY_SLUG, 1)[0]  # sayyn, не aidana
+        url = reverse('core:comment_like',
+                      kwargs={'slug': STORY_SLUG, 'comment_id': comment.pk})
+
+        self.client.post(url)
+        comment.refresh_from_db()
+        self.assertEqual(comment.likes, 1)
+        self.assertTrue(comment.like_set.filter(user__username='aidana').exists())
+
+        self.client.post(url)  # повторный клик снимает
+        comment.refresh_from_db()
+        self.assertEqual(comment.likes, 0)
+        self.assertFalse(comment.like_set.filter(user__username='aidana').exists())
+
+    def test_guest_post_does_not_like(self):
+        comment = data.comments_of_chapter(STORY_SLUG, 1)[0]
+        before = comment.likes
+        url = reverse('core:comment_like',
+                      kwargs={'slug': STORY_SLUG, 'comment_id': comment.pk})
+        self.client.post(url)
+        comment.refresh_from_db()
+        self.assertEqual(comment.likes, before)
 
 
 class CommentReplies(TestCase):
@@ -764,3 +953,120 @@ class StoryLinksBackToItsCollections(TestCase):
         self.assertIsNotNone(orphan, 'нужен стори вне подборок для проверки пустого случая')
         r = self.client.get(reverse('core:story_detail', kwargs={'slug': orphan.slug}))
         self.assertNotContains(r, 'Мына жинақтарда бар')
+
+
+# ═════════════════════ Ф15, Этап 2: комментарии (POST) ═════════════════════
+
+class CommentCreatePersists(TestCase):
+
+    SLUG = 'dalney-berega'
+
+    def setUp(self):
+        login_as(self.client, 'aidana')
+
+    def test_top_level_comment_is_saved_and_bumps_the_story_counter(self):
+        story = Story.objects.get(slug=self.SLUG)
+        before = story.comments
+        r = self.client.post(
+            reverse('core:comment_create', kwargs={'slug': self.SLUG}),
+            {'text': 'Керемет оқылды!', 'chapter': '3'})
+        comment = StoryComment.objects.get(story=story, text='Керемет оқылды!')
+        self.assertEqual(comment.author.username, 'aidana')
+        self.assertEqual(comment.chapter_number, 3)
+        self.assertIsNone(comment.parent)
+        story.refresh_from_db()
+        self.assertEqual(story.comments, before + 1)
+        self.assertRedirects(
+            r, reverse('core:story_detail', kwargs={'slug': self.SLUG})
+            + f'?chapter=3#comment-{comment.pk}')
+
+    def test_reply_to_a_top_level_comment_is_saved(self):
+        top = next(c for c in data.comments_of_chapter(self.SLUG, 3) if c.replies)
+        self.client.post(
+            reverse('core:comment_create', kwargs={'slug': self.SLUG}),
+            {'text': 'Келісемін.', 'chapter': '3', 'parent': str(top.pk)})
+        reply = StoryComment.objects.get(text='Келісемін.')
+        self.assertEqual(reply.parent_id, top.pk)
+
+    def test_reply_to_a_reply_is_rejected(self):
+        # BR-30: ответ сам уже на верхнем уровне не лежит, одна вложенность.
+        existing_reply = next(
+            c.replies[0] for c in data.comments_of_chapter(self.SLUG, 3) if c.replies)
+        before = StoryComment.objects.count()
+        self.client.post(
+            reverse('core:comment_create', kwargs={'slug': self.SLUG}),
+            {'text': 'Жауапқа жауап.', 'chapter': '3', 'parent': str(existing_reply.pk)})
+        self.assertEqual(StoryComment.objects.count(), before)
+
+    def test_parent_from_another_story_is_rejected(self):
+        # 'kronchessii' — басқа шығарма; сырттан parent id жіберу арқылы
+        # бөтен ағашқа жауап жабыстыруға болмайды.
+        foreign_parent = StoryComment.objects.filter(
+            story__slug='kronchessii', parent__isnull=True).first()
+        before = StoryComment.objects.count()
+        self.client.post(
+            reverse('core:comment_create', kwargs={'slug': self.SLUG}),
+            {'text': 'Бөтен ағашқа.', 'chapter': '3', 'parent': str(foreign_parent.pk)})
+        self.assertEqual(StoryComment.objects.count(), before)
+
+    def test_empty_text_saves_nothing(self):
+        before = StoryComment.objects.count()
+        self.client.post(
+            reverse('core:comment_create', kwargs={'slug': self.SLUG}),
+            {'text': '   ', 'chapter': '3'})
+        self.assertEqual(StoryComment.objects.count(), before)
+
+    def test_guest_post_saves_nothing(self):
+        from django.test import Client
+        guest = Client()
+        before = StoryComment.objects.count()
+        guest.post(
+            reverse('core:comment_create', kwargs={'slug': self.SLUG}),
+            {'text': 'Қонақтың пікірі.', 'chapter': '3'})
+        self.assertEqual(StoryComment.objects.count(), before)
+
+
+class CommentDeleteRemovesIt(TestCase):
+
+    SLUG = 'dalney-berega'
+
+    def test_owner_can_delete_their_own_top_level_comment_and_its_replies(self):
+        # Верхнеуровневый комментарий с ответами — удаление каскадное,
+        # счётчик работы обязан упасть на число всех удалённых строк, не
+        # только на одну.
+        top = next(c for c in data.comments_of_chapter(self.SLUG, 3) if c.replies)
+        removed_ids = [top.pk] + [r.pk for r in top.replies]
+        login_as(self.client, top.author.username)
+        story = Story.objects.get(slug=self.SLUG)
+        before = story.comments
+
+        r = self.client.post(reverse(
+            'core:comment_delete', kwargs={'slug': self.SLUG, 'comment_id': top.pk}))
+
+        self.assertFalse(StoryComment.objects.filter(pk__in=removed_ids).exists())
+        story.refresh_from_db()
+        self.assertEqual(story.comments, before - len(removed_ids))
+        self.assertRedirects(
+            r, reverse('core:story_detail', kwargs={'slug': self.SLUG}) + '?chapter=3')
+
+    def test_get_does_not_delete(self):
+        own = next(c for c in data.comments_of_chapter(self.SLUG, 3) if not c.replies)
+        login_as(self.client, own.author.username)
+        self.client.get(reverse(
+            'core:comment_delete', kwargs={'slug': self.SLUG, 'comment_id': own.pk}))
+        self.assertTrue(StoryComment.objects.filter(pk=own.pk).exists())
+
+    def test_cannot_delete_someone_elses_comment(self):
+        target = next(c for c in data.comments_of_chapter(self.SLUG, 3) if not c.replies)
+        other = next(a.username for a in data.all_authors()
+                    if a.username != target.author.username)
+        login_as(self.client, other)
+        self.client.post(reverse(
+            'core:comment_delete', kwargs={'slug': self.SLUG, 'comment_id': target.pk}))
+        self.assertTrue(StoryComment.objects.filter(pk=target.pk).exists())
+
+    def test_guest_cannot_delete(self):
+        target = data.comments_of_chapter(self.SLUG, 3)[0]
+        self.client.post(reverse(
+            'core:comment_delete', kwargs={'slug': self.SLUG, 'comment_id': target.pk}))
+        self.assertTrue(StoryComment.objects.filter(pk=target.pk).exists())

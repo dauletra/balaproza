@@ -57,8 +57,37 @@
     {# Глобальный toast-host — слушает window-событие 'toast' #}
     {% include "components/toast_host.html" %}
 
+    {% if messages %}
+        {% comment %}
+        Ф15, Этап 0: мост Post/Redirect/Get → toast. Формы записи (write/
+        story/contests/profile) отвечают редиректом + django.contrib.messages;
+        тег сообщения ('success'/'info'/'warning'/'error') совпадает со
+        словарём kind у toast_host дословно — своего маппинга не требуется.
+        Обёртка в DOMContentLoaded обязательна: инлайн-скрипт без src
+        выполняется синхронно во время разбора HTML, до того как выполнится
+        deferred alpine.min.js из <head> и toast_host повесит свой слушатель
+        @toast.window — событие, отправленное раньше, никто бы не услышал.
+        {% endcomment %}
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                {% for message in messages %}
+                    window.dispatchEvent(new CustomEvent('toast', {detail: {kind: '{{ message.tags|default:"info" }}', text: '{{ message.message|escapejs }}'}}));
+                {% endfor %}
+            });
+        </script>
+    {% endif %}
+
     {# Глобальный quick-search popup (Cmd+K / Ctrl+K) #}
     {% include "components/search_popup.html" %}
+
+    {% comment %}
+        Глобальный DeleteConfirm — открывается событием `open-delete-confirm`
+        (docs/04.8). Раньше подключался только в manage_story.html, а
+        триггеры на него есть и в my_story_menu.html (my_stories.html), и в
+        comment.html — на тех страницах модалка молча ничего не открывала:
+        событие уходило в window, а слушать было некому.
+    {% endcomment %}
+    {% include "components/delete_confirm_modal.html" %}
 {% endblock %}
 
 {% block extra_scripts %}{% endblock %}
