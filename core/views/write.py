@@ -15,6 +15,8 @@ Post/Redirect/Get: `django.contrib.messages` + мост в `base.html`
 """
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.core.exceptions import ValidationError
 from django.shortcuts import redirect, render
 
@@ -210,12 +212,14 @@ def chapter_editor(request, slug, chapter=None):
     })
 
 
+@require_POST
+@login_required
 def delete_story(request, slug):
-    """Опасная зона (FR-WRITE-06). GET безопасен — ничего не удаляет и
-    просто возвращает в кабинет: удаление происходит только POST'ом из
-    `delete_confirm_modal.html`."""
-    story = data.story_by_slug_for_author(slug, _current_user(request))
-    if request.method == 'POST' and story is not None:
+    """Опасная зона (FR-WRITE-06): удаление происходит только POST'ом из
+    `delete_confirm_modal.html`. Чужая работа не находится вовсе —
+    `story_by_slug_for_author` режет по автору (IDOR)."""
+    story = data.story_by_slug_for_author(slug, request.user)
+    if story is not None:
         title = story.title
         story.delete()
         messages.success(request, f'«{title}» өшірілді.')

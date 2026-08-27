@@ -1,6 +1,8 @@
 """Конкурсы: список, страница, подача, свои заявки (FR-CONT-*)."""
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.shortcuts import redirect, render
 
 from .. import data
@@ -187,14 +189,16 @@ def my_submissions(request):
     })
 
 
+@require_POST
+@login_required
 def contest_withdraw(request, slug):
-    """Отзыв заявки (BR-23b). GET безопасен — ничего не отзывает: настоящий
-    POST приходит из `withdraw_confirm_modal.html`. Условие (приём ещё
-    идёт, жюри ещё не решило) проверяет `data.withdraw_submission` заново —
-    `can_withdraw` на странице решает только, показать ли кнопку."""
-    user = _current_user(request)
+    """Отзыв заявки (BR-23b): настоящий POST приходит из
+    `withdraw_confirm_modal.html`. Условие (приём ещё идёт, жюри ещё не
+    решило) проверяет `data.withdraw_submission` заново — `can_withdraw` на
+    странице решает только, показать ли кнопку."""
+    user = request.user
     contest = data.contest_by_slug(slug)
-    if request.method == 'POST' and contest is not None and user:
+    if contest is not None:
         if data.withdraw_submission(user, contest):
             messages.success(request, 'Өтінім қайтарып алынды.')
         else:

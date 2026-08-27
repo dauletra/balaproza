@@ -907,7 +907,19 @@ class DeleteStoryRemovesIt(TestCase):
         login_as(self.client)
 
     def test_get_does_not_delete(self):
-        self.client.get(reverse('core:delete_story', kwargs={'slug': self.SLUG}))
+        # Не «ничего не произошло», а «метод не тот»: удаление живёт только
+        # за POST'ом из модалки подтверждения.
+        response = self.client.get(
+            reverse('core:delete_story', kwargs={'slug': self.SLUG}))
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(Story.objects.filter(slug=self.SLUG).exists())
+
+    def test_a_guest_is_sent_to_the_door_not_to_the_deletion(self):
+        guest = Client()
+        response = guest.post(reverse('core:delete_story',
+                                      kwargs={'slug': self.SLUG}))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/auth/login/', response['Location'])
         self.assertTrue(Story.objects.filter(slug=self.SLUG).exists())
 
     def test_post_deletes_and_redirects_to_my_stories(self):

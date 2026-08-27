@@ -6,10 +6,12 @@
 """
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 
 from .. import data
 from ..models import RASTER_ONLY
@@ -210,6 +212,8 @@ def profile_other(request, username):
 # kind → подпись, список, счётчик. Счётчик отдельной функцией, а не
 # `len()` от списка: сегментов на странице два, а открыт один, и второму
 # нужно только число.
+@require_POST
+@login_required
 def follow_toggle(request, username):
     """Кнопка «Жазылу» (FR-PROF-04): подписаться или отписаться.
 
@@ -222,8 +226,7 @@ def follow_toggle(request, username):
     страницах. `_safe_next` не пускает наружу (open-redirect).
     """
     target = data.author_by_username(username)
-    if (request.method == 'POST' and target is not None
-            and request.user.is_authenticated):
+    if target is not None:
         now_following = data.toggle_follow(request.user, target)
         messages.success(request, 'Жазылдың' if now_following
                          else 'Жазылудан бас тарттың')

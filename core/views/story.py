@@ -1,11 +1,13 @@
 """Страница произведения и инлайн-чтение главы (FR-STORY-*)."""
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 
 from .. import data
-from .common import _current_user, _current_username
+from .common import _current_user
 
 # Что читатель уже открывал в этой сессии — против накрутки перезагрузкой.
 # Список, а не множество: сессия сериализуется в JSON, где множества нет.
@@ -145,13 +147,14 @@ def _chapter_from_post(request) -> int | None:
         return None
 
 
+@require_POST
+@login_required
 def comment_create(request, slug):
-    """Новый комментарий или ответ. Гость и несуществующий slug молча
-    возвращаются на страницу — форма для них и так не рендерится."""
+    """Новый комментарий или ответ. Несуществующий slug молча возвращается
+    на страницу."""
     story = data.story_by_slug(slug)
-    username = _current_username(request)
     chapter_number = _chapter_from_post(request)
-    if request.method != 'POST' or story is None or not username:
+    if story is None:
         return _back_to_story(slug, chapter_number)
 
     text = request.POST.get('text', '').strip()
@@ -175,13 +178,13 @@ def comment_create(request, slug):
     return _back_to_story(slug, chapter_number, anchor=f'comment-{comment.pk}')
 
 
+@require_POST
+@login_required
 def comment_delete(request, slug, comment_id):
-    """GET безопасен — ничего не удаляет. Владение — `belongs_to` (BR-33),
-    та же проверка, что уже решает, показывать «Жою» или «Шағым»."""
-    username = _current_username(request)
+    """Владение — `belongs_to` (BR-33), та же проверка, что уже решает,
+    показывать «Жою» или «Шағым». Чужой комментарий молча не удаляется."""
     comment = data.comment_of(slug, comment_id)
-    if (request.method == 'POST' and comment is not None
-            and comment.belongs_to(username)):
+    if comment is not None and comment.belongs_to(request.user.username):
         chapter_number = comment.chapter_number
         data.delete_comment(comment)
         messages.success(request, 'Пікір өшірілді.')
@@ -189,12 +192,13 @@ def comment_delete(request, slug, comment_id):
     return _back_to_story(slug, _chapter_from_post(request))
 
 
+@require_POST
+@login_required
 def comment_like(request, slug, comment_id):
-    """Toggle (BR-31) — авторизованный обязателен, на свой комментарий
-    лайк тоже можно поставить (правило не запрещает)."""
-    username = _current_username(request)
+    """Toggle (BR-31); на свой комментарий лайк тоже можно поставить —
+    правило не запрещает."""
     comment = data.comment_of(slug, comment_id)
-    if request.method == 'POST' and comment is not None and username:
+    if comment is not None:
         data.toggle_comment_like(comment, request.user)
         return _back_to_story(slug, comment.chapter_number, anchor=f'comment-{comment.pk}')
     return _back_to_story(slug, _chapter_from_post(request))
@@ -202,6 +206,8 @@ def comment_like(request, slug, comment_id):
 
 # ───────────────────── Библиотека (BR-60/61, FR-LIB-02) ──────────────────
 
+@require_POST
+@login_required
 def library_toggle(request, slug):
     """Кнопка «Сақтау»: положить работу в библиотеку или снять с полки.
 
@@ -209,11 +215,10 @@ def library_toggle(request, slug):
     обещал «Кітапханаға сақталды», а на полке не появлялось ничего, и
     после перезагрузки страницы обещание исчезало вместе с ним.
 
-    Гостю кнопка не рендерится — она сразу ведёт на вход, — поэтому здесь
-    просто возврат без записи, как у остальных действий страницы.
+    Гостю кнопка не рендерится — она сразу ведёт на вход.
     """
     story = data.story_by_slug(slug)
-    if request.method == 'POST' and story is not None and request.user.is_authenticated:
+    if story is not None:
         saved = data.toggle_library_entry(request.user, story)
         messages.success(request, 'Кітапханаға сақталды' if saved
                          else 'Кітапханадан алынды')
@@ -222,26 +227,27 @@ def library_toggle(request, slug):
 
 # ───────────────────── Реакции на главу (BR-REACT-02/03, Ф15 Этап 3) ──────
 
+@require_POST
+@login_required
 def chapter_react(request, slug, chapter):
-    """Ставит/снимает/меняет реакцию на главе — авторизованный обязателен,
-    `kind` — один из пяти закрытого списка (BR-REACT-01)."""
-    username = _current_username(request)
+    """Ставит, снимает или меняет реакцию на главе; `kind` — один из пяти
+    закрытого списка (BR-REACT-01)."""
     ch = data.chapter_of(slug, chapter)
     kind = request.POST.get('kind', '')
-    if (request.method == 'POST' and ch is not None and username
-            and kind in data.REACTIONS_BY_SLUG):
+    if ch is not None and kind in data.REACTIONS_BY_SLUG:
         data.toggle_chapter_reaction(ch, request.user, kind)
     return _back_to_story(slug, chapter)
 
 
 # ───────────────────── Опрос главы (BR-POLL-03/05, Ф15 Этап 4) ────────────
 
+@require_POST
+@login_required
 def poll_vote(request, slug, chapter):
-    """Голос в опросе — авторизованный обязателен; закрытый опрос и
-    невалидный/повторный вариант `data.cast_poll_vote` тихо отклоняет."""
-    username = _current_username(request)
+    """Голос в опросе; закрытый опрос и невалидный или повторный вариант
+    `data.cast_poll_vote` тихо отклоняет."""
     poll = data.poll_of(slug, chapter)
     option_slug = request.POST.get('option', '')
-    if request.method == 'POST' and poll is not None and username and option_slug:
+    if poll is not None and option_slug:
         data.cast_poll_vote(poll, request.user, option_slug)
     return _back_to_story(slug, chapter)

@@ -1264,13 +1264,16 @@ class WithdrawSubmission(TestCase):
             contest__slug=self.OPEN, author__username='aidana').exists())
 
     def test_nothing_else_withdraws_anything(self):
-        # GET безопасен
+        # GET отвечает «не тот метод», а не тихо ничего не делает.
         login_as(self.client, 'dina_books')
-        self.client.get(reverse('core:contest_withdraw', args=[self.OPEN]))
+        self.assertEqual(
+            self.client.get(reverse('core:contest_withdraw',
+                                    args=[self.OPEN])).status_code, 405)
         self.assertTrue(Submission.objects.filter(
             contest__slug=self.OPEN, author__username='dina_books').exists())
-        # Гость
-        Client().post(reverse('core:contest_withdraw', args=[self.OPEN]))
+        # Гость уходит на вход, а не в тихий редирект «как будто получилось».
+        guest = Client().post(reverse('core:contest_withdraw', args=[self.OPEN]))
+        self.assertIn('/auth/login/', guest['Location'])
         self.assertTrue(Submission.objects.filter(
             contest__slug=self.OPEN, author__username='dina_books').exists())
         # Судейство уже идёт

@@ -1,8 +1,10 @@
 """Лента событий автора (FR-NOTIF-01)."""
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 
 from .. import data
 from ..links import notification_href
@@ -37,6 +39,7 @@ def notifications(request):
     })
 
 
+@login_required
 def notification_open(request, pk):
     """Открыть уведомление: снять «непрочитано» и уйти к его предмету.
 
@@ -49,22 +52,21 @@ def notification_open(request, pk):
     ссылки в самой карточке. Предмета может не быть (объект удалили) —
     тогда возвращаемся в ленту, а не на битый адрес.
     """
-    if not request.user.is_authenticated:
-        return redirect('core:notifications')
     notification = data.mark_notification_read(request.user, pk)
     if notification is None:
         return redirect('core:notifications')
     return redirect(notification_href(notification) or reverse('core:notifications'))
 
 
+@require_POST
+@login_required
 def notifications_read_all(request):
     """«Барлығын оқылды деп белгілеу» — кнопка над лентой (FR-NOTIF-04).
 
     Была формой с `@submit.prevent` и тостом «(демо)»: бейдж в шапке
     после неё показывал ровно то же число.
     """
-    if request.method == 'POST' and request.user.is_authenticated:
-        cleared = data.mark_all_notifications_read(request.user)
-        if cleared:
-            messages.success(request, 'Барлығы оқылды деп белгіленді.')
+    cleared = data.mark_all_notifications_read(request.user)
+    if cleared:
+        messages.success(request, 'Барлығы оқылды деп белгіленді.')
     return redirect('core:notifications')
