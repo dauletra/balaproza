@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from .. import data
+from ..forms import CommentForm
 from .common import _current_user
 
 # Что читатель уже открывал в этой сессии — против накрутки перезагрузкой.
@@ -157,22 +158,23 @@ def comment_create(request, slug):
     if story is None:
         return _back_to_story(slug, chapter_number)
 
-    text = request.POST.get('text', '').strip()
+    form = CommentForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, 'Пікір мәтінін жаз.')
+        return _back_to_story(slug, chapter_number)
+
     parent = None
-    parent_id = request.POST.get('parent')
+    parent_id = form.cleaned_data['parent']
     if parent_id:
         # BR-30: ответ — только на верхнеуровневый комментарий этой же
-        # работы. Чужой/несуществующий/уже-ответ id — не создаём ничего.
+        # работы. Чужой, несуществующий и уже-ответ — не создаём ничего.
         parent = data.top_level_comment_of(slug, parent_id)
         if parent is None:
             messages.error(request, 'Бұл пікірге жауап беруге болмайды.')
             return _back_to_story(slug, chapter_number)
 
-    if not text:
-        messages.error(request, 'Пікір мәтінін жаз.')
-        return _back_to_story(slug, chapter_number)
-
-    comment = data.add_comment(story, request.user, text=text,
+    comment = data.add_comment(story, request.user,
+                               text=form.cleaned_data['text'],
                                chapter_number=chapter_number, parent=parent)
     messages.success(request, 'Пікірің қосылды.')
     return _back_to_story(slug, chapter_number, anchor=f'comment-{comment.pk}')

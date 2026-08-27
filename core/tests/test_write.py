@@ -669,6 +669,16 @@ class StorySettingsSavesFields(TestCase):
         story.refresh_from_db()
         self.assertEqual(story.format, 'serial')
 
+    def test_an_annotation_past_the_limit_saves_nothing(self):
+        """BR-16: 500 знаков. Число жило в поле счётчика шаблона и в этом
+        правиле, но в проверке не участвовало вовсе — сохранялось что
+        угодно."""
+        before = Story.objects.get(slug=self.SLUG).annotation
+        self._post(annotation='ә' * 501)
+        self.assertEqual(Story.objects.get(slug=self.SLUG).annotation, before)
+        self._post(annotation='ә' * 500)
+        self.assertEqual(len(Story.objects.get(slug=self.SLUG).annotation), 500)
+
     def test_status_field_outside_the_allowed_set_is_ignored(self):
         # 'aidana-kus' — черновик, радио «Мәртебесі» на этой странице у
         # него вообще не рендерится (BR-10a) — POST в обход формы не
@@ -681,10 +691,10 @@ class StorySettingsSavesFields(TestCase):
 class StorySettingsCoverUpload(TestCase):
     """Тот же валидатор, что у User.avatar (BR-46) — SVG не проходит.
 
-    `story.cover = cover; story.save()` — прямое присваивание, не
-    ModelForm, поэтому `RASTER_ONLY` не срабатывает сам по себе (тот же
-    пробел, что был у `avatar` до Ф15 Этапа 6) — закрыто явным вызовом
-    во view.
+    Отсекает его сам `RASTER_ONLY` на поле модели: форма страницы —
+    `StorySettingsForm`, и валидаторы поля в ней срабатывают. Ручной вызов
+    рядом с присваиванием, который держал это правило раньше, был третьим
+    местом, где его можно было забыть.
     """
 
     SLUG = 'aidana-kus'

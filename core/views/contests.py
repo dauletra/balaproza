@@ -6,6 +6,7 @@ from django.views.decorators.http import require_POST
 from django.shortcuts import redirect, render
 
 from .. import data
+from ..forms import SubmissionForm
 from .common import _current_user, _page_state
 
 # ───────────────────────── CONT — конкурсы ───────────────────────────────
@@ -78,30 +79,18 @@ def contest_submit(request, slug):
         # и отдельной проверки владения форме не нужно.
         candidates = {c['story'].slug: c['story']
                      for c in data.submission_candidates(user, contest)}
-        story = candidates.get(request.POST.get('story_slug', ''))
-        ai_declaration = request.POST.get('ai_used', '')
-        age_confirmed = bool(request.POST.get('confirm_age'))
-        rules_confirmed = bool(request.POST.get('confirm_rules'))
-
-        errors = []
-        if not contest.is_accepting:
-            errors.append('Өтінім қабылдау аяқталды.')
-        if story is None:
-            errors.append('Шығарманы таңда.')
-        if ai_declaration not in data.AI_DECLARATIONS:
-            errors.append('AI-декларацияға жауап бер.')
-        if contest.eligibility_line and not age_confirmed:
-            errors.append('Жас талабына сай екеніңді раста.')
-        if not rules_confirmed:
-            errors.append('Байқау ережелерімен келісуді раста.')
-
-        if errors:
-            for err in errors:
-                messages.error(request, err)
+        form = SubmissionForm(request.POST, candidates=candidates,
+                              contest=contest)
+        if not form.is_valid():
+            for errors in form.errors.values():
+                for error in errors:
+                    messages.error(request, error)
         else:
             _, created = data.create_submission(
-                request.user, contest, story, ai_declaration=ai_declaration,
-                age_confirmed=age_confirmed, rules_confirmed=rules_confirmed)
+                request.user, contest, form.story,
+                ai_declaration=form.cleaned_data['ai_used'],
+                age_confirmed=form.cleaned_data['confirm_age'],
+                rules_confirmed=form.cleaned_data['confirm_rules'])
             if created:
                 messages.success(request, 'Өтінім жіберілді.')
             else:

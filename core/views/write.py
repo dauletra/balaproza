@@ -16,14 +16,27 @@ Post/Redirect/Get: `django.contrib.messages` + мост в `base.html`
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST
-from django.core.exceptions import ValidationError
 from django.shortcuts import redirect, render
+from django.views.decorators.http import require_POST
 
 from .. import data
+from ..forms import ChapterForm, NewStoryForm, StorySettingsForm
 from ..links import attention_links, checklist_links
-from ..models import RASTER_ONLY
 from .common import _current_user, _page_state
+
+
+def _report(request, form) -> None:
+    """Ошибки формы — тостами (FR-SYS-01), по одной строке на причину.
+
+    Формы этих страниц отвечают Post/Redirect/Get, и вернуть заполненную
+    форму с подсветкой полей на редиректе нельзя: у ответа нет тела. Пока
+    так — сообщение называет, что поправить; хранить черновик ввода между
+    запросами это отдельная работа.
+    """
+    for errors in form.errors.values():
+        for error in errors:
+            messages.error(request, error)
+
 
 def my_stories(request):
     user = _current_user(request)
@@ -46,14 +59,15 @@ def my_stories(request):
 
 def new_story(request):
     if request.method == 'POST' and request.user.is_authenticated:
-        title = request.POST.get('title', '').strip()
-        fmt = request.POST.get('format', '')
-        genre = data.genre_by_slug(request.POST.get('genre_primary', ''))
-        if not title or fmt not in data.STORY_FORMATS or genre is None:
-            messages.error(request, 'Атауын, форматын және негізгі жанрын таңда.')
+        form = NewStoryForm(request.POST)
+        if not form.is_valid():
+            _report(request, form)
             return redirect('core:new_story')
         story = data.create_story(
-            author=request.user, title=title, format=fmt, genre_primary=genre)
+            author=request.user,
+            title=form.cleaned_data['title'],
+            format=form.cleaned_data['format'],
+            genre_primary=form.cleaned_data['genre_primary'])
         messages.success(request, 'Шығарма құрылды — енді мәтін.')
         return redirect('core:chapter_new', slug=story.slug)
 
@@ -98,64 +112,27 @@ def story_settings(request, slug):
     story = data.story_by_slug_for_author(slug, _current_user(request))
 
     if request.method == 'POST' and story is not None:
-        title = request.POST.get('title', '').strip()
-        annotation = request.POST.get('annotation', '').strip()
-        fmt = request.POST.get('format', '')
-        audience = request.POST.get('audience', '')
-        status = request.POST.get('status', '')
-        cover = request.FILES.get('cover')
-        tag_names = request.POST.get('tags', '').split(',')
-
-        genre_primary = data.genre_by_slug(request.POST.get('genre_primary', ''))
-        genre_secondary = data.genre_by_slug(request.POST.get('genre_secondary', ''))
-        if genre_secondary and genre_primary and genre_secondary.pk == genre_primary.pk:
-            # Второй жанр не выбирают тем же самым — тихо игнорируем, а не
-            # ругаем: это не то, ради чего форму стоит возвращать с ошибкой.
-            genre_secondary = None
-
-        errors = []
-        if not title:
-            errors.append('Атауын жаз.')
-        if genre_primary is None:
-            errors.append('Негізгі жанрды таңда.')
-        if fmt not in data.STORY_FORMATS:
-            errors.append('Форматты таңда.')
-        if audience and audience not in data.AUDIENCE_ORDER:
-            errors.append('Жас белгісі дұрыс емес.')
-        if fmt == 'single' and story.chapter_set.count() > 1:
-            # Бір бөлімді пішін бір ғана бөлімге лайықталған (Story.text_chapter,
-            # docs/architecture.md) — бірнеше жазылған бөлімі бар жұмысты ауыстыру
-            # деректі бұзады, сондықтан бұл ауысу рұқсат етілмейді.
-            errors.append(
-                'Бірнеше бөлімі жазылған жұмысты бір бөлімді пішінге ауыстыруға болмайды.')
-        if cover:
-            # Тікелей `story.cover = cover; story.save()` (қасиеттің
-            # `validators=[RASTER_ONLY]`-ін іске қоспайды — ол тек
-            # ModelForm арқылы толық `clean()`-де жұмыс істейді), сондықтан
-            # SVG осында айқын тексеріледі (BR-46, `avatar`-мен бірдей).
-            try:
-                RASTER_ONLY(cover)
-            except ValidationError as exc:
-                errors.extend(exc.messages)
-
-        # `status`-радио шаблонда тек ашық сериалға ғана шығады (BR-10a,
-        # BR-11) — POST соны айналып өтсе де, рұқсат етілмеген мән қабылданбайды.
-        allowed_status = (('OnProcess', 'Completed')
-                          if story.is_public and story.is_serial else ())
-        if status and status not in allowed_status:
-            status = ''
-
-        if errors:
-            for err in errors:
-                messages.error(request, err)
-        else:
+        # Обложку проверяет валидатор поля (BR-46) — ручного вызова
+        # `RASTER_ONLY` рядом больше нет, а вместе с ним и шанса забыть его
+        # в третьем месте. Статус и второй жанр форма чинит молча: чужое
+        # значение значит «не меняем», совпавший жанр — «не выбран».
+        form = StorySettingsForm(request.POST, request.FILES, story=story)
+        if form.is_valid():
             data.update_story_settings(
-                story, title=title, annotation=annotation, format=fmt,
-                genre_primary=genre_primary, genre_secondary=genre_secondary,
-                audience=audience, status=status, cover=cover,
-                tag_names=tag_names,
+                story,
+                title=form.cleaned_data['title'],
+                annotation=form.cleaned_data['annotation'],
+                format=form.cleaned_data['format'],
+                genre_primary=form.cleaned_data['genre_primary'],
+                genre_secondary=form.cleaned_data['genre_secondary'],
+                audience=form.cleaned_data['audience'],
+                status=form.cleaned_data['status'],
+                cover=form.cleaned_data['cover'],
+                tag_names=form.tag_names,
             )
             messages.success(request, 'Өзгертулер сақталды.')
+        else:
+            _report(request, form)
         return redirect('core:story_settings', slug=slug)
 
     return render(request, 'pages/write/story_settings.html', {
@@ -175,13 +152,14 @@ def chapter_editor(request, slug, chapter=None):
     story = data.story_by_slug_for_author(slug, _current_user(request))
 
     if request.method == 'POST' and story is not None:
-        title = request.POST.get('title', '').strip()
-        body = request.POST.get('body', '')
-        if not title or not body.strip():
-            messages.error(request, 'Атауын және мәтінін жаз.')
+        form = ChapterForm(request.POST)
+        if not form.is_valid():
+            _report(request, form)
         else:
-            saved = data.save_chapter(story, chapter, title=title, body=body)
-            data.save_chapter_poll(saved, request.POST.get('poll_question', ''),
+            saved = data.save_chapter(story, chapter,
+                                      title=form.cleaned_data['title'],
+                                      body=form.cleaned_data['body'])
+            data.save_chapter_poll(saved, form.cleaned_data['poll_question'],
                                    request.POST.getlist('poll_option'))
             chapter = saved.number
             if request.POST.get('action') == 'submit_review':

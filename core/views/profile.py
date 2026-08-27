@@ -7,15 +7,21 @@
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
 from django.http import Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from .. import data
-from ..models import RASTER_ONLY
+from ..forms import ProfileForm
 from .common import _current_user, _current_username, _safe_next
+
+
+def _report(request, form) -> None:
+    """Ошибки формы — тостами (FR-SYS-01), по строке на причину."""
+    for errors in form.errors.values():
+        for error in errors:
+            messages.error(request, error)
 
 # ───────────────────────── PROF — профиль ────────────────────────────────
 _PROF_TABS_ME    = ("works", "library", "stats", "about")
@@ -109,45 +115,15 @@ def profile_me_edit(request):
     author = data.author_by_username(username)
 
     if request.method == 'POST' and author is not None:
-        pen_name = request.POST.get('pen_name', '').strip()
-        name = request.POST.get('name', '').strip()
-        bio = request.POST.get('bio', '').strip()
-        gender = request.POST.get('gender', '')
-        age_raw = request.POST.get('age', '').strip()
-        avatar = request.FILES.get('avatar')
-
-        errors = []
-        if not pen_name:
-            errors.append('Авторлық атыңды жаз.')
-        elif len(pen_name) > 60:
-            errors.append('Авторлық атың тым ұзын — 60 таңбадан аспасын.')
-        if not name:
-            errors.append('Ресми атыңды жаз.')
-        elif len(name) > 120:
-            errors.append('Ресми атың тым ұзын — 120 таңбадан аспасын.')
-        if len(bio) > 200:
-            errors.append('Өзің туралы мәтін тым ұзын — 200 таңбадан аспасын.')
-        if gender and gender not in data.GENDERS:
-            errors.append('Жынысын дұрыс таңда.')
-        age = None
-        if age_raw:
-            if not age_raw.isdigit() or not (1 <= int(age_raw) <= 120):
-                errors.append('Жасын дұрыс жаз.')
-            else:
-                age = int(age_raw)
-        if avatar:
-            try:
-                RASTER_ONLY(avatar)
-            except ValidationError as exc:
-                errors.extend(exc.messages)
-
-        if errors:
-            for err in errors:
-                messages.error(request, err)
+        # Аватар проверяет валидатор поля (BR-46), лимиты имён и био — сама
+        # модель: до этого «60 таңбадан аспасын» жило числом в трёх местах
+        # сразу — в поле, в подсказке шаблона и в этой проверке.
+        form = ProfileForm(request.POST, request.FILES)
+        if not form.is_valid():
+            _report(request, form)
             return redirect('core:profile_me_edit')
 
-        data.update_profile(request.user, pen_name=pen_name, name=name,
-                            bio=bio, age=age, gender=gender, avatar=avatar)
+        data.update_profile(request.user, **form.cleaned_data)
         messages.success(request, 'Өзгертулер сақталды.')
         return redirect('core:profile_me')
 
