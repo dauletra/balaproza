@@ -64,6 +64,14 @@ class SeededTestRunner(DiscoverRunner):
             parallel=0,          # клонировать будем сами — после сида
             **kwargs,
         )
+        # Пустой `config` — тестовой базы не создали. Django создаёт её
+        # только если тесты её просят (`get_databases(suite)`), а модули из
+        # чистого `unittest.TestCase` — фильтры, лint шаблонов — не просят.
+        # Безусловный сид в этом случае уходил не в тестовую базу, а в ту,
+        # что стоит в `DATABASE_URL`, то есть в базу разработки.
+        if not config:
+            return config
+
         call_command('seed_demo', quiet=True)
 
         for connection, _, _ in config:
