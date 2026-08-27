@@ -10,6 +10,7 @@
  - прогресс чтения отображается только если slug совпадает с SAMPLE_PROGRESS.
 """
 
+from core.tests import factories as make
 from core.tests.base import TestCase, login_as, login_as_newcomer
 from django.urls import reverse
 
@@ -28,263 +29,164 @@ from django.utils import timezone
 STORY_SLUG = 'dalney-berega'   # есть в STORIES_BY_SLUG и в CHAPTERS_BY_STORY
 
 
-class StoryDetailUnknownSlug(TestCase):
-    """Неизвестный slug → 200 + сообщение «Шығарма табылмады»."""
+class StoryPageAnswersTheQuestionShouldIRead(TestCase):
+    """Шапка, аннотация, теги и первая глава — всё, из чего складывается
+    решение читать. Один запрос на класс: сценарий «гость открыл
+    произведение» один, и вопросов к нему полтора десятка."""
 
-    def test_unknown_slug_renders_not_found_message(self):
-        response = self.client.get(reverse('core:story_detail', kwargs={'slug': 'no-such-story'}))
+    def setUp(self):
+        self.response = self.client.get(
+            reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
+        self.story = data.story_by_slug(STORY_SLUG)
+
+    def test_it_names_the_work_its_author_and_its_genres(self):
+        self.assertContains(self.response, self.story.title)
+        self.assertContains(self.response, self.story.author.public_name)
+        for genre in self.story.genres_resolved:
+            with self.subTest(genre=genre.slug):
+                self.assertContains(self.response, genre.name)
+
+    def test_the_annotation_comes_from_the_work_not_from_the_template(self):
+        """Три месяца в шаблоне лежал захардкоженный абзац — один и тот же
+        на всех произведениях, при заполненном `Story.annotation`.
+        Аннотация и есть главный аргумент «читать или нет»."""
+        self.assertContains(self.response, 'Аннотация')
+        self.assertContains(self.response, self.story.annotation)
+        self.assertNotContains(self.response, 'Авторлар әлемі')
+
+    def test_the_first_chapter_opens_as_a_teaser_with_a_way_onward(self):
+        """Чтение идёт inline: отдельного маршрута `/read/` нет (DEC-30),
+        и старого scrollspy-блока тоже."""
+        self.assertContains(self.response, data.chapter_of(STORY_SLUG, 1).title)
+        self.assertContains(self.response, '1-бөлім')
+        self.assertContains(self.response, 'Жалғастыру')
+        self.assertContains(self.response, 'Келесі бөлім')
+        self.assertNotContains(self.response, 'Алдыңғы бөлім')
+        self.assertNotContains(self.response, f'/story/{STORY_SLUG}/read/')
+        self.assertNotContains(self.response, 'href="#anon"')
+
+    def test_every_chapter_is_reachable_from_the_list(self):
+        """Список глав есть и в рейле, и в контенте: рейл начинается с xl."""
+        for chapter in data.chapters_of(STORY_SLUG):
+            with self.subTest(chapter=chapter.number):
+                self.assertContains(self.response, f'?chapter={chapter.number}')
+        self.assertContains(self.response, 'aria-label="Мобильді бөлімдер"')
+
+    def test_the_author_card_survives_the_phone(self):
+        """Рейл начинается с xl, поэтому на телефоне от автора оставалась
+        строка с 24px-аватаром — на платформе, чья ценность в живых
+        молодых авторах."""
+        self.assertContains(self.response, self.story.author.bio, count=2)
+        self.assertContains(self.response, 'Жазылу')
+
+    def test_an_unknown_slug_says_so_without_the_furniture(self):
+        response = self.client.get(
+            reverse('core:story_detail', kwargs={'slug': 'no-such-story'}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Шығарма табылмады')
-        # И никаких артефактов главы
         self.assertNotContains(response, 'Аннотация')
+        self.assertNotContains(response, 'Оқу панелі')
 
 
-class StoryDetailValidSlug(TestCase):
-    """Гость заходит на /story/<slug>/ — видит главную карточку, аннотацию и тизер гл.1."""
+class ChapterNavigationIsForgiving(TestCase):
+    """`?chapter=N` — единственный способ открыть главу. Мусор в параметре
+    это старая ссылка или опечатка, а не повод отдать 404."""
 
-    def setUp(self):
-        self.url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG})
-        self.response = self.client.get(self.url)
+    def test_a_middle_chapter_has_both_directions(self):
+        response = self.client.get(
+            reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=4')
+        self.assertContains(response, data.chapter_of(STORY_SLUG, 4).title)
+        self.assertContains(response, 'Алдыңғы бөлім')
+        self.assertContains(response, 'Келесі бөлім')
+        self.assertContains(response, '?chapter=3')
+        self.assertContains(response, '?chapter=5')
+        # Явный выбор главы отменяет тизер.
+        self.assertNotContains(response, 'Жалғастыру')
 
-    def test_200(self):
-        self.assertEqual(self.response.status_code, 200)
-
-    def test_title_includes_story_and_author(self):
-        story = data.story_by_slug(STORY_SLUG)
-        self.assertContains(self.response, story.title)
-        self.assertContains(self.response, story.author.public_name)
-
-    def test_annotation_section_present(self):
-        self.assertContains(self.response, 'Аннотация')
-
-    def test_first_chapter_shown_inline(self):
-        """Под аннотацией — первая глава с её заголовком."""
-        ch1 = data.chapter_of(STORY_SLUG, 1)
-        self.assertContains(self.response, ch1.title)
-        self.assertContains(self.response, '1-бөлім')
-
-    def test_first_chapter_renders_as_teaser_for_guest(self):
-        """Гость на голом URL без ?chapter — видит «Жалғастыру» (тизер)."""
-        self.assertContains(self.response, 'Жалғастыру')
-
-    def test_no_old_scrollspy_anchors(self):
-        """Старый scrollspy-блок удалён."""
-        # Якорь #anon/#comments в pill-nav больше не нужны
-        self.assertNotContains(self.response, 'href="#anon"')
-        self.assertNotContains(self.response, 'href="#comments"')
-
-    def test_no_read_button(self):
-        """Кнопка «Оқу» удалена — чтение происходит inline."""
-        # Старого пути /read/ нигде в шаблоне быть не должно
-        self.assertNotContains(self.response, f'/story/{STORY_SLUG}/read/')
-
-    def test_right_rail_chapter_links_use_query(self):
-        """Список глав в рейле ведёт на ?chapter=N (а не на /read/N/)."""
-        for c in data.chapters_of(STORY_SLUG):
-            with self.subTest(chapter=c.number):
-                self.assertContains(self.response, f'?chapter={c.number}')
-
-    def test_mobile_chapter_selector_present(self):
-        """На mobile список глав доступен в основном контенте, потому что right rail скрыт."""
-        self.assertContains(self.response, 'aria-label="Мобильді бөлімдер"')
-        self.assertContains(self.response, '<summary', html=False)
-
-    def test_next_chapter_link_present(self):
-        """На гл.1 есть ссылка «Келесі бөлім» через ?chapter=2."""
-        self.assertContains(self.response, 'Келесі бөлім')
-        self.assertContains(self.response, '?chapter=2')
-
-    def test_no_prev_link_on_first_chapter(self):
-        self.assertNotContains(self.response, 'Алдыңғы бөлім')
-
-    def test_genres_chips_rendered(self):
-        story = data.story_by_slug(STORY_SLUG)
-        for g in story.genres_resolved:
-            with self.subTest(genre=g.slug):
-                self.assertContains(self.response, g.name)
-
-
-class StoryDetailChapterParam(TestCase):
-    """?chapter=N показывает конкретную главу полностью (без тизера)."""
-
-    def test_chapter_2_renders_full_text(self):
-        ch2 = data.chapter_of(STORY_SLUG, 2)
-        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=2'
-        r = self.client.get(url)
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, ch2.title)
-        self.assertContains(r, '2-бөлім')
-        # Тизер только для гл.1 на голом URL — здесь его быть не должно
-        self.assertNotContains(r, 'Жалғастыру')
-
-    def test_prev_and_next_for_middle_chapter(self):
-        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=4'
-        r = self.client.get(url)
-        self.assertContains(r, 'Алдыңғы бөлім')
-        self.assertContains(r, 'Келесі бөлім')
-        self.assertContains(r, '?chapter=3')
-        self.assertContains(r, '?chapter=5')
-
-    def test_last_chapter_has_no_next(self):
+    def test_the_last_chapter_offers_nothing_further(self):
         last = len(data.chapters_of(STORY_SLUG))
-        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + f'?chapter={last}'
-        r = self.client.get(url)
-        # Ссылки на ?chapter=last+1 быть не должно
-        self.assertNotContains(r, f'?chapter={last + 1}')
-        self.assertContains(r, 'соңғы бөлім')
+        response = self.client.get(
+            reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + f'?chapter={last}')
+        self.assertContains(response, 'соңғы бөлім')
+        self.assertNotContains(response, f'?chapter={last + 1}')
 
-    def test_out_of_range_falls_back_to_chapter_1(self):
-        """Невалидное N (999) — view возвращает гл.1 (без 404)."""
-        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=999'
-        r = self.client.get(url)
-        self.assertEqual(r.status_code, 200)
-        ch1 = data.chapter_of(STORY_SLUG, 1)
-        self.assertContains(r, ch1.title)
+    def test_junk_falls_back_to_the_first_chapter(self):
+        for junk in ('999', 'abc', '0', '-2'):
+            with self.subTest(chapter=junk):
+                response = self.client.get(
+                    reverse('core:story_detail', kwargs={'slug': STORY_SLUG})
+                    + f'?chapter={junk}')
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, data.chapter_of(STORY_SLUG, 1).title)
 
-    def test_garbage_chapter_param_falls_back(self):
-        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=abc'
-        r = self.client.get(url)
-        self.assertEqual(r.status_code, 200)
-
-
-class StoryDetailSingleWork(TestCase):
-    SLUG = 'sila-imperii'
-
-    def setUp(self):
-        self.response = self.client.get(reverse('core:story_detail', kwargs={'slug': self.SLUG}))
-
-    def test_single_work_uses_full_text_label(self):
-        self.assertContains(self.response, 'Толық мәтін')
-        self.assertContains(self.response, 'Бір оқылым')
-
-    def test_single_work_hides_chapter_navigation(self):
-        self.assertNotContains(self.response, 'aria-label="Мобильді бөлімдер"')
-        self.assertNotContains(self.response, 'Келесі бөлім')
+    def test_a_single_work_has_no_chapter_navigation_at_all(self):
+        """У цельного текста «начать» нечего — там просто «Оқу»."""
+        response = self.client.get(
+            reverse('core:story_detail', kwargs={'slug': 'tunge-deiin'}))
+        self.assertContains(response, 'Толық мәтін')
+        self.assertContains(response, 'Бір оқылым')
+        self.assertContains(response, '<span>Оқу</span>')
+        self.assertNotContains(response, 'Оқуды бастау')
+        self.assertNotContains(response, 'aria-label="Мобильді бөлімдер"')
+        self.assertNotContains(response, 'Келесі бөлім')
+        self.assertNotContains(response, 'Бөлімдер тізімі')
 
 
-class StoryDetailPerChapterComments(TestCase):
-    """Комментарии под текстом — пришвартованные к текущей главе + общие (chapter_number=None)."""
+class CommentsAreAnchoredToTheirChapter(TestCase):
+    """Комментарий швартуется к главе; `chapter_number=None` означает
+    разговор о работе целиком и виден под любой главой."""
 
-    def test_chapter_3_shows_aygerim_comment(self):
-        """У dalney-berega коммент Айгерім привязан к гл.3."""
-        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=3'
-        r = self.client.get(url)
-        self.assertContains(r, '3-бөлім пікірлері')
-        self.assertContains(r, 'үшінші бөлімдегі қарттың сұрағы')
+    def _url(self, chapter=None):
+        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG})
+        return f'{url}?chapter={chapter}' if chapter else url
 
-    def test_chapter_1_does_not_show_chapter_3_comment(self):
-        """На гл.1 коммент из гл.3 не должен появиться."""
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        self.assertNotContains(r, 'үшінші бөлімдегі қарттың сұрағы')
+    def test_a_chapter_shows_its_own_comments_and_the_general_ones(self):
+        third = self.client.get(self._url(3))
+        self.assertContains(third, '3-бөлім пікірлері')
+        self.assertContains(third, 'үшінші бөлімдегі қарттың сұрағы')
+        self.assertNotContains(self.client.get(self._url(1)),
+                               'үшінші бөлімдегі қарттың сұрағы')
+        for number in (1, 2, 3):
+            with self.subTest(chapter=number):
+                self.assertContains(self.client.get(self._url(number)),
+                                    'Келесі бөлім жұма күні шығады')
 
-    def test_general_comment_visible_on_every_chapter(self):
-        """Общий коммент (chapter_number=None) виден под любой главой."""
-        for n in (1, 2, 3):
-            with self.subTest(chapter=n):
-                url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + f'?chapter={n}'
-                r = self.client.get(url)
-                # «Келесі бөлім жұма күні шығады…» — общее объявление автора
-                self.assertContains(r, 'Келесі бөлім жұма күні шығады')
-
-
-class StoryDetailGuestVsAuth(TestCase):
-
-    def test_guest_sees_gate_no_input(self):
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        self.assertContains(r, 'Пікір қалдыру үшін')
-        self.assertNotContains(r, '<textarea')
-
-    def test_authed_sees_input_no_gate(self):
-        login_as(self.client)
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        self.assertNotContains(r, 'Пікір қалдыру үшін')
-        self.assertContains(r, '<textarea')
-
-    def test_report_trigger_only_for_authed(self):
-        r_guest = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        self.assertNotContains(r_guest, "open-report")
+    def test_a_guest_gets_the_gate_and_an_author_gets_the_form(self):
+        guest = self.client.get(self._url())
+        self.assertContains(guest, 'Пікір қалдыру үшін')
+        self.assertNotContains(guest, '<textarea')
+        self.assertNotContains(guest, 'open-report')
 
         login_as(self.client)
-        r_auth = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        self.assertContains(r_auth, "open-report")
+        signed_in = self.client.get(self._url())
+        self.assertNotContains(signed_in, 'Пікір қалдыру үшін')
+        self.assertContains(signed_in, '<textarea')
+        self.assertContains(signed_in, 'open-report')
 
 
-class StoryDetailReadingProgress(TestCase):
-    """Прогресс «Оқылды N/M» только если slug совпадает с SAMPLE_PROGRESS.story_slug."""
+class PendingTagsAreVisibleOnlyToTheirAuthor(TestCase):
+    """BR-TAG-07: тег ещё не прошёл модератора. Автор обязан видеть свой —
+    иначе он решит, что тег не сохранился, и поставит его второй раз."""
 
-    def test_authed_with_matching_progress_shows_indicator(self):
-        # SAMPLE_PROGRESS привязан к 'dalney-berega'
-        self.assertEqual(data.reading_progress_of('aidana').story.slug, STORY_SLUG)
-        login_as(self.client)
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        self.assertContains(r, 'Оқылды:')
+    def test_the_accepted_ones_are_public_and_the_pending_one_is_not(self):
+        author = make.user()
+        story = make.story(author=author, chapters=1)
+        accepted, pending = make.tag(), make.tag(status='pending')
+        story.tags.add(accepted, pending)
+        url = reverse('core:story_detail', kwargs={'slug': story.slug})
 
-    def test_authed_other_story_no_progress_indicator(self):
-        login_as(self.client)
-        # Другой slug — даже если у пользователя есть прогресс на dalney-berega,
-        # на других страницах он не должен подсвечиваться.
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': 'arhimag'}))
-        self.assertNotContains(r, 'Оқылды:')
+        guest = self.client.get(url)
+        self.assertContains(guest, accepted.name)
+        self.assertNotContains(guest, pending.name)
+        self.assertNotContains(guest, 'проверкада')
 
-    def test_guest_no_progress_indicator(self):
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        self.assertNotContains(r, 'Оқылды:')
+        login_as_newcomer(self.client, 'passer-by')
+        self.assertNotContains(self.client.get(url), pending.name)
 
-
-class StoryDetailTags(TestCase):
-    """docs/11: UGC-теги. Pending видны только автору (BR-TAG-07)."""
-
-    # У `dalney-berega` теги все accepted → видны всем
-    PUBLIC_SLUG = 'dalney-berega'
-    # У `temniy-lord` есть pending-тег 'basqa-alem' (басқа әлем)
-    HAS_PENDING_SLUG = 'temniy-lord'
-    # У `aidana-tan` есть pending 'experimental' (эксперимент), автор — aidana
-    OWN_PENDING_SLUG = 'aidana-tan'
-
-    def test_accepted_tag_visible_to_guest(self):
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': self.PUBLIC_SLUG}))
-        self.assertContains(r, 'арман')      # accepted-тег
-        self.assertContains(r, 'жасөспірім') # accepted-тег
-
-    def test_pending_tag_hidden_from_guest(self):
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': self.HAS_PENDING_SLUG}))
-        self.assertContains(r, 'мистика')        # accepted показан
-        self.assertNotContains(r, 'басқа әлем')  # pending скрыт от гостя
-        self.assertNotContains(r, 'проверкада')
-
-    def test_pending_tag_hidden_from_other_authed_user(self):
-        # Логинимся как aidana, смотрим чужое произведение с pending-тегом
-        login_as(self.client)
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': self.HAS_PENDING_SLUG}))
-        self.assertNotContains(r, 'басқа әлем')
-        self.assertNotContains(r, 'проверкада')
-
-    def test_author_sees_own_pending_tag_with_badge(self):
-        # aidana заходит на своё произведение → видит pending-тег с бейджем
-        login_as(self.client)
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': self.OWN_PENDING_SLUG}))
-        self.assertContains(r, 'эксперимент')   # pending-тег
-        self.assertContains(r, 'проверкада')    # бейдж модерации
-
-
-class StoryDetailAnnotation(TestCase):
-    """Аннотация приходит из данных, а не из шаблона.
-
-    Три месяца в шаблоне лежал захардкоженный абзац — один и тот же на всех
-    22 произведениях, при заполненном `Story.annotation`. Аннотация и есть
-    главный аргумент «читать или нет», так что подмена била в самое ценное.
-    """
-
-    def test_annotation_comes_from_the_story(self):
-        for slug in ('dalney-berega', 'tunge-deiin'):
-            with self.subTest(story=slug):
-                story = data.story_by_slug(slug)
-                r = self.client.get(reverse('core:story_detail', kwargs={'slug': slug}))
-                self.assertContains(r, story.annotation)
-
-    def test_hardcoded_placeholder_is_gone(self):
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        self.assertNotContains(r, 'Авторлар әлемі')
+        login_as(self.client, author.username)
+        owner = self.client.get(url)
+        self.assertContains(owner, pending.name)
+        self.assertContains(owner, 'проверкада')
 
 
 class StoryDetailSaveButton(TestCase):
@@ -411,210 +313,127 @@ class ReadingMovesTheWorkBetweenShelves(TestCase):
         self.assertEqual(LibraryEntry.objects.count(), before)
 
 
-class StoryDetailReadCta(TestCase):
-    """Подпись главной кнопки говорит, что произойдёт: начать или продолжить."""
-
-    def test_guest_sees_start_label(self):
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        self.assertContains(r, 'Оқуды бастау')
-
-    def test_reader_with_progress_sees_resume_label(self):
-        login_as(self.client)
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        self.assertContains(r, 'Жалғастыру · ')
-        self.assertNotContains(r, 'Оқуды бастау')
-
-    def test_single_work_says_simply_read(self):
-        """У однобөлімного «начать» нечего — там просто «Оқу»."""
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': 'tunge-deiin'}))
-        self.assertContains(r, '<span>Оқу</span>', html=False)
-        self.assertNotContains(r, 'Оқуды бастау')
-
-
-class StoryDetailAuthorOnMobile(TestCase):
-    """Карточка автора рендерится дважды: в рейле (xl+) и в контенте (xl:hidden).
-
-    Рейл начинается с xl, поэтому на телефоне от автора оставалась строка
-    с 24px-аватаром — на платформе, чья ценность в живых молодых авторах.
-    """
-
-    def test_author_card_rendered_twice(self):
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        story = data.story_by_slug(STORY_SLUG)
-        self.assertContains(r, story.author.bio, count=2)
-
-    def test_follow_action_present_for_guest(self):
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        self.assertContains(r, 'Жазылу')
-
-
-class StoryDetailReportPlacement(TestCase):
-    """Жалоба — в подвале, а не в ряду действий рядом с кнопкой чтения."""
-
-    def test_report_button_stands_below_recommendations(self):
-        login_as(self.client)
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        html = r.content.decode()
-        # Ищем именно жалобу на произведение: `open-report` теперь есть ещё и
-        # в меню каждого комментария, с целью `comment:<id>` (BR-33).
-        self.assertLess(html.index('Басқа шығармалар'), html.index("target: 'story:"))
-
-
-class StoryReaderSettings(TestCase):
-    """FR-STORY-07: настройки чтения открываются панелью, а не стоят рядом.
-
-    Развёрнутый ряд из трёх групп 32px-кнопок стоял перед текстом и на 375px
-    переносился в две строки — три решения до первой прочитанной строки.
-    """
+class TheReadingSurfaceIsBuiltForAPhone(TestCase):
+    """DEC-35 и FR-STORY-07. На 375px контейнер `px-4` и карточка `p-6`
+    оставляли тексту 295px — около 35 знаков при комфортных 45-75. Причём
+    все три настройки работали против читателя: ось ширины на телефоне не
+    делала ничего, крупный кегль сужал меру, а тёплый и ночной фон
+    добавляли свой padding."""
 
     def setUp(self):
-        self.response = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
+        self.response = self.client.get(
+            reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
+        self.html = self.response.content.decode()
 
-    def test_settings_hide_behind_a_trigger(self):
+    def test_the_measure_is_pinned_in_ch_and_the_card_goes_full_bleed(self):
+        self.assertContains(self.response, 'max-width: 68ch')
+        self.assertContains(self.response, '-mx-4')       # гасит px-4 контейнера
+        self.assertContains(self.response, 'sm:mx-0')
+        self.assertContains(self.response, 'margin-inline: -1rem')   # подложка темы
+        self.assertContains(self.response, 'overflow-wrap: break-word')
+
+    def test_size_and_leading_are_separate_properties(self):
+        """Раньше обе оси трогали `line-height`, и порядок правил в файле
+        решал, чья возьмёт."""
+        self.assertIn('.reader-size-base  { font-size: 17px; }', self.html)
+        self.assertIn('.reader-lead-tight { line-height: 1.6; }', self.html)
+
+    def test_the_settings_hide_behind_a_trigger_and_outlive_the_chapter(self):
+        """Развёрнутый ряд из трёх групп 32px-кнопок стоял перед текстом —
+        три решения до первой прочитанной строки. Навигация по главам это
+        full reload, поэтому выбор лежит в localStorage."""
         self.assertContains(self.response, 'Оқу параметрлері')
         self.assertContains(self.response, 'settingsOpen')
-
-    def test_all_three_axes_still_available(self):
         for value in ('reader-size-large', 'reader-lead-tight', 'reader-theme-night'):
             with self.subTest(value=value):
                 self.assertContains(self.response, value)
-
-    def test_choice_survives_the_jump_to_the_next_chapter(self):
-        """Навигация по главам — full reload, поэтому выбор лежит в localStorage."""
         for key in ('bp-reader-size', 'bp-reader-lead', 'bp-reader-theme'):
             with self.subTest(key=key):
                 self.assertContains(self.response, key)
 
+    def test_the_reading_panel_replaces_the_mobile_nav(self):
+        """Две плавающие пилюли на 375px наехали бы друг на друга
+        (docs/07 §7.6)."""
+        self.assertContains(self.response, 'Оқу панелі')
+        self.assertContains(self.response, 'Бөлімдер тізімі')
+        self.assertContains(self.response, 'chaptersOpen')
+        self.assertContains(self.response, 'reading-mode')
 
-class ChapterTextMeasure(TestCase):
-    """DEC-35: длина строки задана явно, а не остатком от отступов.
-
-    На 375px контейнер px-4 и карточка p-6 оставляли тексту 295px — около
-    35 знаков при комфортных 45-75. Причём все три настройки работали
-    против читателя: ось ширины на телефоне не делала ничего, крупный кегль
-    сужал меру, а тёплый и ночной фон добавляли свой padding.
-    """
-
-    def setUp(self):
-        self.response = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-
-    def test_measure_is_pinned_in_ch(self):
-        """68ch привязано к кеглю: мера не плывёт при увеличении шрифта."""
-        self.assertContains(self.response, 'max-width: 68ch')
-
-    def test_card_goes_full_bleed_on_mobile(self):
-        """-mx-4 гасит px-4 контейнера: тексту 343px вместо 295."""
-        self.assertContains(self.response, '-mx-4')
-        self.assertContains(self.response, 'sm:mx-0')
-
-    def test_theme_no_longer_narrows_the_line(self):
-        """Отрицательное поле гасит горизонтальный padding подложки."""
-        self.assertContains(self.response, 'margin-inline: -1rem')
-
-    def test_size_and_lead_are_separate_properties(self):
-        """Раньше обе оси трогали line-height, и порядок правил решал, чья возьмёт."""
-        html = self.response.content.decode()
-        self.assertIn('.reader-size-base  { font-size: 17px; }', html)
-        self.assertIn('.reader-lead-tight { line-height: 1.6; }', html)
-
-    def test_long_word_cannot_break_the_column(self):
-        self.assertContains(self.response, 'overflow-wrap: break-word')
-
-    def test_chapter_text_is_long_enough_to_show_the_problem(self):
-        """На тексте в три абзаца ни мера, ни прогресс, ни панель не проявляются."""
-        body = data.chapter_of(STORY_SLUG, 3).body
-        self.assertGreater(len(body), 2000, 'нужна длинная глава для проверки чтения')
+    def test_the_text_is_long_enough_for_any_of_this_to_show(self):
+        """На тексте в три абзаца ни мера, ни прогресс, ни панель не
+        проявляются."""
+        self.assertGreater(len(data.chapter_of(STORY_SLUG, 3).body), 2000)
 
 
-class ChapterProgressNotDuplicated(TestCase):
-    """Счётчик «N / M» в шапке главы и в панели чтения — один и тот же."""
+class TheMainButtonSaysWhatWillHappen(TestCase):
 
-    def test_header_progress_hidden_on_mobile(self):
+    def test_start_for_a_newcomer_and_resume_for_a_reader(self):
+        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG})
+        self.assertContains(self.client.get(url), 'Оқуды бастау')
+
         login_as(self.client)
-        url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG}) + '?chapter=4'
-        html = self.client.get(url).content.decode()
-        idx = html.index('Оқылды:')
-        self.assertIn('sm:block', html[idx - 200:idx])
+        returning = self.client.get(url)
+        self.assertContains(returning, 'Жалғастыру · ')
+        self.assertNotContains(returning, 'Оқуды бастау')
+
+    def test_progress_is_shown_only_on_the_work_it_belongs_to(self):
+        """И только один раз: счётчик «N / M» в шапке главы и в панели
+        чтения — одно и то же число."""
+        self.assertNotContains(
+            self.client.get(reverse('core:story_detail',
+                                    kwargs={'slug': STORY_SLUG})), 'Оқылды:')
+        login_as(self.client)
+        self.assertEqual(data.reading_progress_of('aidana').story.slug, STORY_SLUG)
+        mine = self.client.get(reverse('core:story_detail',
+                                       kwargs={'slug': STORY_SLUG}) + '?chapter=4')
+        html = mine.content.decode()
+        self.assertContains(mine, 'Оқылды:')
+        self.assertIn('sm:block', html[html.index('Оқылды:') - 200:html.index('Оқылды:')])
+        self.assertNotContains(
+            self.client.get(reverse('core:story_detail', kwargs={'slug': 'arhimag'})),
+            'Оқылды:')
+
+    def test_a_complaint_lives_below_the_recommendations(self):
+        """Жалоба — в подвале, а не в ряду действий рядом с кнопкой чтения."""
+        login_as(self.client)
+        html = self.client.get(reverse('core:story_detail',
+                                       kwargs={'slug': STORY_SLUG})).content.decode()
+        self.assertLess(html.index('Басқа шығармалар'), html.index("target: 'story:"))
 
 
-class StoryReadingPanel(TestCase):
-    """Панель чтения на мобильном: прогресс, оглавление, следующая глава."""
-
-    def test_panel_present_while_a_chapter_is_open(self):
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        self.assertContains(r, 'Оқу панелі')
-
-    def test_panel_absent_without_a_chapter(self):
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': 'no-such-story'}))
-        self.assertNotContains(r, 'Оқу панелі')
-
-    def test_panel_opens_the_chapter_sheet(self):
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        self.assertContains(r, 'Бөлімдер тізімі')
-        self.assertContains(r, 'chaptersOpen')
-
-    def test_single_work_has_no_chapter_sheet(self):
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': 'tunge-deiin'}))
-        self.assertNotContains(r, 'Бөлімдер тізімі')
-
-    def test_mobile_nav_yields_its_place_to_the_panel(self):
-        """Две плавающие пилюли на 375px наехали бы друг на друга (docs/07 §7.6)."""
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        self.assertContains(r, 'reading-mode')
-
-
-class ChapterListShowsLikes(TestCase):
-    """FR-STORY-12: в списке глав счётчик реакций read-only — реакция ставится в главе."""
-
-    def test_chapter_like_counts_rendered(self):
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        first = data.chapter_of(STORY_SLUG, 1)
-        self.assertTrue(first.likes, 'нужна глава с реакциями для проверки')
-        self.assertContains(r, f'{first.likes} реакция')
-
-    def test_no_like_button_in_the_list(self):
-        """Ряд реакций живёт только под текстом главы — реакция требует прочтения (BR-REACT-04)."""
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
-        self.assertContains(r, 'Авторды қолдау — бір рет басу ғана', count=1)
-
-
-class ChapterReactions(TestCase):
-    """FR-STORY-12 / DEC-32: пять реакций вместо одиночного лайка."""
+class ReactionsReplaceTheSingleLike(TestCase):
+    """FR-STORY-12 / DEC-32: пять реакций вместо лайка. Каждая обязана
+    иметь подпись словом — эмодзи запрещены, а монохромная иконка 20px без
+    подписи неразличима."""
 
     def setUp(self):
-        self.response = self.client.get(reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
+        self.response = self.client.get(
+            reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
 
-    def test_all_five_reactions_rendered(self):
-        for reaction in data.REACTIONS:
-            with self.subTest(reaction=reaction.slug):
-                self.assertContains(self.response, reaction.label)
-
-    def test_every_reaction_carries_a_word_label(self):
-        """Эмодзи запрещены, монохромная иконка 20px без подписи неразличима."""
+    def test_all_five_are_offered_with_words(self):
         for reaction in data.REACTIONS:
             with self.subTest(reaction=reaction.slug):
                 self.assertContains(self.response, f'>{reaction.label}<')
-
-    def test_old_single_like_is_gone(self):
         self.assertNotContains(self.response, 'Бұл бөлім ұнады ма?')
-
-    def test_guest_click_leads_to_login(self):
         self.assertContains(self.response, reverse('core:login'))
+        # Набор из пяти кнопок одинаков у первой главы и у сотой.
+        self.assertEqual(5, len(data.reactions_of(data.chapter_of(STORY_SLUG, 1))))
 
-    def test_zero_count_reactions_still_shown(self):
-        """Набор из пяти кнопок одинаков у первой главы и у сотой."""
-        items = data.reactions_of(data.chapter_of(STORY_SLUG, 1))
-        self.assertEqual(5, len(items))
-
-    def test_story_counter_is_the_sum_of_reactions(self):
-        chapter = data.chapter_of(STORY_SLUG, 3)
-        self.assertEqual(chapter.likes,
-                         sum(r.count for r in chapter.reactions.all()))
-
-    def test_top_reaction_reads_the_chapter(self):
+    def test_the_chapter_counter_is_their_sum_and_the_top_one_reads_it(self):
         """«Алғашқы кездесу» собирает Жүрегім, «Депрессия» — Жыладым."""
-        self.assertEqual('juregim', data.chapter_of(STORY_SLUG, 3).top_reaction.slug)
+        third = data.chapter_of(STORY_SLUG, 3)
+        self.assertEqual(third.likes, sum(r.count for r in third.reactions.all()))
+        self.assertEqual('juregim', third.top_reaction.slug)
         self.assertEqual('jyladym', data.chapter_of(STORY_SLUG, 4).top_reaction.slug)
+
+    def test_the_chapter_list_shows_counts_but_offers_no_button(self):
+        """Реакция требует прочтения (BR-REACT-04), поэтому ряд живёт
+        только под текстом главы."""
+        first = data.chapter_of(STORY_SLUG, 1)
+        self.assertTrue(first.likes, 'нужна глава с реакциями для проверки')
+        self.assertContains(self.response, f'{first.likes} реакция')
+        self.assertContains(self.response, 'Авторды қолдау — бір рет басу ғана',
+                            count=1)
 
 
 class ChapterReactionVoting(TestCase):
