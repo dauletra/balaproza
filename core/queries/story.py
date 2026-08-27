@@ -110,8 +110,8 @@ def toggle_chapter_reaction(chapter, user, kind: str) -> str:
 
 
 def _attach_my_vote(poll, viewer: str):
-    """Аннотирует `poll._my_vote` голосом текущего читателя (docs/20 §20.2:
-    одна ставка на опрос, не меняется). Гость (`viewer=''`) не голосует."""
+    """Аннотирует `poll._my_vote` голосом текущего читателя (одна ставка
+    на опрос, не меняется). Гость (`viewer=''`) не голосует."""
     if poll is not None and viewer:
         vote = PollVote.objects.filter(poll=poll, user__username=viewer).first()
         poll._my_vote = vote.option.slug if vote else ''
@@ -128,8 +128,8 @@ def poll_of(story_slug: str, chapter_number: int, viewer: str = ''):
 
 
 def cast_poll_vote(poll, user, option_slug: str) -> bool:
-    """Ставит голос — один на опрос, не на вариант, не меняется (docs/20
-    §20.2). Закрытый опрос (BR-POLL-05) и повторный голос — no-op.
+    """Ставит голос — один на опрос, не на вариант, не меняется.
+    Закрытый опрос (BR-POLL-05) и повторный голос — no-op.
     Возвращает True, если голос принят."""
     if poll.closed:
         return False

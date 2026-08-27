@@ -170,7 +170,7 @@ def publish_checklist(story) -> list:
     """Готовность работы к модерации (FR-WRITE-09, BR-11).
 
     Отдаёт `key` / `ok` / `required` / `target`. Тексты — в шаблоне
-    (docs/16), ссылки — во view: URL-ы в слой данных не спускаются.
+    (docs/ui.md), ссылки — во view: URL-ы в слой данных не спускаются.
     """
     if story is None:
         return []

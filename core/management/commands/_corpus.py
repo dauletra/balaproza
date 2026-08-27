@@ -26,7 +26,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
 
-# ───────────────────────── Теги (docs/11 — UGC-таксономия) ─────────────────
+# ───────────────────────── Теги (docs/ui.md — UGC-таксономия) ─────────────────
 # Параллельно жанрам: до 10 на произведение (BR-TAG-01). Авторы создают
 # свободно, модератор пост-фактум переводит pending → accepted (тег попадает
 # в автокомплит) или rejected (тег удаляется из произведения).
@@ -99,13 +99,13 @@ class Story:
     # отвечать на «что читают сейчас»: без окна первую страницу навсегда
     # занимают несколько старых хитов. После Ф14 — агрегат по логу просмотров.
     recent_views: int = 0
-    # Статус произведения (docs/04.4 · BR-10/11). По умолч. — NotPublished (Draft).
+    # Статус произведения (docs/ui.md · BR-10/11). По умолч. — NotPublished (Draft).
     # Каталожные стории, попадающие в публичные списки, должны явно задать "Published".
     # Переход в Published только через модерацию (BR-11, DEC-23).
     status: str = "NotPublished"   # Published | NotPublished | OnProcess | Completed | OnModeration
     annotation: str = ""        # короткое описание для STORY/MANAGE/EDIT
     secondary_genre: str = ""   # если у произведения есть второй жанр — для форм
-    # UGC-теги (docs/11, BR-TAG-01): до 10 slug-ов на произведение.
+    # UGC-теги (docs/ui.md, BR-TAG-01): до 10 slug-ов на произведение.
     # Pending фильтруются в шаблоне tag_list.html по viewer_is_author (BR-TAG-07).
     tags: tuple = ()
     # Возрастная отметка работы (BR-10b). Пустая строка — «автор ещё не
@@ -1308,7 +1308,7 @@ NOTIFICATIONS_BY_USER: dict = {
         # цитата читателя.
         #
         # Это `needs_work`, а не `rejected`: работу просят продолжить, и
-        # docs/13 §13.5 требует называть такое приглашением, а не отказом.
+        # docs/ui.md требует называть такое приглашением, а не отказом.
         # Работа при этом вернулась в черновики (`aidana-kus` —
         # `NotPublished`): данные не должны противоречить статусу.
         Notification(

@@ -30,7 +30,7 @@
 {% block layout %}
     {% include "partials/header.html" %}
 
-    {# Контент · правый рейл (опц.). docs/07.1 — DesktopShell без sidebar (DEC-25). #}
+    {# Контент · правый рейл (опц.). docs/ui.md — DesktopShell без sidebar (DEC-25). #}
     <div class="mx-auto flex max-w-[1280px] gap-6 px-4 pt-6 pb-24 sm:px-6 md:pb-12 lg:px-12">
         {% comment %}
         Колонка контента не зависит от того, отрисован рейл или нет: 1184 (1280
@@ -82,7 +82,7 @@
 
     {% comment %}
         Глобальный DeleteConfirm — открывается событием `open-delete-confirm`
-        (docs/04.8). Раньше подключался только в manage_story.html, а
+        (docs/ui.md). Раньше подключался только в manage_story.html, а
         триггеры на него есть и в my_story_menu.html (my_stories.html), и в
         comment.html — на тех страницах модалка молча ничего не открывала:
         событие уходило в window, а слушать было некому.

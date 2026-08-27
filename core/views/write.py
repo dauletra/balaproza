@@ -123,7 +123,7 @@ def story_settings(request, slug):
             errors.append('Жас белгісі дұрыс емес.')
         if fmt == 'single' and story.chapter_set.count() > 1:
             # Бір бөлімді пішін бір ғана бөлімге лайықталған (Story.text_chapter,
-            # docs/12 §12.2) — бірнеше жазылған бөлімі бар жұмысты ауыстыру
+            # docs/architecture.md) — бірнеше жазылған бөлімі бар жұмысты ауыстыру
             # деректі бұзады, сондықтан бұл ауысу рұқсат етілмейді.
             errors.append(
                 'Бірнеше бөлімі жазылған жұмысты бір бөлімді пішінге ауыстыруға болмайды.')
@@ -163,7 +163,7 @@ def story_settings(request, slug):
         'genres': data.all_genres(),
         # BR-10b: отметка выбирается автором, а не достаётся дефолтом.
         'story_audiences': data.STORY_AUDIENCES,
-        # docs/11: данные для tag_input + текущие теги стори для edit-режима
+        # docs/ui.md: данные для tag_input + текущие теги стори для edit-режима
         'accepted_tags':    data.accepted_tags_json(),
         'blocked_patterns': data.blocked_tag_patterns_list(),
         'initial_tags':     data.tags_of(story) if story else [],

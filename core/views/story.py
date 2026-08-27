@@ -122,7 +122,7 @@ def story_detail(request, slug):
         'current_chapter_number': chapter_number,
         # FR-STORY-02: блок «Басқа шығармалар» внизу страницы
         'related':  data.related_stories(slug, limit=6) if story else [],
-        # docs/11: UGC-теги произведения (resolved Tag-объекты)
+        # docs/ui.md: UGC-теги произведения (resolved Tag-объекты)
         'tags':      story.tags_resolved if story else [],
         # DEC-31: обратный вход в настроение — подборки, где лежит произведение
         'in_collections': data.collections_of(story) if story else [],

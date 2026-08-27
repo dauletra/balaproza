@@ -23,7 +23,7 @@
                     <li>
                         <a href="{% url 'core:collection_detail' slug=c.slug %}"
                            class="flex min-h-11 items-center gap-2.5 rounded-md px-2 -mx-2 hover:bg-slate-50">
-                            {% comment %}Пары L C — только из реестра docs/03 §3.3 (NFR-50): фон и иконка карточки коллекции.{% endcomment %}
+                            {% comment %}Пары L C — только из реестра docs/ui.md (NFR-50): фон и иконка карточки коллекции.{% endcomment %}
                             <span aria-hidden="true" class="grid h-8 w-8 shrink-0 place-items-center rounded-md" style="background: oklch(0.95 0.05 {{ c.tint_hue }}); color: oklch(0.48 0.14 {{ c.tint_hue }});">
                                 {% include "components/icon.html" with name=c.icon size=16 only %}
                             </span>

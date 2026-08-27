@@ -333,7 +333,7 @@ class ChoiceSurvivesEveryTransition(TestCase):
 class TrendingIsTheDefaultSort(TestCase):
     """Дефолтом была накопленная популярность — то есть рейтинг просмотров.
 
-    docs/13 §13.2 определяет Wattpad-культуру как «популярность важнее
+    docs/ui.md определяет Wattpad-культуру как «популярность важнее
     качества» и противопоставляет ей свою, а первую страницу каталога
     навсегда занимали несколько старых хитов. Окно в 14 дней показывает,
     что читают сейчас, и пускает наверх работы, которые только набирают.
@@ -361,7 +361,7 @@ class TrendingIsTheDefaultSort(TestCase):
 
 
 class QualityIsAnAxisOfItsOwn(TestCase):
-    """«Редакция таңдауы» — знак качества платформы (docs/13 §13.7), а не
+    """«Редакция таңдауы» — знак качества платформы (docs/ui.md), а не
     просмотры. До этой оси он был неотличимой подписью на карточке."""
 
     def test_each_badge_selects_the_works_carrying_it(self):
@@ -383,7 +383,7 @@ class QualityIsAnAxisOfItsOwn(TestCase):
 
 
 class PresetsAreOneTapCombinations(TestCase):
-    """«Не оқимын?» — комбинация осей одним тапом (docs/13 §13.6).
+    """«Не оқимын?» — комбинация осей одним тапом (docs/ui.md).
     `single + short` §13.11 называет быстрым чтением дословно, но собрать
     её в панели значило два тапа в двух разных группах."""
 
@@ -505,7 +505,7 @@ class ReadingTimeHasThreeBuckets(TestCase):
 class TheNewAuthorAxisFindsWhoIsNotReadYet(TestCase):
     """Ни одна ось не помогала найти автора, которого ещё не читают, при том
     что «новые имена» стоят отдельным блоком на главной, а культура портала
-    построена вокруг растущего автора (docs/13 §13.2)."""
+    построена вокруг растущего автора (docs/ui.md)."""
 
     def test_it_selects_by_follower_count_and_stacks_with_genre(self):
         genre = data.genre_by_slug('balalar')

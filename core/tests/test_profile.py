@@ -528,7 +528,7 @@ class AchievementsRow(TestCase):
             'Автордың марапаттары')
 
     def test_an_empty_row_renders_nothing(self):
-        """Пустое состояние здесь звучало бы упрёком новичку (docs/13 §13.8.6)."""
+        """Пустое состояние здесь звучало бы упрёком новичку (docs/ui.md)."""
         html = render_to_string('partials/profile/_achievements.html',
                                 {'achievements': []})
         self.assertNotIn('<ul', html)
@@ -1336,7 +1336,7 @@ class ModerationNotificationNamesItsOutcome(TestCase):
         self.assertEqual(len(tokens), len(data.MODERATION_OUTCOMES) + 1,
                          'у какого-то исхода нет своей ветки цвета')
 
-        # docs/13 §13.5: «толықтыру қажет» — приглашение, а не приговор.
+        # docs/ui.md: «толықтыру қажет» — приглашение, а не приговор.
         # Пока оба отрицательных исхода были одним `rejected`, возврат на
         # доработку приходил под красным `status-error` — токеном,
         # подписанным «Отказ и удаление» (DEC-39).
@@ -1363,7 +1363,7 @@ class ModerationNotificationNamesItsOutcome(TestCase):
 
 
 class NotificationChipFollowsTheRegistry(TestCase):
-    """Иконку выбирают по значению, а не по наличию формы (docs/04 §4.2).
+    """Иконку выбирают по значению, а не по наличию формы (docs/ui.md).
 
     Конкурс носил `bookmark-filled` — глиф, который по DEC-09b означает
     активное «сохранено» и стоит на текущей главе и на кнопке «сақталды».

@@ -75,7 +75,7 @@
             </div>
         {% endif %}
 
-        {# docs/11: UGC-теги. Pending видны только автору (BR-TAG-07). #}
+        {# docs/ui.md: UGC-теги. Pending видны только автору (BR-TAG-07). #}
         {% include "components/tag_list.html" with tags=tags viewer_is_author=is_author size="md" %}
 
         <div class="flex flex-wrap items-center gap-4">
@@ -474,7 +474,7 @@
             самого низа. Геометрия повторяет нижнее меню (пилюля 360×64,
             bottom-4), потому что панель встаёт на его место: две плавающие
             пилюли на 375px наехали бы друг на друга. Меню прячется по
-            событию `reading-mode` (docs/07 §7.6).
+            событию `reading-mode` (docs/ui.md).
         {% endcomment %}
         <div x-show="reading" x-cloak x-transition.opacity
              role="toolbar" aria-label="Оқу панелі"
@@ -670,7 +670,7 @@
 
                 /* Панель чтения занимает место нижнего меню, поэтому о входе
                  * в режим чтения нужно сообщить наружу — mobile_nav слушает
-                 * это событие и убирает свою пилюлю (docs/07 §7.6). */
+                 * это событие и убирает свою пилюлю (docs/ui.md). */
                 setReading: function (on) {
                     if (this.reading === on) return;
                     this.reading = on;

@@ -331,7 +331,7 @@ class TheReadingSurfaceIsBuiltForAPhone(TestCase):
 
     def test_the_reading_panel_replaces_the_mobile_nav(self):
         """Две плавающие пилюли на 375px наехали бы друг на друга
-        (docs/07 §7.6)."""
+        (docs/ui.md)."""
         self.assertContains(self.response, 'Оқу панелі')
         self.assertContains(self.response, 'Бөлімдер тізімі')
         self.assertContains(self.response, 'chaptersOpen')
@@ -537,7 +537,7 @@ class ChapterPollStates(TestCase):
 
 class ChapterPollVoting(TestCase):
     """Ф15 Этап 4: голос в открытом опросе — один на опрос, не меняется
-    (docs/20 §20.2); закрытый опрос голос не принимает (BR-POLL-05)."""
+    (BR-POLL-*); закрытый опрос голос не принимает (BR-POLL-05)."""
 
     OPEN_CHAPTER = 12    # последняя вышедшая — ответа ещё нет
     CLOSED_CHAPTER = 3   # следующая глава вышла, опрос закрыт

@@ -138,7 +138,7 @@ from .queries.story import (
     top_level_comment_of,
 )
 
-# ── Теги (docs/11) ───────────────────────────────────────────────────────
+# ── Теги (docs/ui.md) ───────────────────────────────────────────────────────
 from .queries.tags import (
     accepted_tags_json,
     all_tags,
@@ -151,7 +151,7 @@ from .queries.tags import (
     trending_tags,
 )
 
-# ── Запись: произведение, глава, опрос (Ф15, docs/20) ────────────────────
+# ── Запись: произведение, глава, опрос ───────────────────────────────────
 from .queries.write import (
     create_story,
     save_chapter,

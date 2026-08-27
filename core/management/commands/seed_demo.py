@@ -77,7 +77,7 @@ class Command(BaseCommand):
     @transaction.atomic
     def handle(self, *args, **options):
         # Отчёт — по-английски, как у самих команд Django. Это вывод
-        # инструмента, а не строка интерфейса (docs/16 про второе), и
+        # инструмента, а не строка интерфейса (docs/ui.md про второе), и
         # консоль Windows в cp1251 на «жаңартылды» падает: ң и ү в эту
         # кодировку не отображаются вовсе.
         report = {
@@ -111,7 +111,7 @@ class Command(BaseCommand):
 
         Из года прихода (`joined_year` — единственное, что о времени знает
         стаб) собирается 1 января: в интерфейсе показывается только год
-        (BR-73, docs/12 §12.4), а день никогда не выводится.
+        (BR-73, docs/architecture.md), а день никогда не выводится.
         """
         added = updated = 0
         for author in _corpus.AUTHORS:

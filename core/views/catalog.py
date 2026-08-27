@@ -154,7 +154,7 @@ def genre_detail(request, slug):
 
 
 def tag_detail(request, slug):
-    """Каталог по UGC-тегу (docs/11 Phase 3, DEC-26+27). URL: /tag/<slug>/"""
+    """Каталог по UGC-тегу (docs/ui.md Phase 3, DEC-26+27). URL: /tag/<slug>/"""
     return _render_catalog(request, mode='tag', tag_slug=slug)
 
 

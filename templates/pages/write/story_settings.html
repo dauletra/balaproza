@@ -47,7 +47,7 @@
 
         {% include "components/textarea.html" with name="annotation" label="Аннотация" value=story.annotation rows=4 maxlength=500 required=True %}
 
-        {# Формат — теми же карточками, что в форме создания (docs/13 §13.11). #}
+        {# Формат — теми же карточками, что в форме создания (docs/ui.md). #}
         <fieldset>
             <legend class="mb-2 font-sans text-sm font-semibold text-slate-800">
                 Формат <span class="text-status-error-fg" aria-hidden="true">*</span>
@@ -86,7 +86,7 @@
             </select>
         </label>
 
-        {# docs/11: UGC-теги, до 10. Текущие теги стори передаются initial-списком. #}
+        {# docs/ui.md: UGC-теги, до 10. Текущие теги стори передаются initial-списком. #}
         {% include "components/tag_input.html" with tags=initial_tags %}
 
         {% comment %}

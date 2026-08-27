@@ -23,7 +23,7 @@ def design_components(request):
         # бейджа — это просто перебор конкурсов, а не четыре ручных вызова
         # с выдуманными аргументами, которые разойдутся с компонентом.
         'contests':  data.all_contests(),
-        # docs/11 — showcase тегов
+        # docs/ui.md — showcase тегов
         'showcase_tags_accepted': accepted[:8],
         'showcase_tags_pending':  pending,
         'showcase_tags_mixed':    mixed,

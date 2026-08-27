@@ -792,7 +792,7 @@ class CountdownIconMeansTime(TestCase):
 
     `adjustments` стояла перед «12 күн қалды» потому, что часов в спрайте
     не было, а добавить `<symbol>` было лень. Иконка, взятая по наличию,
-    не значит ничего — CLAUDE.md и docs/04 §4.2 запрещают ровно это.
+    не значит ничего — CLAUDE.md и docs/ui.md запрещают ровно это.
     """
 
     def test_the_countdown_wears_the_clock_and_adjustments_stays_on_the_filter(self):
@@ -1332,7 +1332,7 @@ class MySubmissions(TestCase):
         """«Қабылданды» — решение жюри (BR-41), а не факт получения формы.
 
         Тост подачи говорил именно это слово, и автор читал отправку как
-        победу в первом же круге. Одна сущность — одно слово (docs/16 §16.4).
+        победу в первом же круге. Одна сущность — одно слово (docs/ui.md).
         """
         login_as(self.client)
         story = data.public_stories_of('aidana')[0]

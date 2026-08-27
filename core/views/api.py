@@ -40,7 +40,7 @@ def search_index_json(request):
                 {'username': a.username, 'name': a.public_name}
                 for a in data.all_authors()
             ],
-            # docs/11 Phase 3: теги в Cmd+K (только accepted)
+            # docs/ui.md Phase 3: теги в Cmd+K (только accepted)
             'tags': [
                 {'slug': t.slug, 'name': t.name, 'usage_count': t.usage_count}
                 for t in data.all_tags() if t.status == 'accepted'

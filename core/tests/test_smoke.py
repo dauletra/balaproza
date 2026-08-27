@@ -186,7 +186,7 @@ class TemplateContext(TestCase):
     def test_the_greeting_uses_the_persons_own_name(self):
         """«Қайта қош келдің, Айдана», а не «, aidana»: читателю автор
         известен под лақап аты, но приветствие обращено к нему самому.
-        Фамилии тоже нет — с «сен» (docs/16) она звучит вызовом к доске."""
+        Фамилии тоже нет — с «сен» (docs/ui.md) она звучит вызовом к доске."""
         aidana = User.objects.get(username='aidana')
         ctx = auth_state(self._request_as(aidana))
         self.assertTrue(ctx['signed_in'])

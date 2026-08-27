@@ -193,7 +193,7 @@ class StoryAdmin(admin.ModelAdmin):
         ('Сандар', {
             'fields': ('views', 'recent_views', 'likes', 'comments'),
             'description': 'Уақытша: Ф14 аяқталғанда бұлар сұраныстан '
-                           'есептеледі (docs/19 §19.3).',
+                           'есептеледі.',
         }),
     )
 
@@ -394,7 +394,7 @@ class SubmissionAdmin(admin.ModelAdmin):
     search_fields = ('author__username', 'story__title')
     autocomplete_fields = ('author', 'story')
     # Ответы формы подачи (DEC-21/DEC-24) — жюри и модератору видны,
-    # автор их повторно не редактирует (docs/20 §20.2).
+    # автор их повторно не редактирует.
     readonly_fields = ('ai_declaration', 'age_confirmed', 'rules_confirmed')
 
 

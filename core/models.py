@@ -1,4 +1,4 @@
-"""Модели Ф14. Порядок появления — docs/19 §19.4.
+"""Модели портала.
 
 Здесь все таблицы Ф14: пользователь и справочники, произведения и главы,
 конкурсы, подписки, жинақтар, библиотека, комментарии, опросы и
@@ -124,7 +124,7 @@ class User(AbstractUser):
     bio = models.CharField('өзі туралы', max_length=200, blank=True)
     # Самодекларация (DEC-24) — без верификации документами. Ни одно
     # бизнес-правило их пока не читает: возрастную вилку конкурса решает
-    # отдельный чекбокс формы подачи (BR-48, docs/20 §20.2).
+    # отдельный чекбокс формы подачи (BR-48).
     age = models.PositiveSmallIntegerField('жасы', null=True, blank=True)
     gender = models.CharField('жынысы', max_length=4, choices=GENDER_CHOICES,
                               blank=True)
@@ -171,7 +171,7 @@ class User(AbstractUser):
         что звать по фамилии.
 
         Только первое слово: «Айдана Серікқызы» с обращением на «сен»
-        (docs/16) звучит как вызов к доске. Полного имени нет — остаётся
+        (docs/ui.md) звучит как вызов к доске. Полного имени нет — остаётся
         публичное, оно есть всегда.
         """
         return self.name.split()[0] if self.name.strip() else self.public_name
@@ -217,7 +217,7 @@ class User(AbstractUser):
 class Genre(models.Model):
     """Жанр — закрытый справочник из 12 (DEC-11).
 
-    Не UGC: новый жанр означает новый цвет в системе (docs/03) и новую
+    Не UGC: новый жанр означает новый цвет в системе (docs/ui.md) и новую
     строку в полосе-вывеске на главной, то есть решение редакции, а не
     запись пользователя. Поэтому справочник сеется миграцией и правится
     в админке, а не формой.
@@ -232,7 +232,7 @@ class Genre(models.Model):
 
     slug = models.SlugField('slug', max_length=32, unique=True)
     name = models.CharField('атауы', max_length=40)
-    # OKLCH hue, 0-360 (docs/03 §3.3). Насыщенность и светлота у всех жанров
+    # OKLCH hue, 0-360 (docs/ui.md). Насыщенность и светлота у всех жанров
     # общие — различает их только тон, поэтому хранится один параметр.
     hue = models.PositiveSmallIntegerField('түс (OKLCH hue)',
                                            validators=[MaxValueValidator(360)])
@@ -250,7 +250,7 @@ class Genre(models.Model):
 
 
 class Tag(models.Model):
-    """UGC-тег (docs/11, DEC-26). Заводит автор, судьбу решает модератор.
+    """UGC-тег (docs/ui.md, DEC-26). Заводит автор, судьбу решает модератор.
 
     Живёт параллельно жанрам и отвечает на другой вопрос: жанр — это
     полка, тег — то, о чём написано прямо сейчас. Поэтому у тега нет
@@ -386,7 +386,7 @@ class StoryTag(models.Model):
 class Story(models.Model):
     """Произведение. Центральный объект портала.
 
-    Что здесь **не** хранится и почему — docs/19 §19.3. Коротко: число
+    Что здесь **не** хранится и почему — docs/architecture.md. Коротко: число
     работ автора, счётчик жанра, «сколько дней назад трогали» и знак
     «участвует в байқау» считаются, а не лежат колонкой.
 
@@ -676,7 +676,7 @@ class Story(models.Model):
 
 
 class Chapter(models.Model):
-    """Глава. Запись главы обязана нести текст (docs/12 §12.2).
+    """Глава. Запись главы обязана нести текст (docs/architecture.md).
 
     Обратная связь называется `chapter_set`, а не `chapters`: последнее имя
     занято заявленным числом частей у `Story`, и подменять одно другим
@@ -1320,7 +1320,7 @@ class Collection(models.Model):
 
     slug = models.SlugField('slug', max_length=64, unique=True)
     name = models.CharField('атауы', max_length=120)
-    # OKLCH hue для тонировки карточки и иконки (docs/03 §3.3).
+    # OKLCH hue для тонировки карточки и иконки (docs/ui.md).
     tint_hue = models.PositiveSmallIntegerField('түс (OKLCH hue)',
                                                 validators=[MaxValueValidator(360)])
     icon = models.CharField('иконка', max_length=32)
@@ -1684,7 +1684,7 @@ class PollOption(models.Model):
 
 
 class PollVote(models.Model):
-    """Голос читателя в опросе главы (Ф15 Этап 4, docs/20 §20.2).
+    """Голос читателя в опросе главы (BR-POLL-*).
 
     Одна ставка на весь опрос, не на вариант, и голос не меняется после
     отправки — `UniqueConstraint(user, poll)`, не только правило формы.

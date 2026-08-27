@@ -266,7 +266,7 @@ class TheCreationFormAsksThreeThings(TestCase):
         for genre in data.all_genres():
             with self.subTest(genre=genre.slug):
                 self.assertContains(self.response, f'value="{genre.slug}"')
-        # Формат перестраивает читательскую страницу целиком (docs/13 §13.11),
+        # Формат перестраивает читательскую страницу целиком (docs/ui.md),
         # парой радио между аннотацией и жанром он подавался слабее жанра.
         self.assertContains(self.response, 'id="format-single"')
         self.assertContains(self.response, 'id="format-serial"')
@@ -518,7 +518,7 @@ class TheChapterEditorReportsTheTruth(TestCase):
         """BR-11: автор не публикует, публикует модератор. Кнопка
         называлась «Жариялау», а тост рядом говорил «модерацияға
         жіберілді» — правду говорил тост. «Тексеруге» тоже не годится:
-        docs/16 §16.3 отводит ему оттенок экзамена."""
+        docs/ui.md отводит ему оттенок экзамена."""
         response = self.client.get(
             reverse('core:chapter_new', kwargs={'slug': self.SLUG}))
         body = response.content.decode()
@@ -533,7 +533,7 @@ class TheChapterEditorReportsTheTruth(TestCase):
         """Статичное `{{ current.char_count }}` не двигалось при вводе,
         хотя соседняя аннотация считала живьём — две механики одного и
         того же на одном экране. `bottom-24` разводит панель с плавающей
-        пилюлей `mobile_nav` (docs/07 §7.6)."""
+        пилюлей `mobile_nav` (docs/ui.md)."""
         body = self.client.get(reverse(
             'core:chapter_new', kwargs={'slug': self.SLUG})).content.decode()
         self.assertIn('x-text="count"', body)
@@ -569,7 +569,7 @@ class TheChapterEditorReportsTheTruth(TestCase):
 
 # ═════════════════════ Ф15, Этап 1: запись (POST) ══════════════════════════
 # До этой точки в файле — только GET/рендер. Ни один из этих тестов не
-# существовал до Этапа 1: до него формы ничего не сохраняли (docs/20).
+# существовал до Этапа 1: до него формы ничего не сохраняли.
 
 class NewStoryCreatesADraft(TestCase):
 
