@@ -167,6 +167,19 @@ class PersonalPagesStayWithinTheirQueryBudget(TestCase):
             self.client.get(reverse('core:profile_other',
                                     kwargs={'username': 'aidana'}))
 
+    def test_profile_people(self):
+        """Подписчики и подписки: автор, открытый список и число во втором
+        сегменте.
+
+        Было пять: цикл сегментов звал обе выборки заново, то есть
+        страница делала ту, что показывает, дважды — и вторую целиком, со
+        счётчиком работ у каждого имени, ради одного числа.
+        """
+        with self.assertNumQueries(4):
+            self.client.get(reverse('core:profile_people',
+                                    kwargs={'username': 'rudazov',
+                                            'kind': 'followers'}))
+
     def test_my_stories(self):
         """Кабинет: работы и полоса внимания по одному и тому же списку."""
         login_as(self.client)

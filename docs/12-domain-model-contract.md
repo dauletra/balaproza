@@ -131,6 +131,7 @@ Author workspace, library, social:
 - `is_following(me: str, them: str) -> bool`
 - `following_of(username: str) -> list[Author]` — оба списка публичны (BR-75), страницу собирает `profile_people`
 - `followers_of(username: str) -> list[Author]`
+- `following_count_of(username: str) -> int` / `followers_count_of(username: str) -> int` — только число. Страница показывает два сегмента, а открывает один: соседнему нужен счётчик, а не выборка имён со счётчиком работ у каждого
 - `notifications_for_user(username: str) -> dict` — три бакета FR-NOTIF-01; событие старше недели не попадает ни в один (BR-70a)
 - `unread_count_for_user(username: str) -> int` — считает то же, что показывается: скрытое старое уведомление в бейдж не идёт. Считает **база**: окно ленты в семь дней (`FEED_DAYS`) выражено условием по `created_at`, а не отбором по свойству `bucket` в Python. Число зовёт контекст-процессор на каждой странице, и у автора с двухлетней историей прежний вариант вёз всю историю ради семи дней
 - `kk_ago(days: int, hours: int | None = None) -> str` — «как давно» словами, одна формулировка на проект: её берут `Notification.when` и `Submission.submitted_label`

@@ -42,6 +42,22 @@ def following_of(username: str) -> list:
         .order_by('username')))
 
 
+def followers_count_of(username: str) -> int:
+    """Сколько человек подписано на автора.
+
+    Отдельно от `followers_of`, потому что страница подписок показывает
+    два сегмента, а открывает один: соседнему нужно число, а не список
+    имён со счётчиком работ у каждого. Полная выборка ради `len()` —
+    это та же выборка, только выброшенная.
+    """
+    return Follow.objects.filter(following__username=username).count()
+
+
+def following_count_of(username: str) -> int:
+    """Сколько людей читает сам автор. Пара к `followers_count_of`."""
+    return Follow.objects.filter(follower__username=username).count()
+
+
 def with_works(users):
     """Аннотация «сколько работ видит читатель» — её подхватывает
     `User.works`. Без неё каждый автор в списке стоит своего запроса."""

@@ -210,9 +210,12 @@ def profile_other(request, username):
     })
 
 
+# kind → подпись, список, счётчик. Счётчик отдельной функцией, а не
+# `len()` от списка: сегментов на странице два, а открыт один, и второму
+# нужно только число.
 _PEOPLE_KINDS = {
-    'followers': ('Жазылушылар', data.followers_of),
-    'following': ('Жазылулар',   data.following_of),
+    'followers': ('Жазылушылар', data.followers_of, data.followers_count_of),
+    'following': ('Жазылулар',   data.following_of, data.following_count_of),
 }
 
 
@@ -230,27 +233,32 @@ def profile_people(request, username, kind):
     if not author or kind not in _PEOPLE_KINDS:
         raise Http404(f'@{username}: {kind} табылмады')
 
-    title, fetch = _PEOPLE_KINDS[kind]
+    title, fetch, _ = _PEOPLE_KINDS[kind]
     me = _current_username(request)
+    people = fetch(username)
     return render(request, 'pages/profile/profile_people.html', {
         'profile_user': author,
         'username':     username,
         'kind':         kind,
         'title':        title,
-        'people':       fetch(username),
+        'people':       people,
         'is_self':      me == username,
         # Сегменты ведут между двумя списками одного автора. `?tab=` здесь
         # не годится — список это путь, а не состояние страницы, — поэтому
         # каждый сегмент несёт готовый `href`.
+        #
+        # Открытый список уже на руках, и его длина берётся отсюда. Раньше
+        # цикл звал обе выборки заново, то есть страница делала ту, что
+        # показывает, дважды.
         'people_items': [
             {
                 'slug':  k,
                 'label': lbl,
-                'count': len(f(username)),
+                'count': len(people) if k == kind else count_of(username),
                 'href':  reverse('core:profile_people',
                                  kwargs={'username': username, 'kind': k}),
             }
-            for k, (lbl, f) in _PEOPLE_KINDS.items()
+            for k, (lbl, _list_of, count_of) in _PEOPLE_KINDS.items()
         ],
         'catalog_href': reverse('core:catalog'),
     })
