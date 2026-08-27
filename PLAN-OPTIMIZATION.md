@@ -517,20 +517,30 @@ test_seed.py         test_lint.py
 Итоговый `docs/`: `README.md` (29, индекс), `architecture.md` (127),
 `spec.md` (258), `ui.md` (290), `10-resolved-decisions.md` (86).
 
-### Шаг 4. Слой данных: QuerySet вместо list
-- [ ] **4.1** `core/managers.py`: `StoryQuerySet` с
-      `.public()`, `.with_reading_effort()`, `.for_card()` (select/prefetch),
-      `.by_author(u)`, `.sorted_by(sort)`. `Story.objects` → этот менеджер.
-- [ ] **4.2** `ContestQuerySet`: `.with_counts()`, `.accepting()`,
-      `.finished()`. Убирает `_list_base`/`_base` из `queries/contests.py`.
-- [ ] **4.3** Все `return list(...)` в `queries/*` → `return <QuerySet>`.
-      Проверять шаблоны на `|length` (работает и на QuerySet) и на повторные
-      итерации.
-- [ ] **4.4** Удалить `AuthorFacts` и параметр `facts=` из девяти хелперов.
-      Проверять шагом `test_query_budget` — бюджеты не должны вырасти.
-- [ ] **4.5** Слой данных принимает `User`, а не `username: str`. Это убирает
-      join по строке в каждом запросе и запрос `AuthorFacts.user` (для своего
-      профиля объект уже лежит в `request.user`).
+### Шаг 4. Слой данных: QuerySet вместо list ✔ закрыт 2026-08-27
+- [x] **4.1** `core/managers.py`: `StoryQuerySet` — `.public()`, `.for_card()`,
+      `.with_reading_effort()`, `.by_author()`, `.sorted_by()`,
+      `.latest_edited()` плюс шесть осей каталога (`with_audience`,
+      `with_length`, `of_kind`, `with_badge`, `by_author_tier`, `matching`,
+      `in_genre`, `with_tag`). `Story.objects` — этот queryset.
+      Ушли приватные `_reading_effort` и `_sorted`; `queries/catalog.py`
+      327 → 152 строки.
+- [x] **4.2** `ContestQuerySet`: `.with_counts()`, `.for_card()`, `.full()`,
+      `.accepting()`, `.unfinished()`, `.finished()`. Ушли `_list_base`,
+      `_base`, `_counted`, `_accepting_q`.
+- [x] **4.3** Четырнадцать хелперов отдают QuerySet вместо списка.
+      Первым же прогоном нашлась плата за материализацию: каталог клал в
+      контекст `popular_tags`, которого не читает ни один его шаблон, —
+      запрос на каждой странице раздела. Бюджеты: каталог, жанр и поиск
+      18 → **17**, витрина тега 20 → **19**.
+- [x] **4.4** `AuthorFacts` и параметр `facts=` удалены. Снимок переехал на
+      сам объект (`User.authored`, `public_works`, `own_submissions`,
+      `library_entries`, `shelf()`, `reads` — `cached_property`): он и есть
+      то, что страница передаёт из вызова в вызов, и забыть его нельзя.
+- [x] **4.5** Слой данных принимает `User`, а не `username: str`; гость —
+      `None`. Бюджеты: свой профиль 14 → **13**, чужой 9 → **8** — ушёл
+      второй `SELECT` того же человека. `_current_username` остался только
+      там, где нужна строка (сравнение с ником из адреса).
 
 ### Шаг 5. Формы и декораторы
 - [ ] **5.1** `core/forms.py`: `StorySettingsForm` (ModelForm),
@@ -733,6 +743,12 @@ test_seed.py         test_lint.py
 > намеренно, и потому перестаёт быть работой по улучшению кода.
 
 | 2026-08-27 | 3.1-3.7 | `052bbe8` | Документация: 21 файл → 5, 3 613 строк → 790. `CLAUDE.md` 493 → 108. Деплой переехал в `README.md`. Ссылки в коде переведены. Суита 556, OK. **Шаг 3 закрыт.** |
+
+| 2026-08-27 | 4.1-4.2 | `a1417f1` | `core/managers.py`: выдача выражена queryset'ами, `queries/catalog.py` 327 → 152. Бюджеты не сдвинулись. |
+
+| 2026-08-27 | 4.3 | `aa94ef3` | Хелперы отдают QuerySet. Нашёлся мёртвый `popular_tags` в контексте каталога: каталог/жанр/поиск 18 → 17, тег 20 → 19. |
+
+| 2026-08-27 | 4.4-4.5 | `6c7301d` | Слой данных принимает `User`; `AuthorFacts` и `facts=` сняты, снимок живёт на объекте. Профиль свой 14 → 13, чужой 9 → 8. **Шаг 4 закрыт.** |
 
 > **Итог шага 3: 4 106 строк документации → 898.** Цель по `CLAUDE.md`
 > выполнена (108 при ≤ 120), по `docs/` — 790 при заявленных 700.
