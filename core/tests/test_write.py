@@ -1365,3 +1365,26 @@ class OwnershipIsEnforced(TestCase):
         self.client.post(
             reverse('core:delete_story', kwargs={'slug': self.foreign.slug}))
         self.assertTrue(Story.objects.filter(pk=self.foreign.pk).exists())
+
+
+class AttentionSpeaksOnlyWhenThereIsSomething(TestCase):
+    """Полоса «что требует внимания» (FR-WRITE-08) — сигналы, а не опись.
+
+    `slug` заполнен только когда элемент один: вести «3 шығарма
+    модерацияда» в одну из трёх было бы враньём.
+    """
+
+    def test_signals_come_in_the_order_of_the_authors_day(self):
+        kinds = [i['kind'] for i in data.writer_attention('aidana')]
+        self.assertEqual(kinds, ['moderation', 'comments', 'draft'])
+
+    def test_nothing_to_say_about_a_stranger(self):
+        self.assertEqual(data.writer_attention('no-such-user'), [])
+
+    def test_a_single_item_points_at_itself(self):
+        for item in data.writer_attention('aidana'):
+            with self.subTest(kind=item['kind']):
+                if item['count'] > 1 or item['kind'] == 'comments':
+                    self.assertEqual(item['slug'], '')
+                else:
+                    self.assertIsNotNone(data.story_by_slug(item['slug']))

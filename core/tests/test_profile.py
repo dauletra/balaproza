@@ -1101,3 +1101,89 @@ class FollowingAnAuthorIsWrittenDown(TestCase):
         before = Follow.objects.count()
         self.client.post(self._url('no-such-user'))
         self.assertEqual(Follow.objects.count(), before)
+
+
+class AchievementsAreDerivedNotStored(TestCase):
+    """Знаки автора выводятся из его работ (BR-ACH-01, DEC-41).
+
+    Колонки «награды автора» нет и быть не может — она разошлась бы с тем,
+    что человек сделал. Рейтинга здесь тоже нет: знак говорит «ты
+    сделал», рейтинг — «ты хуже вон того», и аудитории 14-18 второе не
+    нужно.
+
+    Проверки идут по всему корпусу, потому что вопрос именно такой:
+    выполняется ли правило **для каждого** автора. Раньше это был десяток
+    отдельных классов в `test_corpus`.
+    """
+
+    def _all(self):
+        return [(a.username, ach)
+                for a in data.all_authors()
+                for ach in data.achievements_of(a.username)]
+
+    def test_shape_and_uniqueness(self):
+        self.assertEqual(data.achievements_of('ghost'), [])
+        for username, ach in self._all():
+            with self.subTest(author=username, key=ach.get('key')):
+                self.assertEqual(set(ach), {'key', 'label', 'art', 'tier'})
+                self.assertTrue(ach['label'])
+                self.assertTrue(ach['art'])
+                self.assertIn(ach['tier'], data.AWARD_TIERS)
+        for author in data.all_authors():
+            marks = data.achievements_of(author.username)
+            with self.subTest(author=author.username):
+                keys = [m['key'] for m in marks]
+                arts = [m['art'] for m in marks]
+                self.assertEqual(len(keys), len(set(keys)))
+                self.assertEqual(len(arts), len(set(arts)))
+
+    def test_only_the_highest_read_tier_is_shown(self):
+        """«Мың» и «Он мың» рядом говорят одно и то же."""
+        for author in data.all_authors():
+            reads = [m for m in data.achievements_of(author.username)
+                     if m['key'] == 'reads']
+            with self.subTest(author=author.username):
+                self.assertLessEqual(len(reads), 1)
+                if reads:
+                    self.assertEqual(reads[0]['label'],
+                                     data.read_tier(author.username)[1])
+
+    def test_gold_stays_rare(self):
+        """Металл — сигнал ценности. Позолотить всё значит обесценить золото.
+
+        «Байқау жеңімпазы» из системного реестра убран (DEC-46): победу
+        называет награда конкретного конкурса, и металла у неё нет.
+        """
+        gold = {ach['key'] for _, ach in self._all() if ach['tier'] == 'gold'}
+        self.assertTrue(gold <= {'editorial_choice', 'reads'}, gold)
+        golden_reads = {ach['label'] for _, ach in self._all()
+                        if ach['key'] == 'reads' and ach['tier'] == 'gold'}
+        self.assertTrue(golden_reads <= {'Жүз мың оқылым'})
+        self.assertEqual(data.READ_TIER_ART[100_000][1], 'gold')
+        self.assertEqual(data.READ_TIER_ART[1_000][1], 'bronze')
+
+    def test_every_tier_has_art(self):
+        self.assertEqual(set(data.READ_TIER_ART), {t[0] for t in data.READ_TIERS})
+        for art, metal in data.READ_TIER_ART.values():
+            with self.subTest(art=art):
+                self.assertIn(metal, data.AWARD_TIERS)
+
+    def test_a_mark_never_outruns_its_reason(self):
+        """Каждый знак обязан иметь под собой факт: редакционный — публичную
+        работу с этим бейджем, конкурсный — заявку, прошедшую жюри
+        (DEC-46), «дописанный сериал» — сериал."""
+        editorial = data.BADGE_LABELS['editorial']
+        for author in data.all_authors():
+            keys = {m['key'] for m in data.achievements_of(author.username)}
+            with self.subTest(author=author.username):
+                has_public_pick = any(
+                    editorial in s.badges
+                    for s in data.public_stories_of(author.username))
+                self.assertEqual('editorial_choice' in keys, has_public_pick)
+                if data.contest_awards_of(author.username):
+                    self.assertIn('contest_participant', keys)
+                    self.assertIn('contest_accepted', keys)
+                if 'finished_serial' in keys:
+                    self.assertTrue(any(
+                        s.is_serial and s.status == 'Completed'
+                        for s in data.public_stories_of(author.username)))

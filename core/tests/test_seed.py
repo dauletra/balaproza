@@ -497,3 +497,66 @@ class SeededCorpusHasEveryRow(TestCase):
         for model, n in expected.items():
             with self.subTest(model=model.__name__):
                 self.assertEqual(model.objects.count(), n)
+
+
+class SeededCorpusHoldsItsInvariants(TestCase):
+    """Целостность демо-содержимого — то, что ломается от правки данных,
+    а не кода.
+
+    Раньше это был отдельный файл на 55 тестов. Половина его проверяла
+    правила (ступени наград, вывод счётчиков, подписи времени) и переехала
+    туда, где эти правила живут; здесь осталось то, что действительно про
+    корпус: он должен быть пригоден к показу.
+    """
+
+    def test_every_chapter_carries_text(self):
+        """Глава без тела — пустая страница чтения. Работа без написанных
+        частей не несёт ни одной главы, а не N пустых."""
+        for chapter in Chapter.objects.select_related('story'):
+            with self.subTest(story=chapter.story.slug, chapter=chapter.number):
+                self.assertTrue(chapter.body)
+                self.assertGreater(chapter.char_count, 0)
+
+    def test_single_works_carry_exactly_one_chapter(self):
+        for story in Story.objects.filter(format='single'):
+            with self.subTest(story=story.slug):
+                self.assertEqual(story.chapters, 1)
+
+    def test_recent_views_never_exceed_the_total(self):
+        """Окно в 14 дней — подмножество накопленного (DEC-36). Обратное
+        означало бы, что за две недели прочитали больше, чем за всё время."""
+        for story in Story.objects.all():
+            with self.subTest(story=story.slug):
+                self.assertLessEqual(story.recent_views, story.views)
+
+    def test_collections_are_deep_enough_and_public(self):
+        """Жинақ — первичный вход в чтение (DEC-31): подборка из двух
+        работ это тупик, а черновик в ней — утечка ненапечатанного."""
+        for collection in data.all_collections():
+            with self.subTest(collection=collection.slug):
+                self.assertGreaterEqual(collection.count, 5)
+                self.assertEqual(collection.count, len(collection.stories))
+                self.assertEqual(collection.covers, collection.stories[:3])
+                self.assertEqual(collection.curator, 'редакция')
+                for story in collection.stories:
+                    self.assertIn(story.status, data.PUBLIC_STATUSES)
+
+    def test_the_showcases_resolve(self):
+        """Книга недели, баннер конкурса и ссылки школы — то, что видит
+        гость в первом фолде. Пустой любой из них — дыра на главной."""
+        self.assertIsInstance(data.book_of_week().story, Story)
+        self.assertTrue(data.hero_contest().is_accepting)
+        channels = {link.channel for link in data.school_links()}
+        self.assertTrue({'youtube', 'instagram', 'tiktok', 'telegram'} <= channels)
+        for link in data.school_links():
+            with self.subTest(channel=link.channel):
+                self.assertTrue(link.url and link.title and link.subtitle)
+
+    def test_the_two_tag_showcases_do_not_coincide(self):
+        """Иначе «Осы аптада» — копия «Танымал тегтер» и занимает место зря
+        (DEC-31). Держится это на разбросе дат правок в корпусе: сид
+        датирует связку последней правкой работы."""
+        self.assertNotEqual(
+            [t.slug for t in data.trending_tags(6)],
+            [t.slug for t in data.popular_tags(6)],
+        )
