@@ -161,7 +161,7 @@ class AlpineDirectivesAreInScope(TestCase):
 
     def test_no_directive_outside_an_x_data_root(self):
         from django.urls import reverse
-        from core.tests.test_urls_smoke import PUBLIC_URLS
+        from core.tests.test_smoke import PUBLIC_URLS
 
         login_as(self.client)
 
@@ -195,7 +195,7 @@ class TabRolesPromiseAPanel(TestCase):
 
     def test_no_tab_role_without_a_tabpanel(self):
         from django.urls import reverse
-        from core.tests.test_urls_smoke import PUBLIC_URLS
+        from core.tests.test_smoke import PUBLIC_URLS
 
         login_as(self.client)
 
@@ -276,7 +276,7 @@ class GenericElementsCarryNoAriaLabel(TestCase):
 
     def test_no_aria_label_on_a_roleless_generic(self):
         from django.urls import reverse
-        from core.tests.test_urls_smoke import PUBLIC_URLS
+        from core.tests.test_smoke import PUBLIC_URLS
 
         login_as(self.client)
 
@@ -344,7 +344,7 @@ class IconLabelsDoNotDuplicateText(TestCase):
 
     def test_no_icon_repeats_its_neighbours_text(self):
         from django.urls import reverse
-        from core.tests.test_urls_smoke import PUBLIC_URLS
+        from core.tests.test_smoke import PUBLIC_URLS
 
         login_as(self.client)
 
@@ -450,7 +450,7 @@ class PlatformDoesNotNameItsAudience(TestCase):
         У конкурса своя вилка — она обязана быть видна, иначе автор не
         узнает, подавать ли ему.
         """
-        from core.tests.test_urls_smoke import PUBLIC_URLS
+        from core.tests.test_smoke import PUBLIC_URLS
         return [(n, kw, label) for n, kw, label in PUBLIC_URLS
                 if not n.startswith('core:contest')]
 
