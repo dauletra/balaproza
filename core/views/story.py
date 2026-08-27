@@ -7,6 +7,39 @@ from django.urls import reverse
 from .. import data
 from .common import _current_username
 
+# Что читатель уже открывал в этой сессии — против накрутки перезагрузкой.
+# Список, а не множество: сессия сериализуется в JSON, где множества нет.
+_SEEN_STORIES = 'seen_stories'
+# Хвост ограничен, иначе сессия растёт вместе с прочитанным. Двести работ —
+# это заметно больше, чем читают за один заход на портал, а вышедшая за
+# край работа в худшем случае засчитается второй раз.
+_SEEN_LIMIT = 200
+
+
+def _count_view(request, story) -> None:
+    """Один оқылым на работу за сессию.
+
+    Счётчик до этого не рос вообще: в базу его клал только сид, и
+    «Қазір танымал» — дефолтная сортировка каталога — навсегда
+    показывала порядок демо-данных.
+
+    Свой заход автору не засчитывается. Это не борьба с мошенничеством —
+    от неё защищает не сессия, — а защита от самого частого способа
+    надуть цифру случайно: открыть свою работу и обновить страницу.
+    """
+    if request.method != 'GET':
+        return
+    if request.user.is_authenticated and story.author_id == request.user.id:
+        return
+
+    seen = request.session.get(_SEEN_STORIES, [])
+    if story.pk in seen:
+        return
+    seen.append(story.pk)
+    request.session[_SEEN_STORIES] = seen[-_SEEN_LIMIT:]
+    data.record_story_view(story)
+
+
 def _back_to_story(slug, chapter_number=None, anchor=None):
     """PRG-редирект обратно на страницу произведения, к той же главе и,
     если есть на что, к якорю нового/задетого комментария."""
@@ -27,6 +60,9 @@ def story_detail(request, slug):
     # Автор своего стори видит pending-теги (BR-TAG-07). Для прочих скрыты.
     viewer = _current_username(request)
     is_author = bool(story and viewer and story.author.username == viewer)
+
+    if story is not None:
+        _count_view(request, story)
 
     # Резолв текущей главы из ?chapter=N. Невалидное/отсутствующее значение:
     #  - авторизованный с прогрессом по этому slug → SAMPLE_PROGRESS.current_chapter

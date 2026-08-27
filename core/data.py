@@ -127,6 +127,7 @@ from .queries.story import (
     delete_comment,
     poll_of,
     reactions_of,
+    record_story_view,
     toggle_chapter_reaction,
     toggle_comment_like,
     top_level_comment_of,

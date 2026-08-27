@@ -1097,3 +1097,73 @@ class CommentDeleteRemovesIt(TestCase):
         self.client.post(reverse(
             'core:comment_delete', kwargs={'slug': self.SLUG, 'comment_id': target.pk}))
         self.assertTrue(StoryComment.objects.filter(pk=target.pk).exists())
+
+
+class ReadingCountsAsAView(TestCase):
+    """Оқылым засчитывается при открытии работы (FR-STORY-01, DEC-36).
+
+    До этого счётчик в базу клал только сид: `views` и `recent_views` не
+    росли ни от одного захода. То есть «Қазір танымал» — дефолтная
+    сортировка каталога — навсегда показывала порядок демо-данных, а
+    автору портал сообщал число, к которому его читатели не имели
+    отношения.
+    """
+
+    SLUG = STORY_SLUG
+
+    def _url(self, **params):
+        url = reverse('core:story_detail', kwargs={'slug': self.SLUG})
+        return url + ('?' + '&'.join(f'{k}={v}' for k, v in params.items())
+                      if params else '')
+
+    def _counters(self):
+        s = Story.objects.get(slug=self.SLUG)
+        return s.views, s.recent_views
+
+    def test_first_visit_moves_both_counters(self):
+        before = self._counters()
+        self.client.get(self._url())
+        views, recent = self._counters()
+        self.assertEqual(views, before[0] + 1)
+        self.assertEqual(recent, before[1] + 1)
+
+    def test_the_page_shows_the_visit_it_just_counted(self):
+        """Цифра, отставшая на один заход, читается как «меня не засчитали»."""
+        before = self._counters()[0]
+        r = self.client.get(self._url())
+        self.assertEqual(r.context['story'].views, before + 1)
+
+    def test_reload_and_chapter_hopping_count_once(self):
+        before = self._counters()[0]
+        self.client.get(self._url())
+        self.client.get(self._url())
+        self.client.get(self._url(chapter=3))
+        self.client.get(self._url(chapter=7))
+        self.assertEqual(self._counters()[0], before + 1)
+
+    def test_another_reader_counts_again(self):
+        from django.test import Client
+
+        before = self._counters()[0]
+        self.client.get(self._url())
+        Client().get(self._url())
+        self.assertEqual(self._counters()[0], before + 2)
+
+    def test_the_author_does_not_read_themselves_into_the_numbers(self):
+        story = Story.objects.get(slug=self.SLUG)
+        login_as(self.client, story.author.username)
+        before = self._counters()
+        self.client.get(self._url())
+        self.assertEqual(self._counters(), before)
+
+    def test_reading_does_not_pass_for_editing(self):
+        """`updated_at` двигает автор, а не читатель: «өзгертілген бүгін»
+        после чужого захода — неправда, и она уезжает в сортировку."""
+        before = Story.objects.get(slug=self.SLUG).updated_at
+        self.client.get(self._url())
+        self.assertEqual(Story.objects.get(slug=self.SLUG).updated_at, before)
+
+    def test_unknown_story_counts_nothing(self):
+        r = self.client.get(reverse('core:story_detail',
+                                    kwargs={'slug': 'no-such-story'}))
+        self.assertEqual(r.status_code, 200)
