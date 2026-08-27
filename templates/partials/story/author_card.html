@@ -42,7 +42,7 @@
         </div>
     </dl>
 
-    {# Подписка (FR-PROF-04) — тот же стаб-паттерн, что на чужом профиле #}
+    {# Подписка (FR-PROF-04) — настоящий POST, тот же маршрут, что в шапке профиля #}
     {% if not signed_in %}
         <a href="{% url 'core:login' %}?next={{ request.get_full_path|urlencode }}"
            class="mt-4 flex h-11 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:border-brand hover:text-brand">
@@ -50,8 +50,9 @@
             Жазылу
         </a>
     {% elif is_followed %}
-        <form method="post" action="#" class="mt-4" @submit.prevent="$dispatch('toast', { kind:'success', text:'Жазылудан бас тарттың (демо)' })">
+        <form method="post" action="{% url 'core:follow_toggle' username=story.author.username %}" class="mt-4">
             {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
             <button type="submit"
                     class="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
                 {% include "components/icon.html" with name="check" size=14 only %}
@@ -59,8 +60,9 @@
             </button>
         </form>
     {% else %}
-        <form method="post" action="#" class="mt-4" @submit.prevent="$dispatch('toast', { kind:'success', text:'Жазылдың (демо)' })">
+        <form method="post" action="{% url 'core:follow_toggle' username=story.author.username %}" class="mt-4">
             {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
             <button type="submit"
                     class="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:border-brand hover:text-brand">
                 {% include "components/icon.html" with name="plus" size=16 only %}

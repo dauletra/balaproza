@@ -29,12 +29,16 @@ def _current_username(request) -> str:
     return request.user.username if request.user.is_authenticated else ''
 
 
-def _safe_next(request, fallback='core:home'):
+def _safe_next(request, fallback_url: str = ''):
     """Защита от open-redirect: принимаем только относительные пути на нашем хосте.
 
     Отклоняем абсолютные URL (http://…), protocol-relative (//evil.com/) и пустое.
+
+    `fallback_url` — готовый адрес, куда вернуться без `?next=`. Кнопка
+    подписки стоит на двух разных страницах и возвращает на ту, с которой
+    нажали; имени маршрута тут мало — у профиля в адресе есть `username`.
     """
     nxt = request.GET.get('next') or request.POST.get('next')
     if nxt and nxt.startswith('/') and not nxt.startswith('//'):
         return nxt
-    return reverse(fallback)
+    return fallback_url or reverse('core:home')

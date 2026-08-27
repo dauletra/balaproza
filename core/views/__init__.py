@@ -58,6 +58,7 @@ from .legal import (
 from .library import library
 from .notifications import notifications
 from .profile import (
+    follow_toggle,
     profile_me,
     profile_me_edit,
     profile_other,

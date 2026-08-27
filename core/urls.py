@@ -27,6 +27,7 @@ urlpatterns = [
     path('story/<slug:slug>/', views.story_detail, name='story_detail'),
     path('story/<slug:slug>/comment/', views.comment_create, name='comment_create'),
     path('story/<slug:slug>/library/', views.library_toggle, name='library_toggle'),
+    path('u/<str:username>/follow/', views.follow_toggle, name='follow_toggle'),
     path('story/<slug:slug>/comment/<int:comment_id>/delete/',
         views.comment_delete, name='comment_delete'),
     path('story/<slug:slug>/comment/<int:comment_id>/like/',

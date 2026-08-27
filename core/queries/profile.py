@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 from typing import Callable
 
+from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
@@ -28,6 +29,37 @@ from .author import AuthorFacts, author_facts
 def is_following(me: str, them: str) -> bool:
     return bool(me) and Follow.objects.filter(
         follower__username=me, following__username=them).exists()
+
+
+def toggle_follow(follower, following) -> bool:
+    """Подписка на автора — toggle (FR-PROF-04). Возвращает новое состояние.
+
+    До этого кнопка «Жазылу» отвечала Alpine-тостом «(демо)»: подписки не
+    возникало, счётчик не двигался, и после перезагрузки страница снова
+    предлагала подписаться.
+
+    `User.followers` пересчитывается по строкам, а не сдвигается на
+    единицу. Колонка остаётся — её читают лента «Жаңа есімдер» (сортировка),
+    карточка автора и ось каталога «Жаңа есімдер» (`WHERE`), — но
+    пересчёт делает её самоисправляющейся: тот же приём, что у
+    `toggle_comment_like`. Сдвиг на единицу однажды разъезжается и молча
+    остаётся неверным навсегда; здесь этого не может быть по построению.
+
+    На себя не подписываются — это же держит `CheckConstraint` в базе.
+    """
+    if follower.pk == following.pk:
+        return False
+    with transaction.atomic():
+        link = Follow.objects.filter(follower=follower, following=following).first()
+        if link is None:
+            Follow.objects.create(follower=follower, following=following)
+            now_following = True
+        else:
+            link.delete()
+            now_following = False
+        User.objects.filter(pk=following.pk).update(
+            followers=Follow.objects.filter(following=following).count())
+    return now_following
 
 
 def followers_of(username: str) -> list:

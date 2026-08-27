@@ -13,7 +13,7 @@ from django.test import Client
 from django.urls import reverse
 
 from core import data
-from core.models import User
+from core.models import Follow, User
 
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
 
@@ -227,9 +227,10 @@ class ProfileOtherKnown(TestCase):
     def test_authed_sees_follow_button(self):
         login_as(self.client, 'bekzhan_t')   # bekzhan_t подписан на rudazov
         r = self.client.get(reverse('core:profile_other', kwargs={'username': self.USERNAME}))
-        # «Уже подписан» — кнопка «Жазылдың» + toast «отписка»
+        # «Уже подписан» — кнопка «Жазылдың», ведущая в настоящий POST
         self.assertContains(r, 'Жазылдың')
-        self.assertContains(r, 'Жазылудан бас тарттың')
+        self.assertContains(r, reverse('core:follow_toggle',
+                                       kwargs={'username': self.USERNAME}))
 
     def test_authed_not_following_sees_subscribe(self):
         login_as(self.client, 'sayyn')       # sayyn НЕ подписан на rudazov
@@ -1019,3 +1020,84 @@ class ProfileEditPrefillsRawPenName(TestCase):
         self.client.force_login(user)
         html = self.client.get(reverse('core:profile_me_edit')).content.decode()
         self.assertNotIn('value="@blankpen"', html)
+
+
+class FollowingAnAuthorIsWrittenDown(TestCase):
+    """Кнопка «Жазылу» заводит подписку (FR-PROF-04, BR-75).
+
+    Обе формы — в шапке профиля и в карточке автора — стояли с
+    `action="#"` и отвечали тостом «(демо)». Строки `Follow` при этом
+    существовали и обслуживали списки: подписаться было нельзя, а
+    отписаться от того, что положил сид, — тем более.
+    """
+
+    TARGET = 'rudazov'
+
+    def _url(self, username=None):
+        return reverse('core:follow_toggle',
+                       kwargs={'username': username or self.TARGET})
+
+    def _links(self, username=None):
+        return Follow.objects.filter(
+            following__username=username or self.TARGET).count()
+
+    def _stored(self, username=None):
+        return User.objects.get(username=username or self.TARGET).followers
+
+    def test_subscribing_creates_the_link_and_moves_the_counter(self):
+        login_as(self.client, 'sayyn')       # sayyn ещё не подписан
+        before = self._links()
+        self.client.post(self._url())
+        self.assertEqual(self._links(), before + 1)
+        self.assertEqual(self._stored(), before + 1)
+
+    def test_pressing_again_unsubscribes(self):
+        login_as(self.client, 'bekzhan_t')   # уже подписан
+        before = self._links()
+        self.client.post(self._url())
+        self.assertEqual(self._links(), before - 1)
+        self.assertEqual(self._stored(), before - 1)
+
+    def test_the_stored_counter_always_matches_the_rows(self):
+        """`User.followers` — колонка, и разъехаться с записями она не
+        должна ни на одном шаге: пересчёт идёт по строкам."""
+        login_as(self.client, 'sayyn')
+        for _ in range(3):
+            self.client.post(self._url())
+            self.assertEqual(self._stored(), self._links())
+
+    def test_nobody_follows_themselves(self):
+        login_as(self.client, self.TARGET)
+        before = self._links()
+        self.client.post(self._url())
+        self.assertEqual(self._links(), before)
+
+    def test_a_guest_writes_nothing(self):
+        before = self._links()
+        self.client.post(self._url())
+        self.assertEqual(self._links(), before)
+
+    def test_get_writes_nothing(self):
+        login_as(self.client, 'sayyn')
+        before = self._links()
+        self.client.get(self._url())
+        self.assertEqual(self._links(), before)
+
+    def test_it_comes_back_where_it_was_pressed(self):
+        """Кнопок две и стоят они на разных страницах."""
+        login_as(self.client, 'sayyn')
+        story_page = reverse('core:story_detail', kwargs={'slug': 'kronchessii'})
+        r = self.client.post(self._url(), {'next': story_page})
+        self.assertRedirects(r, story_page)
+
+    def test_it_refuses_to_leave_the_site(self):
+        login_as(self.client, 'sayyn')
+        r = self.client.post(self._url(), {'next': '//evil.example/'})
+        self.assertRedirects(r, reverse('core:profile_other',
+                                        kwargs={'username': self.TARGET}))
+
+    def test_unknown_author_writes_nothing(self):
+        login_as(self.client, 'sayyn')
+        before = Follow.objects.count()
+        self.client.post(self._url('no-such-user'))
+        self.assertEqual(Follow.objects.count(), before)

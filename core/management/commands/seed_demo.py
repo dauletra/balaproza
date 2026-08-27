@@ -330,22 +330,27 @@ class Command(BaseCommand):
     def _seed_follows(self):
         """Подписки и счётчик подписчиков.
 
-        Счётчик приходит из стаба числом, а строки `Follow` — настоящие,
-        и их несколько. Это не рассогласование сида, а состояние демо:
-        восемь тысяч подписчиков `rudazov` некому создать поимённо. Число
-        показывает профиль, строки обслуживают «подписан ли я» и списки.
+        Счётчик считается по строкам `Follow`, а не берётся числом из
+        корпуса. Раньше брался: профиль `rudazov` объявлял 8 420 оқырман
+        при трёх записях, и то же расхождение стояло у всех остальных.
+        Пока подписаться было нельзя, его никто не замечал; с живой
+        кнопкой оно стало бы расти на глазах.
+
+        Демо от этого беднее — зато сходится, и `toggle_follow` считает
+        ровно так же.
         """
-        added = updated = 0
-        for author in _corpus.AUTHORS:
-            User.objects.filter(username=author.username).update(
-                followers=author.followers)
-            updated += 1
+        added = 0
         for follower, targets in _corpus.FOLLOWING.items():
             me = User.objects.get(username=follower)
             for target in targets:
                 _, is_new = Follow.objects.get_or_create(
                     follower=me, following=User.objects.get(username=target))
                 added += is_new
+        updated = 0
+        for user in User.objects.all():
+            User.objects.filter(pk=user.pk).update(
+                followers=Follow.objects.filter(following=user).count())
+            updated += 1
         return added, updated
 
     def _seed_collections(self):

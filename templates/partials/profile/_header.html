@@ -47,9 +47,9 @@
                 Жазылу
             </a>
         {% elif is_followed %}
-            <form method="post" action="#" x-data
-                  @submit.prevent="$dispatch('toast', { kind:'success', text:'Жазылудан бас тарттың (демо)' })">
+            <form method="post" action="{% url 'core:follow_toggle' username=profile_user.username %}">
                 {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
                 <button type="submit"
                         class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
                     {% include "components/icon.html" with name="check" size=14 only %}
@@ -57,9 +57,9 @@
                 </button>
             </form>
         {% else %}
-            <form method="post" action="#" x-data
-                  @submit.prevent="$dispatch('toast', { kind:'success', text:'Жазылдың (демо)' })">
+            <form method="post" action="{% url 'core:follow_toggle' username=profile_user.username %}">
                 {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
                 <button type="submit"
                         class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:border-brand hover:text-brand">
                     {% include "components/icon.html" with name="plus" size=16 only %}

@@ -347,9 +347,19 @@ class HomeEditorialBlocks(TestCase):
         self.assertLess(self.html.index('Жаңа авторлар'), self.html.index('Сенің әңгімең'))
 
     def test_new_authors_shows_least_followed(self):
-        usernames = [a.username for a in self.response.context['new_authors']]
-        self.assertEqual(usernames[0], 'aidana')  # 23 подписчика — меньше всех
-        self.assertNotIn('rudazov', usernames)    # 8420 — не «жаңа автор»
+        """Порядок — по числу подписчиков снизу вверх, и самый читаемый
+        автор портала в ленту новых имён не попадает.
+
+        Проверяется свойство, а не конкретные ники: числа подписчиков
+        теперь считаются по строкам `Follow`, и всякая правка графа
+        подписок в корпусе меняла бы литерал в тесте.
+        """
+        shown = self.response.context['new_authors']
+        counts = [a.followers for a in shown]
+        self.assertEqual(counts, sorted(counts))
+
+        most_followed = max(data.all_authors(), key=lambda a: a.followers)
+        self.assertNotIn(most_followed.username, [a.username for a in shown])
 
     def test_no_dead_placeholder_links(self):
         """Отдельного списка авторов в проекте нет — href="#" был бы тупиком."""

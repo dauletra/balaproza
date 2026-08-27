@@ -178,6 +178,7 @@ from .queries.profile import (
     read_ladder,
     read_tier,
     reads_total,
+    toggle_follow,
     unread_count_for_user,
     update_profile,
 )

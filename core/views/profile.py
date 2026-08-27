@@ -13,7 +13,7 @@ from django.urls import reverse
 
 from .. import data
 from ..models import RASTER_ONLY
-from .common import _current_username
+from .common import _current_username, _safe_next
 
 # ───────────────────────── PROF — профиль ────────────────────────────────
 _PROF_TABS_ME    = ("works", "library", "stats", "about")
@@ -213,6 +213,27 @@ def profile_other(request, username):
 # kind → подпись, список, счётчик. Счётчик отдельной функцией, а не
 # `len()` от списка: сегментов на странице два, а открыт один, и второму
 # нужно только число.
+def follow_toggle(request, username):
+    """Кнопка «Жазылу» (FR-PROF-04): подписаться или отписаться.
+
+    До этого обе формы — в шапке профиля и в карточке автора — стояли с
+    `action="#"` и `@submit.prevent`, а отвечал им тост «(демо)». Строки
+    `Follow` при этом существовали и обслуживали списки: подписаться было
+    нельзя, а отписаться от того, что положил сид, — тем более.
+
+    Возврат — по `?next=`, потому что кнопок две и стоят они на разных
+    страницах. `_safe_next` не пускает наружу (open-redirect).
+    """
+    target = data.author_by_username(username)
+    if (request.method == 'POST' and target is not None
+            and request.user.is_authenticated):
+        now_following = data.toggle_follow(request.user, target)
+        messages.success(request, 'Жазылдың' if now_following
+                         else 'Жазылудан бас тарттың')
+    return redirect(_safe_next(request, reverse(
+        'core:profile_other', kwargs={'username': username})))
+
+
 _PEOPLE_KINDS = {
     'followers': ('Жазылушылар', data.followers_of, data.followers_count_of),
     'following': ('Жазылулар',   data.following_of, data.following_count_of),

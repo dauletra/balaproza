@@ -703,11 +703,17 @@ class CatalogPresets(TestCase):
         self.assertIn('length=short', href)
 
     def test_counts_are_real(self):
+        """Счётчик чипа — про всю выдачу пресета, а не про её первую страницу.
+
+        Сверять его с `len(results)` можно было, только пока ни один
+        пресет не перебирал `PAGE_SIZE`; первый же, кто перебрал, показал,
+        что тест сравнивал итог со страницей.
+        """
         r = self.client.get(reverse('core:catalog'))
         for p in r.context['presets']:
             with self.subTest(preset=p['slug']):
                 target = self.client.get(p['href'])
-                self.assertEqual(p['count'], len(target.context['results']))
+                self.assertEqual(p['count'], target.context['total_results'])
 
     def test_empty_presets_are_not_offered(self):
         """Чип, ведущий в пустоту, хуже отсутствующего чипа."""
