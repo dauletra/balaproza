@@ -141,6 +141,27 @@ class PagesStayWithinTheirQueryBudget(TestCase):
             self.client.get(reverse('core:contest_detail',
                                     kwargs={'slug': 'altyn-qalam'}))
 
+    def test_tag_page(self):
+        """Витрина тега — тот же движок каталога плюс резолв самого тега.
+
+        Было 27: «принят ли тег» проверялось отдельным `EXISTS` внутри
+        `filter_catalog`, а страница зовёт его семь раз — выдача плюс
+        счётчик каждого пресета. Теперь условие стоит на той же связке,
+        что и слаг, и лишнего запроса нет вовсе.
+        """
+        with self.assertNumQueries(20):
+            self.client.get(reverse('core:tag_detail',
+                                    kwargs={'slug': 'mektep'}))
+
+    def test_collection_detail(self):
+        """Страница одной подборки. Было 76 (B7): соседний
+        `all_collections()` делает prefetch, а одиночный резолв не делал,
+        и состав тянул автора, жанр, теги и объём на каждую работу.
+        Бюджета у страницы не было, поэтому это и не было видно."""
+        with self.assertNumQueries(5):
+            self.client.get(reverse('core:collection_detail',
+                                    kwargs={'slug': 'kulki-kerek'}))
+
 
 class PersonalPagesStayWithinTheirQueryBudget(TestCase):
     """Страницы вошедшего: профиль, кабинет, библиотека, конкурсные заявки.
@@ -230,6 +251,37 @@ class PersonalPagesStayWithinTheirQueryBudget(TestCase):
         login_as(self.client)
         with self.assertNumQueries(5):
             self.client.get(reverse('core:my_submissions'))
+
+    def test_notifications(self):
+        """Лента: недельное окно одной выборкой, предметы событий — одним
+        `select_related`. Шаг 1.9 сделал метку «прочитано» настоящей, и
+        строка теперь ведёт через `notification_open`; адрес собирает
+        `links.notification_href` из уже загруженных объектов."""
+        login_as(self.client)
+        with self.assertNumQueries(6):
+            self.client.get(reverse('core:notifications'))
+
+    def test_manage_story(self):
+        """Страница одной работы в кабинете: сама работа, её главы,
+        чек-лист готовности и полоса внимания."""
+        login_as(self.client)
+        with self.assertNumQueries(11):
+            self.client.get(reverse('core:manage_story',
+                                    kwargs={'slug': 'aidana-tan'}))
+
+    def test_chapter_editor(self):
+        """Редактор главы — форма, а не выдача: дороже одной работы с её
+        главами она быть не должна."""
+        login_as(self.client)
+        with self.assertNumQueries(8):
+            self.client.get(reverse('core:chapter_edit',
+                                    kwargs={'slug': 'aidana-tan', 'chapter': 1}))
+
+    def test_profile_me_edit(self):
+        """Форма профиля читает одного пользователя — того, кто вошёл."""
+        login_as(self.client)
+        with self.assertNumQueries(5):
+            self.client.get(reverse('core:profile_me_edit'))
 
     def test_contest_submit(self):
         """Форма подачи: конкурс берётся один раз вместо трёх, объём

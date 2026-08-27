@@ -12,7 +12,7 @@
 """
 
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Prefetch
 
 from ..domain.story import REACTIONS
 from ..models import (
@@ -27,7 +27,7 @@ from ..models import (
     Story,
     StoryComment,
 )
-from .catalog import chapter_count_subquery
+from .catalog import all_stories, chapter_count_subquery
 
 
 def chapters_of(story_slug: str) -> list:
@@ -277,7 +277,17 @@ def all_collections() -> list:
 
 
 def collection_by_slug(slug: str):
-    return Collection.objects.filter(slug=slug).first()
+    """Одна подборка — со всем, что рисует карточка работы.
+
+    Соседний `all_collections()` prefetch делает, одиночный резолв не
+    делал: страница спрашивала автора, жанр, теги и объём на каждую
+    работу состава — семьдесят шесть запросов на десять карточек.
+    Бюджета у страницы не было, поэтому это и не было видно.
+    """
+    return (Collection.objects
+            .prefetch_related(Prefetch('item_set__story',
+                                       queryset=all_stories()))
+            .filter(slug=slug).first())
 
 
 def book_of_week():

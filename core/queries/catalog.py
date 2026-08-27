@@ -41,7 +41,7 @@ from ..domain.catalog import (
     NEW_AUTHOR_FOLLOWERS,
     PUBLIC_STATUSES,
 )
-from ..models import Chapter, Genre, Story, Submission, Tag, User
+from ..models import Chapter, Genre, Story, Submission, User
 from .site import REFERENCE_TTL
 
 # Знаков в минуту: темп, комфортный для казахской прозы. Живёт рядом с
@@ -280,10 +280,12 @@ def filter_catalog(*, query: str = '', genre: str = '', tag: str = '',
     if tag:
         # Pending-тег публичную выдачу не фильтрует (BR-TAG-07): он ещё не
         # прошёл модератора, и его страница для постороннего не существует.
-        if Tag.objects.filter(slug=tag, status='accepted').exists():
-            qs = qs.filter(tags__slug=tag)
-        else:
-            qs = qs.none()
+        # Оба условия — на одной связке: у многозначного отношения это
+        # означает «тег с таким слагом И принятый», то есть непринятый
+        # слаг не находит ничего. Отдельным `.exists()` эта проверка
+        # стоила по запросу на каждый вызов, а страница тега зовёт
+        # `filter_catalog` семь раз — выдача плюс счётчик каждого пресета.
+        qs = qs.filter(tags__slug=tag, tags__status='accepted')
 
     return apply_catalog_filters(qs, sort=sort, status=status,
                                  audience=audience, length=length,
