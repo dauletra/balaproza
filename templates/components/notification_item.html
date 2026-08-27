@@ -83,7 +83,7 @@
         <p class="font-sans text-sm leading-snug text-slate-900">
             {% if n.kind == 'comment' and n.actor and n.story %}
                 <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.public_name }}</a>
-                <span class="text-slate-700">«{{ n.story.title }}» туындысына пікір қалдырды.</span>
+                <span class="text-slate-700">«<a href="{% url 'core:notification_open' pk=n.pk %}" class="font-semibold hover:text-brand">{{ n.story.title }}</a>» туындысына пікір қалдырды.</span>
             {% elif n.kind == 'like' and n.actor and n.story %}
                 {% comment %}
                     «Ұнатты» описывало действие, которого в интерфейсе нет:
@@ -93,7 +93,7 @@
                     главе, как и `Chapter.top_reaction`.
                 {% endcomment %}
                 <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.public_name }}</a>
-                <span class="text-slate-700">«<a href="{% url 'core:story_detail' slug=n.story.slug %}" class="font-semibold hover:text-brand">{{ n.story.title }}</a>» туындысына реакция қалдырды.</span>
+                <span class="text-slate-700">«<a href="{% url 'core:notification_open' pk=n.pk %}" class="font-semibold hover:text-brand">{{ n.story.title }}</a>» туындысына реакция қалдырды.</span>
             {% elif n.kind == 'new_chapter' and n.story %}
                 {% comment %}
                     Автор назван и ведёт к себе. `actor_username` лежал в
@@ -101,13 +101,13 @@
                     кого подписан читатель (BR-72), и без имени строка не
                     отвечала, почему она вообще пришла.
                 {% endcomment %}
-                <a href="{% url 'core:story_detail' slug=n.story.slug %}" class="font-bold hover:text-brand">{{ n.story.title }}</a>
+                <a href="{% url 'core:notification_open' pk=n.pk %}" class="font-bold hover:text-brand">{{ n.story.title }}</a>
                 <span class="text-slate-700">— {{ n.text }}</span>
                 {% if n.actor %}
                     <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-semibold text-slate-600 hover:text-brand">{{ n.actor.public_name }}</a>
                 {% endif %}
             {% elif n.kind == 'follower' and n.actor %}
-                <a href="{% url 'core:profile_other' username=n.actor.username %}" class="font-bold hover:text-brand">{{ n.actor.public_name }}</a>
+                <a href="{% url 'core:notification_open' pk=n.pk %}" class="font-bold hover:text-brand">{{ n.actor.public_name }}</a>
                 <span class="text-slate-700">саған жазылды.</span>
             {% elif n.kind == 'moderation' %}
                 {% comment %}
@@ -121,7 +121,7 @@
                 {% endcomment %}
                 <span class="font-bold">{{ n.outcome_label }}:</span>
                 {% if n.story %}
-                    <a href="{% url 'core:manage_story' slug=n.story.slug %}" class="font-semibold hover:text-brand">«{{ n.story.title }}»</a>
+                    <a href="{% url 'core:notification_open' pk=n.pk %}" class="font-semibold hover:text-brand">«{{ n.story.title }}»</a>
                     <span class="text-slate-700">— {{ n.text }}</span>
                 {% else %}
                     <span class="text-slate-700">{{ n.text }}</span>
@@ -129,7 +129,7 @@
             {% elif n.kind == 'contest' %}
                 <span class="font-bold">Байқау:</span>
                 {% if n.contest %}
-                    <a href="{% url 'core:contest_detail' slug=n.contest.slug %}" class="font-semibold hover:text-brand">{{ n.contest.name }}</a>
+                    <a href="{% url 'core:notification_open' pk=n.pk %}" class="font-semibold hover:text-brand">{{ n.contest.name }}</a>
                     <span class="text-slate-700">— {{ n.text }}</span>
                 {% else %}
                     <span class="text-slate-700">{{ n.text }}</span>

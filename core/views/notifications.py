@@ -1,8 +1,11 @@
 """Лента событий автора (FR-NOTIF-01)."""
 
-from django.shortcuts import render
+from django.contrib import messages
+from django.shortcuts import redirect, render
+from django.urls import reverse
 
 from .. import data
+from ..links import notification_href
 from .common import _current_username, _page_state
 
 # ───────────────────────── NOTIF — уведомления ───────────────────────────
@@ -32,3 +35,36 @@ def notifications(request):
         'has_data':      state == 'content',
         'unread_total':  data.unread_count_for_user(username) if username else 0,
     })
+
+
+def notification_open(request, pk):
+    """Открыть уведомление: снять «непрочитано» и уйти к его предмету.
+
+    BR-71 говорит, что метку снимает **открытие уведомления**, а не
+    открытие ленты. Поэтому лента ничего не помечает сама: строка,
+    погасшая раньше, чем её прочли, — это ровно то состояние, ради
+    которого бейдж и заводился.
+
+    Адрес предмета собирает `notification_href`, тот же, что рисует
+    ссылки в самой карточке. Предмета может не быть (объект удалили) —
+    тогда возвращаемся в ленту, а не на битый адрес.
+    """
+    if not request.user.is_authenticated:
+        return redirect('core:notifications')
+    notification = data.mark_notification_read(request.user, pk)
+    if notification is None:
+        return redirect('core:notifications')
+    return redirect(notification_href(notification) or reverse('core:notifications'))
+
+
+def notifications_read_all(request):
+    """«Барлығын оқылды деп белгілеу» — кнопка над лентой (FR-NOTIF-04).
+
+    Была формой с `@submit.prevent` и тостом «(демо)»: бейдж в шапке
+    после неё показывал ровно то же число.
+    """
+    if request.method == 'POST' and request.user.is_authenticated:
+        cleared = data.mark_all_notifications_read(request.user)
+        if cleared:
+            messages.success(request, 'Барлығы оқылды деп белгіленді.')
+    return redirect('core:notifications')

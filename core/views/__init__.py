@@ -56,7 +56,11 @@ from .legal import (
     legal_terms,
 )
 from .library import library
-from .notifications import notifications
+from .notifications import (
+    notification_open,
+    notifications,
+    notifications_read_all,
+)
 from .profile import (
     follow_toggle,
     profile_me,

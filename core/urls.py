@@ -28,6 +28,8 @@ urlpatterns = [
     path('story/<slug:slug>/comment/', views.comment_create, name='comment_create'),
     path('story/<slug:slug>/library/', views.library_toggle, name='library_toggle'),
     path('u/<str:username>/follow/', views.follow_toggle, name='follow_toggle'),
+    path('notifications/read-all/', views.notifications_read_all, name='notifications_read_all'),
+    path('notifications/<int:pk>/open/', views.notification_open, name='notification_open'),
     path('story/<slug:slug>/comment/<int:comment_id>/delete/',
         views.comment_delete, name='comment_delete'),
     path('story/<slug:slug>/comment/<int:comment_id>/like/',

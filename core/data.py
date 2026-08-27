@@ -172,6 +172,8 @@ from .queries.profile import (
     following_count_of,
     following_of,
     is_following,
+    mark_all_notifications_read,
+    mark_notification_read,
     new_authors,
     notifications_for_user,
     portal_stats,

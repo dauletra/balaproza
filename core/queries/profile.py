@@ -347,6 +347,33 @@ def notifications_for_user(username: str) -> dict:
     return grouped
 
 
+def mark_notification_read(user, pk):
+    """Снять «непрочитано» с одного уведомления (BR-71). Отдаёт его или None.
+
+    Только своё: `user` в фильтре — не удобство, а закрытая дверь. Без
+    него любой вошедший снимал бы метку с чужой ленты по прямому адресу,
+    а заодно узнавал бы, что уведомление с таким номером существует.
+    """
+    notification = Notification.objects.filter(pk=pk, user=user).select_related(
+        'actor', 'story', 'contest').first()
+    if notification is not None and not notification.read:
+        Notification.objects.filter(pk=notification.pk).update(read=True)
+        notification.read = True
+    return notification
+
+
+def mark_all_notifications_read(user) -> int:
+    """«Барлығын оқылды деп белгілеу». Отдаёт число снятых меток.
+
+    Режется тем же окном, что и лента: за её пределами уведомлений для
+    читателя не существует — ни в списке, ни в бейдже (BR-70a), — и
+    снимать метку с того, чего он не видел, значит тихо стирать историю,
+    которая однажды понадобится.
+    """
+    return Notification.objects.filter(
+        user=user, read=False, created_at__gte=_feed_window_start()).update(read=True)
+
+
 def unread_count_for_user(username: str) -> int:
     """Бейдж в шапке считает то же, что показывает страница.
 

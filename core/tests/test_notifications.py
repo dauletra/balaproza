@@ -145,27 +145,41 @@ class NotificationsLeadSomewhere(TestCase):
         login_as(self.client)
         self.response = self.client.get(reverse('core:notifications'))
 
+    def _opens_at(self, n):
+        """Куда приводит клик по уведомлению.
+
+        Ссылка ведёт не прямо на предмет, а через `notification_open`:
+        по BR-71 метку «непрочитано» снимает именно открытие. Проверяется
+        поэтому конечная точка, а не строка адреса в разметке, — заодно
+        это ловит и саму таблицу соответствий `notification_href`.
+        """
+        self.assertContains(
+            self.response,
+            reverse('core:notification_open', kwargs={'pk': n.pk}))
+        return self.client.get(
+            reverse('core:notification_open', kwargs={'pk': n.pk}))
+
     def test_contest_notification_links_to_its_contest(self):
         contest_notifs = [n for n in _aidana_notifications()
                           if n.kind == 'contest']
-        self.assertTrue(contest_notifs, 'стаб потерял конкурсные уведомления')
+        self.assertTrue(contest_notifs, 'корпус потерял конкурсные уведомления')
         for n in contest_notifs:
             with self.subTest(contest=n.contest.slug):
                 self.assertTrue(n.contest, 'конкурсное уведомление без конкурса')
-                self.assertContains(
-                    self.response,
+                self.assertRedirects(
+                    self._opens_at(n),
                     reverse('core:contest_detail', kwargs={'slug': n.contest.slug}))
 
     def test_moderation_notification_links_to_the_story(self):
         mods = [n for n in _aidana_notifications()
                 if n.kind == 'moderation' and n.story]
-        self.assertTrue(mods, 'стаб потерял уведомление о модерации')
+        self.assertTrue(mods, 'корпус потерял уведомление о модерации')
         for n in mods:
             with self.subTest(story=n.story.slug):
                 # Работа на модерации не публична — вести на неё можно
                 # только в авторский кабинет (BR-73).
-                self.assertContains(
-                    self.response,
+                self.assertRedirects(
+                    self._opens_at(n),
                     reverse('core:manage_story', kwargs={'slug': n.story.slug}))
 
     def test_text_does_not_repeat_the_name_of_its_subject(self):
@@ -714,3 +728,71 @@ class HeaderUnreadBadge(TestCase):
     def test_guest_no_bell_at_all(self):
         r = self.client.get(reverse('core:home'))
         self.assertNotContains(r, 'Хабарламалар (')
+
+
+class ReadingANotificationClearsIt(TestCase):
+    """«Непрочитано» снимает открытие уведомления (BR-71).
+
+    Метку не выставлял никто, кроме сида: колокольчик в шапке навсегда
+    показывал число из демо-данных, а кнопка «Барлығын оқылды деп
+    белгілеу» отвечала тостом «(демо)».
+    """
+
+    def setUp(self):
+        login_as(self.client)
+        self.unread = [n for n in _aidana_notifications() if not n.read]
+        self.assertTrue(self.unread, 'корпус потерял непрочитанные')
+
+    def _badge(self):
+        return data.unread_count_for_user('aidana')
+
+    def _open(self, n):
+        return self.client.get(
+            reverse('core:notification_open', kwargs={'pk': n.pk}))
+
+    def test_opening_one_clears_one(self):
+        before = self._badge()
+        self._open(self.unread[0])
+        self.assertTrue(Notification.objects.get(pk=self.unread[0].pk).read)
+        self.assertEqual(self._badge(), before - 1)
+
+    def test_opening_it_twice_does_not_go_negative(self):
+        self._open(self.unread[0])
+        after_first = self._badge()
+        self._open(self.unread[0])
+        self.assertEqual(self._badge(), after_first)
+
+    def test_the_feed_itself_clears_nothing(self):
+        """Строка, погасшая раньше, чем её прочли, — это ровно то
+        состояние, ради которого бейдж и заводился."""
+        before = self._badge()
+        self.client.get(reverse('core:notifications'))
+        self.assertEqual(self._badge(), before)
+
+    def test_mark_all_empties_the_badge(self):
+        self.client.post(reverse('core:notifications_read_all'))
+        self.assertEqual(self._badge(), 0)
+
+    def test_mark_all_needs_a_post(self):
+        before = self._badge()
+        self.client.get(reverse('core:notifications_read_all'))
+        self.assertEqual(self._badge(), before)
+
+    def test_a_guest_clears_nothing(self):
+        before = self._badge()
+        self.client.logout()
+        self.client.post(reverse('core:notifications_read_all'))
+        self._open(self.unread[0])
+        self.assertEqual(self._badge(), before)
+
+    def test_nobody_clears_someone_elses_feed(self):
+        """`user` в фильтре — закрытая дверь, а не удобство."""
+        target = self.unread[0]
+        login_as(self.client, 'bekzhan_t')
+        self._open(target)
+        self.assertFalse(Notification.objects.get(pk=target.pk).read)
+
+    def test_the_button_disappears_once_everything_is_read(self):
+        self.client.post(reverse('core:notifications_read_all'))
+        r = self.client.get(reverse('core:notifications'))
+        self.assertNotContains(r, 'Барлығын оқылды деп белгілеу')

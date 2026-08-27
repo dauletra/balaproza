@@ -312,3 +312,35 @@ def checklist_links(story) -> list:
     hrefs = {'settings': settings_href, 'text': text_href}
     return [{**item, 'href': hrefs[item['target']]}
             for item in data.publish_checklist(story)]
+
+
+def notification_href(n) -> str:
+    """Куда ведёт уведомление (BR-72a, FR-NOTIF-05).
+
+    Предмет у каждого типа свой: отклик и комментарий открывают работу,
+    новый подписчик — его профиль, решение модератора — работу **в
+    авторском кабинете** (публично её может не быть, BR-73), конкурсное —
+    конкурс.
+
+    Собирается здесь, а не в шаблоне, потому что этот же адрес нужен
+    вью: клик по уведомлению проходит через `notification_open`, которое
+    снимает «непрочитано» и отправляет дальше (BR-71). Два экземпляра
+    одной таблицы соответствий разошлись бы на первом же новом типе.
+
+    Пусто — предмета нет (объект удалили): уведомление остаётся строкой
+    без ссылки, а не ведёт на битый адрес.
+    """
+    if n.kind == 'moderation':
+        return (reverse('core:manage_story', kwargs={'slug': n.story.slug})
+                if n.story_id else '')
+    if n.kind == 'contest':
+        return (reverse('core:contest_detail', kwargs={'slug': n.contest.slug})
+                if n.contest_id else '')
+    if n.kind == 'follower':
+        return (reverse('core:profile_other', kwargs={'username': n.actor.username})
+                if n.actor_id else '')
+    if n.story_id:
+        return reverse('core:story_detail', kwargs={'slug': n.story.slug})
+    if n.actor_id:
+        return reverse('core:profile_other', kwargs={'username': n.actor.username})
+    return ''

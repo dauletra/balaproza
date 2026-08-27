@@ -139,7 +139,9 @@ Author workspace, library, social:
 - `followers_of(username: str) -> list[Author]`
 - `following_count_of(username: str) -> int` / `followers_count_of(username: str) -> int` — только число. Страница показывает два сегмента, а открывает один: соседнему нужен счётчик, а не выборка имён со счётчиком работ у каждого
 - `notifications_for_user(username: str) -> dict` — три бакета FR-NOTIF-01; событие старше недели не попадает ни в один (BR-70a)
-- `unread_count_for_user(username: str) -> int` — считает то же, что показывается: скрытое старое уведомление в бейдж не идёт. Считает **база**: окно ленты в семь дней (`FEED_DAYS`) выражено условием по `created_at`, а не отбором по свойству `bucket` в Python. Число зовёт контекст-процессор на каждой странице, и у автора с двухлетней историей прежний вариант вёз всю историю ради семи дней
+- `unread_count_for_user(username: str) -> int`
+- `mark_notification_read(user, pk) -> Notification | None` — снять «непрочитано» с одного (BR-71). Только со своего: `user` в фильтре
+- `mark_all_notifications_read(user) -> int` — со всех в пределах недельного окна ленты — считает то же, что показывается: скрытое старое уведомление в бейдж не идёт. Считает **база**: окно ленты в семь дней (`FEED_DAYS`) выражено условием по `created_at`, а не отбором по свойству `bucket` в Python. Число зовёт контекст-процессор на каждой странице, и у автора с двухлетней историей прежний вариант вёз всю историю ради семи дней
 - `kk_ago(days: int, hours: int | None = None) -> str` — «как давно» словами, одна формулировка на проект: её берут `Notification.when` и `Submission.submitted_label`
 
 Contests:
