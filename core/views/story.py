@@ -5,7 +5,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from .. import data
-from .common import _current_username
+from .common import _current_user, _current_username
 
 # Что читатель уже открывал в этой сессии — против накрутки перезагрузкой.
 # Список, а не множество: сессия сериализуется в JSON, где множества нет.
@@ -58,8 +58,8 @@ def story_detail(request, slug):
     story = data.story_by_slug(slug)
     chapters = data.chapters_of(slug)
     # Автор своего стори видит pending-теги (BR-TAG-07). Для прочих скрыты.
-    viewer = _current_username(request)
-    is_author = bool(story and viewer and story.author.username == viewer)
+    viewer = _current_user(request)
+    is_author = bool(story and viewer and story.author_id == viewer.pk)
 
     if story is not None:
         _count_view(request, story)
@@ -69,7 +69,7 @@ def story_detail(request, slug):
     #  - иначе → 1
     # Если глав нет вовсе — chapter_number=None, current=None (no-op в шаблоне).
     explicit_chapter = request.GET.get('chapter')
-    progress = data.reading_progress_of(viewer) if viewer else None
+    progress = data.reading_progress_of(viewer)
     has_progress_here = bool(progress and progress.story.slug == slug)
     if chapters:
         try:
@@ -130,11 +130,8 @@ def story_detail(request, slug):
         # Шапка (FR-STORY-01): подпись главной кнопки — «начать» или «продолжить».
         'has_progress': bool(has_progress_here),
         # Кнопка «Сақтау» и подписка на автора в карточке автора.
-        'in_library':  data.in_library(viewer, slug) if viewer else False,
-        'is_followed': (
-            data.is_following(viewer, story.author.username)
-            if viewer and story else False
-        ),
+        'in_library':  data.in_library(viewer, slug),
+        'is_followed': data.is_following(viewer, story.author if story else None),
     })
 
 

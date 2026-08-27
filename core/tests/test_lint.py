@@ -397,7 +397,7 @@ class IconNamesExistInSprite(TestCase):
         """Слаг иллюстрации приходит из данных — опечатку заметить негде."""
         ids = self._award_ids()
         for a in data.all_authors():
-            for ach in data.achievements_of(a.username):
+            for ach in data.achievements_of(a):
                 with self.subTest(author=a.username, art=ach["art"]):
                     self.assertIn(ach["art"], ids)
 
@@ -411,7 +411,7 @@ class IconNamesExistInSprite(TestCase):
         """Символ, на который никто не ссылается, — мёртвый вес на странице."""
         used = {a[0] for a in data.READ_TIER_ART.values()}
         for author in data.all_authors():
-            used |= {x["art"] for x in data.achievements_of(author.username)}
+            used |= {x["art"] for x in data.achievements_of(author)}
         self.assertEqual(self._award_ids() - used, set())
 
     def test_template_icon_literals_exist(self):

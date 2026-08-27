@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.shortcuts import redirect, render
 
 from .. import data
-from .common import _current_username, _page_state
+from .common import _current_user, _page_state
 
 # ───────────────────────── CONT — конкурсы ───────────────────────────────
 def contest_list(request):
@@ -46,8 +46,7 @@ def _contest_rail_has_content(contest, *, submitted: bool, hide_cta: bool) -> bo
 
 def contest_detail(request, slug):
     contest = data.contest_by_slug(slug)
-    username = _current_username(request)
-    submitted = data.has_submission(username, slug) if username else False
+    submitted = data.has_submission(_current_user(request), slug)
     return render(request, 'pages/contests/contest_detail.html', {
         'has_right_rail': _contest_rail_has_content(contest, submitted=submitted,
                                                     hide_cta=False),
@@ -69,14 +68,14 @@ def contest_detail(request, slug):
 
 def contest_submit(request, slug):
     contest = data.contest_by_slug(slug)
-    username = _current_username(request)
+    user = _current_user(request)
 
-    if request.method == 'POST' and username and contest:
+    if request.method == 'POST' and user and contest:
         # Кандидаты — те же публичные работы автора, что и на GET (BR-10,
         # DEC-23): чужой или непубличный slug просто не найдётся здесь,
         # и отдельной проверки владения форме не нужно.
         candidates = {c['story'].slug: c['story']
-                     for c in data.submission_candidates(username, contest)}
+                     for c in data.submission_candidates(user, contest)}
         story = candidates.get(request.POST.get('story_slug', ''))
         ai_declaration = request.POST.get('ai_used', '')
         age_confirmed = bool(request.POST.get('confirm_age'))
@@ -109,13 +108,12 @@ def contest_submit(request, slug):
                 messages.error(request, 'Сен бұл байқауға өтінім бергенсің.')
         return redirect('core:contest_submit', slug=slug)
 
-    submitted = data.has_submission(username, slug) if username else False
-    # Конкурс и работы автора берутся по одному разу и раздаются дальше:
-    # через слаг и `submission_candidates`, и `can_withdraw` тянули бы
-    # состав конкурса заново — по шесть запросов на каждый вызов.
-    facts = data.author_facts(username)
-    candidates = (data.submission_candidates(username, contest, facts=facts)
-                  if (username and contest) else [])
+    submitted = data.has_submission(user, slug)
+    # Конкурс берётся один раз и раздаётся дальше: через слаг и
+    # `submission_candidates`, и `can_withdraw` тянули бы состав конкурса
+    # заново — по шесть запросов на каждый вызов. Работы автора приходят
+    # снимком с него самого.
+    candidates = data.submission_candidates(user, contest) if contest else []
 
     # Выбранная по умолчанию — первая без заметок, иначе просто первая.
     # Отклонять форма ничего не отклоняет (BR-24), но начинать выбор с
@@ -160,13 +158,13 @@ def contest_submit(request, slug):
         # у автора с тремя работами поле над ними — лишний элемент.
         'picker_search':     len(candidates) > PICKER_SEARCH_FROM,
         'checklist':         checklist,
-        'can_withdraw':      data.can_withdraw(username, contest) if username else False,
+        'can_withdraw':      data.can_withdraw(user, contest),
         'already_submitted': submitted,
     })
 
 
 def my_submissions(request):
-    username = _current_username(request)
+    user = _current_user(request)
     # «Когда узнаю?» — первый вопрос после подачи, и до CONT-5 страница на
     # него не отвечала вовсе: статус «Қаралуда» стоял без единой даты.
     items = [
@@ -175,9 +173,9 @@ def my_submissions(request):
             'contest':      sub.contest,
             # Готовый объект, а не слаг: через слаг ответ стоил полной
             # выборки конкурса со всем составом — на каждую строку.
-            'can_withdraw': data.can_withdraw(username, sub.contest),
+            'can_withdraw': data.can_withdraw(user, sub.contest),
         }
-        for sub in (data.submissions_of(username) if username else [])
+        for sub in data.submissions_of(user)
     ]
     return render(request, 'pages/contests/my_submissions.html', {
         'page_state': _page_state(request),
@@ -194,10 +192,10 @@ def contest_withdraw(request, slug):
     POST приходит из `withdraw_confirm_modal.html`. Условие (приём ещё
     идёт, жюри ещё не решило) проверяет `data.withdraw_submission` заново —
     `can_withdraw` на странице решает только, показать ли кнопку."""
-    username = _current_username(request)
+    user = _current_user(request)
     contest = data.contest_by_slug(slug)
-    if request.method == 'POST' and contest is not None and username:
-        if data.withdraw_submission(username, contest):
+    if request.method == 'POST' and contest is not None and user:
+        if data.withdraw_submission(user, contest):
             messages.success(request, 'Өтінім қайтарып алынды.')
         else:
             messages.error(request, 'Өтінімді қайтарып алу мүмкін болмады.')

@@ -24,7 +24,7 @@ from django.utils import timezone
 
 from core import data
 from core.models import Follow, Notification, Story, User
-from core.tests.base import TestCase, login_as, login_as_newcomer
+from core.tests.base import TestCase, login_as, login_as_newcomer, user
 
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
 NOTIFICATION_ITEM = TEMPLATES / 'components' / 'notification_item.html'
@@ -64,8 +64,8 @@ class PublicSurfaceOfAnAuthor(TestCase):
         # `Author.works` разойдутся, профиль и карточка автора на STORY
         # снова будут врать друг про друга (у aidana было 5 против 3).
         for author in data.all_authors():
-            public = data.public_stories_of(author.username)
-            stats = data.public_stats(author.username)
+            public = data.public_stories_of(author)
+            stats = data.public_stats(author)
             with self.subTest(author=author.username):
                 self.assertEqual(stats['works'], author.works)
                 self.assertEqual(stats['reads'], sum(s.views for s in public))
@@ -73,14 +73,14 @@ class PublicSurfaceOfAnAuthor(TestCase):
                 self.assertTrue(all(s.is_public for s in public))
 
     def test_hidden_work_reaches_neither_the_count_nor_the_rail(self):
-        hidden = [s for s in data.my_stories_of('aidana') if not s.is_public]
+        hidden = [s for s in data.my_stories_of(user('aidana')) if not s.is_public]
         self.assertTrue(hidden, 'фикстура сломана: у aidana нет непубличных работ')
         self.assertEqual(
-            data.public_stats('aidana')['works'],
-            len(data.my_stories_of('aidana')) - len(hidden),
+            data.public_stats(user('aidana'))['works'],
+            len(data.my_stories_of(user('aidana'))) - len(hidden),
         )
         # Рейл — публичная поверхность, и BR-73 действует в нём так же.
-        top = data.top_stories_of('aidana', limit=99)
+        top = data.top_stories_of(user('aidana'), limit=99)
         self.assertTrue(all(s.is_public for s in top))
         for story in hidden:
             with self.subTest(story=story.slug):
@@ -89,59 +89,59 @@ class PublicSurfaceOfAnAuthor(TestCase):
     def test_public_list_keeps_serials(self):
         # DEC-37: публичный сериал носит OnProcess/Completed. Фильтр по
         # литералу 'Published' молча выкинул бы их все.
-        public = data.public_stories_of('rudazov')
+        public = data.public_stories_of(user('rudazov'))
         self.assertEqual(len(public), 3)
         self.assertIn('arhimag', {s.slug for s in public})   # OnProcess
 
     def test_own_stats_add_the_private_half(self):
-        stats = data.reader_stats('aidana')
+        stats = data.reader_stats(user('aidana'))
         # Публичные числа те же, что у постороннего: свой профиль не
         # показывает владельцу другую арифметику, чем читателю.
-        self.assertEqual(stats['works'], data.public_stats('aidana')['works'])
-        self.assertEqual(stats['works_total'], len(data.my_stories_of('aidana')))
+        self.assertEqual(stats['works'], data.public_stats(user('aidana'))['works'])
+        self.assertEqual(stats['works_total'], len(data.my_stories_of(user('aidana'))))
         self.assertGreater(stats['works_total'], stats['works'])
         self.assertEqual(stats['finished'], 1)
         self.assertEqual(stats['followers'],
                          User.objects.get(username='aidana').followers)
 
     def test_the_rail_top_is_sorted_and_capped(self):
-        top = data.top_stories_of('aygerim_k')
+        top = data.top_stories_of(user('aygerim_k'))
         self.assertEqual([s.views for s in top],
                          sorted((s.views for s in top), reverse=True))
         self.assertLessEqual(len(top), 3)
-        self.assertEqual(len(data.top_stories_of('aygerim_k', limit=1)), 1)
+        self.assertEqual(len(data.top_stories_of(user('aygerim_k'), limit=1)), 1)
 
     def test_unknown_user_is_empty_everywhere(self):
-        stats = data.public_stats('no-such-user')
+        stats = data.public_stats(user('no-such-user'))
         self.assertEqual([stats['works'], stats['reads'],
                           stats['likes'], stats['followers']], [0, 0, 0, 0])
-        reader = data.reader_stats('no-such-user')
+        reader = data.reader_stats(user('no-such-user'))
         self.assertEqual([reader['works'], reader['works_total'],
                           reader['finished'], reader['followers']], [0, 0, 0, 0])
-        self.assertEqual(list(data.public_stories_of('no-such-user')), [])
-        self.assertEqual(list(data.top_stories_of('no-such-user')), [])
-        self.assertEqual(list(data.following_of('no-such-user')), [])
-        self.assertEqual(list(data.followers_of('no-such-user')), [])
+        self.assertEqual(list(data.public_stories_of(user('no-such-user'))), [])
+        self.assertEqual(list(data.top_stories_of(user('no-such-user'))), [])
+        self.assertEqual(list(data.following_of(user('no-such-user'))), [])
+        self.assertEqual(list(data.followers_of(user('no-such-user'))), [])
 
 
 class FollowGraphHelpers(TestCase):
 
     def test_the_graph_answers_both_directions(self):
-        self.assertTrue(data.is_following('aidana', 'rudazov'))
-        self.assertFalse(data.is_following('aidana', 'bekzhan_t'))
-        self.assertEqual({a.username for a in data.following_of('aidana')},
+        self.assertTrue(data.is_following(user('aidana'), user('rudazov')))
+        self.assertFalse(data.is_following(user('aidana'), user('bekzhan_t')))
+        self.assertEqual({a.username for a in data.following_of(user('aidana'))},
                          {'rudazov', 'sayyn', 'dina_books'})
-        followers = data.followers_of('aidana')
+        followers = data.followers_of(user('aidana'))
         self.assertEqual([a.username for a in followers], ['aygerim_k'])
 
     def test_every_link_is_visible_from_both_ends(self):
         """Подписка — одна строка, и обе выдачи обязаны её называть."""
         for author in data.all_authors():
-            for other in data.following_of(author.username):
+            for other in data.following_of(author):
                 with self.subTest(who=author.username, whom=other.username):
                     self.assertIn(
                         author.username,
-                        {a.username for a in data.followers_of(other.username)})
+                        {a.username for a in data.followers_of(other)})
 
 
 class OwnProfile(TestCase):
@@ -165,7 +165,7 @@ class OwnProfile(TestCase):
         self.assertContains(response, '@aidana')
         # DEC-44: вкладка показывает публичные работы — то же, что видит
         # читатель. Черновик и работа на модерации сюда не попадают.
-        for story in data.public_stories_of('aidana'):
+        for story in data.public_stories_of(user('aidana')):
             with self.subTest(story=story.slug):
                 self.assertContains(response, story.title)
         # Список сегментов ведём из самого источника: добавленный в
@@ -195,7 +195,7 @@ class OwnProfile(TestCase):
         library = self.client.get(reverse('core:profile_me') + '?tab=library')
         self.assertContains(library, 'Оқу үстіндегі')
         self.assertContains(library, 'Сақталған')
-        for entry in data.library_of('aidana', 'reading'):
+        for entry in data.library_of(user('aidana'), 'reading'):
             with self.subTest(story=entry.story.slug):
                 self.assertContains(library, entry.story.title)
 
@@ -209,7 +209,7 @@ class OwnProfile(TestCase):
         self.assertContains(about, 'Тек саған көрінеді')
         self.assertContains(about, 'Айдана Серікқызы')      # ресми аты-жөні
         self.assertContains(about, '2025 жылдан бері')      # joined_year
-        self.assertContains(about, len(data.my_stories_of('aidana')))
+        self.assertContains(about, len(data.my_stories_of(user('aidana'))))
         self.assertContains(about, 'жобалармен бірге')
 
     def test_an_unknown_tab_falls_back_to_works(self):
@@ -227,7 +227,7 @@ class StrangerProfile(TestCase):
             reverse('core:profile_other', kwargs={'username': 'rudazov'}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Rudazov')
-        for story in data.public_stories_of('rudazov'):
+        for story in data.public_stories_of(user('rudazov')):
             with self.subTest(story=story.slug):
                 self.assertContains(response, story.title)
         # Сегмент обещал «Шығармалар 5» и открывал список из трёх.
@@ -241,7 +241,7 @@ class StrangerProfile(TestCase):
         висели обычными кликабельными карточками."""
         response = self.client.get(
             reverse('core:profile_other', kwargs={'username': 'aidana'}))
-        hidden = [s for s in data.my_stories_of('aidana') if not s.is_public]
+        hidden = [s for s in data.my_stories_of(user('aidana')) if not s.is_public]
         self.assertTrue(hidden, 'фикстура сломана: у aidana нет непубличных работ')
         for story in hidden:
             with self.subTest(story=story.slug):
@@ -309,7 +309,7 @@ class ProfileIsNotASecondCabinet(TestCase):
     def test_the_owner_sees_exactly_what_a_reader_sees(self):
         self.assertEqual(
             [s.slug for s in self.response.context['works']],
-            [s.slug for s in data.public_stories_of('aidana')],
+            [s.slug for s in data.public_stories_of(user('aidana'))],
         )
         for slug in ('aidana-kus', 'aidana-erteg'):
             with self.subTest(story=slug):
@@ -327,7 +327,7 @@ class ProfileIsNotASecondCabinet(TestCase):
         stats = self.client.get(reverse('core:profile_me') + '?tab=stats')
         self.assertContains(stats, 'Тек саған көрінеді')
         self.assertEqual(stats.context['writer']['total'],
-                         len(data.my_stories_of('aidana')))
+                         len(data.my_stories_of(user('aidana'))))
 
     def test_owner_and_stranger_count_works_the_same_way(self):
         theirs = self.client.get(reverse(
@@ -351,17 +351,17 @@ class ProfileRailByViewer(TestCase):
     def test_a_stranger_gets_the_most_read_work_not_the_subscriptions(self):
         response = self.client.get(
             reverse('core:profile_other', kwargs={'username': 'aygerim_k'}))
-        self.assertTrue(data.following_of('aygerim_k'))   # подписки есть
+        self.assertTrue(data.following_of(user('aygerim_k')))   # подписки есть
         self.assertNotContains(response, 'Жазылулар')     # и они не здесь
         self.assertContains(response, 'Ең көп оқылғаны')
         self.assertTrue(response.context['has_right_rail'])
-        self.assertContains(response, data.top_stories_of('aygerim_k')[0].title)
+        self.assertContains(response, data.top_stories_of(user('aygerim_k'))[0].title)
 
     def test_the_rail_stays_away_when_the_body_already_shows_everything(self):
         # Три работы: вкладка «Шығармалар» показывает их целиком, топ-3
         # рядом был бы дублем — тем же, за который убирали числа из рейла.
         url = reverse('core:profile_other', kwargs={'username': 'rudazov'})
-        self.assertEqual(len(data.public_stories_of('rudazov')), 3)
+        self.assertEqual(len(data.public_stories_of(user('rudazov'))), 3)
         self.assertFalse(self.client.get(url).context['has_right_rail'])
         # На «Туралы» работ в теле нет вовсе — там блок полезен с первой.
         self.assertTrue(self.client.get(url + '?tab=about').context['has_right_rail'])
@@ -389,7 +389,7 @@ class PeoplePages(TestCase):
             with self.subTest(kind=kind):
                 response = self.client.get(self._url('aidana', kind))
                 self.assertEqual(response.status_code, 200)
-                for author in fetch('aidana'):
+                for author in fetch(user('aidana')):
                     self.assertContains(response, author.public_name)
 
     def test_segments_carry_real_paths_and_real_counts(self):
@@ -398,8 +398,8 @@ class PeoplePages(TestCase):
         self.assertNotContains(response, '?tab=following')
         counts = {it['slug']: it['count']
                   for it in response.context['people_items']}
-        self.assertEqual(counts['followers'], len(data.followers_of('aidana')))
-        self.assertEqual(counts['following'], len(data.following_of('aidana')))
+        self.assertEqual(counts['followers'], len(data.followers_of(user('aidana'))))
+        self.assertEqual(counts['following'], len(data.following_of(user('aidana'))))
 
     def test_a_row_leads_to_the_profile_not_to_a_decision(self):
         # Кнопка рядом с одним именем просит решение раньше, чем показано,
@@ -411,7 +411,7 @@ class PeoplePages(TestCase):
                                               kwargs={'username': 'aidana'}))
 
     def test_empty_explains_itself_and_garbage_is_404(self):
-        self.assertEqual(list(data.following_of('rudazov')), [])
+        self.assertEqual(list(data.following_of(user('rudazov'))), [])
         self.assertContains(self.client.get(self._url('rudazov', 'following')),
                             'Әлі ешкімге жазылмаған')
         # Молчаливый фолбэк отдал бы подписчиков под чужим заголовком.
@@ -458,7 +458,7 @@ class ProfileStatsTab(TestCase):
         for _, label in data.READ_TIERS:
             with self.subTest(tier=label):
                 self.assertContains(self.response, label)
-        unearned = [a for a in data.award_catalog('aidana') if not a['earned']]
+        unearned = [a for a in data.award_catalog(user('aidana')) if not a['earned']]
         self.assertTrue(unearned, 'фикстура сломана: у aidana все награды взяты')
         for award in unearned:
             with self.subTest(award=award['key']):
@@ -516,7 +516,7 @@ class AchievementsRow(TestCase):
         mine = self.client.get(reverse('core:profile_me'))
         theirs = self.client.get(
             reverse('core:profile_other', kwargs={'username': 'aidana'}))
-        marks = data.achievements_of('aidana')
+        marks = data.achievements_of(user('aidana'))
         self.assertTrue(marks)
         for mark in marks:
             with self.subTest(key=mark['key']):
@@ -541,7 +541,7 @@ class AchievementsRow(TestCase):
         # Участие без статуса: число совпадает с длиной списка заявок и не
         # выдаёт вычитанием, что одна из них отклонена.
         self.assertContains(response,
-                            f'{len(data.submissions_of("aidana"))} байқау')
+                            f'{len(data.submissions_of(user("aidana")))} байқау')
         # Дубль числа работ уже вычищали из рейла — не возвращаем в шапку.
         self.assertNotIn('шығарма', (TEMPLATES / 'partials' / 'profile'
                                      / '_header.html').read_text(encoding='utf-8'))
@@ -549,7 +549,7 @@ class AchievementsRow(TestCase):
     def test_the_facts_line_omits_contests_when_there_are_none(self):
         response = self.client.get(
             reverse('core:profile_other', kwargs={'username': 'aygerim_k'}))
-        self.assertEqual(list(data.submissions_of('aygerim_k')), [])
+        self.assertEqual(list(data.submissions_of(user('aygerim_k'))), [])
         self.assertEqual(response.context['contests_n'], 0)
         self.assertContains(response, '2024 жылдан бері')
         # Проверяем сегмент, а не слово: «Байқаулар» есть в шапке и подвале.
@@ -582,10 +582,10 @@ class AchievementsAreDerivedNotStored(TestCase):
     def _all(self):
         return [(a.username, ach)
                 for a in data.all_authors()
-                for ach in data.achievements_of(a.username)]
+                for ach in data.achievements_of(a)]
 
     def test_shape_and_uniqueness(self):
-        self.assertEqual(data.achievements_of('ghost'), [])
+        self.assertEqual(data.achievements_of(user('ghost')), [])
         for username, ach in self._all():
             with self.subTest(author=username, key=ach.get('key')):
                 self.assertEqual(set(ach), {'key', 'label', 'art', 'tier'})
@@ -593,7 +593,7 @@ class AchievementsAreDerivedNotStored(TestCase):
                 self.assertTrue(ach['art'])
                 self.assertIn(ach['tier'], data.AWARD_TIERS)
         for author in data.all_authors():
-            marks = data.achievements_of(author.username)
+            marks = data.achievements_of(author)
             with self.subTest(author=author.username):
                 keys = [m['key'] for m in marks]
                 arts = [m['art'] for m in marks]
@@ -604,7 +604,7 @@ class AchievementsAreDerivedNotStored(TestCase):
                 self.assertLessEqual(len(reads), 1)
                 if reads:
                     self.assertEqual(reads[0]['label'],
-                                     data.read_tier(author.username)[1])
+                                     data.read_tier(author)[1])
 
     def test_gold_stays_rare_and_every_tier_has_art(self):
         """Металл — сигнал ценности. Позолотить всё значит обесценить золото.
@@ -630,19 +630,19 @@ class AchievementsAreDerivedNotStored(TestCase):
         (DEC-46), «дописанный сериал» — сериал."""
         editorial = data.BADGE_LABELS['editorial']
         for author in data.all_authors():
-            keys = {m['key'] for m in data.achievements_of(author.username)}
+            keys = {m['key'] for m in data.achievements_of(author)}
             with self.subTest(author=author.username):
                 has_public_pick = any(
                     editorial in s.badges
-                    for s in data.public_stories_of(author.username))
+                    for s in data.public_stories_of(author))
                 self.assertEqual('editorial_choice' in keys, has_public_pick)
-                if data.contest_awards_of(author.username):
+                if data.contest_awards_of(author):
                     self.assertIn('contest_participant', keys)
                     self.assertIn('contest_accepted', keys)
                 if 'finished_serial' in keys:
                     self.assertTrue(any(
                         s.is_serial and s.status == 'Completed'
-                        for s in data.public_stories_of(author.username)))
+                        for s in data.public_stories_of(author)))
 
 
 class AwardRegistry(TestCase):
@@ -651,15 +651,15 @@ class AwardRegistry(TestCase):
     def test_the_row_and_the_catalog_come_from_the_same_source(self):
         keys = [x.key for x in data.AWARDS]
         for author in data.all_authors():
-            earned_row = {x['key'] for x in data.achievements_of(author.username)
+            earned_row = {x['key'] for x in data.achievements_of(author)
                           if x['key'] != 'reads'}
-            catalog = data.award_catalog(author.username)
+            catalog = data.award_catalog(author)
             with self.subTest(author=author.username):
                 self.assertEqual(earned_row,
                                  {x['key'] for x in catalog if x['earned']})
                 # Список полный у всех: серая плитка отвечает «что дальше».
                 self.assertEqual([x['key'] for x in catalog], keys)
-        unknown = data.award_catalog('ghost')
+        unknown = data.award_catalog(user('ghost'))
         self.assertEqual(len(unknown), len(data.AWARDS))
         self.assertFalse(any(x['earned'] for x in unknown))
 
@@ -669,8 +669,8 @@ class AwardRegistry(TestCase):
                 self.assertTrue(award.hint.strip())
                 self.assertNotEqual(award.hint, award.label)
         for author in data.all_authors():
-            items = (data.award_catalog(author.username)
-                     + data.read_ladder(author.username))
+            items = (data.award_catalog(author)
+                     + data.read_ladder(author))
             for item in items:
                 with self.subTest(author=author.username,
                                   key=item.get('key') or item.get('threshold')):
@@ -678,7 +678,7 @@ class AwardRegistry(TestCase):
 
     def test_the_ladder_marks_exactly_one_next_step(self):
         for author in data.all_authors():
-            ladder = data.read_ladder(author.username)
+            ladder = data.read_ladder(author)
             with self.subTest(author=author.username):
                 self.assertEqual(len(ladder), len(data.READ_TIERS))
                 self.assertLessEqual(sum(1 for s in ladder if s['is_next']), 1)
@@ -696,11 +696,11 @@ class ContestAwardsInProfile(TestCase):
     """DEC-46: награды конкурсов стоят тем же рядом, что и системные знаки."""
 
     def test_a_winner_gets_a_medallion_with_a_complete_shape(self):
-        awards = data.contest_awards_of('bekzhan_t')
+        awards = data.contest_awards_of(user('bekzhan_t'))
         self.assertEqual([a['title'] for a in awards], ['Бас жүлде'])
         self.assertEqual(awards[0]['year'], 2023)
         for author in data.all_authors():
-            for item in data.contest_awards_of(author.username):
+            for item in data.contest_awards_of(author):
                 with self.subTest(author=author.username, key=item['key']):
                     self.assertEqual(
                         set(item),
@@ -716,14 +716,14 @@ class ContestAwardsInProfile(TestCase):
         номинации мало — «Бас жүлде» бывает у каждого конкурса."""
         response = self.client.get(reverse('core:profile_other',
                                            kwargs={'username': 'bekzhan_t'}))
-        award = data.contest_awards_of('bekzhan_t')[0]
+        award = data.contest_awards_of(user('bekzhan_t'))[0]
         self.assertContains(response, f"/media/{award['image']}")
         self.assertContains(response, 'Бас жүлде · Жас алдым — 2023')
 
     def test_an_author_without_contest_awards_shows_no_medallion(self):
         """Системные знаки у неё есть, конкурсных нет — и медальона тоже."""
-        self.assertEqual(data.contest_awards_of('aidana'), [])
-        self.assertEqual(data.contest_awards_of('ghost'), [])
+        self.assertEqual(data.contest_awards_of(user('aidana')), [])
+        self.assertEqual(data.contest_awards_of(user('ghost')), [])
         self.assertNotContains(
             self.client.get(reverse('core:profile_other',
                                     kwargs={'username': 'aidana'})),
@@ -738,21 +738,22 @@ class ContestHistoryPrivacy(TestCase):
     def test_the_helper_hides_the_verdict_from_strangers(self):
         # Публично «қаралуда» и «қабылданбады» одинаково выглядят участием,
         # поэтому отказ нельзя ни увидеть, ни отличить от ожидания.
-        public = data.contest_history('aidana')
+        public = data.contest_history(user('aidana'))
         self.assertEqual([i['note'] for i in public], ['', ''])
         for item in public:
             with self.subTest(contest=item['contest'].slug):
                 self.assertIn(item['result'], ('', *data.PUBLIC_CONTEST_RESULTS))
-        mine = data.contest_history('aidana', is_self=True)
+        mine = data.contest_history(user('aidana'), is_self=True)
         self.assertTrue(any(self.JURY_NOTE in i['note'] for i in mine))
         self.assertEqual({i['result'] for i in mine}, {'reviewing', 'rejected'})
 
     def test_the_rows_match_the_submissions_and_run_newest_first(self):
         """Строк столько же, сколько подач — иначе отказ считается вычитанием."""
         for username in ('aidana', 'dina_books', 'bekzhan_t'):
-            history = data.contest_history(username)
+            author = user(username)
+            history = data.contest_history(author)
             with self.subTest(user=username):
-                self.assertEqual(len(history), len(data.submissions_of(username)))
+                self.assertEqual(len(history), len(data.submissions_of(author)))
                 years = [i['year'] for i in history]
                 self.assertEqual(years, sorted(years, reverse=True))
                 # BR-73: подача не раскрывает снятую с публикации работу.
@@ -763,7 +764,7 @@ class ContestHistoryPrivacy(TestCase):
     def test_a_win_is_derived_from_the_contest_not_from_the_status(self):
         # У dina_books заявка помечена accepted, а победа лежит в
         # Contest.winners: без вывода из данных «Жеңімпаз» не появился бы.
-        winners = [i for i in data.contest_history('dina_books')
+        winners = [i for i in data.contest_history(user('dina_books'))
                    if i['result'] == 'winner']
         self.assertEqual([i['contest'].slug for i in winners], ['zhas-aldym-2023'])
         # Строка называет номинацию, а не общее «Жеңімпаз» (DEC-46):
@@ -791,7 +792,7 @@ class ContestHistoryPrivacy(TestCase):
                 self.assertContains(mine, shown)
 
     def test_an_author_without_submissions_gets_no_section(self):
-        self.assertEqual(data.contest_history('aygerim_k'), [])
+        self.assertEqual(data.contest_history(user('aygerim_k')), [])
         response = self.client.get(
             reverse('core:profile_other', kwargs={'username': 'aygerim_k'})
             + '?tab=about')
@@ -972,13 +973,13 @@ class LibraryShelves(TestCase):
     KINDS = ('saved', 'reading', 'done')
 
     def test_the_shelves_partition_the_library(self):
-        everything = data.library_of('aidana')
-        by_kind = {k: data.library_of('aidana', k) for k in self.KINDS}
+        everything = data.library_of(user('aidana'))
+        by_kind = {k: data.library_of(user('aidana'), k) for k in self.KINDS}
         self.assertEqual(sum(len(v) for v in by_kind.values()), len(everything))
         slugs = [e.story.slug for shelf in by_kind.values() for e in shelf]
         self.assertEqual(len(slugs), len(set(slugs)), 'работа лежит на двух полках')
         self.assertTrue(all(by_kind.values()), 'у aidana пустая полка')
-        self.assertEqual(data.library_of('no-such-user'), [])
+        self.assertEqual(data.library_of(user('no-such-user')), [])
         for entry in by_kind['reading']:
             with self.subTest(entry=entry.story.slug):
                 self.assertGreaterEqual(entry.progress_chapter, 1)
@@ -988,16 +989,16 @@ class LibraryShelves(TestCase):
         response = self.client.get(reverse('core:library'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'кір')
-        for entry in data.library_of('aidana'):
+        for entry in data.library_of(user('aidana')):
             with self.subTest(story=entry.story.slug):
                 self.assertNotContains(response, entry.story.title)
 
     def test_each_tab_shows_its_own_shelf_and_nothing_else(self):
         login_as(self.client)
-        everything = _titles(data.library_of('aidana'))
+        everything = _titles(data.library_of(user('aidana')))
         for kind, cta in (('saved', None), ('reading', 'Жалғастыру'),
                           ('done', 'Қайта оқу')):
-            shelf = data.library_of('aidana', kind)
+            shelf = data.library_of(user('aidana'), kind)
             response = self.client.get(reverse('core:library') + f'?tab={kind}')
             with self.subTest(tab=kind):
                 self.assertContains(response, f'?tab={kind}')
@@ -1011,7 +1012,7 @@ class LibraryShelves(TestCase):
                         self.assertNotContains(response, title)
         # Прогресс «N / M бөлім» считается, а не хранится (DEC-52).
         reading = self.client.get(reverse('core:library') + '?tab=reading')
-        for entry in data.library_of('aidana', 'reading'):
+        for entry in data.library_of(user('aidana'), 'reading'):
             with self.subTest(story=entry.story.slug):
                 self.assertContains(
                     reading,
@@ -1021,7 +1022,7 @@ class LibraryShelves(TestCase):
         login_as(self.client)
         response = self.client.get(reverse('core:library') + '?tab=garbage')
         self.assertEqual(response.status_code, 200)
-        for entry in data.library_of('aidana', 'saved'):
+        for entry in data.library_of(user('aidana'), 'saved'):
             with self.subTest(story=entry.story.slug):
                 self.assertContains(response, entry.story.title)
 
@@ -1050,7 +1051,7 @@ class NotificationFeed(TestCase):
         self.response = self.client.get(reverse('core:notifications'))
 
     def test_the_buckets_come_from_the_registry_and_match_the_data(self):
-        grouped = data.notifications_for_user('aidana')
+        grouped = data.notifications_for_user(user('aidana'))
         items = _aidana_notifications()
         for bucket in data.NOTIF_BUCKETS:
             with self.subTest(bucket=bucket):
@@ -1058,7 +1059,7 @@ class NotificationFeed(TestCase):
                                  sum(1 for n in items if n.bucket == bucket))
                 self.assertTrue(grouped[bucket],
                                 'у aidana должен быть непустым каждый бакет')
-        for bucket in data.notifications_for_user('no-such-user').values():
+        for bucket in data.notifications_for_user(user('no-such-user')).values():
             self.assertEqual(bucket, [])
         # Секции строит реестр, а не три копии блока.
         keys = [s['key'] for s in self.response.context['sections']]
@@ -1071,7 +1072,7 @@ class NotificationFeed(TestCase):
         self.assertContains(self.response, '<ul class="flex flex-col gap-3">')
 
     def test_an_empty_bucket_renders_no_heading(self):
-        grouped = data.notifications_for_user('aidana')
+        grouped = data.notifications_for_user(user('aidana'))
         lonely = {b: (items if b == 'today' else [])
                   for b, items in grouped.items()}
         # Патчится фасад: view ходит через `core.data`.
@@ -1102,8 +1103,8 @@ class NotificationFeed(TestCase):
         items = _aidana_notifications()
         unread = sum(1 for n in items if not n.read and n.bucket)
         self.assertGreater(unread, 0)
-        self.assertEqual(data.unread_count_for_user('aidana'), unread)
-        self.assertEqual(data.unread_count_for_user('ghost'), 0)
+        self.assertEqual(data.unread_count_for_user(user('aidana')), unread)
+        self.assertEqual(data.unread_count_for_user(user('ghost')), 0)
         self.assertContains(self.response, f'{unread} оқылмаған')
         self.assertContains(self.response, 'Барлығын оқылды деп белгілеу')
 
@@ -1166,9 +1167,9 @@ class NotificationTimeIsDerived(TestCase):
         тоже, иначе шапка звала бы на страницу, где его нет.
         """
         _notification(kind='like', days_ago=30)
-        grouped = data.notifications_for_user('ghost')
+        grouped = data.notifications_for_user(user('ghost'))
         self.assertEqual([], [n for b in grouped.values() for n in b])
-        self.assertEqual(0, data.unread_count_for_user('ghost'))
+        self.assertEqual(0, data.unread_count_for_user(user('ghost')))
 
     def test_the_wording_of_kk_ago(self):
         self.assertEqual(data.kk_ago(0, 2), '2 сағат бұрын')
@@ -1183,7 +1184,7 @@ class NotificationTimeIsDerived(TestCase):
     def test_the_freshest_comes_first_inside_a_bucket(self):
         """Порядок объявления в данных — не порядок ленты: сегодняшние
         события шли «2 сағат · 4 сағат · 9 сағат · 6 сағат»."""
-        for bucket in data.notifications_for_user('aidana').values():
+        for bucket in data.notifications_for_user(user('aidana')).values():
             moments = [n.created_at for n in bucket]
             self.assertEqual(moments, sorted(moments, reverse=True))
 
@@ -1444,7 +1445,7 @@ class NotificationChipFollowsTheRegistry(TestCase):
         self.assertIn(marker, html)
         self.assertNotIn('aria-label="оқылмаған"', html)
         # Отметка стоит только у непрочитанного — иначе она ничего не значит.
-        self.assertEqual(html.count(marker), data.unread_count_for_user('aidana'))
+        self.assertEqual(html.count(marker), data.unread_count_for_user(user('aidana')))
 
 
 class ReadingANotificationClearsIt(TestCase):
@@ -1462,7 +1463,7 @@ class ReadingANotificationClearsIt(TestCase):
         self.assertTrue(self.unread, 'корпус потерял непрочитанные')
 
     def _badge(self):
-        return data.unread_count_for_user('aidana')
+        return data.unread_count_for_user(user('aidana'))
 
     def _open(self, notification):
         return self.client.get(

@@ -30,7 +30,7 @@ from core.models import (
     Submission,
     User,
 )
-from core.tests.base import TestCase, login_as, login_as_newcomer
+from core.tests.base import TestCase, login_as, login_as_newcomer, user
 
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
 
@@ -361,7 +361,7 @@ class ContestAwardsData(TestCase):
                 self.assertIn(
                     grant.contest.slug,
                     {s.contest.slug
-                     for s in data.submissions_of(grant.story.author.username)})
+                     for s in data.submissions_of(grant.story.author)})
             seen.append((grant.contest.slug, grant.award.slug))
         # Одна номинация вручается не более одного раза.
         self.assertEqual(len(seen), len(set(seen)))
@@ -384,7 +384,7 @@ class ContestAwardsData(TestCase):
                     # Победа без поданной заявки — конкурсной истории
                     # неоткуда взяться.
                     self.assertTrue(
-                        data.has_submission(story.author.username, contest.slug))
+                        data.has_submission(story.author, contest.slug))
 
     def test_an_open_contest_has_no_winners_yet(self):
         for contest in data.open_contests():
@@ -820,9 +820,9 @@ class SubmissionHelpers(TestCase):
         (DEC-23): их нельзя ни дать прочитать жюри, ни показать читателю
         рядом с победителями. Это единственное, что список сужает — всё
         остальное заметки, не запреты (BR-24)."""
-        items = data.submission_candidates('aidana', 'altyn-qalam')
+        items = data.submission_candidates(user('aidana'), 'altyn-qalam')
         self.assertEqual([i['story'].slug for i in items],
-                         [s.slug for s in data.public_stories_of('aidana')])
+                         [s.slug for s in data.public_stories_of(user('aidana'))])
         for item in items:
             with self.subTest(story=item['story'].slug):
                 self.assertTrue(item['story'].is_public)
@@ -830,14 +830,14 @@ class SubmissionHelpers(TestCase):
                 for note in item['notes']:
                     self.assertEqual(set(note), {'key', 'text'})
                     self.assertIn(note['key'], data.SUBMISSION_NOTES)
-        self.assertEqual(data.submission_candidates('aidana', 'no-such'), [])
-        self.assertEqual(data.submission_candidates('ghost', 'altyn-qalam'), [])
+        self.assertEqual(data.submission_candidates(user('aidana'), 'no-such'), [])
+        self.assertEqual(data.submission_candidates(user('ghost'), 'altyn-qalam'), [])
 
     def test_the_submission_lookup_answers_both_ways(self):
-        self.assertEqual(len(data.submissions_of('aidana')), 2)
-        self.assertEqual(list(data.submissions_of('ghost')), [])
-        self.assertTrue(data.has_submission('aidana', 'altyn-qalam'))
-        self.assertFalse(data.has_submission('aidana', 'bolashak-mektebi'))
+        self.assertEqual(len(data.submissions_of(user('aidana'))), 2)
+        self.assertEqual(list(data.submissions_of(user('ghost'))), [])
+        self.assertTrue(data.has_submission(user('aidana'), 'altyn-qalam'))
+        self.assertFalse(data.has_submission(user('aidana'), 'bolashak-mektebi'))
 
     def test_the_checklist_marks_volume_and_demands_the_declaration(self):
         contest = data.contest_by_slug('altyn-qalam')
@@ -886,10 +886,10 @@ class SubmitFormShowsWhatCanBeSent(TestCase):
         response = self.client.get(
             reverse('core:contest_submit', kwargs={'slug': self.OPEN}))
         self.assertEqual(response.status_code, 200)
-        for story in data.public_stories_of('aidana'):
+        for story in data.public_stories_of(user('aidana')):
             with self.subTest(slug=story.slug):
                 self.assertContains(response, f'value="{story.slug}"')
-        for story in data.my_stories_of('aidana'):
+        for story in data.my_stories_of(user('aidana')):
             if not story.is_public:
                 with self.subTest(hidden=story.slug):
                     self.assertNotContains(response, f'value="{story.slug}"')
@@ -976,7 +976,7 @@ class SubmissionNotesInformButDoNotBlock(TestCase):
 
     def _items(self, username, slug='bolashak-mektebi'):
         return {i['story'].slug: i
-                for i in data.submission_candidates(username, slug)}
+                for i in data.submission_candidates(user(username), slug)}
 
     @staticmethod
     def _keys(item):
@@ -1008,8 +1008,8 @@ class SubmissionNotesInformButDoNotBlock(TestCase):
 
     def test_neither_a_finished_contest_nor_this_one_counts_as_busy(self):
         # Работа своё отучаствовала — заметки о ней больше нет.
-        self.assertIsNone(data.busy_contest_of('bekzhan_t', 'temniy-lord'))
-        self.assertIsNone(data.busy_contest_of('aidana', 'aidana-tan',
+        self.assertIsNone(data.busy_contest_of(user('bekzhan_t'), 'temniy-lord'))
+        self.assertIsNone(data.busy_contest_of(user('aidana'), 'aidana-tan',
                                                besides='altyn-qalam'))
 
     def test_no_radio_is_disabled_and_every_note_stands_next_to_its_work(self):
@@ -1024,7 +1024,7 @@ class SubmissionNotesInformButDoNotBlock(TestCase):
                       html.index('Сәйкестік чек-листі')]
         self.assertNotIn('disabled', picker)
         self.assertIn('Өтінім беру', html)
-        items = data.submission_candidates('rudazov', 'bolashak-mektebi')
+        items = data.submission_candidates(user('rudazov'), 'bolashak-mektebi')
         self.assertTrue(any(i['notes'] for i in items),
                         'корпус потерял работы с заметками')
         for item in items:
@@ -1097,12 +1097,12 @@ class WorkPickerScalesToManyWorks(TestCase):
     def _submit_html(self, username='aidana', stories=None):
         """Длинный список подделывается на снимке автора, а не на хелпере.
 
-        Работы кандидатов приходят из `AuthorFacts` — того самого снимка,
+        Работы кандидатов приходят из `User.authored` — того самого снимка,
         который страница собирает один раз и раздаёт. Подменять надо его:
         подмена отдельного хелпера сторожила бы имя, а не источник.
         """
         login_as(self.client, username)
-        ctx = (mock.patch.object(data.AuthorFacts, 'stories',
+        ctx = (mock.patch.object(User, 'authored',
                                  property(lambda self: stories))
                if stories is not None else contextlib.nullcontext())
         with ctx:
@@ -1118,7 +1118,7 @@ class WorkPickerScalesToManyWorks(TestCase):
         self.assertNotIn('type="search"', self._picker(html))
 
     def test_a_long_list_gets_one_that_hides_nothing_without_js(self):
-        many = list(data.public_stories_of('aidana')) * 4   # > порога
+        many = list(data.public_stories_of(user('aidana'))) * 4   # > порога
         response, html = self._submit_html(stories=many)
         self.assertTrue(response.context['picker_search'])
         picker = self._picker(html)
@@ -1128,7 +1128,7 @@ class WorkPickerScalesToManyWorks(TestCase):
         for volume in response.context['volumes'].values():
             self.assertTrue(volume['title'])
         # Без JS `x-show` не срабатывает, и список остаётся целым.
-        for story in data.public_stories_of('aidana'):
+        for story in data.public_stories_of(user('aidana')):
             with self.subTest(story=story.slug):
                 self.assertIn(story.title, picker)
         self.assertNotIn('style="display:none"', picker)
@@ -1231,10 +1231,10 @@ class WithdrawSubmission(TestCase):
     OPEN = 'bolashak-mektebi'   # dina_books подала, приём идёт
 
     def test_withdrawal_is_open_only_while_the_contest_accepts(self):
-        self.assertTrue(data.can_withdraw('dina_books', self.OPEN))
-        self.assertFalse(data.can_withdraw('aidana', 'altyn-qalam'))
-        self.assertFalse(data.can_withdraw('bekzhan_t', 'zhas-aldym-2023'))
-        self.assertFalse(data.can_withdraw('bekzhan_t', self.OPEN))
+        self.assertTrue(data.can_withdraw(user('dina_books'), self.OPEN))
+        self.assertFalse(data.can_withdraw(user('aidana'), 'altyn-qalam'))
+        self.assertFalse(data.can_withdraw(user('bekzhan_t'), 'zhas-aldym-2023'))
+        self.assertFalse(data.can_withdraw(user('bekzhan_t'), self.OPEN))
 
     def test_the_button_appears_only_where_withdrawal_is_open(self):
         login_as(self.client, 'dina_books')
@@ -1305,7 +1305,7 @@ class MySubmissions(TestCase):
         login_as(self.client)
         response = self.client.get(reverse('core:my_submissions'))
         self.assertEqual(response.status_code, 200)
-        for sub in data.submissions_of('aidana'):
+        for sub in data.submissions_of(user('aidana')):
             with self.subTest(slug=sub.contest.slug):
                 self.assertContains(response, sub.contest.name)
                 self.assertContains(response, sub.story.title)
@@ -1335,7 +1335,7 @@ class MySubmissions(TestCase):
         победу в первом же круге. Одна сущность — одно слово (docs/ui.md).
         """
         login_as(self.client)
-        story = data.public_stories_of('aidana')[0]
+        story = data.public_stories_of(user('aidana'))[0]
         html = self.client.post(
             reverse('core:contest_submit', args=['bolashak-mektebi']),
             {'story_slug': story.slug, 'ai_used': 'no',
@@ -1398,16 +1398,16 @@ class SubmissionIntegrity(TestCase):
                     self.assertLessEqual(sub.submitted_on, sub.contest.closes_on)
 
     def test_the_label_follows_the_date(self):
-        fresh = data.submissions_of('aidana')[0]
+        fresh = data.submissions_of(user('aidana'))[0]
         self.assertEqual(fresh.submitted_label,
                          data.kk_ago((date.today() - fresh.submitted_on).days))
         # Заявка 2023 года в 2026-м — не «1 жыл бұрын».
-        old = data.submissions_of('bekzhan_t')[0]
+        old = data.submissions_of(user('bekzhan_t'))[0]
         years = (date.today() - old.submitted_on).days // 365
         self.assertEqual(old.submitted_label, f'{years} жыл бұрын')
 
     def test_the_rejection_note_names_the_side_of_the_threshold(self):
-        sub = next(s for s in data.submissions_of('aidana')
+        sub = next(s for s in data.submissions_of(user('aidana'))
                    if s.status == 'rejected')
         total = sum(c.char_count for c in data.chapters_of(sub.story.slug))
         self.assertLess(total, sub.contest.min_chars)

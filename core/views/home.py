@@ -3,16 +3,17 @@
 from django.shortcuts import render
 
 from .. import data
-from .common import _current_username, _page_state
+from .common import _current_user, _page_state
 
 # HOME
 def home(request):
     """Главная — редакционная витрина. Гость vs возвращающийся (FR-HOME-01)."""
-    username = _current_username(request)
-    is_signed_in = bool(username)
-    my_stories = data.my_stories_of(username) if username else []
-    active_work = next((s for s in my_stories if s.status == 'OnProcess'), my_stories[0] if my_stories else None)
-    progress = data.reading_progress_of(username) if is_signed_in else None
+    user = _current_user(request)
+    is_signed_in = user is not None
+    my_stories = user.authored if user else []
+    active_work = next((s for s in my_stories if s.status == 'OnProcess'),
+                       my_stories[0] if my_stories else None)
+    progress = data.reading_progress_of(user)
 
     # Design-system demo override for the four authenticated hero states.
     hero_state_demo = request.GET.get('hero_state')

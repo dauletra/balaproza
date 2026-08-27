@@ -19,13 +19,23 @@ def _page_state(request) -> str:
     return st if st in _PAGE_STATES else 'content'
 
 
-def _current_username(request) -> str:
-    """Ник вошедшего или '' у гостя.
+def _current_user(request):
+    """Вошедший или `None` у гостя.
 
-    Слой данных принимает ник строкой, поэтому здесь имя,
-    а не объект: переход на объекты — отдельное решение и отдельный проход
-    по всем вызовам.
+    Слой данных принимает пользователя, а не ник: гость — это `None`, и
+    каждый хелпер отвечает на него пустотой. Заодно объект несёт снимок
+    своих работ (`User.authored` и соседние `cached_property`), поэтому
+    страница, которая спрашивает их из восьми мест, платит один запрос.
+
+    `request.user` — один экземпляр на запрос, то есть снимок живёт ровно
+    запрос и не переиспользуется между ними.
     """
+    return request.user if request.user.is_authenticated else None
+
+
+def _current_username(request) -> str:
+    """Ник вошедшего или '' у гостя — там, где нужна именно строка
+    (сравнение с `username` из адреса, `viewer` в шаблоне)."""
     return request.user.username if request.user.is_authenticated else ''
 
 

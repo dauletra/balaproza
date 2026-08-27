@@ -36,23 +36,23 @@ def chapters_of(story_slug: str):
             .prefetch_related('reactions'))
 
 
-def _attach_my_reaction(chapter, viewer: str):
+def _attach_my_reaction(chapter, viewer):
     """Аннотирует `chapter._my_reaction` голосом текущего читателя
-    (BR-REACT-02/03). Гость (`viewer=''`) не голосует — запроса нет."""
-    if chapter is not None and viewer:
+    (BR-REACT-02/03). Гость (`None`) не голосует — запроса нет."""
+    if chapter is not None and viewer is not None:
         vote = ChapterReactionVote.objects.filter(
-            chapter=chapter, user__username=viewer).first()
+            chapter=chapter, user=viewer).first()
         chapter._my_reaction = vote.kind if vote else ''
     return chapter
 
 
-def chapter_of(story_slug: str, number: int, viewer: str = ''):
+def chapter_of(story_slug: str, number: int, viewer=None):
     chapter = (Chapter.objects.filter(story__slug=story_slug, number=number)
               .prefetch_related('reactions').first())
     return _attach_my_reaction(chapter, viewer)
 
 
-def reactions_of(chapter, viewer: str = '') -> list:
+def reactions_of(chapter, viewer=None) -> list:
     """Полный ряд из пяти реакций в каноническом порядке.
 
     `mine` — что нажал текущий читатель (BR-REACT-02/03). Если `chapter`
@@ -110,16 +110,16 @@ def toggle_chapter_reaction(chapter, user, kind: str) -> str:
         return kind
 
 
-def _attach_my_vote(poll, viewer: str):
+def _attach_my_vote(poll, viewer):
     """Аннотирует `poll._my_vote` голосом текущего читателя (одна ставка
-    на опрос, не меняется). Гость (`viewer=''`) не голосует."""
-    if poll is not None and viewer:
-        vote = PollVote.objects.filter(poll=poll, user__username=viewer).first()
+    на опрос, не меняется). Гость (`None`) не голосует."""
+    if poll is not None and viewer is not None:
+        vote = PollVote.objects.filter(poll=poll, user=viewer).first()
         poll._my_vote = vote.option.slug if vote else ''
     return poll
 
 
-def poll_of(story_slug: str, chapter_number: int, viewer: str = ''):
+def poll_of(story_slug: str, chapter_number: int, viewer=None):
     """Опрос главы или None: опрос необязателен (BR-POLL-01)."""
     chapter = (Chapter.objects
                .filter(story__slug=story_slug, number=chapter_number)
@@ -152,7 +152,7 @@ def _comments(story_slug: str):
             .prefetch_related('reply_set__author'))
 
 
-def _attach_liked(comments: list, viewer: str) -> list:
+def _attach_liked(comments: list, viewer) -> list:
     """Проставляет `.liked` на каждый комментарий и его ответы (BR-31).
 
     `replies` — `cached_property` (Ф15 Этап 2) именно ради этого: второй
@@ -161,10 +161,10 @@ def _attach_liked(comments: list, viewer: str) -> list:
     """
     pairs = [(c, c.replies) for c in comments]
     liked_ids = set()
-    if viewer:
+    if viewer is not None:
         ids = {c.pk for c, _ in pairs} | {r.pk for _, reps in pairs for r in reps}
         liked_ids = set(CommentLike.objects.filter(
-            user__username=viewer, comment_id__in=ids).values_list('comment_id', flat=True))
+            user=viewer, comment_id__in=ids).values_list('comment_id', flat=True))
     for c, reps in pairs:
         c.liked = c.pk in liked_ids
         for r in reps:
@@ -172,12 +172,12 @@ def _attach_liked(comments: list, viewer: str) -> list:
     return comments
 
 
-def comments_of(story_slug: str, viewer: str = '') -> list:
+def comments_of(story_slug: str, viewer=None) -> list:
     """Все верхнеуровневые комментарии произведения; ответы висят на них."""
     return _attach_liked(list(_comments(story_slug)), viewer)
 
 
-def comments_of_chapter(story_slug: str, chapter_number: int, viewer: str = '') -> list:
+def comments_of_chapter(story_slug: str, chapter_number: int, viewer=None) -> list:
     """Комментарии главы плюс общие — те, у которых главы нет вовсе."""
     from django.db.models import Q
 

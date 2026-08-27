@@ -3,8 +3,7 @@
 from django.shortcuts import render
 from django.urls import reverse
 
-from .. import data
-from .common import _current_username, _page_state
+from .common import _current_user, _page_state
 
 # ───────────────────────── LIB — библиотека ──────────────────────────────
 _LIB_TABS = ("saved", "reading", "done")
@@ -23,20 +22,19 @@ def library(request):
     Реальное переключение через ?tab=saved|reading|done. Каждая вкладка
     рисует свои элементы; «Оқу үстіндегі» добавляет «Жалғастыру».
     """
-    username = _current_username(request)
+    user = _current_user(request)
     tab = request.GET.get('tab', 'saved')
     if tab not in _LIB_TABS:
         tab = 'saved'
     # Полки режутся из одной выборки. Раньше вкладка стоила запроса, и
     # счётчики в сегментах добавляли ещё три — четыре выборки одной и той
     # же библиотеки ради трёх чисел над ней.
-    facts = data.author_facts(username)
-    entries = facts.shelf(tab) if username else []
+    entries = user.shelf(tab) if user else []
     items = [
         {
             'slug':  t,
             'label': _LIB_LABELS[t],
-            'count': len(facts.shelf(t)) if username else 0,
+            'count': len(user.shelf(t)) if user else 0,
         }
         for t in _LIB_TABS
     ]

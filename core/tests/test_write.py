@@ -1,7 +1,6 @@
 """WRITE: авторский кабинет — my_stories, new, manage, settings, chapter_editor."""
 
 import re
-from dataclasses import replace
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.template.loader import render_to_string
@@ -10,7 +9,7 @@ from django.urls import reverse
 
 from core import data
 from core.models import Chapter, Story, Tag
-from core.tests.base import login_as, login_as_newcomer
+from core.tests.base import login_as, login_as_newcomer, user
 from core.templatetags.balaproza import spaced
 
 
@@ -25,7 +24,7 @@ class TheCabinetAnswersWhatToDoNext(TestCase):
     def setUp(self):
         login_as(self.client)
         self.response = self.client.get(reverse('core:my_stories'))
-        self.mine = data.my_stories_of('aidana')
+        self.mine = data.my_stories_of(user('aidana'))
 
     def test_it_lists_every_work_with_its_status_and_its_actions(self):
         for story in self.mine:
@@ -97,19 +96,19 @@ class TheAttentionStripSpeaksOnlyWhenThereIsSomething(TestCase):
     def test_it_names_moderation_unread_comments_and_the_empty_draft(self):
         login_as(self.client)
         response = self.client.get(reverse('core:my_stories'))
-        self.assertEqual([i['kind'] for i in data.writer_attention('aidana')],
+        self.assertEqual([i['kind'] for i in data.writer_attention(user('aidana'))],
                          ['moderation', 'comments', 'draft'])
         self.assertContains(response, 'модерацияда')
         self.assertContains(response, 'жоба бастамада тұр')
 
         unread = sum(len([n for n in items if n.kind == 'comment' and not n.read])
-                     for items in data.notifications_for_user('aidana').values())
+                     for items in data.notifications_for_user(user('aidana')).values())
         self.assertGreater(unread, 0, 'корпус потерял непрочитанные пікір')
         self.assertContains(response, f'{unread} жаңа пікір')
         self.assertContains(response, reverse('core:notifications'))
 
     def test_a_single_item_points_at_the_work_a_group_does_not(self):
-        for item in data.writer_attention('aidana'):
+        for item in data.writer_attention(user('aidana')):
             with self.subTest(kind=item['kind']):
                 if item['count'] > 1 or item['kind'] == 'comments':
                     self.assertEqual(item['slug'], '')
@@ -117,7 +116,7 @@ class TheAttentionStripSpeaksOnlyWhenThereIsSomething(TestCase):
                     self.assertIsNotNone(data.story_by_slug(item['slug']))
 
     def test_silence_when_there_is_nothing_to_say(self):
-        self.assertEqual(data.writer_attention('no-such-user'), [])
+        self.assertEqual(data.writer_attention(user('no-such-user')), [])
         login_as_newcomer(self.client, 'quiet-author')
         self.assertNotContains(self.client.get(reverse('core:my_stories')),
                                'Назарыңды күтеді')
@@ -156,7 +155,7 @@ class TheCabinetCarriesNoAuthorTotals(TestCase):
 
     def test_the_only_way_to_totals_is_the_profile(self):
         login_as(self.client)
-        stats = data.writer_stats('aidana')
+        stats = data.writer_stats(user('aidana'))
         story = data.story_by_slug('aidana-tan')
         self.assertNotEqual(stats['views'], story.views)   # иначе тест пуст
         body = self.client.get(reverse(
@@ -196,7 +195,7 @@ class StatusIsSpokenInOneVocabulary(TestCase):
         разбивкой 2+1+1. Слагаемые, не дающие целого, — то же враньё, что
         и хранимый счётчик, только разложенное на части."""
         for author in data.all_authors():
-            stats = data.writer_stats(author.username)
+            stats = data.writer_stats(author)
             with self.subTest(author=author.username):
                 self.assertEqual(
                     stats['published'] + stats['ongoing']
@@ -207,12 +206,12 @@ class StatusIsSpokenInOneVocabulary(TestCase):
         self.assertEqual(set(buckets), set(data.STORY_STATUSES))
 
     def test_the_helper_answers_only_about_its_own_author(self):
-        mine = data.my_stories_of('aidana')
+        mine = data.my_stories_of(user('aidana'))
         self.assertEqual(len(mine), 5)
         for story in mine:
             self.assertEqual(story.author.username, 'aidana')
-        self.assertEqual(list(data.my_stories_of('no-such-user')), [])
-        stats = data.writer_stats('aidana')
+        self.assertEqual(list(data.my_stories_of(user('no-such-user'))), [])
+        stats = data.writer_stats(user('aidana'))
         self.assertEqual(stats['views'], sum(s.views for s in mine))
         self.assertEqual(stats['followers'],
                          data.author_by_username('aidana').followers)
@@ -226,7 +225,7 @@ class TheTextButtonOpensTheTextThatExists(TestCase):
     def test_a_single_work_edits_its_only_chapter_a_serial_adds_one(self):
         login_as(self.client)
         listing = self.client.get(reverse('core:my_stories'))
-        for story in data.my_stories_of('aidana'):
+        for story in data.my_stories_of(user('aidana')):
             if not story.text_chapter:
                 continue
             with self.subTest(story=story.slug):
@@ -806,7 +805,7 @@ class ChapterEditorSavesADraft(TestCase):
         self.assertEqual(story.chapters, 3)
         self.assertEqual(story.reading_meta_label, '3 бөлім')
 
-        from_feed = next(s for s in data.my_stories_of('aidana')
+        from_feed = next(s for s in data.my_stories_of(user('aidana'))
                          if s.slug == self.SLUG)
         self.assertEqual(from_feed.chapters, 3)
 

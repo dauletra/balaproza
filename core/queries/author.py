@@ -9,135 +9,65 @@
 Поэтому счётчики профиля считаются здесь и по одному правилу
 публичности: два числа под одним словом, посчитанные в разных местах,
 однажды разъедутся — так и случилось с хранимым `Author.works`.
+
+Хелперы принимают **пользователя, а не ник**. Снимок его работ живёт на
+самом объекте (`User.authored`, `User.public_works`, `User.library_entries`),
+поэтому страница, которая спрашивает восемь раз, платит один: параметра
+`facts=`, который надо было не забыть передать, больше нет. Гость — это
+`None`, и каждый хелпер отвечает на него пустотой, а не падением.
 """
 
-from functools import cached_property
-
-from django.db.models import F
-
-from ..domain.catalog import PUBLIC_STATUSES
 from ..domain.library import LIBRARY_KINDS
 from ..domain.story import PUBLISH_CHECKLIST
 from ..managers import chapter_count_subquery
-from ..models import LibraryEntry, Notification, Story, User
+from ..models import LibraryEntry, Notification, Story
 from .catalog import all_stories
 
 
-class AuthorFacts:
-    """Всё об одном авторе, посчитанное один раз за запрос.
-
-    Заведено не ради стройности. Хелперы этого слоя возвращают `list`, а
-    не `QuerySet`, — у списка нет кэша, и каждый вызов идёт в базу заново.
-    Вызывающая сторона об этом не знала и звала их столько раз, сколько
-    было удобно читать: свой профиль спрашивал `my_stories_of`
-    **шестнадцать раз** за один рендер, и из этого складывались
-    пятьдесят девять запросов на страницу.
-
-    Поля ленивые: объект можно создать заранее и не заплатить за то, что
-    странице не понадобилось. Заявки на конкурс нужны профилю и не нужны
-    кабинету — и кабинет за них не платит.
-
-    Живёт ровно один запрос: это снимок, а не кэш. Между запросами его не
-    переиспользуют — иначе страница показывала бы вчерашние работы.
-    """
-
-    def __init__(self, username: str):
-        self.username = username
-
-    def __repr__(self):
-        return f'AuthorFacts({self.username!r})'
-
-    @cached_property
-    def stories(self) -> list:
-        """Все работы автора, любого статуса (кабинет)."""
-        return my_stories_of(self.username)
-
-    @cached_property
-    def public_stories(self) -> list:
-        """Работы, которые видит посторонний (BR-73).
-
-        Режется из уже загруженного списка, а не спрашивается отдельно:
-        правило публичности одно и то же, и второй запрос с тем же
-        `WHERE` — это просто второй запрос.
-        """
-        return [s for s in self.stories if s.is_public]
-
-    @cached_property
-    def submissions(self) -> list:
-        # Импорт внутри: `contests` читает `public_stories_of` отсюда, и на
-        # верхнем уровне это был бы цикл. Тот же приём, что в `catalog.py`.
-        from .contests import submissions_of
-
-        return submissions_of(self.username)
-
-    @cached_property
-    def library(self) -> list:
-        """Вся библиотека читателя — все три полки одной выборкой."""
-        return library_of(self.username)
-
-    @cached_property
-    def user(self):
-        """Сам пользователь или None. Нужен ради `followers` в сводках."""
-        if not self.username:
-            return None
-        return User.objects.filter(username=self.username).first()
-
-    def shelf(self, kind: str) -> list:
-        """Одна полка. Из общего списка, а не запросом на вкладку: три
-        вкладки библиотеки стоили трёх выборок ради трёх счётчиков."""
-        return [e for e in self.library if e.kind == kind]
-
-    @cached_property
-    def reads(self) -> int:
-        """Сколько раз прочитали автора — по публичным работам (BR-73)."""
-        return sum(s.views for s in self.public_stories)
-
-
-def author_facts(username: str) -> AuthorFacts:
-    """Снимок автора для одного запроса. Ничего не читает до обращения."""
-    return AuthorFacts(username)
-
-
-def my_stories_of(username: str):
+def my_stories_of(user):
     """Все работы автора — любого статуса, в порядке «что трогал последним».
 
-    Пустой ник отдаёт пустую выдачу, а не `[]`: у вызывающей стороны один
-    тип на оба случая, и `.count()` по гостю не падает.
+    Гость отдаёт пустую выдачу, а не `[]`: у вызывающей стороны один тип на
+    оба случая, и `.count()` по гостю не падает.
     """
-    return all_stories().by_author(username).latest_edited()
+    return all_stories().by_author(user).latest_edited()
 
 
-def public_stories_of(username: str):
+def public_stories_of(user):
     """Работы, которые видит посторонний (BR-73).
 
     Публичность — по `PUBLIC_STATUSES`, а не по литералу `'Published'`:
     после DEC-37 публичный сериал носит `Completed` или `OnProcess`, и
     сравнение со строкой молча выкинуло бы из профиля все сериалы.
     """
-    return my_stories_of(username).public()
+    return my_stories_of(user).public()
 
 
-def top_stories_of(username: str, limit: int = 3, *,
-                   facts: AuthorFacts = None) -> list:
+def top_stories_of(user, limit: int = 3) -> list:
     """Самые читаемые публичные работы — для рейла чужого профиля.
 
     По накопленному `views`, а не по окну в 14 дней: рейл отвечает «с чего
     начать знакомство с автором», а не «что у него сейчас в моде». Автор
     с одной старой сильной работой иначе остался бы без ответа.
+
+    Из снимка на объекте: страница уже показывает эти же работы телом
+    вкладки, и второй запрос ради трёх строк был бы за то же самое.
     """
-    facts = facts or author_facts(username)
-    return sorted(facts.public_stories,
-                  key=lambda s: s.views, reverse=True)[:limit]
+    if user is None:
+        return []
+    return sorted(user.public_works, key=lambda s: s.views, reverse=True)[:limit]
 
 
-def writer_attention(username: str, *, facts: AuthorFacts = None) -> list:
+def writer_attention(user) -> list:
     """Что ждёт автора — короткая строка над списком (FR-WRITE-08).
 
     Отдаёт `kind` / `count` / `slug`; тексты и ссылки собирает вызывающая
     сторона. `slug` заполнен только когда элемент один: вести «3 шығарма
     модерацияда» в одну из трёх было бы враньём.
     """
-    mine = (facts or author_facts(username)).stories
+    if user is None:
+        return []
+    mine = user.authored
     items = []
 
     def _one(kind, stories):
@@ -150,8 +80,8 @@ def writer_attention(username: str, *, facts: AuthorFacts = None) -> list:
 
     _one('moderation', [s for s in mine if s.status == 'OnModeration'])
 
-    unread = Notification.objects.filter(user__username=username,
-                                         kind='comment', read=False).count()
+    unread = Notification.objects.filter(user=user, kind='comment',
+                                         read=False).count()
     if unread:
         items.append({'kind': 'comments', 'count': unread, 'slug': ''})
 
@@ -201,18 +131,16 @@ def can_submit_for_review(story) -> bool:
             and not missing_for_review(story))
 
 
-def writer_stats(username: str, *, facts: AuthorFacts = None) -> dict:
+def writer_stats(user) -> dict:
     """Сводка кабинета. Разбивка по статусам обязана давать в сумме
     `total`: разбивка, не сходящаяся с целым, — то же враньё, что и
-    хранимый счётчик.
+    хранимый счётчик (BR-ACH-07).
 
-    `facts` — уже собранный снимок автора. Страница профиля показывает
-    рядом четыре сводки по одному и тому же списку работ, и без снимка
-    каждая тянула его заново.
+    Считается по снимку работ на объекте: страница профиля показывает
+    рядом четыре сводки по одному и тому же списку, и раньше каждая тянула
+    его заново.
     """
-    facts = facts or author_facts(username)
-    mine = facts.stories
-    user = facts.user
+    mine = user.authored if user is not None else []
     return {
         'total':         len(mine),
         'published':     sum(1 for s in mine
@@ -227,41 +155,38 @@ def writer_stats(username: str, *, facts: AuthorFacts = None) -> dict:
     }
 
 
-def public_stats(username: str, *, facts: AuthorFacts = None) -> dict:
+def public_stats(user) -> dict:
     """Четыре числа публичного профиля (FR-PROF-01).
 
     `works` совпадает с `User.works` по построению: одно правило
     публичности, посчитанное один раз.
     """
-    facts = facts or author_facts(username)
-    pub = facts.public_stories
-    user = facts.user
+    pub = user.public_works if user is not None else []
     return {
         'works':     len(pub),
-        'reads':     facts.reads,
+        'reads':     user.reads if user is not None else 0,
         'likes':     sum(s.likes for s in pub),
-        'followers': user.followers if user else 0,
+        'followers': user.followers if user is not None else 0,
     }
 
 
-def reader_stats(username: str, *, facts: AuthorFacts = None) -> dict:
+def reader_stats(user) -> dict:
     """Свой профиль: те же числа плюс приватное.
 
     Публичная часть берётся из `public_stats` — владелец не должен видеть
     другую арифметику, чем читатель.
     """
-    facts = facts or author_facts(username)
-    stats = dict(public_stats(username, facts=facts))
+    stats = dict(public_stats(user))
     stats.update({
-        'works_total': len(facts.stories),
+        'works_total': len(user.authored) if user is not None else 0,
         # Из общей выборки библиотеки, а не отдельным COUNT: полки на этой
         # же странице уже прочитаны целиком.
-        'finished':    len(facts.shelf('done')),
+        'finished':    len(user.shelf('done')) if user is not None else 0,
     })
     return stats
 
 
-def library_of(username: str, kind: str = '') -> list:
+def library_of(user, kind: str = '') -> list:
     """Полки читателя. Пустой `kind` — вся библиотека.
 
     Число частей приезжает той же строкой (`story_chapters`) и садится на
@@ -270,11 +195,11 @@ def library_of(username: str, kind: str = '') -> list:
     `Prefetch` это стоило бы второго запроса, через `Story.chapters` без
     подсказки — по запросу на каждую строку полки.
     """
-    if not username:
+    if user is None:
         return []
     from .library import progress_chapter_subquery
 
-    entries = (LibraryEntry.objects.filter(user__username=username)
+    entries = (LibraryEntry.objects.filter(user=user)
                .select_related('story', 'story__author',
                                'story__primary_genre')
                .annotate(story_chapters=chapter_count_subquery('story'),
@@ -289,23 +214,25 @@ def library_of(username: str, kind: str = '') -> list:
     return rows
 
 
-def in_library(username: str, story_slug: str) -> bool:
+def in_library(user, story_slug: str) -> bool:
     """Лежит ли работа в библиотеке — для кнопки «Сақтау»."""
-    return bool(username) and LibraryEntry.objects.filter(
-        user__username=username, story__slug=story_slug).exists()
+    return user is not None and LibraryEntry.objects.filter(
+        user=user, story__slug=story_slug).exists()
 
 
-def story_by_slug_for_author(slug: str, username: str):
+def story_by_slug_for_author(slug: str, user):
     """Работа для кабинета: любой статус, но только своя, вместе с автором.
 
     Отдельно от каталожного резолва: тот режет по публичности, и свой
-    черновик автор в кабинете не открыл бы. Фильтр по `username` — не
-    только удобство: без него любой вошедший открывал бы чужой черновик
-    по прямому URL (Ф15, IDOR). Чужой и несуществующий slug неотличимы
+    черновик автор в кабинете не открыл бы. Фильтр по автору — не только
+    удобство: без него любой вошедший открывал бы чужой черновик по
+    прямому URL (Ф15, IDOR). Чужой и несуществующий slug неотличимы
     снаружи — оба дают `None` и одну и ту же карточку «не найдено», а не
     403: подтверждать постороннему, что slug вообще существует, незачем.
     """
-    return (Story.objects.filter(slug=slug, author__username=username)
+    if user is None:
+        return None
+    return (Story.objects.filter(slug=slug, author=user)
             .select_related('author', 'primary_genre', 'secondary_genre')
             # Кабинет показывает «N бөлім» — без аннотации это отдельный
             # запрос за счётом глав (`Story.chapters`).

@@ -15,20 +15,20 @@ from datetime import datetime, time, timedelta
 from typing import Callable
 
 from django.db import transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from ..domain.awards import READ_TIER_ART, READ_TIERS, next_tier_for, tier_for
 from ..domain.catalog import BADGE_LABELS, PUBLIC_STATUSES
 from ..domain.notifications import NOTIF_BUCKETS
 from ..models import AwardGrant, Follow, Genre, Notification, Story, User
-from .author import AuthorFacts, author_facts
 
 
 # ── Подписки (FR-PROF-10, BR-75) ─────────────────────────────────────────
-def is_following(me: str, them: str) -> bool:
-    return bool(me) and Follow.objects.filter(
-        follower__username=me, following__username=them).exists()
+def is_following(me, them) -> bool:
+    """Подписан ли `me` на `them`. Гость (`None`) не подписан ни на кого."""
+    return (me is not None and them is not None
+            and Follow.objects.filter(follower=me, following=them).exists())
 
 
 def toggle_follow(follower, following) -> bool:
@@ -62,19 +62,21 @@ def toggle_follow(follower, following) -> bool:
     return now_following
 
 
-def followers_of(username: str):
-    return with_works(
-        User.objects.filter(following_set__following__username=username)
-        .order_by('username'))
+def followers_of(user):
+    if user is None:
+        return User.objects.none()
+    return with_works(User.objects.filter(following_set__following=user)
+                      .order_by('username'))
 
 
-def following_of(username: str):
-    return with_works(
-        User.objects.filter(follower_set__follower__username=username)
-        .order_by('username'))
+def following_of(user):
+    if user is None:
+        return User.objects.none()
+    return with_works(User.objects.filter(follower_set__follower=user)
+                      .order_by('username'))
 
 
-def followers_count_of(username: str) -> int:
+def followers_count_of(user) -> int:
     """Сколько человек подписано на автора.
 
     Отдельно от `followers_of`, потому что страница подписок показывает
@@ -82,12 +84,12 @@ def followers_count_of(username: str) -> int:
     имён со счётчиком работ у каждого. Полная выборка ради `len()` —
     это та же выборка, только выброшенная.
     """
-    return Follow.objects.filter(following__username=username).count()
+    return Follow.objects.filter(following=user).count()
 
 
-def following_count_of(username: str) -> int:
+def following_count_of(user) -> int:
     """Сколько людей читает сам автор. Пара к `followers_count_of`."""
-    return Follow.objects.filter(follower__username=username).count()
+    return Follow.objects.filter(follower=user).count()
 
 
 def with_works(users):
@@ -149,34 +151,28 @@ def portal_stats() -> dict:
 
 
 # ── Прочтения и ступени ──────────────────────────────────────────────────
-def reads_total(username: str, *, facts: AuthorFacts = None) -> int:
+def reads_total(user) -> int:
     """Сколько раз прочитали автора — по публичным работам (BR-73).
 
-    Со снимком считается из уже загруженных работ: правило публичности то
-    же самое, и отдельный `SUM` по тем же строкам — просто ещё один
-    запрос. Без снимка остаётся агрегатом — сам по себе он дешевле, чем
-    выборка всех работ ради суммы.
+    Из снимка работ на объекте: правило публичности то же самое, и
+    отдельный `SUM` по тем же строкам — просто ещё один запрос.
     """
-    if facts is not None:
-        return facts.reads
-    return (Story.objects.filter(author__username=username,
-                                 status__in=PUBLIC_STATUSES)
-            .aggregate(total=Sum('views'))['total'] or 0)
+    return user.reads if user is not None else 0
 
 
-def read_tier(username: str, *, facts: AuthorFacts = None):
+def read_tier(user):
     """Высшая взятая ступень. В публичный ряд идёт только она: «Мың» и
     «Он мың» рядом говорят одно и то же."""
-    return tier_for(reads_total(username, facts=facts))
+    return tier_for(reads_total(user))
 
 
-def read_ladder(username: str, *, facts: AuthorFacts = None) -> list:
+def read_ladder(user) -> list:
     """Весь путь по ступеням — для своей статистики (FR-PROF-08).
 
     Публичный ряд показывает одну ступень; здесь видно, что дальше, ради
     чего своя статистика и заводилась.
     """
-    total = reads_total(username, facts=facts)
+    total = reads_total(user)
     ahead = next_tier_for(total)
     return [
         {
@@ -201,10 +197,10 @@ class Award:
     Условие (`earned`) лежит рядом с наградой, а не в отдельном списке
     «как получить»: два описания одного правила однажды разойдутся.
 
-    Проверка читает `AuthorFacts`, а не ник. Пока она принимала ник,
-    каждая из пяти наград шла в базу за работами автора сама, а
-    `award_catalog` вдобавок звал её дважды на награду — десять полных
-    выборок ради пяти галочек.
+    Проверка читает **пользователя**, а не ник, и берёт снимок его работ
+    с самого объекта. Пока она принимала ник, каждая из пяти наград шла в
+    базу за работами автора сама, а `award_catalog` вдобавок звал её
+    дважды на награду — десять полных выборок ради пяти галочек.
     """
 
     key: str
@@ -212,7 +208,7 @@ class Award:
     art: str        # слаг иллюстрации в `components/awards/_sprite.html`
     tier: str       # металл постамента (BR-ACH-02)
     hint: str       # что сделать, чтобы получить
-    earned: Callable[[AuthorFacts], bool]
+    earned: Callable[..., bool]
 
     def as_dict(self) -> dict:
         return {'key': self.key, 'label': self.label,
@@ -223,74 +219,76 @@ class Award:
 AWARDS = (
     Award('first_publication', 'Алғашқы жарияланым', 'first-publication',
           'bronze', 'Бірінші шығармаңды жарияла',
-          lambda f: bool(f.public_stories)),
+          lambda u: bool(u.public_works)),
     Award('contest_participant', 'Байқауға қатысты', 'contest-participant',
           'bronze', 'Кез келген байқауға өтінім жібер',
-          lambda f: bool(f.submissions)),
+          lambda u: bool(u.own_submissions)),
     # Дописанный сериал — самая ценная награда набора: дописать начатое
     # подростку тяжелее всего, и это ровно то поведение, которое платформе
     # нужно поощрять. Одиночный рассказ сюда не считается — он «дописан»
     # в момент публикации (BR-10a, BR-ACH-04).
     Award('finished_serial', 'Сериалды аяқтады', 'finished-serial',
           'silver', 'Көп бөлімді шығармаңды аяқта',
-          lambda f: any(s.status == 'Completed' and not s.is_single
-                        for s in f.stories)),
+          lambda u: any(s.status == 'Completed' and not s.is_single
+                        for s in u.authored)),
     Award('contest_accepted', 'Байқауға қабылданды', 'contest-accepted',
           'silver', 'Өтінімің қазылар алқасынан өтсін',
-          lambda f: any(s.status == 'accepted' for s in f.submissions)),
+          lambda u: any(s.status == 'accepted' for s in u.own_submissions)),
     # Системного «Байқау жеңімпазы» здесь нет — DEC-46. Один общий знак на
     # все конкурсы всех лет вытеснен наградой конкретного конкурса: она
     # называет номинацию, год и работу, а общий — только факт.
     Award('editorial_choice', BADGE_LABELS['editorial'], 'editorial-choice',
           'gold', 'Редакция шығармаңды таңдасын',
-          lambda f: any(s.is_editorial_pick for s in f.public_stories)),
+          lambda u: any(s.is_editorial_pick for s in u.public_works)),
 )
 
 
-def award_catalog(username: str, *, facts: AuthorFacts = None) -> list:
+def award_catalog(user) -> list:
     """Все знаки с отметкой «взят» — для своей статистики (FR-PROF-08).
 
     Тот же реестр, что у публичного ряда: «что можно получить» не может
     разойтись с «что получено», потому что это один список.
     """
-    facts = facts or author_facts(username)
     out = []
     for a in AWARDS:
-        # Один вызов на награду. Раньше их было два — второй считал `dim`,
+        # Список полный и у того, кто не взял ни одной: серая плитка
+        # отвечает на «что дальше», ради чего раздел и заводился (BR-ACH-08).
+        # Один вызов на награду — раньше их было два, и второй считал `dim`,
         # то есть заново вычислял отрицание уже известного.
-        earned = bool(a.earned(facts))
+        earned = bool(user is not None and a.earned(user))
         out.append({**a.as_dict(), 'hint': a.hint, 'earned': earned,
                     # Готовый флаг «обесцветить»: `{% include %}` не умеет `not`.
                     'dim': not earned})
     return out
 
 
-def achievements_of(username: str, *, facts: AuthorFacts = None) -> list:
+def achievements_of(user) -> list:
     """Полученные знаки — публичный ряд (FR-PROF-06).
 
     Ссылок здесь нет: URL-ы в слой данных не спускаются. В ряд идёт только
     высшая взятая ступень оқылым — пройденные видно в своей статистике.
     """
-    facts = facts or author_facts(username)
-    if facts.user is None:
+    if user is None:
         return []
-    out = [a.as_dict() for a in AWARDS if a.earned(facts)]
-    tier = read_tier(username, facts=facts)
+    out = [a.as_dict() for a in AWARDS if a.earned(user)]
+    tier = read_tier(user)
     if tier:
         art, metal = READ_TIER_ART[tier[0]]
         out.append({'key': 'reads', 'label': tier[1], 'art': art, 'tier': metal})
     return out
 
 
-def contest_awards_of(username: str) -> list:
+def contest_awards_of(user) -> list:
     """Награды конкурсов автора (DEC-46), свежие сверху.
 
     Работа называется только пока публична (BR-73): снятая с публикации не
     должна проступать через награду. Сама награда остаётся — она
     принадлежит автору, а не видимости текста.
     """
+    if user is None:
+        return []
     out = []
-    for grant in (AwardGrant.objects.filter(story__author__username=username)
+    for grant in (AwardGrant.objects.filter(story__author=user)
                   .select_related('award', 'contest', 'story')):
         out.append({
             'key':     f'{grant.contest.slug}:{grant.award.slug}',
@@ -323,7 +321,7 @@ def _feed_window_start():
     return timezone.make_aware(datetime.combine(day, time.min))
 
 
-def notifications_for_user(username: str) -> dict:
+def notifications_for_user(user) -> dict:
     """Лента, сгруппированная по времени: сегодня, вчера, на этой неделе.
 
     Групп три, и старше недели событие не показывается: глубину ленты
@@ -331,14 +329,13 @@ def notifications_for_user(username: str) -> dict:
     Внутри группы — свежие сверху.
     """
     grouped = {b: [] for b in NOTIF_BUCKETS}
-    if not username:
+    if user is None:
         return grouped
     # Окно режется в базе, а не циклом по всем уведомлениям автора: лента
     # показывает неделю, и у человека с двумя годами истории отбрасывать
     # лишнее в Python значит везти всю историю ради семи дней.
     rows = (Notification.objects
-            .filter(user__username=username,
-                    created_at__gte=_feed_window_start())
+            .filter(user=user, created_at__gte=_feed_window_start())
             .select_related('actor', 'story', 'story__author', 'contest')
             .order_by('-created_at'))
     for n in rows:
@@ -374,7 +371,7 @@ def mark_all_notifications_read(user) -> int:
         user=user, read=False, created_at__gte=_feed_window_start()).update(read=True)
 
 
-def unread_count_for_user(username: str) -> int:
+def unread_count_for_user(user) -> int:
     """Бейдж в шапке считает то же, что показывает страница.
 
     Событие старше недели в ленту не попадает (BR-70a), и учитывать его в
@@ -384,8 +381,8 @@ def unread_count_for_user(username: str) -> int:
     отбрасывал старые по свойству `bucket` — на **каждой** странице у
     каждого вошедшего, потому что число зовёт контекст-процессор.
     """
-    if not username:
+    if user is None:
         return 0
     return Notification.objects.filter(
-        user__username=username, read=False,
+        user=user, read=False,
         created_at__gte=_feed_window_start()).count()

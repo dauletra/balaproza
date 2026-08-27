@@ -23,7 +23,7 @@ def auth_state(request):
         'signed_in': is_in,
         'current_user_name': user.get_short_name() if is_in else '',
         'current_user_username': username,
-        'unread_notifications': data.unread_count_for_user(username) if is_in else 0,
+        'unread_notifications': data.unread_count_for_user(user if is_in else None),
     }
 
 

@@ -178,30 +178,32 @@ class PersonalPagesStayWithinTheirQueryBudget(TestCase):
     базу заново. Пятьдесят девять запросов на страницу — из этого. Ни один
     тест про содержимое такого не видел: все они оставались зелёными.
 
-    Границы держат правило «посчитать один раз и передать»: работы автора,
-    его заявки и полки библиотеки собираются в `AuthorFacts` и дальше
-    только читаются.
+    Границы держат правило «посчитать один раз»: работы автора, его заявки
+    и полки библиотеки — снимок на самом пользователе (`User.authored` и
+    соседние `cached_property`), и дальше их только читают.
     """
 
     def test_profile_me(self):
         """Свой профиль — самая дорогая страница портала: сегменты, четыре
         сводки, ряд знаков, каталог знаков, ступени оқылым, библиотека и
-        конкурсная биография. Было 59."""
+        конкурсная биография. Было 59, затем 14 — четырнадцатым был второй
+        `SELECT` того же пользователя: снимок искал его по нику, хотя
+        страница уже держала объект на руках."""
         login_as(self.client)
-        with self.assertNumQueries(14):
+        with self.assertNumQueries(13):
             self.client.get(reverse('core:profile_me'))
 
     def test_profile_me_stats_tab(self):
         """Вкладка «Статистика» не добавляет запросов: своя статистика
         считается из тех же работ, что и публичная."""
         login_as(self.client)
-        with self.assertNumQueries(14):
+        with self.assertNumQueries(13):
             self.client.get(reverse('core:profile_me') + '?tab=stats')
 
     def test_profile_other(self):
         """Чужой профиль дешевле своего: библиотеки и приватной сводки нет.
-        Было 24."""
-        with self.assertNumQueries(9):
+        Было 24, потом 9 — девятым был второй `SELECT` автора."""
+        with self.assertNumQueries(8):
             self.client.get(reverse('core:profile_other',
                                     kwargs={'username': 'aidana'}))
 

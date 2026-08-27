@@ -19,7 +19,7 @@ from core import data
 from core.models import BlockedTagPattern, Genre, StoryTag, Tag, User
 from core.templatetags.balaproza import compact_count, page_range
 from core.tests import factories as make
-from core.tests.base import TestCase
+from core.tests.base import TestCase, user
 
 
 class UserSaysWhoTheAuthorIs(TestCase):
@@ -274,11 +274,11 @@ class ReadTiersAreLadderNotRating(TestCase):
         author = make.user()
         make.story(author=author, chapters=1, views=500)
         make.story(author=author, chapters=1, views=700, status='NotPublished')
-        self.assertEqual(data.reads_total(author.username), 500)
+        self.assertEqual(data.reads_total(author), 500)
 
     def test_an_unknown_user_has_no_tier(self):
-        self.assertEqual(data.reads_total('ghost'), 0)
-        self.assertIsNone(data.read_tier('ghost'))
+        self.assertEqual(data.reads_total(user('ghost')), 0)
+        self.assertIsNone(data.read_tier(user('ghost')))
 
 
 class PublicWorkCountIsDerived(TestCase):

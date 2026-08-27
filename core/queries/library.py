@@ -123,7 +123,7 @@ def toggle_library_entry(user, story) -> bool:
     return True
 
 
-def reading_progress_of(username: str):
+def reading_progress_of(user):
     """Последнее, что читатель не дочитал, или None.
 
     Одна запись, а не список: «Оқуды жалғастыру» отвечает на «что открыть
@@ -133,10 +133,10 @@ def reading_progress_of(username: str):
     «3 / 12 бөлім», и без подсказки `Story.chapters` спросил бы базу
     отдельно (тот же приём, что в `library_of`).
     """
-    if not username:
+    if user is None:
         return None
     progress = (ReadingProgress.objects
-                .filter(user__username=username)
+                .filter(user=user)
                 .select_related('story', 'story__author',
                                 'story__primary_genre')
                 .annotate(story_chapters=chapter_count_subquery('story'))

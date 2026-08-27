@@ -13,7 +13,7 @@ from django.urls import reverse
 
 from .. import data
 from ..models import RASTER_ONLY
-from .common import _current_username, _safe_next
+from .common import _current_user, _current_username, _safe_next
 
 # ───────────────────────── PROF — профиль ────────────────────────────────
 _PROF_TABS_ME    = ("works", "library", "stats", "about")
@@ -27,7 +27,7 @@ def _resolve_prof_tab(request, allowed) -> str:
     return tab if tab in allowed else 'works'
 
 
-def _prof_items(facts, allowed: tuple, is_self: bool) -> list:
+def _prof_items(author, allowed: tuple, is_self: bool) -> list:
     """Сегменты PROF (label + count).
 
     Счётчик работ считается по публичным работам **для обоих** — DEC-44.
@@ -35,8 +35,8 @@ def _prof_items(facts, allowed: tuple, is_self: bool) -> list:
     арифметики, и «Шығармалар 5» открывало список из трёх у постороннего.
     Одно правило, посчитанное один раз, разойтись не может.
     """
-    works_n = len(facts.public_stories)
-    lib_n   = len(facts.library) if is_self else 0
+    works_n = len(author.public_works) if author else 0
+    lib_n   = len(author.library_entries) if (author and is_self) else 0
     labels = {
         "works":   ("Шығармалар", works_n),
         "library": ("Кітапхана",  lib_n),
@@ -51,50 +51,49 @@ def _prof_items(facts, allowed: tuple, is_self: bool) -> list:
 def profile_me(request):
     """Свой профиль (FR-PROF-01/03). Реальное переключение секций через ?tab=."""
     username = _current_username(request)
+    # Автор с аннотацией «сколько работ видит читатель» и со снимком своих
+    # работ на самом объекте: страница спрашивает их из восьми мест —
+    # сегменты, две сводки, пять наград, ступени, конкурсная биография, — и
+    # пока каждое ходило в базу само, свой профиль стоил пятидесяти девяти
+    # запросов.
     author = data.author_by_username(username)
     tab = _resolve_prof_tab(request, _PROF_TABS_ME)
-    # Один снимок автора на весь рендер. Страница спрашивает его работы
-    # из восьми мест — сегменты, две сводки, пять наград, ступени,
-    # конкурсная биография, — и пока каждое ходило в базу само, свой
-    # профиль стоил пятидесяти девяти запросов.
-    facts = data.author_facts(username)
     # Рейл профиля состоит из одного блока «Жазылулар»: без него
     # partials/right_rail/profile.html не рендерит ничего, и гость получал
     # пустую колонку в 300px, которая просто сдвигала гейт от центра.
-    following = data.following_of(username) if username else []
-    catalog = data.award_catalog(username, facts=facts) if username else []
-    ladder = data.read_ladder(username, facts=facts) if username else []
+    following = data.following_of(author)
+    catalog = data.award_catalog(author)
+    ladder = data.read_ladder(author)
     return render(request, 'pages/profile/profile_me.html', {
         'has_right_rail':  bool(author and following),
         'profile_user':    author,
         'username':        username,
         'is_self':         True,
         'tab':             tab,
-        'prof_items':      _prof_items(facts, _PROF_TABS_ME, True) if username else [],
+        'prof_items':      _prof_items(author, _PROF_TABS_ME, True) if author else [],
         # DEC-44: профиль — публичный вид на автора, а не второй кабинет.
         # `?tab=works` показывал `my_stories_of` строками `my_story_row` —
         # то есть ровно список из `/my-stories/` минус полоса внимания.
         # Теперь здесь то же, что видит читатель; черновики и модерация
         # живут только в кабинете, а их количество автор видит во вкладке
         # «Статистика» под пометкой «Тек саған көрінеді» (FR-PROF-08).
-        'works':           facts.public_stories if username else [],
-        'hidden_n':        (len(facts.stories)
-                            - len(facts.public_stories)) if username else 0,
+        'works':           author.public_works if author else [],
+        'hidden_n':        (len(author.authored)
+                            - len(author.public_works)) if author else 0,
         'my_stories_href': reverse('core:my_stories'),
-        'lib_reading':     facts.shelf('reading') if username else [],
-        'lib_saved':       facts.shelf('saved') if username else [],
-        'stats':           data.reader_stats(username, facts=facts) if username else None,
-        'achievements':    data.achievements_of(username, facts=facts) if username else [],
-        'contest_awards':  data.contest_awards_of(username) if username else [],
-        'contests_n':      len(facts.submissions) if username else 0,
-        'contest_history': data.contest_history(username, is_self=True,
-                                                facts=facts) if username else [],
+        'lib_reading':     author.shelf('reading') if author else [],
+        'lib_saved':       author.shelf('saved') if author else [],
+        'stats':           data.reader_stats(author) if author else None,
+        'achievements':    data.achievements_of(author),
+        'contest_awards':  data.contest_awards_of(author),
+        'contests_n':      len(author.own_submissions) if author else 0,
+        'contest_history': data.contest_history(author, is_self=True),
         # FR-PROF-08 — своя статистика. Ничего из этого посторонний не видит.
-        'writer':          data.writer_stats(username, facts=facts) if username else None,
+        'writer':          data.writer_stats(author) if author else None,
         'award_catalog':   catalog,
         'awards_earned':   sum(1 for a in catalog if a['earned']),
         'read_ladder':     ladder,
-        'reads_total':     data.reads_total(username, facts=facts) if username else 0,
+        'reads_total':     data.reads_total(author),
         'next_tier':       next((s for s in ladder if s['is_next']), None),
         'following':       following,
         'new_story_href':  reverse('core:new_story'),
@@ -168,12 +167,12 @@ def profile_other(request, username):
     author = data.author_by_username(username)
     if not author:
         raise Http404(f'Автор @{username} табылмады')
-    me = _current_username(request)
+    me = _current_user(request)
     tab = _resolve_prof_tab(request, _PROF_TABS_OTHER)
-    # Тот же снимок, что и в своём профиле: работы автора спрашивают
-    # сегменты, тело вкладки, рейл, сводка и три награды.
-    facts = data.author_facts(username)
-    works = facts.public_stories
+    # Тот же снимок, что и в своём профиле, и живёт он на самом авторе:
+    # его работы спрашивают сегменты, тело вкладки, рейл, сводка и три
+    # награды.
+    works = author.public_works
     # Рейл чужого профиля — «Ең көп оқылғаны», а не «на кого он подписан»
     # (FR-PROF-09). Список чужих подписок читателю ничего не сообщает, а
     # занимал единственный блок рейла.
@@ -183,30 +182,28 @@ def profile_other(request, username):
     # копией соседней колонки (то же, за что убирали числа —
     # test_desktop_layout.ProfileStatsNotDuplicated). На «Туралы» работ в
     # теле нет вовсе, поэтому там блок полезен с первой.
-    rail_top = (
-        data.top_stories_of(username, facts=facts)
-        if tab == 'about' or len(works) >= 4 else []
-    )
+    rail_top = (data.top_stories_of(author)
+                if tab == 'about' or len(works) >= 4 else [])
     return render(request, 'pages/profile/profile_other.html', {
         'has_right_rail': bool(rail_top),
         'profile_user':  author,
         'username':      username,
         'is_self':       False,
         'tab':           tab,
-        'prof_items':    _prof_items(facts, _PROF_TABS_OTHER, False),
+        'prof_items':    _prof_items(author, _PROF_TABS_OTHER, False),
         'works':         works,
         'rail_top':      rail_top,
-        'stats':         data.public_stats(username, facts=facts),
+        'stats':         data.public_stats(author),
         # Знаки одинаковы для владельца и для постороннего: достижение
         # публично по определению (FR-PROF-06). Число конкурсов — участие
         # без статуса, поэтому совпадает с длиной публичного списка и не
         # выдаёт вычитанием, что какая-то заявка отклонена (BR-74a).
-        'achievements':  data.achievements_of(username, facts=facts),
-        'contest_awards': data.contest_awards_of(username),
-        'contests_n':    len(facts.submissions),
+        'achievements':  data.achievements_of(author),
+        'contest_awards': data.contest_awards_of(author),
+        'contests_n':    len(author.own_submissions),
         # is_self=False режет результат и комментарий жюри (BR-74a)
-        'contest_history': data.contest_history(username, facts=facts),
-        'is_followed':   data.is_following(me, username) if me else False,
+        'contest_history': data.contest_history(author),
+        'is_followed':   data.is_following(me, author),
     })
 
 
@@ -256,7 +253,7 @@ def profile_people(request, username, kind):
 
     title, fetch, _ = _PEOPLE_KINDS[kind]
     me = _current_username(request)
-    people = fetch(username)
+    people = list(fetch(author))
     return render(request, 'pages/profile/profile_people.html', {
         'profile_user': author,
         'username':     username,
@@ -275,7 +272,7 @@ def profile_people(request, username, kind):
             {
                 'slug':  k,
                 'label': lbl,
-                'count': len(people) if k == kind else count_of(username),
+                'count': len(people) if k == kind else count_of(author),
                 'href':  reverse('core:profile_people',
                                  kwargs={'username': username, 'kind': k}),
             }

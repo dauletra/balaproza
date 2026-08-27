@@ -93,8 +93,6 @@ from .queries.catalog import (
 
 # ── Кабинет автора, профиль, библиотека ──────────────────────────────────
 from .queries.author import (
-    AuthorFacts,
-    author_facts,
     can_submit_for_review,
     in_library,
     library_of,

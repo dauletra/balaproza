@@ -275,7 +275,7 @@ def catalog_links(state: CatalogState) -> dict:
 
 
 # ─────────────────────────── Кабинет автора ──────────────────────────────
-def attention_links(username: str, facts=None) -> list:
+def attention_links(user) -> list:
     """Сигналы кабинета с готовыми ссылками (FR-WRITE-08).
 
     `writer_attention` отдаёт только данные — kind/count/slug. Пустой
@@ -283,7 +283,7 @@ def attention_links(username: str, facts=None) -> list:
     больше одной работы.
     """
     items = []
-    for item in data.writer_attention(username, facts=facts):
+    for item in data.writer_attention(user):
         if item['kind'] == 'comments':
             href = reverse('core:notifications')
         elif item['slug']:

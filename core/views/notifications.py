@@ -6,13 +6,13 @@ from django.urls import reverse
 
 from .. import data
 from ..links import notification_href
-from .common import _current_username, _page_state
+from .common import _current_user, _page_state
 
 # ───────────────────────── NOTIF — уведомления ───────────────────────────
 def notifications(request):
     """Список уведомлений с группировкой БҮГІН / КЕШЕ / ӨТКЕН АПТАДА (FR-NOTIF-01)."""
-    username = _current_username(request)
-    grouped = data.notifications_for_user(username) if username else {}
+    user = _current_user(request)
+    grouped = data.notifications_for_user(user)
     has_any = any(grouped.get(b) for b in data.NOTIF_BUCKETS)
     state = _page_state(request)
     # Готовые секции вместо словаря и списка ключей. Django-шаблон не умеет
@@ -33,7 +33,7 @@ def notifications(request):
         # оқылмаған» и кнопка «отметить всё» соседствовали с сообщением
         # о неудачной загрузке (DEC-17).
         'has_data':      state == 'content',
-        'unread_total':  data.unread_count_for_user(username) if username else 0,
+        'unread_total':  data.unread_count_for_user(user),
     })
 
 

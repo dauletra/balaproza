@@ -7,7 +7,7 @@
 """
 
 from core.tests import factories as make
-from core.tests.base import TestCase, login_as, login_as_newcomer
+from core.tests.base import TestCase, login_as, login_as_newcomer, user
 from django.test import Client
 from django.urls import reverse
 
@@ -356,7 +356,7 @@ class TheMainButtonSaysWhatWillHappen(TestCase):
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': STORY_SLUG})), 'Оқылды:')
         login_as(self.client)
-        self.assertEqual(data.reading_progress_of('aidana').story.slug, STORY_SLUG)
+        self.assertEqual(data.reading_progress_of(user('aidana')).story.slug, STORY_SLUG)
         mine = self.client.get(reverse('core:story_detail',
                                        kwargs={'slug': STORY_SLUG}) + '?chapter=4')
         html = mine.content.decode()
@@ -476,7 +476,7 @@ class ChapterReactionVoting(TestCase):
         login_as(self.client)
         self.client.post(self._url(), {'kind': 'shabyt'})
 
-        chapter = data.chapter_of(STORY_SLUG, self.CHAPTER, 'aidana')
+        chapter = data.chapter_of(STORY_SLUG, self.CHAPTER, user('aidana'))
         self.assertEqual(chapter.my_reaction, 'shabyt')
         picked = [i['reaction'].slug for i in data.reactions_of(chapter) if i['mine']]
         self.assertEqual(picked, ['shabyt'])
@@ -553,7 +553,7 @@ class ChapterPollVoting(TestCase):
 
         self.client.post(self._url(self.OPEN_CHAPTER), {'option': option.slug})
 
-        poll = data.poll_of(STORY_SLUG, self.OPEN_CHAPTER, 'aidana')
+        poll = data.poll_of(STORY_SLUG, self.OPEN_CHAPTER, user('aidana'))
         self.assertEqual(poll.my_vote, option.slug)
         self.assertEqual(poll.option_set.get(slug=option.slug).votes, before + 1)
         self.assertTrue(PollVote.objects.filter(
@@ -574,7 +574,7 @@ class ChapterPollVoting(TestCase):
         self.client.post(self._url(self.OPEN_CHAPTER), {'option': first.slug})
         self.client.post(self._url(self.OPEN_CHAPTER), {'option': second.slug})
 
-        poll = data.poll_of(STORY_SLUG, self.OPEN_CHAPTER, 'aidana')
+        poll = data.poll_of(STORY_SLUG, self.OPEN_CHAPTER, user('aidana'))
         self.assertEqual(poll.my_vote, first.slug)
         self.assertEqual(poll.option_set.get(slug=second.slug).votes, second_before)
         self.assertEqual(

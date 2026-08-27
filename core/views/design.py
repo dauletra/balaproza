@@ -5,8 +5,18 @@ from django.http import Http404
 from django.shortcuts import render
 
 from .. import data
+from ..models import User
 
 # ───────────────────── DESIGN — внутренние страницы (только DEBUG) ────────
+
+
+def _demo_user():
+    """Автор демо-корпуса — витрине состояний нужен живой человек с полкой
+    и лентой, а слой данных принимает пользователя, а не ник."""
+    from .auth import DEMO_USERNAME
+
+    return User.objects.filter(username=DEMO_USERNAME).first()
+
 def design_components(request):
     """Каталог всех атомов во всех состояниях. Только при DEBUG."""
     if not settings.DEBUG:
@@ -42,9 +52,9 @@ def design_states(request):
         # По одному настоящему объекту каждого вида: витрина состояний
         # должна показывать то же, что живые страницы, иначе она
         # рассказывает про вёрстку, которой нет.
-        'sample_entry':   data.library_of('aidana')[0],
+        'sample_entry':   data.library_of(_demo_user())[0],
         'sample_notif':   next(iter(sum(
-            data.notifications_for_user('aidana').values(), [])), None),
+            data.notifications_for_user(_demo_user()).values(), [])), None),
         'sample_comment': data.comments_of('dalney-berega')[0],
     })
 

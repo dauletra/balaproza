@@ -35,6 +35,16 @@ class TestCase(DjangoTestCase):
         cache.clear()
 
 
+def user(username: str):
+    """Пользователь корпуса по нику — или `None`, если такого нет.
+
+    Слой данных принимает объект, а не строку, и `None` в нём значит
+    «гость». Поэтому `user('ghost')` — законный способ спросить хелпер за
+    того, кого не существует: ответом будет пустота, а не падение.
+    """
+    return User.objects.filter(username=username).first()
+
+
 def login_as(client, username='aidana'):
     """Ввести тестового клиента под настоящим пользователем корпуса.
 

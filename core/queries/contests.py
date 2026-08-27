@@ -24,7 +24,6 @@ from ..domain.contests import (
 )
 from ..domain.formatting import spaced_number
 from ..models import Contest, Submission
-from .author import author_facts
 
 # Порядок открытых конкурсов — по тому, что читатель может сделать:
 # сначала куда можно подать прямо сейчас, потом что откроется, потом что
@@ -112,34 +111,36 @@ def hero_contest():
     return Contest.objects.accepting().order_by('closes_on', 'pk').first()
 
 
-def submissions_of(username: str):
+def submissions_of(user):
     """Заявки автора.
 
     Присуждений здесь нет намеренно: они нужны одной `contest_history`, и
     она добирает их сама. Список заявок в кабинете спрашивает только «можно
     ли отозвать», и платить за чужой вопрос ему незачем.
     """
-    if not username:
+    if user is None:
         return Submission.objects.none()
-    return (Submission.objects.filter(author__username=username)
+    return (Submission.objects.filter(author=user)
             .select_related('contest', 'story', 'story__author'))
 
 
-def has_submission(username: str, contest_slug: str) -> bool:
+def has_submission(user, contest_slug: str) -> bool:
     """BR-23: один автор — одна работа на конкретный конкурс."""
-    return bool(username) and Submission.objects.filter(
-        author__username=username, contest__slug=contest_slug).exists()
+    return user is not None and Submission.objects.filter(
+        author=user, contest__slug=contest_slug).exists()
 
 
-def busy_contest_of(username: str, story_slug: str, *, besides: str = ''):
+def busy_contest_of(user, story_slug: str, *, besides: str = ''):
     """Незавершённый конкурс, который уже держит эту работу (BR-23a).
 
     Одна работа не идёт в двух конкурсах сразу: жюри читают параллельно, и
     одним текстом нельзя выиграть дважды. Завершённый не мешает — работа
     своё отучаствовала.
     """
+    if user is None:
+        return None
     rows = (Submission.objects
-            .filter(author__username=username, story__slug=story_slug,
+            .filter(author=user, story__slug=story_slug,
                     contest__results_on__gt=timezone.localdate())
             .exclude(contest__slug=besides)
             .select_related('contest'))
@@ -147,7 +148,7 @@ def busy_contest_of(username: str, story_slug: str, *, besides: str = ''):
     return row.contest if row else None
 
 
-def can_withdraw(username: str, contest) -> bool:
+def can_withdraw(user, contest) -> bool:
     """Можно ли отозвать заявку (BR-23b).
 
     Пока идёт приём и жюри не вынесло решения. Без отзыва «одна работа на
@@ -162,10 +163,9 @@ def can_withdraw(username: str, contest) -> bool:
     if isinstance(contest, str):
         # Без `contest_by_slug`: здесь нужны три даты, а не состав.
         contest = Contest.objects.filter(slug=contest).first()
-    if not contest or not contest.is_accepting:
+    if user is None or not contest or not contest.is_accepting:
         return False
-    return Submission.objects.filter(author__username=username,
-                                     contest=contest,
+    return Submission.objects.filter(author=user, contest=contest,
                                      status='reviewing').exists()
 
 
@@ -262,7 +262,7 @@ def submission_checklist(story, contest, *, chars: int = None) -> list:
     return items
 
 
-def submission_candidates(username: str, contest_slug, *, facts=None) -> list:
+def submission_candidates(user, contest_slug) -> list:
     """Работы автора как кандидаты и что о них стоит знать (BR-24).
 
     **Заметки, а не запреты.** Короткий текст бывает намеренно короткой
@@ -279,11 +279,10 @@ def submission_candidates(username: str, contest_slug, *, facts=None) -> list:
     """
     contest = (contest_slug if not isinstance(contest_slug, str)
                else contest_by_slug(contest_slug))
-    if not contest:
+    if not contest or user is None:
         return []
-    facts = facts or author_facts(username)
     result = []
-    for story in facts.public_stories:
+    for story in user.public_works:
         total = _total_chars(story)
         notes = []
         if total < contest.min_chars:
@@ -294,7 +293,7 @@ def submission_candidates(username: str, contest_slug, *, facts=None) -> list:
             notes.append({'key': 'too_long',
                           'text': f"{SUBMISSION_NOTES['too_long']} — "
                                   f"макс. {spaced_number(contest.max_chars)}"})
-        busy = busy_contest_of(username, story.slug, besides=contest.slug)
+        busy = busy_contest_of(user, story.slug, besides=contest.slug)
         if busy:
             notes.append({'key': 'busy',
                           'text': f"{SUBMISSION_NOTES['busy']}: «{busy.name}»"})
@@ -324,22 +323,21 @@ def create_submission(user, contest, story, *, ai_declaration: str,
     )
 
 
-def withdraw_submission(username: str, contest) -> bool:
+def withdraw_submission(user, contest) -> bool:
     """Отзыв заявки (BR-23b, Ф15 Этап 5).
 
     Условие то же, что у `can_withdraw` — приём ещё идёт, жюри ещё не
     решило, — и проверяется здесь заново: `can_withdraw` решает, показать
     ли кнопку, а не охраняет сам POST.
     """
-    if not can_withdraw(username, contest):
+    if not can_withdraw(user, contest):
         return False
     deleted, _ = Submission.objects.filter(
-        author__username=username, contest=contest, status='reviewing').delete()
+        author=user, contest=contest, status='reviewing').delete()
     return bool(deleted)
 
 
-def contest_history(username: str, *, is_self: bool = False,
-                    facts=None) -> list:
+def contest_history(user, *, is_self: bool = False) -> list:
     """Конкурсная биография автора (FR-PROF-07), свежие сверху.
 
     Правило приватности живёт здесь, а не в шаблоне (BR-74a): публично
@@ -351,7 +349,9 @@ def contest_history(username: str, *, is_self: bool = False,
     только пока публична (BR-73): подача не должна раскрывать снятое с
     публикации произведение.
     """
-    subs = (facts or author_facts(username)).submissions
+    if user is None:
+        return []
+    subs = user.own_submissions
     # Присуждения — одним запросом на все конкурсы сразу. Ниже цикл ищет
     # среди них работу этой заявки, и без prefetch каждая строка биографии
     # стоила запроса за присуждениями плюс запроса за номинацией на

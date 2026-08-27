@@ -23,7 +23,7 @@ from django.urls import reverse
 from core import data
 from core.context_processors import auth_state, nav_state
 from core.models import User
-from core.tests.base import TestCase, login_as, login_as_newcomer
+from core.tests.base import TestCase, login_as, login_as_newcomer, user
 from core.views import DEMO_USERNAME
 
 # (имя маршрута, kwargs, подпись для subTest)
@@ -195,7 +195,7 @@ class TemplateContext(TestCase):
         # Число не вписывается литералом: вторая копия разъезжалась бы с
         # первой при каждой правке демо-корпуса.
         self.assertEqual(ctx['unread_notifications'],
-                         data.unread_count_for_user('aidana'))
+                         data.unread_count_for_user(user('aidana')))
 
         nameless = User.objects.create_user('nameless', pen_name='Түнгі жазушы')
         self.assertEqual(auth_state(self._request_as(nameless))['current_user_name'],

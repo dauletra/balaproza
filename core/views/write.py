@@ -21,23 +21,24 @@ from django.shortcuts import redirect, render
 from .. import data
 from ..links import attention_links, checklist_links
 from ..models import RASTER_ONLY
-from .common import _current_username, _page_state
+from .common import _current_user, _page_state
 
 def my_stories(request):
-    username = _current_username(request)
+    user = _current_user(request)
     # Агрегатов автора здесь больше нет — DEC-48. Они жили в правом рейле и
     # в полосе под шапкой, повторяя `partials/profile/_stats.html` слово
     # в слово, а на страницах одного произведения тот же рейл читался как
     # статистика этого произведения. Кабинет отвечает на «что делать»,
     # профиль — на «как идёт».
-    facts = data.author_facts(username)
     return render(request, 'pages/write/my_stories.html', {
         # FR-WRITE-08: что требует внимания — модерация, новые пікір, пустой
         # черновик. Страница перечисляла имущество и молчала о том, что делать.
-        'attention': attention_links(username, facts) if username else [],
+        'attention':  attention_links(user),
         'page_state': _page_state(request),
-        'stories':    facts.stories if username else [],
-        'username':   username,
+        # Снимок работ живёт на самом пользователе: полоса внимания и
+        # список ниже смотрят в одну и ту же выборку, а не в две.
+        'stories':    user.authored if user else [],
+        'username':   user.username if user else '',
     })
 
 
@@ -65,8 +66,7 @@ def new_story(request):
 
 
 def manage_story(request, slug):
-    username = _current_username(request)
-    story = data.story_by_slug_for_author(slug, username)
+    story = data.story_by_slug_for_author(slug, _current_user(request))
 
     if request.method == 'POST' and story is not None:
         # Единственное действие этой страницы — «Модерацияға жіберу»
@@ -93,8 +93,7 @@ def manage_story(request, slug):
 
 
 def story_settings(request, slug):
-    username = _current_username(request)
-    story = data.story_by_slug_for_author(slug, username)
+    story = data.story_by_slug_for_author(slug, _current_user(request))
 
     if request.method == 'POST' and story is not None:
         title = request.POST.get('title', '').strip()
@@ -171,8 +170,7 @@ def story_settings(request, slug):
 
 
 def chapter_editor(request, slug, chapter=None):
-    username = _current_username(request)
-    story = data.story_by_slug_for_author(slug, username)
+    story = data.story_by_slug_for_author(slug, _current_user(request))
 
     if request.method == 'POST' and story is not None:
         title = request.POST.get('title', '').strip()
@@ -216,8 +214,7 @@ def delete_story(request, slug):
     """Опасная зона (FR-WRITE-06). GET безопасен — ничего не удаляет и
     просто возвращает в кабинет: удаление происходит только POST'ом из
     `delete_confirm_modal.html`."""
-    username = _current_username(request)
-    story = data.story_by_slug_for_author(slug, username)
+    story = data.story_by_slug_for_author(slug, _current_user(request))
     if request.method == 'POST' and story is not None:
         title = story.title
         story.delete()

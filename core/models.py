@@ -199,6 +199,62 @@ class User(AbstractUser):
             return annotated
         return self.stories.filter(status__in=PUBLIC_STATUSES).count()
 
+    # ── Снимок автора на один запрос ─────────────────────────────────────
+    # Страница профиля спрашивает работы автора из восьми мест: сегменты,
+    # две сводки, пять наград, ступени оқылым, конкурсная биография. Пока
+    # каждое ходило в базу само, свой профиль стоил пятидесяти девяти
+    # запросов; лечили это снимком `AuthorFacts`, который надо было не
+    # забыть передать параметром `facts=` в девять хелперов.
+    #
+    # Теперь снимок живёт **на самом объекте**. Он и есть то, что страница
+    # передаёт из вызова в вызов, а `cached_property` кэширует в
+    # `self.__dict__`, то есть ровно на время жизни экземпляра — один
+    # запрос. Забыть параметр больше нельзя: его нет.
+    #
+    # Между запросами объект не переиспользуют: `request.user` создаётся
+    # заново каждый раз. Долгоживущий экземпляр (команда, скрипт) покажет
+    # то, что прочитал в начале, — как и всякий снимок.
+    @cached_property
+    def authored(self) -> list:
+        """Все работы автора, любого статуса, «что трогал последним»."""
+        from .queries.catalog import all_stories
+
+        return list(all_stories().by_author(self).latest_edited())
+
+    @cached_property
+    def public_works(self) -> list:
+        """Работы, которые видит посторонний (BR-73).
+
+        Режется из уже загруженных, а не спрашивается отдельно: правило
+        публичности то же самое, и второй запрос с тем же `WHERE` — это
+        просто второй запрос.
+        """
+        return [s for s in self.authored if s.is_public]
+
+    @cached_property
+    def own_submissions(self) -> list:
+        """Заявки на конкурсы — нужны профилю и не нужны кабинету."""
+        from .queries.contests import submissions_of
+
+        return list(submissions_of(self))
+
+    @cached_property
+    def library_entries(self) -> list:
+        """Вся библиотека — три полки одной выборкой."""
+        from .queries.author import library_of
+
+        return list(library_of(self))
+
+    def shelf(self, kind: str) -> list:
+        """Одна полка из общей выборки: три вкладки библиотеки стоили трёх
+        запросов ради трёх счётчиков."""
+        return [e for e in self.library_entries if e.kind == kind]
+
+    @cached_property
+    def reads(self) -> int:
+        """Сколько раз прочитали автора — по публичным работам (BR-73)."""
+        return sum(s.views for s in self.public_works)
+
     @property
     def joined_year(self) -> int:
         """«2024 жылдан бері» в шапке профиля.
