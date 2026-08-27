@@ -16,7 +16,7 @@ from datetime import timedelta
 from django.utils import timezone
 
 from core import data
-from core.models import Chapter, Story, Tag, User
+from core.models import Chapter, Story, StoryTag, Tag, User
 from core.tests.base import TestCase
 
 
@@ -201,6 +201,55 @@ class TrendingTagsShowMovementNotArchive(TestCase):
             [t.slug for t in data.trending_tags(6)],
             [t.slug for t in data.popular_tags(6)],
         )
+
+
+class TagCountsAreDerived(TestCase):
+    """Оба счётчика тега считаются по связкам, а не хранятся (DEC-53).
+
+    Колонками они были уступкой: `weekly_count` нечем было посчитать,
+    пока у связки не появилась дата, и он лежал числом, которое никогда
+    не менялось. Отсюда же брались невозможные состояния — тег обещал 42
+    использования при трёх настоящих связках.
+    """
+
+    def _links(self, tag, *, since=None):
+        rows = StoryTag.objects.filter(
+            tag=tag, story__status__in=data.PUBLIC_STATUSES)
+        return rows.filter(created_at__gte=since).count() if since else rows.count()
+
+    def test_usage_equals_the_public_links(self):
+        for tag in Tag.objects.all():
+            with self.subTest(tag=tag.slug):
+                self.assertEqual(tag.usage_count, self._links(tag))
+
+    def test_week_is_a_subset_of_all_time(self):
+        """Недельный счётчик больше накопленного — невозможное состояние,
+        и раньше оно было достижимо: числа стояли рядом независимо."""
+        for tag in data.all_tags():
+            with self.subTest(tag=tag.slug):
+                self.assertLessEqual(tag.weekly_count, tag.usage_count)
+
+    def test_week_counts_only_recent_links(self):
+        since = timezone.now() - timedelta(days=7)
+        for tag in Tag.objects.all():
+            with self.subTest(tag=tag.slug):
+                self.assertEqual(tag.weekly_count, self._links(tag, since=since))
+
+    def test_a_draft_does_not_inflate_the_counter(self):
+        """По счётчику читатель не должен догадываться, что у кого-то
+        есть черновик с этим тегом — то же правило, что у жанров."""
+        draft = Story.objects.filter(status='NotPublished').first()
+        tag = Tag.objects.first()
+        before = Tag.objects.get(pk=tag.pk).usage_count
+        draft.tags.add(tag)
+        self.assertEqual(Tag.objects.get(pk=tag.pk).usage_count, before)
+
+    def test_annotated_and_unannotated_agree(self):
+        annotated = {t.slug: (t.usage_count, t.weekly_count) for t in data.all_tags()}
+        for slug, counts in annotated.items():
+            with self.subTest(tag=slug):
+                plain = Tag.objects.get(slug=slug)
+                self.assertEqual((plain.usage_count, plain.weekly_count), counts)
 
 
 class RecentViewsAreConsistent(TestCase):

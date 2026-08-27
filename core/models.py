@@ -16,6 +16,7 @@
 агрегат по логу слишком дорог — и тогда рядом стоит его пересчёт.
 """
 
+from datetime import timedelta
 from functools import cached_property
 from pathlib import Path
 
@@ -256,18 +257,17 @@ class Tag(models.Model):
     закрытого списка, зато есть путь `pending → accepted | rejected`
     (BR-TAG-03) и блок-лист (BR-TAG-05).
 
-    Оба счётчика — колонки, и это уступка, а не замысел. `usage_count`
-    вычислим (работ с тегом), `weekly_count` — нет: когда тег появился на
-    работе, нигде не записано. А DEC-31 держится ровно на расхождении
-    этих двух чисел: «Осы аптада» имеет смысл, только пока она не копия
-    «Танымал тегтер». Вычислить одно и хранить другое нельзя — недельный
-    счётчик оказался бы больше общего.
+    **Оба счётчика — производные** (DEC-53). Колонками они были уступкой:
+    когда тег появился на работе, нигде не записывалось, и `weekly_count`
+    нечем было посчитать — он лежал литералом, который не менялся
+    никогда, а DEC-31 держится ровно на расхождении этих двух чисел.
 
-    Правильный ответ — дата в связке «работа-тег»; она появилась
-    (`StoryTag.created_at`, Ф15 Этап 1), но `usage_count`/`weekly_count`
-    здесь пока не пересчитываются по ней — превращение в агрегаты
-    осталось отдельной задачей (docs/20 §20.4). Пока это та же уступка
-    демо-корпусу, что `User.followers`.
+    Дата в связке появилась (`StoryTag.created_at`, Ф15 Этап 1), и
+    уступка кончилась: оба считаются по `StoryTag` — аннотацией `usage` /
+    `weekly` в выдаче (`queries/tags.with_counts`), у одиночного объекта
+    запросом. Считаются только публичные работы, как у жанров: по
+    счётчику читатель не должен догадываться, что у кого-то есть черновик
+    с этим тегом.
     """
 
     STATUS_CHOICES = [(s, s) for s in TAG_STATUSES]
@@ -278,8 +278,6 @@ class Tag(models.Model):
     name = models.CharField('атауы', max_length=48)
     status = models.CharField('күйі', max_length=16, choices=STATUS_CHOICES,
                               default='pending')
-    usage_count = models.PositiveIntegerField('қолданылған саны', default=0)
-    weekly_count = models.PositiveIntegerField('осы аптада', default=0)
     created_at = models.DateTimeField('жасалған', auto_now_add=True)
 
     class Meta:
@@ -287,15 +285,45 @@ class Tag(models.Model):
         verbose_name = 'тег'
         verbose_name_plural = 'тегтер'
         indexes = [
-            # «Танымал тегтер» и автокомплит формы: `accepted` по убыванию
-            # использования. Витрина «Осы аптада» ходит тем же путём по
-            # своему счётчику — два разных вопроса (DEC-31), два индекса.
-            models.Index(fields=['status', '-usage_count']),
-            models.Index(fields=['status', '-weekly_count']),
+            # Обе витрины и автокомплит начинают с `accepted`; порядок
+            # дальше задают аннотации, и своего индекса у них быть не
+            # может — сортировка идёт по агрегату, а не по колонке.
+            models.Index(fields=['status']),
         ]
 
     def __str__(self):
         return self.name
+
+    @property
+    def usage_count(self) -> int:
+        """Сколько публичных работ несут этот тег.
+
+        Выдача подставляет ответ аннотацией `usage`; одиночный объект
+        считает сам. Тот же контракт, что у `Story.chapters`: молча
+        неверного ответа не бывает, бывает лишний запрос.
+        """
+        annotated = getattr(self, 'usage', None)
+        if annotated is not None:
+            return annotated
+        return self.stories.filter(status__in=PUBLIC_STATUSES).count()
+
+    @property
+    def weekly_count(self) -> int:
+        """Сколько раз тег поставили за последнюю неделю — «Осы аптада».
+
+        Считается по дате связки, а не хранится: хранимое число не
+        убывает, и через месяц недельная витрина стала бы копией
+        накопленной, ради отличия от которой её и завели (DEC-31).
+        """
+        annotated = getattr(self, 'weekly', None)
+        if annotated is not None:
+            return annotated
+        from .queries.tags import TRENDING_DAYS
+
+        since = timezone.now() - timedelta(days=TRENDING_DAYS)
+        return self.stories.filter(
+            status__in=PUBLIC_STATUSES,
+            storytag__tag=self, storytag__created_at__gte=since).count()
 
     @property
     def is_public(self) -> bool:

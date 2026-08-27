@@ -9,16 +9,48 @@
 автокомплите: он ещё не прошёл модератора.
 """
 
+from datetime import timedelta
+
+from django.db.models import Count, Q
+from django.utils import timezone
+
+from ..domain.catalog import PUBLIC_STATUSES
 from ..domain.slugs import slugify_kz
 from ..models import BlockedTagPattern, Tag
 
+# Ширина недельного среза («Осы аптада», DEC-31). Живёт здесь, рядом с
+# единственным запросом, который его применяет.
+TRENDING_DAYS = 7
+
+
+def with_counts(tags):
+    """Оба счётчика тега аннотацией: накопленный и недельный.
+
+    Колонок под ними больше нет (DEC-53). Считаются они по `StoryTag` —
+    той самой таблице, ради даты в которой связка и перестала быть голым
+    M2M: `weekly_count` без неё было нечем посчитать, и он лежал
+    литералом, который не менялся никогда.
+
+    Считаются только публичные работы — как у жанров: по счётчику
+    читатель не должен догадываться, что у кого-то есть черновик с этим
+    тегом.
+    """
+    public = Q(storytag__story__status__in=PUBLIC_STATUSES)
+    since = timezone.now() - timedelta(days=TRENDING_DAYS)
+    return tags.annotate(
+        usage=Count('storytag', filter=public, distinct=True),
+        weekly=Count('storytag',
+                     filter=public & Q(storytag__created_at__gte=since),
+                     distinct=True),
+    )
+
 
 def all_tags() -> list:
-    return list(Tag.objects.all())
+    return list(with_counts(Tag.objects.all()))
 
 
 def tag_by_slug(slug: str):
-    return Tag.objects.filter(slug=slug).first()
+    return with_counts(Tag.objects.filter(slug=slug)).first()
 
 
 def tags_of(story) -> list:
@@ -33,8 +65,8 @@ def tags_of(story) -> list:
 
 def popular_tags(limit: int = 10) -> list:
     """Опоры портала — accepted по накопленному использованию."""
-    return list(Tag.objects.filter(status='accepted')
-                .order_by('-usage_count', 'name')[:limit])
+    return list(with_counts(Tag.objects.filter(status='accepted'))
+                .order_by('-usage', 'name')[:limit])
 
 
 def trending_tags(limit: int = 6) -> list:
@@ -43,8 +75,9 @@ def trending_tags(limit: int = 6) -> list:
     Теги без недельной активности пропускаются: иначе полоса вырождается
     в копию «Танымал тегтер».
     """
-    return list(Tag.objects.filter(status='accepted', weekly_count__gt=0)
-                .order_by('-weekly_count', 'name')[:limit])
+    return list(with_counts(Tag.objects.filter(status='accepted'))
+                .filter(weekly__gt=0)
+                .order_by('-weekly', 'name')[:limit])
 
 
 def is_blocked(name: str) -> bool:
@@ -61,7 +94,7 @@ def accepted_tags_json() -> list:
     """Accepted-теги простыми словарями — для автокомплита в форме."""
     return [
         {'slug': t.slug, 'name': t.name, 'usage_count': t.usage_count}
-        for t in Tag.objects.filter(status='accepted').order_by('-usage_count')
+        for t in with_counts(Tag.objects.filter(status='accepted')).order_by('-usage')
     ]
 
 

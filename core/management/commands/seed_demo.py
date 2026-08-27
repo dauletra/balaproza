@@ -53,6 +53,7 @@ from core.models import (
     SchoolLink,
     Story,
     StoryComment,
+    StoryTag,
     Submission,
     Tag,
     TimelineStage,
@@ -132,19 +133,17 @@ class Command(BaseCommand):
         return added, updated
 
     def _seed_tags(self):
-        """UGC-теги вместе со счётчиками витрин.
+        """UGC-теги. Счётчиков витрин здесь нет (DEC-53).
 
-        Счётчики — колонки по необходимости: когда тег появился на работе,
-        нигде не записано, а «Осы аптада» держится на расхождении с
-        накопленным (DEC-31). Подробности — в `core.models.Tag`.
+        Оба считаются по связкам «работа — тег» и их датам. Раньше сид
+        клал сюда литералы, и тег обещал 42 использования при трёх
+        настоящих — та же декорация, что 8 420 подписчиков у автора.
         """
         added = updated = 0
         for tag in _corpus.TAGS:
             _, is_new = Tag.objects.update_or_create(
                 slug=tag.slug,
-                defaults={'name': tag.name, 'status': tag.status,
-                          'usage_count': tag.usage_count,
-                          'weekly_count': tag.weekly_count},
+                defaults={'name': tag.name, 'status': tag.status},
             )
             added += is_new
             updated += not is_new
@@ -189,9 +188,15 @@ class Command(BaseCommand):
                 },
             )
             story.tags.set([tags[slug] for slug in stub.tags if slug in tags])
+            # Связка «работа — тег» датируется последней правкой работы, а
+            # не сегодняшним днём. `auto_now_add` иначе проставил бы всем
+            # момент запуска сида, и витрина «Осы аптада» стала бы точной
+            # копией «Танымал тегтер» — того самого вырождения, ради
+            # отличия от которого её и завели (DEC-31, DEC-53).
             if stub.updated_days_ago is not None:
-                Story.objects.filter(pk=story.pk).update(
-                    updated_at=timezone.now() - timedelta(days=stub.updated_days_ago))
+                touched = timezone.now() - timedelta(days=stub.updated_days_ago)
+                Story.objects.filter(pk=story.pk).update(updated_at=touched)
+                StoryTag.objects.filter(story=story).update(created_at=touched)
             added += is_new
             updated += not is_new
         return added, updated

@@ -36,27 +36,24 @@ class Tag:
     slug: str
     name: str           # оригинал, отображается; в Ф14 — original input автора
     status: str         # 'pending' | 'accepted' | 'rejected'
-    usage_count: int    # денормализовано, для сортировки автокомплита/виджета
-    weekly_count: int = 0   # использований за последние 7 дней — «осы аптада»
 
-# usage_count — накопленное за всё время, weekly_count — срез недели. Две разные
-# витрины: первая показывает опоры портала, вторая — о чём пишут прямо сейчас
-# (DEC-31). У «сиқыр-академиясы» накоплено мало, а на неделе много — именно
-# такие всплески теги и должны ловить.
+# Счётчиков здесь нет: обе витрины считаются по связкам «работа — тег» и их
+# датам (DEC-53). Разойтись с тем, что лежит на работах, они больше не могут —
+# а раньше расходились: тег обещал 42 использования при трёх настоящих.
 TAGS = [
-    Tag('mektep',           'мектеп',           'accepted', 42, weekly_count=6),
-    Tag('dostyk',           'достық',           'accepted', 38, weekly_count=4),
-    Tag('sayahat',          'саяхат',           'accepted', 24, weekly_count=2),
-    Tag('jasospirim',       'жасөспірім',       'accepted', 56, weekly_count=9),
-    Tag('gashyqtyq',        'ғашықтық',         'accepted', 31, weekly_count=11),
-    Tag('mistika',          'мистика',          'accepted', 18, weekly_count=7),
-    Tag('syikyr-akademiya', 'сиқыр-академиясы', 'accepted', 12, weekly_count=13),
-    Tag('arman',            'арман',            'accepted', 27, weekly_count=3),
-    Tag('detektiv-jas',     'жас детектив',     'accepted',  9, weekly_count=5),
-    Tag('aua-ralighi',      'ауыл-қала',        'accepted', 14, weekly_count=1),
+    Tag('mektep',           'мектеп',           'accepted'),
+    Tag('dostyk',           'достық',           'accepted'),
+    Tag('sayahat',          'саяхат',           'accepted'),
+    Tag('jasospirim',       'жасөспірім',       'accepted'),
+    Tag('gashyqtyq',        'ғашықтық',         'accepted'),
+    Tag('mistika',          'мистика',          'accepted'),
+    Tag('syikyr-akademiya', 'сиқыр-академиясы', 'accepted'),
+    Tag('arman',            'арман',            'accepted'),
+    Tag('detektiv-jas',     'жас детектив',     'accepted'),
+    Tag('aua-ralighi',      'ауыл-қала',        'accepted'),
     # pending — для иллюстрации работы модерации (BR-TAG-03/07)
-    Tag('basqa-alem',       'басқа әлем',       'pending',   3, weekly_count=3),
-    Tag('experimental',     'эксперимент',      'pending',   1, weekly_count=1),
+    Tag('basqa-alem',       'басқа әлем',       'pending'),
+    Tag('experimental',     'эксперимент',      'pending'),
 ]
 
 # ───────────────────────── Пользователи / Авторы ─────────────────────────
