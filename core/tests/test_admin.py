@@ -43,31 +43,34 @@ def _story(author, **kwargs):
     return Story.objects.create(author=author, **fields)
 
 
-class ModerationChangesStatusAndTellsTheAuthor(TestCase):
-    """`Story.apply_moderation` — одна дверь на решение и уведомление."""
+class ADecisionReachesTheAuthor(TestCase):
+    """`Story.apply_moderation` — одна дверь на решение и уведомление
+    (BR-11). Порознь они бессмысленны: статус без уведомления оставляет
+    автора гадать, что случилось, а уведомление без статуса обещает
+    публикацию, которой не произошло."""
 
     def setUp(self):
         self.author = User.objects.get(username='aidana')
 
-    def test_approved_single_becomes_published(self):
-        story = _story(self.author, format='single')
-        story.apply_moderation('approved')
-        story.refresh_from_db()
-        self.assertEqual(story.status, 'Published')
+    def test_approval_depends_on_the_format(self):
+        """BR-10a: у сериала `Published` невалиден — он продолжается. Обе
+        его читательские метки это `OnProcess` и `Completed`, и литерал в
+        одобрении отнял бы у сериала ответ на «дописан ли он»."""
+        single = _story(self.author, format='single')
+        single.apply_moderation('approved')
+        single.refresh_from_db()
+        self.assertEqual(single.status, 'Published')
 
-    def test_approved_serial_does_not_become_published(self):
-        """BR-10a: у сериала `Published` невалиден — он продолжается.
+        serial = _story(self.author, slug='test-serial', format='serial')
+        note = serial.apply_moderation('approved')
+        serial.refresh_from_db()
+        self.assertEqual(serial.status, 'OnProcess')
+        self.assertEqual(note.outcome, 'approved')
+        self.assertEqual(note.text, '')
 
-        Литерал `'Published'` в одобрении означал бы, что после первой же
-        модерации сериал перестаёт отвечать на вопрос «дописан ли он»:
-        обе читательские метки — `OnProcess` и `Completed`.
-        """
-        story = _story(self.author, format='serial')
-        story.apply_moderation('approved')
-        story.refresh_from_db()
-        self.assertEqual(story.status, 'OnProcess')
-
-    def test_needs_work_returns_the_draft_with_a_reason(self):
+    def test_a_return_carries_its_reason_all_the_way(self):
+        """Подпись исхода берётся из реестра (BR-72b), а не собирается в
+        шаблоне."""
         story = _story(self.author)
         note = story.apply_moderation('needs_work', 'Диалогтар үзіліп қалған.')
         story.refresh_from_db()
@@ -77,48 +80,32 @@ class ModerationChangesStatusAndTellsTheAuthor(TestCase):
         self.assertEqual(note.outcome, 'needs_work')
         self.assertEqual(note.text, 'Диалогтар үзіліп қалған.')
         self.assertEqual(note.story, story)
+        self.assertEqual(note.outcome_label, 'Толықтыру қажет')
 
-    def test_rejected_without_a_reason_is_refused(self):
-        """BR-11: отказ без причины не сообщает автору ничего."""
+    def test_what_the_door_refuses(self):
+        """Отказ без причины не сообщает автору ничего (BR-11). Одобрить
+        чужой черновик значит опубликовать непоказанное: готовность
+        объявляет автор (FR-WRITE-09), модератор отвечает «да» или «нет»."""
         story = _story(self.author)
-        with self.assertRaises(ValueError):
-            story.apply_moderation('rejected', '   ')
+        for outcome, reason in (('rejected', '   '), ('maybe', 'себебі')):
+            with self.subTest(outcome=outcome):
+                with self.assertRaises(ValueError):
+                    story.apply_moderation(outcome, reason)
         story.refresh_from_db()
         self.assertEqual(story.status, 'OnModeration')
         self.assertFalse(Notification.objects.filter(story=story).exists())
 
-    def test_approval_needs_no_reason(self):
-        story = _story(self.author)
-        note = story.apply_moderation('approved')
-        self.assertEqual(note.outcome, 'approved')
-        self.assertEqual(note.text, '')
-
-    def test_only_what_the_author_submitted_is_decided(self):
-        """Одобрить чужой черновик значит опубликовать непоказанное.
-
-        Готовность объявляет автор (FR-WRITE-09) — модератор отвечает
-        «да» или «нет», а не решает за него, что работа готова.
-        """
-        draft = _story(self.author, status='NotPublished')
+        draft = _story(self.author, slug='test-draft', status='NotPublished')
         with self.assertRaises(ValueError):
             draft.apply_moderation('approved')
         draft.refresh_from_db()
         self.assertEqual(draft.status, 'NotPublished')
 
-    def test_unknown_outcome_is_refused(self):
-        story = _story(self.author)
-        with self.assertRaises(ValueError):
-            story.apply_moderation('maybe', 'себебі')
 
-    def test_the_notification_says_what_the_moderator_decided(self):
-        """Подпись — из реестра (BR-72b), а не собрана в шаблоне."""
-        story = _story(self.author)
-        note = story.apply_moderation('needs_work', 'Толықтыр.')
-        self.assertEqual(note.outcome_label, 'Толықтыру қажет')
-
-
-class ModerationThroughTheAdmin(TestCase):
-    """Тот же путь, каким им пользуются: список работ и действие над ним."""
+class TheModeratorWorksThroughTheAdmin(TestCase):
+    """Тот же путь, каким им пользуются: список работ и действие над ним.
+    Кастомного UI до V2 не будет (DEC-23), значит проверять надо не
+    «страница открылась», а то, что дело доводится до конца."""
 
     def setUp(self):
         self.moderator = User.objects.create_superuser(
@@ -135,27 +122,24 @@ class ModerationThroughTheAdmin(TestCase):
             **extra,
         }, follow=True)
 
-    def test_action_asks_for_a_reason_before_applying(self):
-        r = self._act('send_back')
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'Толықтыру қажет')
+    def test_a_negative_outcome_asks_for_a_reason_and_only_then_applies(self):
+        asked = self._act('send_back')
+        self.assertContains(asked, 'Толықтыру қажет')
         self.story.refresh_from_db()
         self.assertEqual(self.story.status, 'OnModeration')
 
-    def test_applying_moves_the_work_and_notifies(self):
+        empty = self._act('reject', apply='1', reason='  ')
+        self.assertContains(empty, 'Себепті жазу керек')
+        self.story.refresh_from_db()
+        self.assertEqual(self.story.status, 'OnModeration')
+        self.assertFalse(Notification.objects.filter(story=self.story).exists())
+
         self._act('send_back', apply='1', reason='Соңы жоқ.')
         self.story.refresh_from_db()
         self.assertEqual(self.story.status, 'NotPublished')
         note = Notification.objects.get(story=self.story)
         self.assertEqual(note.outcome, 'needs_work')
         self.assertEqual(note.text, 'Соңы жоқ.')
-
-    def test_empty_reason_does_not_apply(self):
-        r = self._act('reject', apply='1', reason='  ')
-        self.assertContains(r, 'Себепті жазу керек')
-        self.story.refresh_from_db()
-        self.assertEqual(self.story.status, 'OnModeration')
-        self.assertFalse(Notification.objects.filter(story=self.story).exists())
 
     def test_approval_goes_through_without_a_reason(self):
         self._act('approve', apply='1', reason='')
@@ -164,22 +148,18 @@ class ModerationThroughTheAdmin(TestCase):
         self.assertEqual(Notification.objects.get(story=self.story).outcome,
                          'approved')
 
-    def test_work_outside_the_queue_is_named_not_skipped_silently(self):
+    def test_a_work_outside_the_queue_is_named_not_skipped_silently(self):
         """Иначе модератор считает решёнными все, что выбрал."""
         self.story.status = 'NotPublished'
         self.story.save(update_fields=['status'])
-        r = self._act('approve')
-        self.assertContains(r, 'өткізілді')
+        self.assertContains(self._act('approve'), 'өткізілді')
         self.story.refresh_from_db()
         self.assertEqual(self.story.status, 'NotPublished')
 
-    def test_manual_status_change_warns_that_nobody_was_told(self):
+    def test_editing_the_field_by_hand_warns_that_nobody_was_told(self):
         """Правка поля — не модерация: уведомление пишет только решение.
-
-        Молча она означала бы, что работа ушла из очереди, а автор об
-        этом не узнал.
-        """
-        url = reverse('admin:core_story_change', args=[self.story.pk])
+        Молча она означала бы, что работа ушла из очереди, а автор об этом
+        не узнал."""
         form = {
             'slug': self.story.slug, 'title': self.story.title,
             'author': self.author.pk, 'annotation': '',
@@ -189,33 +169,16 @@ class ModerationThroughTheAdmin(TestCase):
             'status': 'Published', 'views': 0, 'recent_views': 0,
             'likes': 0, 'comments': 0,
             'chapter_set-TOTAL_FORMS': '0', 'chapter_set-INITIAL_FORMS': '0',
-            # StoryTagInline (Ф15): tags — M2M через `through`, вне
-            # fieldsets, редактируется только этим формсетом.
+            # StoryTagInline: `tags` — M2M через `through`, вне fieldsets.
             'storytag_set-TOTAL_FORMS': '0', 'storytag_set-INITIAL_FORMS': '0',
         }
-        r = self.client.post(url, form, follow=True)
+        response = self.client.post(
+            reverse('admin:core_story_change', args=[self.story.pk]),
+            form, follow=True)
         self.story.refresh_from_db()
         self.assertEqual(self.story.status, 'Published')
-        self.assertContains(r, 'автор хабарлама алмады')
+        self.assertContains(response, 'автор хабарлама алмады')
         self.assertFalse(Notification.objects.filter(story=self.story).exists())
-
-
-class NotificationsAreReadOnly(TestCase):
-    """Уведомление пишет событие, а не рука модератора (BR-72b)."""
-
-    def setUp(self):
-        self.client.force_login(
-            User.objects.create_superuser('moderator', password='x'))
-
-    def test_no_add_and_no_change(self):
-        note = Notification.objects.first()
-        self.assertEqual(
-            self.client.get(reverse('admin:core_notification_add')).status_code,
-            403)
-        r = self.client.get(
-            reverse('admin:core_notification_change', args=[note.pk]))
-        # Django отдаёт карточку в режиме просмотра, но без формы сохранения.
-        self.assertNotContains(r, 'name="_save"')
 
 
 MEDIA = tempfile.mkdtemp()
@@ -223,7 +186,8 @@ MEDIA = tempfile.mkdtemp()
 
 @override_settings(MEDIA_ROOT=MEDIA)
 class MediaUploadsTakeRasterOnly(TestCase):
-    """BR-46: файл из `/media/` открывается в origin сайта, SVG — документ."""
+    """BR-46: файл из `/media/` открывается в origin сайта, а SVG — это
+    документ, а не картинка."""
 
     @classmethod
     def tearDownClass(cls):
@@ -231,72 +195,64 @@ class MediaUploadsTakeRasterOnly(TestCase):
         super().tearDownClass()
 
     def _form(self, upload):
-        Form = modelform_factory(ContestAward, fields=('contest', 'slug',
-                                                       'title', 'image'))
-        contest = Contest.objects.first()
-        return Form({'contest': contest.pk, 'slug': 'bas-julde-test',
-                     'title': 'Бас жүлде'},
+        Form = modelform_factory(ContestAward,
+                                 fields=('contest', 'slug', 'title', 'image'))
+        return Form({'contest': Contest.objects.first().pk,
+                     'slug': 'bas-julde-test', 'title': 'Бас жүлде'},
                     {'image': upload})
 
-    def test_png_is_accepted_and_lands_under_its_contest(self):
-        form = self._form(SimpleUploadedFile('эмблема.png', b'\x89PNG demo',
-                                             content_type='image/png'))
-        self.assertTrue(form.is_valid(), form.errors)
-        award = form.save()
-        self.assertTrue(award.image.name.startswith(
-            f'awards/{award.contest.slug}/'))
+    def test_a_raster_lands_under_its_contest_and_an_svg_does_not_land(self):
+        png = self._form(SimpleUploadedFile('эмблема.png', b'\x89PNG demo',
+                                            content_type='image/png'))
+        self.assertTrue(png.is_valid(), png.errors)
+        award = png.save()
+        self.assertTrue(award.image.name.startswith(f'awards/{award.contest.slug}/'))
         self.assertTrue(award.image.name.endswith('.png'))
 
-    def test_svg_is_refused(self):
-        form = self._form(SimpleUploadedFile('эмблема.svg', b'<svg/>',
-                                             content_type='image/svg+xml'))
-        self.assertFalse(form.is_valid())
-        self.assertIn('SVG', str(form.errors))
+        svg = self._form(SimpleUploadedFile('эмблема.svg', b'<svg/>',
+                                            content_type='image/svg+xml'))
+        self.assertFalse(svg.is_valid())
+        self.assertIn('SVG', str(svg.errors))
 
 
-class EveryRegisteredPageOpens(TestCase):
-    """Смоук по админке: список и форма добавления у каждой модели.
-
-    Системные чеки ловят не всё: свойство без колонки в `list_filter`
-    проходит проверку и падает при открытии страницы. А открывают её
-    редко — модерация в MVP это и есть весь инструмент.
-    """
+class TheWholeToolOpens(TestCase):
+    """Смоук по админке. Системные чеки ловят не всё: свойство без колонки
+    в `list_filter` проходит проверку и падает при открытии страницы — а
+    открывают её редко, модерация в MVP это и есть весь инструмент."""
 
     def setUp(self):
         self.client.force_login(
             User.objects.create_superuser('moderator', password='x'))
 
-    def test_changelists_render(self):
+    def test_every_registered_model_has_a_list_and_a_form(self):
         for model in django_admin.site._registry:
             opts = model._meta
             with self.subTest(model=opts.model_name):
-                url = reverse(f'admin:{opts.app_label}_{opts.model_name}_changelist')
-                self.assertEqual(self.client.get(url).status_code, 200)
-
-    def test_add_forms_render(self):
-        for model in django_admin.site._registry:
-            opts = model._meta
-            with self.subTest(model=opts.model_name):
-                url = reverse(f'admin:{opts.app_label}_{opts.model_name}_add')
+                self.assertEqual(self.client.get(reverse(
+                    f'admin:{opts.app_label}_{opts.model_name}_changelist')
+                ).status_code, 200)
                 # 403 — тоже ответ: уведомление руками не заводят (BR-72b).
-                self.assertIn(self.client.get(url).status_code, (200, 403))
+                self.assertIn(self.client.get(reverse(
+                    f'admin:{opts.app_label}_{opts.model_name}_add')
+                ).status_code, (200, 403))
 
-    def test_moderation_queue_is_reachable_by_filter(self):
-        """Очередь модератора — это `?status=OnModeration` в списке работ."""
-        url = reverse('admin:core_story_changelist') + '?status=OnModeration'
-        r = self.client.get(url)
-        self.assertEqual(r.status_code, 200)
+    def test_the_moderation_queue_is_a_filter_on_the_story_list(self):
+        self.assertEqual(self.client.get(
+            reverse('admin:core_story_changelist') + '?status=OnModeration'
+        ).status_code, 200)
 
+    def test_a_notification_is_written_by_the_event_not_by_hand(self):
+        """BR-72b. Django отдаёт карточку в режиме просмотра, но без формы
+        сохранения."""
+        note = Notification.objects.first()
+        self.assertEqual(self.client.get(
+            reverse('admin:core_notification_add')).status_code, 403)
+        self.assertNotContains(self.client.get(
+            reverse('admin:core_notification_change', args=[note.pk])),
+            'name="_save"')
 
-class ChapterTextIsEditable(TestCase):
-    """Текст главы правится в админке: форм автора нет до Ф15."""
-
-    def setUp(self):
-        self.client.force_login(
-            User.objects.create_superuser('moderator', password='x'))
-
-    def test_chapter_change_form_has_the_body(self):
+    def test_chapter_text_is_editable_here(self):
         chapter = Chapter.objects.exclude(body='').first()
-        r = self.client.get(
-            reverse('admin:core_chapter_change', args=[chapter.pk]))
-        self.assertContains(r, 'name="body"')
+        self.assertContains(self.client.get(
+            reverse('admin:core_chapter_change', args=[chapter.pk])),
+            'name="body"')
