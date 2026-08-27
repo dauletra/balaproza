@@ -26,6 +26,7 @@ urlpatterns = [
     # STORY — произведение (чтение глав происходит inline через ?chapter=N)
     path('story/<slug:slug>/', views.story_detail, name='story_detail'),
     path('story/<slug:slug>/comment/', views.comment_create, name='comment_create'),
+    path('story/<slug:slug>/library/', views.library_toggle, name='library_toggle'),
     path('story/<slug:slug>/comment/<int:comment_id>/delete/',
         views.comment_delete, name='comment_delete'),
     path('story/<slug:slug>/comment/<int:comment_id>/like/',

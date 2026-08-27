@@ -91,6 +91,9 @@ def story_detail(request, slug):
     # знакомство с работой похожим на возвращение к ней.
     if current is not None and request.user.is_authenticated:
         data.record_reading_progress(request.user, story, chapter_number, chapters)
+        # BR-61 / FR-LIB-02: полку двигает само чтение, а не только кнопка.
+        data.move_to_shelf(request.user, story,
+                           finished=chapter_number == len(chapters))
 
     # Тизер с разворотом — только для гл.1 при «голом» URL без ?chapter (первое
     # знакомство с произведением). Возвращающийся юзер или явный выбор главы → полный текст.
@@ -197,6 +200,26 @@ def comment_like(request, slug, comment_id):
     if request.method == 'POST' and comment is not None and username:
         data.toggle_comment_like(comment, request.user)
         return _back_to_story(slug, comment.chapter_number, anchor=f'comment-{comment.pk}')
+    return _back_to_story(slug, _chapter_from_post(request))
+
+
+# ───────────────────── Библиотека (BR-60/61, FR-LIB-02) ──────────────────
+
+def library_toggle(request, slug):
+    """Кнопка «Сақтау»: положить работу в библиотеку или снять с полки.
+
+    До этого кнопка меняла только своё состояние в браузере: тост
+    обещал «Кітапханаға сақталды», а на полке не появлялось ничего, и
+    после перезагрузки страницы обещание исчезало вместе с ним.
+
+    Гостю кнопка не рендерится — она сразу ведёт на вход, — поэтому здесь
+    просто возврат без записи, как у остальных действий страницы.
+    """
+    story = data.story_by_slug(slug)
+    if request.method == 'POST' and story is not None and request.user.is_authenticated:
+        saved = data.toggle_library_entry(request.user, story)
+        messages.success(request, 'Кітапханаға сақталды' if saved
+                         else 'Кітапханадан алынды')
     return _back_to_story(slug, _chapter_from_post(request))
 
 

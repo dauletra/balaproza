@@ -11,7 +11,7 @@ from django.db.models import OuterRef, Subquery, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from ..models import ReadingProgress
+from ..models import LibraryEntry, ReadingProgress
 from .catalog import CHARS_PER_MINUTE, chapter_count_subquery
 
 
@@ -74,6 +74,53 @@ def record_reading_progress(user, story, chapter_number: int, chapters) -> None:
             ReadingProgress.objects.create(user=user, story=story, **values)
     except IntegrityError:
         ReadingProgress.objects.filter(user=user, story=story).update(**values)
+
+
+def move_to_shelf(user, story, *, finished: bool) -> None:
+    """Автопереход полки по факту чтения (BR-61, FR-LIB-02).
+
+    Правило записано в ТЗ и здесь только исполняется: начало чтения кладёт
+    работу на «оқу үстінде», прочтение всех глав — на «оқылған». Полки не
+    пересекаются, поэтому это перевод, а не добавление второй записи.
+
+    Запись **создаётся**, если её не было: по FR-LIB-02 на полку попадают
+    по факту чтения, а не только по кнопке «Сақтау». До этого вкладка «Оқу
+    үстіндегі» наполнялась одним сидом и у настоящего читателя оставалась
+    пустой, сколько бы он ни читал.
+
+    Повторное чтение дочитанной работы возвращает её на «оқу үстінде» —
+    строка `done` предлагает «Қайта оқу», и после нажатия она обязана
+    описывать то, что происходит. Дойдя до конца, работа снова станет
+    `done`; у одночастной это один и тот же заход.
+
+    Сначала UPDATE, вставка — только на ноль задетых строк: у читателя,
+    который уже держит работу на полке, это один запрос.
+    """
+    kind = 'done' if finished else 'reading'
+    if LibraryEntry.objects.filter(user=user, story=story).update(kind=kind):
+        return
+    try:
+        with transaction.atomic():
+            LibraryEntry.objects.create(user=user, story=story, kind=kind)
+    except IntegrityError:
+        LibraryEntry.objects.filter(user=user, story=story).update(kind=kind)
+
+
+def toggle_library_entry(user, story) -> bool:
+    """Кнопка «Сақтау» — работа в библиотеке или нет. Возвращает новое
+    состояние.
+
+    Кнопка отвечает на вопрос присутствия, а не выбирает полку: она так и
+    подписана — «Сақтау» / «Сақталды», и снимает работу с любой полки, на
+    какой бы та ни лежала. Ручное сохранение кладёт на «сақталған»
+    (BR-61); дальше её двигает само чтение.
+    """
+    entry = LibraryEntry.objects.filter(user=user, story=story).first()
+    if entry is not None:
+        entry.delete()
+        return False
+    LibraryEntry.objects.create(user=user, story=story, kind='saved')
+    return True
 
 
 def reading_progress_of(username: str):

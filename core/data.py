@@ -111,7 +111,12 @@ from .queries.author import (
 )
 
 # ── Произведение: главы, отклик, комментарии, подборки ───────────────────
-from .queries.library import reading_progress_of, record_reading_progress
+from .queries.library import (
+    move_to_shelf,
+    reading_progress_of,
+    record_reading_progress,
+    toggle_library_entry,
+)
 from .queries.story import (
     add_comment,
     all_collections,

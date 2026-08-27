@@ -100,20 +100,29 @@
 
             <div class="flex items-center gap-2.5">
                 {% comment %}
-                    «Сақтау» была мёртвой иконкой без подписи: ни состояния, ни
-                    отклика, ни гейта для гостя. Это главный вход в «Кітапхана»,
-                    поэтому теперь она с текстом и ведёт себя как chapter_like —
-                    гостя отправляет на логин с ?next=.
+                    Главный вход в «Кітапхана». Настоящий POST, а не
+                    Alpine-состояние: до этого кнопка меняла только свой вид,
+                    тост обещал «Кітапханаға сақталды», а на полке не
+                    появлялось ничего — обещание жило до перезагрузки.
+                    Гостя отправляет на вход с ?next=, как chapter_like.
                 {% endcomment %}
-                <button type="button" x-data="{ saved: {{ in_library|yesno:'true,false' }} }"
-                        @click="{% if signed_in %}saved = !saved; $dispatch('toast', { kind: saved ? 'success' : 'info', text: saved ? 'Кітапханаға сақталды' : 'Кітапханадан алынды' }){% else %}window.location = '{% url 'core:login' %}?next=' + encodeURIComponent(window.location.pathname){% endif %}"
-                        :aria-pressed="saved"
-                        :class="saved ? 'border-brand bg-brand/5 text-brand-dark' : 'border-slate-300 bg-white text-slate-700 hover:border-brand hover:text-brand'"
-                        class="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md border px-4 font-sans text-sm font-semibold sm:flex-none">
-                    <template x-if="saved">{% include "components/icon.html" with name="bookmark-filled" size=18 only %}</template>
-                    <template x-if="!saved">{% include "components/icon.html" with name="bookmark" size=18 only %}</template>
-                    <span x-text="saved ? 'Сақталды' : 'Сақтау'">Сақтау</span>
-                </button>
+                {% if signed_in %}
+                    <form method="post" action="{% url 'core:library_toggle' slug=story.slug %}" class="flex-1 sm:flex-none">
+                        {% csrf_token %}
+                        {% if chapter_number %}<input type="hidden" name="chapter" value="{{ chapter_number }}">{% endif %}
+                        <button type="submit" aria-pressed="{{ in_library|yesno:'true,false' }}"
+                                class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border px-4 font-sans text-sm font-semibold {% if in_library %}border-brand bg-brand/5 text-brand-dark{% else %}border-slate-300 bg-white text-slate-700 hover:border-brand hover:text-brand{% endif %}">
+                            {% if in_library %}{% include "components/icon.html" with name="bookmark-filled" size=18 only %}{% else %}{% include "components/icon.html" with name="bookmark" size=18 only %}{% endif %}
+                            <span>{% if in_library %}Сақталды{% else %}Сақтау{% endif %}</span>
+                        </button>
+                    </form>
+                {% else %}
+                    <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}"
+                       class="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:border-brand hover:text-brand sm:flex-none">
+                        {% include "components/icon.html" with name="bookmark" size=18 only %}
+                        <span>Сақтау</span>
+                    </a>
+                {% endif %}
 
                 {% include "components/share_button.html" with url=request.build_absolute_uri title=story.title wrap_cls="flex-1 sm:flex-none" btn_cls="w-full justify-center sm:w-auto" %}
             </div>

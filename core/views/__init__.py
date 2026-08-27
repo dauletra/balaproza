@@ -68,6 +68,7 @@ from .story import (
     comment_create,
     comment_delete,
     comment_like,
+    library_toggle,
     poll_vote,
     story_detail,
 )

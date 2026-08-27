@@ -16,6 +16,7 @@ from django.urls import reverse
 from core import data
 from core.models import (
     ChapterReactionVote,
+    LibraryEntry,
     PollVote,
     ReadingProgress,
     Story,
@@ -287,25 +288,127 @@ class StoryDetailAnnotation(TestCase):
 
 
 class StoryDetailSaveButton(TestCase):
-    """«Сақтау» — живая кнопка: состояние из библиотеки, гость идёт на логин."""
+    """«Сақтау» кладёт работу на полку, а не только перекрашивает себя.
+
+    Кнопка три месяца была Alpine-состоянием: тост обещал «Кітапханаға
+    сақталды», записи не появлялось, и обещание жило до перезагрузки.
+    """
 
     IN_LIBRARY = 'dalney-berega'      # у Айданы kind='reading'
     NOT_IN_LIBRARY = 'zhuldyz-kartasy'
 
+    def _url(self, slug):
+        return reverse('core:story_detail', kwargs={'slug': slug})
+
+    def _toggle(self, slug):
+        return self.client.post(reverse('core:library_toggle', kwargs={'slug': slug}))
+
+    def _entry(self, slug, username='aidana'):
+        return LibraryEntry.objects.filter(user__username=username,
+                                           story__slug=slug).first()
+
     def test_guest_click_leads_to_login(self):
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': self.IN_LIBRARY}))
+        r = self.client.get(self._url(self.IN_LIBRARY))
         self.assertContains(r, 'Сақтау')
         self.assertContains(r, reverse('core:login'))
 
     def test_saved_state_reflects_library(self):
         login_as(self.client)
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': self.IN_LIBRARY}))
-        self.assertContains(r, 'saved: true')
+        r = self.client.get(self._url(self.IN_LIBRARY))
+        self.assertContains(r, 'Сақталды')
+        self.assertContains(r, reverse('core:library_toggle', kwargs={'slug': self.IN_LIBRARY}))
 
     def test_unsaved_state_for_story_outside_library(self):
         login_as(self.client)
-        r = self.client.get(reverse('core:story_detail', kwargs={'slug': self.NOT_IN_LIBRARY}))
-        self.assertContains(r, 'saved: false')
+        r = self.client.get(self._url(self.NOT_IN_LIBRARY))
+        self.assertContains(r, 'Сақтау')
+        self.assertNotContains(r, 'Сақталды')
+
+    def test_saving_puts_it_on_the_saved_shelf(self):
+        login_as(self.client)
+        self._toggle(self.NOT_IN_LIBRARY)
+        entry = self._entry(self.NOT_IN_LIBRARY)
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.kind, 'saved')
+
+    def test_pressing_again_takes_it_off_any_shelf(self):
+        """Кнопка отвечает на вопрос присутствия, а не выбирает полку:
+        снимает и то, что лежало на «оқу үстінде»."""
+        login_as(self.client)
+        self.assertEqual(self._entry(self.IN_LIBRARY).kind, 'reading')
+        self._toggle(self.IN_LIBRARY)
+        self.assertIsNone(self._entry(self.IN_LIBRARY))
+
+    def test_toggle_redirects_back_to_the_story(self):
+        login_as(self.client)
+        r = self._toggle(self.NOT_IN_LIBRARY)
+        self.assertRedirects(r, self._url(self.NOT_IN_LIBRARY))
+
+    def test_a_guest_cannot_write_to_anyones_shelf(self):
+        before = LibraryEntry.objects.count()
+        self._toggle(self.NOT_IN_LIBRARY)
+        self.assertEqual(LibraryEntry.objects.count(), before)
+
+    def test_get_changes_nothing(self):
+        login_as(self.client)
+        before = LibraryEntry.objects.count()
+        self.client.get(reverse('core:library_toggle', kwargs={'slug': self.NOT_IN_LIBRARY}))
+        self.assertEqual(LibraryEntry.objects.count(), before)
+
+
+class ReadingMovesTheWorkBetweenShelves(TestCase):
+    """Автопереходы полки (BR-61, FR-LIB-02).
+
+    Вкладка «Оқу үстіндегі» наполнялась одним сидом: у настоящего читателя
+    она оставалась пустой, сколько бы он ни читал.
+    """
+
+    SLUG = STORY_SLUG
+    READER = 'lonely_reader'
+
+    def setUp(self):
+        login_as_newcomer(self.client, self.READER)
+        self.last = len(data.chapters_of(self.SLUG))
+
+    def _open(self, chapter):
+        self.client.get(reverse('core:story_detail',
+                                kwargs={'slug': self.SLUG}) + f'?chapter={chapter}')
+
+    def _kind(self):
+        entry = LibraryEntry.objects.filter(user__username=self.READER,
+                                            story__slug=self.SLUG).first()
+        return entry.kind if entry else None
+
+    def test_starting_to_read_puts_it_on_the_reading_shelf(self):
+        self.assertIsNone(self._kind())
+        self._open(2)
+        self.assertEqual(self._kind(), 'reading')
+
+    def test_reaching_the_last_chapter_marks_it_read(self):
+        self._open(2)
+        self._open(self.last)
+        self.assertEqual(self._kind(), 'done')
+
+    def test_rereading_a_finished_work_puts_it_back(self):
+        """Строка `done` предлагает «Қайта оқу», и после нажатия полка
+        обязана описывать то, что происходит."""
+        self._open(self.last)
+        self.assertEqual(self._kind(), 'done')
+        self._open(1)
+        self.assertEqual(self._kind(), 'reading')
+
+    def test_reading_never_leaves_two_entries(self):
+        for chapter in (1, 3, self.last, 2):
+            self._open(chapter)
+        self.assertEqual(
+            LibraryEntry.objects.filter(user__username=self.READER,
+                                        story__slug=self.SLUG).count(), 1)
+
+    def test_a_guest_leaves_no_trace(self):
+        self.client.logout()
+        before = LibraryEntry.objects.count()
+        self._open(3)
+        self.assertEqual(LibraryEntry.objects.count(), before)
 
 
 class StoryDetailReadCta(TestCase):
