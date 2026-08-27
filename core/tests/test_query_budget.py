@@ -179,6 +179,24 @@ class PersonalPagesStayWithinTheirQueryBudget(TestCase):
             self.client.get(reverse('core:profile_other',
                                     kwargs={'username': 'aidana'}))
 
+    def test_story_page_signed_in(self):
+        """Вошедший платит за две вещи, которых у гостя нет: «сохранено ли
+        в библиотеке», «подписан ли я на автора» — и за закладку, которую
+        оставляет сам заход (`update_or_create` — выборка и запись).
+
+        Сессия у него уже есть, поэтому пяти запросов первого захода
+        гостя здесь нет: счётчик оқылым обходится одним UPDATE.
+
+        Тридцать четыре — первое открытие работы. Возвращение дешевле на
+        два: закладка ставится сначала UPDATE'ом и только на ноль задетых
+        строк переходит к вставке (`record_reading_progress`), а вставка
+        тянет за собой транзакцию.
+        """
+        login_as(self.client, 'bekzhan_t')
+        with self.assertNumQueries(34):
+            self.client.get(reverse('core:story_detail',
+                                    kwargs={'slug': 'dalney-berega'}))
+
     def test_profile_people(self):
         """Подписчики и подписки: автор, открытый список и число во втором
         сегменте.

@@ -567,7 +567,7 @@ COMMENTS_BY_STORY: dict = {
             likes=12, liked=True,
             chapter_number=1,
         ),
-        # 4) Очень короткий — на 4-ю главу (где SAMPLE_PROGRESS)
+        # 4) Очень короткий — на 4-ю главу, где стоит закладка Айданы
         StoryComment(
             "dina_books", timedelta(days=5),
             "Бұл бөлім — шедевр.",
@@ -623,23 +623,6 @@ COMMENTS_BY_STORY: dict = {
 }
 
 # ───────────────────────── Прогресс чтения (для returning hero) ────────────
-
-@dataclass(frozen=True)
-class ReadingProgress:
-    story_slug: str
-    current_chapter: int        # сейчас на этой главе
-    quote: str                  # последний абзац, на котором остановился
-    minutes_left: int           # приблизительно
-    last_read_days: int         # «N күн бұрын»
-
-
-SAMPLE_PROGRESS = ReadingProgress(
-    story_slug="dalney-berega",
-    current_chapter=4,
-    quote="«…қалай ойлайсыз, бұл саяхатымыздың соңына жеттік пе?» — деді Сандр, біраз үнсіз отырып.",
-    minutes_left=18,
-    last_read_days=2,
-)
 
 # ───────────────────────── Книга недели (FR-HOME-03) ──────────────────────
 
@@ -1196,20 +1179,27 @@ class LibraryEntry:
     """Запись в библиотеке пользователя. Тип задаётся `kind`.
 
     - 'saved'   — Сақталған (отложил «на потом»)
-    - 'reading' — Оқу үстіндегі (читает сейчас); progress_chapter — текущая глава
+    - 'reading' — Оқу үстіндегі (читает сейчас)
     - 'done'    — Оқылғаны (прочитал)
+
+    У 'reading' сид заводит ещё и закладку (`ReadingProgress`): глава и
+    цитата отсюда, оставшееся время считается по главам. Отдельного
+    литерала прогресса больше нет: два источника одного факта в корпусе
+    уже разошлись (DEC-52).
     """
     story_slug: str
     kind: str                       # 'saved' | 'reading' | 'done'
     added_ago: timedelta            # когда положил на полку; подпись выводится
-    progress_chapter: int = 1       # имеет смысл только для 'reading'
+    progress_chapter: int = 1       # глава закладки; имеет смысл только для 'reading'
+    quote: str = ''                 # последний абзац, на котором остановился
 
 
 # Библиотека Айданы. Используется PROF/LIB.
 LIBRARY_BY_USER: dict = {
     "aidana": [
         # ── Оқу үстіндегі ──
-        LibraryEntry("dalney-berega",  "reading", timedelta(days=2), progress_chapter=4),
+        LibraryEntry("dalney-berega",  "reading", timedelta(days=2), progress_chapter=4,
+                      quote="«…қалай ойлайсыз, бұл саяхатымыздың соңына жеттік пе?» — деді Сандр, біраз үнсіз отырып."),
         LibraryEntry("kronchessii",    "reading", timedelta(days=7), progress_chapter=2),
         # ── Сақталған ──
         LibraryEntry("temniy-lord",    "saved",   timedelta(0)),

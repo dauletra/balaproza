@@ -10,11 +10,18 @@
  - прогресс чтения отображается только если slug совпадает с SAMPLE_PROGRESS.
 """
 
-from core.tests.base import TestCase, login_as
+from core.tests.base import TestCase, login_as, login_as_newcomer
 from django.urls import reverse
 
 from core import data
-from core.models import ChapterReactionVote, PollVote, Story, StoryComment
+from core.models import (
+    ChapterReactionVote,
+    PollVote,
+    ReadingProgress,
+    Story,
+    StoryComment,
+)
+from django.utils import timezone
 
 
 STORY_SLUG = 'dalney-berega'   # есть в STORIES_BY_SLUG и в CHAPTERS_BY_STORY
@@ -1167,3 +1174,71 @@ class ReadingCountsAsAView(TestCase):
         r = self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'no-such-story'}))
         self.assertEqual(r.status_code, 200)
+
+
+class ReadingRemembersWhereYouStopped(TestCase):
+    """Закладка двигается по мере чтения (FR-HOME-02).
+
+    `ReadingProgress` до этого создавал только сид: «Оқуды жалғастыру» на
+    главной всегда указывало в одно и то же место, сколько бы читатель ни
+    читал. Закладка — вещь личная, поэтому у гостя её нет вовсе.
+    """
+
+    SLUG = STORY_SLUG
+    READER = 'lonely_reader'
+
+    def setUp(self):
+        login_as_newcomer(self.client, self.READER)
+
+    def _url(self, chapter=None):
+        url = reverse('core:story_detail', kwargs={'slug': self.SLUG})
+        return f'{url}?chapter={chapter}' if chapter else url
+
+    def _progress(self):
+        return ReadingProgress.objects.filter(
+            user__username=self.READER, story__slug=self.SLUG).first()
+
+    def test_opening_a_chapter_leaves_a_bookmark(self):
+        self.assertIsNone(self._progress())
+        self.client.get(self._url(5))
+        progress = self._progress()
+        self.assertIsNotNone(progress)
+        self.assertEqual(progress.current_chapter, 5)
+        self.assertEqual(progress.last_read_on, timezone.localdate())
+
+    def test_the_bookmark_moves_and_does_not_multiply(self):
+        for chapter in (2, 5, 9):
+            self.client.get(self._url(chapter))
+        self.assertEqual(self._progress().current_chapter, 9)
+        self.assertEqual(
+            ReadingProgress.objects.filter(user__username=self.READER).count(), 1)
+
+    def test_time_left_counts_the_chapters_still_ahead(self):
+        chapters = data.chapters_of(self.SLUG)
+        self.client.get(self._url(3))
+        expected = sum(c.char_count for c in chapters if c.number > 3)
+        self.assertEqual(self._progress().minutes_left, -(-expected // 900))
+
+    def test_the_last_chapter_leaves_nothing_ahead(self):
+        self.client.get(self._url(len(data.chapters_of(self.SLUG))))
+        self.assertEqual(self._progress().minutes_left, 0)
+
+    def test_the_first_visit_is_not_a_return(self):
+        """Закладка пишется после резолва главы, а не до него: иначе первое
+        знакомство с работой выглядело бы возвращением к ней, и тизер
+        первой главы не показывался бы ни разу."""
+        r = self.client.get(self._url())
+        self.assertContains(r, 'Жалғастыру')
+        self.assertFalse(r.context['has_progress'])
+
+    def test_the_next_visit_opens_where_it_stopped(self):
+        self.client.get(self._url(6))
+        r = self.client.get(self._url())
+        self.assertEqual(r.context['chapter_number'], 6)
+        self.assertTrue(r.context['has_progress'])
+
+    def test_a_guest_gets_no_bookmark(self):
+        self.client.logout()
+        self.client.get(self._url(4))
+        self.assertFalse(ReadingProgress.objects.filter(story__slug=self.SLUG,
+                                                        user__username=self.READER).exists())

@@ -59,6 +59,8 @@ from core.models import (
     User,
 )
 
+from core.queries.catalog import CHARS_PER_MINUTE
+
 from . import _corpus
 
 
@@ -384,32 +386,46 @@ class Command(BaseCommand):
         дату: подпись обязана выводиться, иначе она устареет к завтрашнему
         дню. Обращение проверяет само себя — если разобранная дата не даёт
         ту же подпись, сид падает, а не молча меняет текст на странице.
+
+        Закладка заводится у каждой работы на полке «оқу үстінде» и
+        только у них (DEC-52): полка и прогресс — один факт, и держать
+        его двумя литералами значит однажды их разъединить. В корпусе это
+        уже случилось: `kronchessii` лежал на полке со второй главой, а
+        записи о прогрессе у него не было.
+
+        Оставшееся время не литерал, а сумма глав после текущей —
+        то же правило, по которому его считает `record_reading_progress`.
         """
         added = updated = 0
         for username, entries in _corpus.LIBRARY_BY_USER.items():
             user = User.objects.get(username=username)
             for stub in entries:
+                story = Story.objects.get(slug=stub.story_slug)
                 _, is_new = LibraryEntry.objects.update_or_create(
-                    user=user, story=Story.objects.get(slug=stub.story_slug),
+                    user=user, story=story,
                     defaults={
                         'kind': stub.kind,
-                        'progress_chapter': stub.progress_chapter,
                         'added_on': timezone.localdate() - stub.added_ago,
                     },
                 )
                 added += is_new
                 updated += not is_new
 
-        progress = _corpus.SAMPLE_PROGRESS
-        ReadingProgress.objects.update_or_create(
-            user=User.objects.get(username='aidana'),
-            story=Story.objects.get(slug=progress.story_slug),
-            defaults={'current_chapter': progress.current_chapter,
-                      'quote': progress.quote,
-                      'minutes_left': progress.minutes_left,
-                      'last_read_on': timezone.localdate()
-                      - timedelta(days=progress.last_read_days)},
-        )
+                if stub.kind != 'reading':
+                    ReadingProgress.objects.filter(user=user, story=story).delete()
+                    continue
+                remaining = sum(
+                    c.char_count for c in story.chapter_set.all()
+                    if c.number > stub.progress_chapter)
+                ReadingProgress.objects.update_or_create(
+                    user=user, story=story,
+                    defaults={
+                        'current_chapter': stub.progress_chapter,
+                        'quote': stub.quote,
+                        'minutes_left': (remaining + CHARS_PER_MINUTE - 1) // CHARS_PER_MINUTE,
+                        'last_read_on': timezone.localdate() - stub.added_ago,
+                    },
+                )
         return added, updated
 
     def _seed_comments(self):

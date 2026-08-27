@@ -1390,6 +1390,11 @@ class LibraryEntry(models.Model):
 
     Давность хранится датой, подпись выводится: «3 күн бұрын» в колонке
     устаревало бы каждые сутки — та же ошибка, что с `days_left` (DEC-45).
+
+    Номера главы здесь нет (DEC-52): где читатель остановился, знает
+    `ReadingProgress`, и вторая колонка с тем же смыслом уже разошлась с
+    первой в самом демо-корпусе. Полка получает её аннотацией
+    `progress_chapter` (`queries/library.progress_chapter_subquery`).
     """
 
     KIND_CHOICES = [(k, k) for k in LIBRARY_KINDS]
@@ -1402,8 +1407,6 @@ class LibraryEntry(models.Model):
                               related_name='library_entries')
     kind = models.CharField('түрі', max_length=16, choices=KIND_CHOICES)
     added_on = models.DateField('қосылған күні', default=timezone.localdate)
-    # Имеет смысл только у «оқу үстінде».
-    progress_chapter = models.PositiveSmallIntegerField('бөлім', default=1)
 
     class Meta:
         ordering = ('-added_on', 'pk')

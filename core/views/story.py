@@ -65,7 +65,7 @@ def story_detail(request, slug):
         _count_view(request, story)
 
     # Резолв текущей главы из ?chapter=N. Невалидное/отсутствующее значение:
-    #  - авторизованный с прогрессом по этому slug → SAMPLE_PROGRESS.current_chapter
+    #  - авторизованный с прогрессом по этому slug → его глава
     #  - иначе → 1
     # Если глав нет вовсе — chapter_number=None, current=None (no-op в шаблоне).
     explicit_chapter = request.GET.get('chapter')
@@ -84,6 +84,13 @@ def story_detail(request, slug):
     else:
         chapter_number = None
         current = None
+
+    # Запоминаем место **после** резолва: `has_progress_here` выше отвечает
+    # на «была ли закладка до этого захода», и от неё зависят и тизер, и
+    # подпись главной кнопки. Записанный раньше прогресс сделал бы первое
+    # знакомство с работой похожим на возвращение к ней.
+    if current is not None and request.user.is_authenticated:
+        data.record_reading_progress(request.user, story, chapter_number, chapters)
 
     # Тизер с разворотом — только для гл.1 при «голом» URL без ?chapter (первое
     # знакомство с произведением). Возвращающийся юзер или явный выбор главы → полный текст.

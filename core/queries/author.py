@@ -276,10 +276,15 @@ def library_of(username: str, kind: str = '') -> list:
     """
     if not username:
         return []
+    from .library import progress_chapter_subquery
+
     entries = (LibraryEntry.objects.filter(user__username=username)
                .select_related('story', 'story__author',
                                'story__primary_genre')
-               .annotate(story_chapters=chapter_count_subquery('story')))
+               .annotate(story_chapters=chapter_count_subquery('story'),
+                         # На какой главе читатель — из записи о прогрессе,
+                         # а не своей колонкой (DEC-52).
+                         progress_chapter=progress_chapter_subquery()))
     if kind in LIBRARY_KINDS:
         entries = entries.filter(kind=kind)
     rows = list(entries)
