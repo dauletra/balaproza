@@ -48,6 +48,7 @@ from .domain.story import (
     status_after_moderation,
 )
 from .domain.tags import TAG_STATUSES
+from .managers import ContestQuerySet, StoryQuerySet
 
 
 # Что принимаем в `media/` (BR-46). Растр и только растр: файл из `/media/`
@@ -398,6 +399,11 @@ class Story(models.Model):
     STATUS_CHOICES = [(s, s) for s in STORY_STATUSES]
     FORMAT_CHOICES = [(f, f) for f in STORY_FORMATS]
 
+    # Выдача живёт в `managers.StoryQuerySet`: публичность, состав карточки,
+    # объём чтения и оси каталога комбинируются цепочкой, а не собираются
+    # приватной функцией одного модуля.
+    objects = StoryQuerySet.as_manager()
+
     slug = models.SlugField('slug', max_length=64, unique=True)
     title = models.CharField('атауы', max_length=120)
     author = models.ForeignKey('core.User', verbose_name='авторы',
@@ -516,7 +522,7 @@ class Story(models.Model):
         портал больше не даёт.
 
         Выдача подставляет ответ аннотацией `chapter_count`
-        (`queries/catalog.chapter_count_subquery`); одиночный объект вне
+        (`managers.chapter_count_subquery`); одиночный объект вне
         такой выдачи честно спрашивает базу. Молча неверного ответа здесь
         не бывает — бывает лишний запрос, и его ловит `test_query_budget`.
         """
@@ -827,6 +833,8 @@ class Contest(models.Model):
     `conditions`), потому что шаблон перебирает их напрямую, а менеджер
     связи в шаблоне не перебирается.
     """
+
+    objects = ContestQuerySet.as_manager()
 
     slug = models.SlugField('slug', max_length=64, unique=True)
     name = models.CharField('атауы', max_length=120)

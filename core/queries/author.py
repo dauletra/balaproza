@@ -18,8 +18,9 @@ from django.db.models import F
 from ..domain.catalog import PUBLIC_STATUSES
 from ..domain.library import LIBRARY_KINDS
 from ..domain.story import PUBLISH_CHECKLIST
+from ..managers import chapter_count_subquery
 from ..models import LibraryEntry, Notification, Story, User
-from .catalog import all_stories, chapter_count_subquery
+from .catalog import all_stories
 
 
 class AuthorFacts:

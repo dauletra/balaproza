@@ -13,7 +13,7 @@
 конкурса до всякого жюри.
 """
 
-from django.db.models import Count, prefetch_related_objects
+from django.db.models import prefetch_related_objects
 from django.utils import timezone
 
 from ..domain.catalog import PUBLIC_STATUSES
@@ -32,39 +32,12 @@ from .author import author_facts
 _OPEN_ORDER = ('accepting', 'upcoming', 'judging')
 
 
-def _counted(qs):
-    """Число заявок аннотацией — его подхватывает `Contest.submissions`.
-
-    Без неё каждая карточка списка спрашивала своё `COUNT`: десять
-    запросов на десять конкурсов, и растут они вместе с разделом.
-    """
-    return qs.annotate(submission_count=Count('submission_set'))
-
-
-def _list_base():
-    """Конкурс для списка карточек.
-
-    Номинации, этапы, жюри и условия карточка не показывает — она
-    называет фазу, приз и победителей. Тянуть состав списком значит
-    платить четыре запроса за то, чего на экране нет; победители нужны,
-    поэтому присуждения остаются.
-    """
-    return _counted(Contest.objects.prefetch_related('grant_set__story'))
-
-
-def _base():
-    """Конкурс со всем составом — для его собственной страницы."""
-    return _counted(Contest.objects.prefetch_related(
-        'award_set', 'stage_set', 'jury_set', 'condition_set',
-        'grant_set__award', 'grant_set__story__author'))
-
-
-def all_contests() -> list:
-    return list(_list_base())
+def all_contests():
+    return Contest.objects.for_card()
 
 
 def contest_by_slug(slug: str):
-    return _base().filter(slug=slug).first()
+    return Contest.objects.full().filter(slug=slug).first()
 
 
 def contest_participants(contest) -> list:
@@ -74,7 +47,7 @@ def contest_participants(contest) -> list:
     (тот же приём, что в `contest_history`), поэтому фильтр по
     status='accepted' уже покрывает весь `PUBLIC_CONTEST_RESULTS`.
 
-    Принимает конкурс, полученный через `contest_by_slug` (`_base()`):
+    Принимает конкурс, полученный через `contest_by_slug` (полный состав):
     иначе `contest.grants` тянет присуждения отдельным запросом на каждый
     вызов.
     """
@@ -94,26 +67,22 @@ def contest_participants(contest) -> list:
     return out
 
 
-# Фазы, выраженные для базы. Тот же календарь, что у `Contest.phase`, и
-# расходиться им нельзя: свойство отвечает на странице, эти условия — в
-# выдаче, и разное «идёт ли приём» в двух местах читатель увидит сразу.
-def _accepting_q():
-    today = timezone.localdate()
-    return {'opens_on__lte': today, 'closes_on__gte': today}
-
-
 def open_contests() -> list:
-    """Незавершённые — в порядке того, что с ними можно сделать."""
-    return sorted(_list_base().filter(results_on__gt=timezone.localdate()),
+    """Незавершённые — в порядке того, что с ними можно сделать.
+
+    Список, а не queryset: порядок здесь не выражается `ORDER BY` — он задан
+    последовательностью фаз, а фаза выводится из трёх дат (DEC-45).
+    """
+    return sorted(Contest.objects.for_card().unfinished(),
                   key=lambda c: _OPEN_ORDER.index(c.phase))
 
 
-def accepting_contests() -> list:
-    return list(_list_base().filter(**_accepting_q()))
+def accepting_contests():
+    return Contest.objects.for_card().accepting()
 
 
-def finished_contests() -> list:
-    return list(_list_base().filter(results_on__lte=timezone.localdate()))
+def finished_contests():
+    return Contest.objects.for_card().finished()
 
 
 def home_contests(limit: int = 4) -> list:
@@ -123,7 +92,7 @@ def home_contests(limit: int = 4) -> list:
     подать/что уже судят), хвост добирают недавно завершённые — иначе
     секция пустеет в межсезонье, когда нет ни одного открытого конкурса.
     """
-    return (open_contests() + finished_contests())[:limit]
+    return (open_contests() + list(finished_contests()))[:limit]
 
 
 def hero_contest():
@@ -140,8 +109,7 @@ def hero_contest():
     главная платит четыре запроса за номинации и жюри, которых не
     показывает.
     """
-    return (Contest.objects.filter(**_accepting_q())
-            .order_by('closes_on', 'pk').first())
+    return Contest.objects.accepting().order_by('closes_on', 'pk').first()
 
 
 def submissions_of(username: str) -> list:

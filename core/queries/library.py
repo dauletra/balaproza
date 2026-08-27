@@ -12,7 +12,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from ..models import LibraryEntry, ReadingProgress
-from .catalog import CHARS_PER_MINUTE, chapter_count_subquery
+from ..managers import CHARS_PER_MINUTE, chapter_count_subquery
 
 
 def progress_chapter_subquery(user_ref: str = 'user', story_ref: str = 'story'):

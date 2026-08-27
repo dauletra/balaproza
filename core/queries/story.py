@@ -15,6 +15,7 @@ from django.db import transaction
 from django.db.models import F, Prefetch
 
 from ..domain.story import REACTIONS
+from ..managers import chapter_count_subquery
 from ..models import (
     BookOfWeek,
     Chapter,
@@ -27,7 +28,7 @@ from ..models import (
     Story,
     StoryComment,
 )
-from .catalog import all_stories, chapter_count_subquery
+from .catalog import all_stories
 
 
 def chapters_of(story_slug: str) -> list:

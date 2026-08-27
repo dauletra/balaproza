@@ -1,145 +1,34 @@
 """Каталог, поиск, жанры: единый движок выдачи (DEC-27, DEC-36).
 
-Здесь живут правила, по которым читателю показывают произведения. Их
-четыре, и каждое однажды нарушалось именно потому, что лежало не в одном
-месте:
+Здесь остались только сборка выдачи и справочники. Сама выдача выражена
+`Story.objects` — оси, публичность и объём чтения живут в
+`core/managers.py`, потому что там их можно продолжить фильтром и посчитать,
+а не только вернуть готовым списком.
 
-- **в публичную выдачу идут только публичные статусы** (DEC-23) — до
-  этого «Модерацияда» открыто лежала в каталоге;
-- **ось «Жасың» накопительная** (DEC-38) — точное совпадение прятало от
-  четырнадцатилетнего три четверти каталога;
-- **дефолт сортировки — окно в 14 дней** (DEC-36), а не накопленные
-  просмотры;
-- **pending-тег публичную выдачу не фильтрует** (BR-TAG-07).
-
-Объём чтения считается в базе, а не в Python. Соблазн отфильтровать
-двадцать карточек на стороне приложения велик, но ось «оқу уақыты» —
-это `WHERE`, и написанная списком она перестаёт работать ровно тогда,
-когда в каталоге появится третья страница.
+Четыре правила этого раздела нарушались именно потому, что лежали не в одном
+месте: в публичную выдачу идут только публичные статусы (DEC-23), ось «Жасың»
+накопительная (DEC-38), дефолт сортировки — окно в 14 дней (DEC-36),
+pending-тег публичную выдачу не фильтрует (BR-TAG-07). Каждое теперь названо
+одним методом queryset'а.
 """
 
 from django.core.cache import cache
-from django.db.models import (
-    Case,
-    Count,
-    Exists,
-    F,
-    IntegerField,
-    OuterRef,
-    Q,
-    Subquery,
-    Sum,
-    Value,
-    When,
-)
-from django.db.models.functions import Coalesce, Lower
-from django.utils import timezone
+from django.db.models import Case, Count, F, IntegerField, Q, Value, When
 
-from ..domain.catalog import (
-    AUDIENCE_ORDER,
-    CATALOG_DEFAULT_SORT,
-    NEW_AUTHOR_FOLLOWERS,
-    PUBLIC_STATUSES,
-)
-from ..models import Chapter, Genre, Story, Submission, User
+from ..domain.catalog import CATALOG_DEFAULT_SORT, PUBLIC_STATUSES
+from ..models import Genre, Story, User
 from .site import REFERENCE_TTL
-
-# Знаков в минуту: темп, комфортный для казахской прозы. Живёт рядом с
-# моделью (`Story.read_minutes`) и здесь — одно и то же число в двух
-# видах, потому что одна форма нужна объекту, вторая базе.
-CHARS_PER_MINUTE = 900
-
-
-def chapter_count_subquery(story_ref: str = 'pk'):
-    """Сколько частей у работы — подзапросом, для аннотации `chapter_count`.
-
-    `story_ref` — чем внешняя выдача ссылается на произведение. По
-    умолчанию это сама работа; выдачам, где строка **про** работу (полка
-    библиотеки, прогресс чтения), передаётся `'story'`, и число едет с их
-    собственной строкой, не добавляя запроса.
-
-    Число частей больше не хранится колонкой: она объявлялась автором и
-    расходилась с тем, что он написал (`save_chapter` её не трогал вовсе,
-    и работа с пятью главами показывала «0 бөлім»). Подхватывает
-    `Story.chapters`.
-
-    Подзапросом, а не `Count` по join, — по той же причине, что и объём:
-    фильтр по тегам размножил бы строки и посчитал каждую главу столько
-    раз, сколько у работы тегов.
-    """
-    return Coalesce(
-        Subquery(
-            Chapter.objects.filter(story=OuterRef(story_ref)).values('story')
-            .annotate(n=Count('pk')).values('n')[:1],
-            output_field=IntegerField(),
-        ),
-        Value(0),
-    )
-
-
-def _reading_effort(qs):
-    """Аннотация «сколько это читать» — минуты, как их видит читатель.
-
-    Объём берётся **подзапросом**, а не `Sum` по join: как только к
-    выдаче добавится фильтр по тегам, join размножит строки, и сумма
-    знаков вырастет во столько раз, сколько у работы тегов. Ошибка
-    беззвучная — просто часть каталога уезжает не в свой фильтр.
-    """
-    written = Subquery(
-        Chapter.objects.filter(story=OuterRef('pk')).values('story')
-        .annotate(total=Sum('char_count')).values('total')[:1],
-        output_field=IntegerField(),
-    )
-    return qs.annotate(
-        # Прежде здесь стояла оценка «объявленных частей на 1800 знаков»
-        # для работ без текста. Оценивать больше нечего: части, которых
-        # никто не написал, портал больше не обещает.
-        effective_chars=Coalesce(written, Value(0)),
-        chapter_count=chapter_count_subquery(),
-    ).annotate(
-        # Округление вверх целочисленным делением — тот же расчёт, что в
-        # `Story.read_minutes`; нижняя граница в три минуты на бакеты не
-        # влияет, короткое и так короткое.
-        read_minutes_db=(F('effective_chars') + Value(CHARS_PER_MINUTE - 1))
-        / Value(CHARS_PER_MINUTE),
-        # Участвует ли работа в незавершённом конкурсе — знак «Байқауға
-        # қатысады». `Story.badges` подхватывает эту аннотацию: без неё
-        # каждая карточка спрашивала бы базу отдельно.
-        in_open_contest=Exists(
-            Submission.objects.filter(
-                story=OuterRef('pk'),
-                contest__results_on__gt=timezone.localdate())),
-        # Есть ли хоть одна записанная глава — подхватывает
-        # `Story.has_chapters`. Отдельно от объёма намеренно: глава с
-        # пустым телом даёт ноль знаков, но работа при этом уже не пустой
-        # черновик, и полоса внимания в кабинете позвала бы автора писать
-        # то, что он начал.
-        has_any_chapter=Exists(Chapter.objects.filter(story=OuterRef('pk'))),
-    )
 
 
 def catalog_base():
-    """Базовая выдача каталога: публичное, со всем, что рисует карточка.
-
-    `select_related` и `prefetch_related` здесь не оптимизация, а условие
-    работоспособности: карточка спрашивает автора, жанр и теги, и без них
-    страница из двадцати карточек делает под сотню запросов.
-    """
-    return _reading_effort(
-        Story.objects.filter(status__in=PUBLIC_STATUSES)
-        .select_related('author', 'primary_genre', 'secondary_genre')
-        .prefetch_related('tags')
-    )
+    """Базовая выдача каталога: публичное, со всем, что рисует карточка."""
+    return Story.objects.public().for_card().with_reading_effort()
 
 
 def all_stories():
-    """Все произведения, включая непубличные. Для витрин и поиска, которые
+    """Все произведения, включая непубличные. Для витрин и кабинета, которые
     сами решают, что показать."""
-    return _reading_effort(
-        Story.objects.select_related('author', 'primary_genre',
-                                     'secondary_genre')
-        .prefetch_related('tags')
-    )
+    return Story.objects.for_card().with_reading_effort()
 
 
 def public_stories():
@@ -201,55 +90,13 @@ def apply_catalog_filters(stories, sort: str = CATALOG_DEFAULT_SORT,
                           length: str = '', badge: str = '',
                           author_tier: str = '', kind: str = ''):
     """Оси каталога поверх готовой выдачи. Пустая ось — no-op."""
-    qs = stories
-    if status:
-        qs = qs.filter(status=status)
-    if audience in AUDIENCE_ORDER:
-        # Накопительно, а не точным совпадением (DEC-38): читателю
-        # четырнадцати лет доступно и то, что помечено 10+. Безопасное
-        # направление сохраняется — младшая вилка старших отметок не видит.
-        allowed = AUDIENCE_ORDER[:AUDIENCE_ORDER.index(audience) + 1]
-        qs = qs.filter(audience__in=allowed)
-    if length == 'short':
-        qs = qs.filter(read_minutes_db__lte=10)
-    elif length == 'medium':
-        qs = qs.filter(read_minutes_db__gt=10, read_minutes_db__lte=30)
-    elif length == 'long':
-        qs = qs.filter(read_minutes_db__gt=30)
-    if kind == 'single':
-        qs = qs.filter(format='single')
-    elif kind == 'done':
-        qs = qs.filter(format='serial', status='Completed')
-    elif kind == 'ongoing':
-        qs = qs.filter(format='serial', status='OnProcess')
-    if badge == 'editorial':
-        qs = qs.filter(is_editorial_pick=True)
-    elif badge == 'contest':
-        # «Байқауға қатысады» — участие в **незавершённом** конкурсе
-        # (DEC-45). Не «в идущем приёме»: работа, ушедшая к жюри, всё ещё
-        # в конкурсе, и снимать с неё знак до объявления итогов рано.
-        qs = qs.filter(submissions__contest__results_on__gt=timezone.localdate()
-                       ).distinct()
-    if author_tier == 'new':
-        qs = qs.filter(author__followers__lt=NEW_AUTHOR_FOLLOWERS)
-
-    return _sorted(qs, sort)
-
-
-def _sorted(qs, sort: str):
-    """Порядок выдачи.
-
-    `pk` вторым ключом везде, где первый допускает ничью: без него
-    Postgres вправе вернуть равные строки в любом порядке, и страница
-    каталога перетасовывалась бы между запросами.
-    """
-    if sort == 'alphabet':
-        return qs.order_by(Lower('title'), 'pk')
-    if sort == 'recent':
-        return qs.order_by('-created_at', '-pk')
-    if sort == 'popularity':
-        return qs.order_by('-views', 'pk')
-    return qs.order_by('-recent_views', 'pk')
+    qs = stories.filter(status=status) if status else stories
+    return (qs.with_audience(audience)
+              .with_length(length)
+              .of_kind(kind)
+              .with_badge(badge)
+              .by_author_tier(author_tier)
+              .sorted_by(sort))
 
 
 def filter_catalog(*, query: str = '', genre: str = '', tag: str = '',
@@ -262,30 +109,7 @@ def filter_catalog(*, query: str = '', genre: str = '', tag: str = '',
     какие бы оси ни выставили: черновик и работа на модерации — этапы
     авторского пути, а не публикация (DEC-23).
     """
-    qs = catalog_base()
-
-    q = (query or '').strip()
-    if q:
-        qs = qs.filter(
-            Q(title__icontains=q)
-            | Q(author__pen_name__icontains=q)
-            | Q(author__username__icontains=q)
-            | Q(author__name__icontains=q)
-        )
-
-    if genre:
-        qs = qs.filter(Q(primary_genre__slug=genre)
-                       | Q(secondary_genre__slug=genre))
-
-    if tag:
-        # Pending-тег публичную выдачу не фильтрует (BR-TAG-07): он ещё не
-        # прошёл модератора, и его страница для постороннего не существует.
-        # Оба условия — на одной связке: у многозначного отношения это
-        # означает «тег с таким слагом И принятый», то есть непринятый
-        # слаг не находит ничего. Отдельным `.exists()` эта проверка
-        # стоила по запросу на каждый вызов, а страница тега зовёт
-        # `filter_catalog` семь раз — выдача плюс счётчик каждого пресета.
-        qs = qs.filter(tags__slug=tag, tags__status='accepted')
+    qs = catalog_base().matching(query).in_genre(genre).with_tag(tag)
 
     return apply_catalog_filters(qs, sort=sort, status=status,
                                  audience=audience, length=length,

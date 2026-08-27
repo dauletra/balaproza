@@ -60,7 +60,7 @@ from core.models import (
     User,
 )
 
-from core.queries.catalog import CHARS_PER_MINUTE
+from core.managers import CHARS_PER_MINUTE
 
 from . import _corpus
 
