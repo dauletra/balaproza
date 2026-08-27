@@ -61,17 +61,21 @@ class PagesStayWithinTheirQueryBudget(TestCase):
         список ORM-объектов со всеми тегами: шесть раз ради шести цифр.
 
         Ещё два запроса ушли вместе с `CatalogState`: резолв жанра и тега
-        вызывался с пустым слагом и всё равно шёл в базу.
+        вызывался с пустым слагом и всё равно шёл в базу. Восемнадцатый ушёл
+        вместе с ключом `popular_tags` в контексте: чипы тегов панели
+        приходят из `catalog_links`, а второй список тех же тегов не читал
+        ни один шаблон раздела — материализованный список платил за него
+        молча.
         """
-        with self.assertNumQueries(18):
+        with self.assertNumQueries(17):
             self.client.get(reverse('core:catalog'))
 
     def test_genre_page(self):
-        with self.assertNumQueries(18):
+        with self.assertNumQueries(17):
             self.client.get(reverse('core:genre_detail', kwargs={'slug': 'fantezi'}))
 
     def test_search(self):
-        with self.assertNumQueries(18):
+        with self.assertNumQueries(17):
             self.client.get(reverse('core:search_results') + '?q=жағалау')
 
     def test_story_page(self):
@@ -147,9 +151,10 @@ class PagesStayWithinTheirQueryBudget(TestCase):
         Было 27: «принят ли тег» проверялось отдельным `EXISTS` внутри
         `filter_catalog`, а страница зовёт его семь раз — выдача плюс
         счётчик каждого пресета. Теперь условие стоит на той же связке,
-        что и слаг, и лишнего запроса нет вовсе.
+        что и слаг, и лишнего запроса нет вовсе. Двадцатый ушёл вместе с
+        неиспользуемым `popular_tags` в контексте каталога.
         """
-        with self.assertNumQueries(20):
+        with self.assertNumQueries(19):
             self.client.get(reverse('core:tag_detail',
                                     kwargs={'slug': 'mektep'}))
 

@@ -835,7 +835,7 @@ class SubmissionHelpers(TestCase):
 
     def test_the_submission_lookup_answers_both_ways(self):
         self.assertEqual(len(data.submissions_of('aidana')), 2)
-        self.assertEqual(data.submissions_of('ghost'), [])
+        self.assertEqual(list(data.submissions_of('ghost')), [])
         self.assertTrue(data.has_submission('aidana', 'altyn-qalam'))
         self.assertFalse(data.has_submission('aidana', 'bolashak-mektebi'))
 
@@ -1118,7 +1118,7 @@ class WorkPickerScalesToManyWorks(TestCase):
         self.assertNotIn('type="search"', self._picker(html))
 
     def test_a_long_list_gets_one_that_hides_nothing_without_js(self):
-        many = data.public_stories_of('aidana') * 4   # > порога
+        many = list(data.public_stories_of('aidana')) * 4   # > порога
         response, html = self._submit_html(stories=many)
         self.assertTrue(response.context['picker_search'])
         picker = self._picker(html)

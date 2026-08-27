@@ -98,28 +98,23 @@ def author_facts(username: str) -> AuthorFacts:
     return AuthorFacts(username)
 
 
-def my_stories_of(username: str) -> list:
-    """Все работы автора — любого статуса, свежие сверху.
+def my_stories_of(username: str):
+    """Все работы автора — любого статуса, в порядке «что трогал последним».
 
-    Порядок — «что я трогал последним»: до него список шёл в порядке
-    вставки, то есть случайно. `nulls_last` обязателен: Postgres при
-    `DESC` ставит `NULL` **первыми**, и работы без даты правки уехали бы
-    наверх вместо конца.
+    Пустой ник отдаёт пустую выдачу, а не `[]`: у вызывающей стороны один
+    тип на оба случая, и `.count()` по гостю не падает.
     """
-    if not username:
-        return []
-    return list(all_stories().filter(author__username=username)
-                .order_by(F('updated_at').desc(nulls_last=True), 'pk'))
+    return all_stories().by_author(username).latest_edited()
 
 
-def public_stories_of(username: str) -> list:
+def public_stories_of(username: str):
     """Работы, которые видит посторонний (BR-73).
 
     Публичность — по `PUBLIC_STATUSES`, а не по литералу `'Published'`:
     после DEC-37 публичный сериал носит `Completed` или `OnProcess`, и
     сравнение со строкой молча выкинуло бы из профиля все сериалы.
     """
-    return [s for s in my_stories_of(username) if s.status in PUBLIC_STATUSES]
+    return my_stories_of(username).public()
 
 
 def top_stories_of(username: str, limit: int = 3, *,

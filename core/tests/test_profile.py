@@ -118,10 +118,10 @@ class PublicSurfaceOfAnAuthor(TestCase):
         reader = data.reader_stats('no-such-user')
         self.assertEqual([reader['works'], reader['works_total'],
                           reader['finished'], reader['followers']], [0, 0, 0, 0])
-        self.assertEqual(data.public_stories_of('no-such-user'), [])
-        self.assertEqual(data.top_stories_of('no-such-user'), [])
-        self.assertEqual(data.following_of('no-such-user'), [])
-        self.assertEqual(data.followers_of('no-such-user'), [])
+        self.assertEqual(list(data.public_stories_of('no-such-user')), [])
+        self.assertEqual(list(data.top_stories_of('no-such-user')), [])
+        self.assertEqual(list(data.following_of('no-such-user')), [])
+        self.assertEqual(list(data.followers_of('no-such-user')), [])
 
 
 class FollowGraphHelpers(TestCase):
@@ -411,7 +411,7 @@ class PeoplePages(TestCase):
                                               kwargs={'username': 'aidana'}))
 
     def test_empty_explains_itself_and_garbage_is_404(self):
-        self.assertEqual(data.following_of('rudazov'), [])
+        self.assertEqual(list(data.following_of('rudazov')), [])
         self.assertContains(self.client.get(self._url('rudazov', 'following')),
                             'Әлі ешкімге жазылмаған')
         # Молчаливый фолбэк отдал бы подписчиков под чужим заголовком.
@@ -549,7 +549,7 @@ class AchievementsRow(TestCase):
     def test_the_facts_line_omits_contests_when_there_are_none(self):
         response = self.client.get(
             reverse('core:profile_other', kwargs={'username': 'aygerim_k'}))
-        self.assertEqual(data.submissions_of('aygerim_k'), [])
+        self.assertEqual(list(data.submissions_of('aygerim_k')), [])
         self.assertEqual(response.context['contests_n'], 0)
         self.assertContains(response, '2024 жылдан бері')
         # Проверяем сегмент, а не слово: «Байқаулар» есть в шапке и подвале.

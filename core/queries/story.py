@@ -31,9 +31,9 @@ from ..models import (
 from .catalog import all_stories
 
 
-def chapters_of(story_slug: str) -> list:
-    return list(Chapter.objects.filter(story__slug=story_slug)
-                .prefetch_related('reactions'))
+def chapters_of(story_slug: str):
+    return (Chapter.objects.filter(story__slug=story_slug)
+            .prefetch_related('reactions'))
 
 
 def _attach_my_reaction(chapter, viewer: str):
@@ -263,18 +263,18 @@ def toggle_comment_like(comment, user) -> bool:
     return created
 
 
-def collections_of(story) -> list:
+def collections_of(story):
     """Подборки, в которых лежит работа — обратный вход со страницы.
 
     Порядок редакционный, а не по релевантности: жинақ и есть редакционное
     высказывание.
     """
-    return list(Collection.objects.filter(item_set__story=story).distinct())
+    return Collection.objects.filter(item_set__story=story).distinct()
 
 
-def all_collections() -> list:
-    return list(Collection.objects.prefetch_related(
-        'item_set__story__author', 'item_set__story__primary_genre'))
+def all_collections():
+    return Collection.objects.prefetch_related(
+        'item_set__story__author', 'item_set__story__primary_genre')
 
 
 def collection_by_slug(slug: str):

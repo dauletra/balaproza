@@ -112,7 +112,7 @@ def hero_contest():
     return Contest.objects.accepting().order_by('closes_on', 'pk').first()
 
 
-def submissions_of(username: str) -> list:
+def submissions_of(username: str):
     """Заявки автора.
 
     Присуждений здесь нет намеренно: они нужны одной `contest_history`, и
@@ -120,9 +120,9 @@ def submissions_of(username: str) -> list:
     ли отозвать», и платить за чужой вопрос ему незачем.
     """
     if not username:
-        return []
-    return list(Submission.objects.filter(author__username=username)
-                .select_related('contest', 'story', 'story__author'))
+        return Submission.objects.none()
+    return (Submission.objects.filter(author__username=username)
+            .select_related('contest', 'story', 'story__author'))
 
 
 def has_submission(username: str, contest_slug: str) -> bool:

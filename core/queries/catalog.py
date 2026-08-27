@@ -79,10 +79,10 @@ def genre_by_slug(slug: str):
     return next((g for g in all_genres() if g.slug == slug), None)
 
 
-def all_authors() -> list:
+def all_authors():
     from .profile import with_works
 
-    return list(with_works(User.objects.order_by('username')))
+    return with_works(User.objects.order_by('username'))
 
 
 def apply_catalog_filters(stories, sort: str = CATALOG_DEFAULT_SORT,
@@ -117,7 +117,7 @@ def filter_catalog(*, query: str = '', genre: str = '', tag: str = '',
                                  kind=kind)
 
 
-def related_stories(slug: str, limit: int = 6) -> list:
+def related_stories(slug: str, limit: int = 6):
     """«Что дальше» под произведением (FR-STORY-02).
 
     Тот же основной жанр, **чужой автор** — знакомство с новым именем
@@ -135,9 +135,9 @@ def related_stories(slug: str, limit: int = 6) -> list:
     """
     source = Story.objects.filter(slug=slug).first()
     if not source:
-        return []
+        return Story.objects.none()
 
-    return list(
+    return (
         catalog_base()
         .exclude(slug=slug)
         .exclude(author=source.author)

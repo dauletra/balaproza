@@ -211,7 +211,7 @@ class StatusIsSpokenInOneVocabulary(TestCase):
         self.assertEqual(len(mine), 5)
         for story in mine:
             self.assertEqual(story.author.username, 'aidana')
-        self.assertEqual(data.my_stories_of('no-such-user'), [])
+        self.assertEqual(list(data.my_stories_of('no-such-user')), [])
         stats = data.writer_stats('aidana')
         self.assertEqual(stats['views'], sum(s.views for s in mine))
         self.assertEqual(stats['followers'],

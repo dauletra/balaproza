@@ -114,7 +114,10 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
         'genre':              genre,
         'current_tag_slug':   state.tag,
         'current_tag':        tag or _accepted_tag(state.tag),
-        'popular_tags':       data.popular_tags(),
+        # `popular_tags` здесь не отдаётся: чипы тегов панели приходят
+        # готовыми ссылками в `tag_options` из `catalog_links`, и второй
+        # список тех же тегов ни один шаблон каталога не читал — он стоил
+        # запроса на каждую страницу раздела и молчал об этом.
         # Жинақтар — первичный вход в чтение (DEC-31). В каталоге они нужны
         # ровно там, где сүзгі не дали результата: пустой экран не должен быть
         # тупиком, из которого выход только назад.

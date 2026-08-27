@@ -62,16 +62,16 @@ def toggle_follow(follower, following) -> bool:
     return now_following
 
 
-def followers_of(username: str) -> list:
-    return list(with_works(
+def followers_of(username: str):
+    return with_works(
         User.objects.filter(following_set__following__username=username)
-        .order_by('username')))
+        .order_by('username'))
 
 
-def following_of(username: str) -> list:
-    return list(with_works(
+def following_of(username: str):
+    return with_works(
         User.objects.filter(follower_set__follower__username=username)
-        .order_by('username')))
+        .order_by('username'))
 
 
 def followers_count_of(username: str) -> int:
@@ -123,13 +123,13 @@ def update_profile(user, *, pen_name: str, name: str, bio: str,
     user.save()
 
 
-def new_authors(limit: int = 4) -> list:
+def new_authors(limit: int = 4):
     """«Жаңа авторлар» для главной — те, у кого меньше всего подписчиков.
 
     Социальное доказательство: подросток должен видеть, что здесь пишут
     такие же начинающие, а не только авторы с восемью тысячами подписок.
     """
-    return list(with_works(User.objects.order_by('followers', 'username'))[:limit])
+    return with_works(User.objects.order_by('followers', 'username'))[:limit]
 
 
 def portal_stats() -> dict:

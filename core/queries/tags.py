@@ -45,39 +45,39 @@ def with_counts(tags):
     )
 
 
-def all_tags() -> list:
-    return list(with_counts(Tag.objects.all()))
+def all_tags():
+    return with_counts(Tag.objects.all())
 
 
 def tag_by_slug(slug: str):
     return with_counts(Tag.objects.filter(slug=slug)).first()
 
 
-def tags_of(story) -> list:
+def tags_of(story):
     """Теги работы — включая pending.
 
     Фильтрация по видимости делается на стороне показа
     (`components/tag_list.html` по `viewer_is_author`): автор обязан
     видеть собственный тег, пока тот ждёт модератора.
     """
-    return list(story.tags.all()) if story else []
+    return story.tags.all() if story else Tag.objects.none()
 
 
-def popular_tags(limit: int = 10) -> list:
+def popular_tags(limit: int = 10):
     """Опоры портала — accepted по накопленному использованию."""
-    return list(with_counts(Tag.objects.filter(status='accepted'))
-                .order_by('-usage', 'name')[:limit])
+    return (with_counts(Tag.objects.filter(status='accepted'))
+            .order_by('-usage', 'name')[:limit])
 
 
-def trending_tags(limit: int = 6) -> list:
+def trending_tags(limit: int = 6):
     """О чём пишут на этой неделе.
 
     Теги без недельной активности пропускаются: иначе полоса вырождается
     в копию «Танымал тегтер».
     """
-    return list(with_counts(Tag.objects.filter(status='accepted'))
-                .filter(weekly__gt=0)
-                .order_by('-weekly', 'name')[:limit])
+    return (with_counts(Tag.objects.filter(status='accepted'))
+            .filter(weekly__gt=0)
+            .order_by('-weekly', 'name')[:limit])
 
 
 def is_blocked(name: str) -> bool:
