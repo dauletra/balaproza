@@ -35,7 +35,7 @@
                 {% if story.is_single %}
                     {% include "components/stat_pill.html" with icon="book" value="бір бөлімді" %}
                 {% else %}
-                    {% include "components/stat_pill.html" with icon="book" value=story.chapters|stringformat:"s"|add:" бөлім" %}
+                    {% include "components/stat_pill.html" with icon="book" value=story.chapters|spaced|add:" бөлім" %}
                 {% endif %}
                 {% include "components/stat_pill.html" with icon="eye" value=story.views|spaced label=story.views|spaced|add:" оқылым" %}
                 {% include "components/stat_pill.html" with icon="heart" value=story.likes|spaced label=story.likes|spaced|add:" реакция" %}

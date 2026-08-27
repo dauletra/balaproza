@@ -51,11 +51,11 @@
                 <span class="font-sans text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Назарыңды күтеді</span>
                 {% for item in attention %}
                     {% if item.kind == 'moderation' %}
-                        {% include "components/attention_item.html" with icon="adjustments" text=item.count|stringformat:"s"|add:" шығарма модерацияда" href=item.href %}
+                        {% include "components/attention_item.html" with icon="adjustments" text=item.count|spaced|add:" шығарма модерацияда" href=item.href %}
                     {% elif item.kind == 'comments' %}
-                        {% include "components/attention_item.html" with icon="message-caption" text=item.count|stringformat:"s"|add:" жаңа пікір" href=item.href %}
+                        {% include "components/attention_item.html" with icon="message-caption" text=item.count|spaced|add:" жаңа пікір" href=item.href %}
                     {% elif item.kind == 'draft' %}
-                        {% include "components/attention_item.html" with icon="pen" text=item.count|stringformat:"s"|add:" жоба бастамада тұр" href=item.href %}
+                        {% include "components/attention_item.html" with icon="pen" text=item.count|spaced|add:" жоба бастамада тұр" href=item.href %}
                     {% endif %}
                 {% endfor %}
             </div>

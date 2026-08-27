@@ -46,6 +46,44 @@ class TemplateCommentSyntax(unittest.TestCase):
         )
 
 
+class NumbersUseTheProjectFilters(unittest.TestCase):
+    """`stringformat` не форматирует число — он только делает из него строку.
+
+    Разряды портала ставят `compact_count` (читателю) и `spaced` (автору),
+    и оба уже возвращают строку, то есть годятся для `add:` без посредника.
+    А `stringformat` в той же позиции выводит число сплошняком: шапка
+    произведения показывала «12482 оқылым» строкой ниже «12,5 мың реакция»
+    — два разных вида одной величины на одном экране.
+
+    Одно применение остаётся законным и здесь не запрещается:
+    `{% with chap=N|stringformat:"d" %}` для сборки адреса
+    `?chapter=N#chapter-N`. Там нужна именно голая цифра — разряд с
+    неразрывным пробелом сломал бы ссылку.
+    """
+
+    # `"s"` не делает вообще ничего, кроме `str()`; `"d"`, воткнутый прямо
+    # в `add:`, — это отображаемое число, а не адрес.
+    BANNED = (
+        (re.compile(r'stringformat:"s"'), 'stringformat:"s"'),
+        (re.compile(r'stringformat:"d"\|add:'), 'stringformat:"d"|add:'),
+    )
+
+    def test_metrics_do_not_go_through_stringformat(self):
+        offenders = []
+        for path in _templates():
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                for pattern, shown in self.BANNED:
+                    if pattern.search(line):
+                        rel = path.relative_to(TEMPLATES_DIR.parent)
+                        offenders.append(f"{rel}:{number}  {shown}")
+
+        self.assertFalse(
+            offenders,
+            "Число выводится через stringformat — разрядов не будет. "
+            "Читателю `compact_count`, автору `spaced`:\n" + "\n".join(offenders),
+        )
+
+
 class TemplateTagSyntax(unittest.TestCase):
 
     def test_no_multiline_template_tags(self):

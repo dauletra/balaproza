@@ -55,7 +55,7 @@
             {% if story.is_single %}
                 {% include "components/stat_pill.html" with icon="book" value="бір бөлімді" %}
             {% elif story.chapters %}
-                {% include "components/stat_pill.html" with icon="book" value=story.chapters|stringformat:"s"|add:" бөлім" %}
+                {% include "components/stat_pill.html" with icon="book" value=story.chapters|spaced|add:" бөлім" %}
             {% endif %}
 
             {% comment %}
@@ -64,7 +64,7 @@
             {% endcomment %}
             {% if story.status == "OnModeration" %}
                 {% if story.updated_days_ago %}
-                    {% include "components/stat_pill.html" with icon="adjustments" value=story.updated_days_ago|stringformat:"s"|add:" күн тексеруде" %}
+                    {% include "components/stat_pill.html" with icon="adjustments" value=story.updated_days_ago|spaced|add:" күн тексеруде" %}
                 {% else %}
                     {% include "components/stat_pill.html" with icon="adjustments" value="тексеруде" %}
                 {% endif %}

@@ -81,8 +81,8 @@
         <div class="flex flex-wrap items-center gap-4">
             {# FR-STORY-12 + DEC-32: общий счётчик = сумма реакций по главам #}
             {% include "components/stat_pill.html" with icon="heart" value=story.likes|compact_count label=story.likes|spaced|add:" реакция" %}
-            {% include "components/stat_pill.html" with icon="eye" value=story.views label=story.views|stringformat:"s"|add:" оқылым" %}
-            {% include "components/stat_pill.html" with icon="message-caption" value=story.comments label=story.comments|stringformat:"s"|add:" пікір" %}
+            {% include "components/stat_pill.html" with icon="eye" value=story.views|compact_count label=story.views|spaced|add:" оқылым" %}
+            {% include "components/stat_pill.html" with icon="message-caption" value=story.comments|compact_count label=story.comments|spaced|add:" пікір" %}
         </div>
 
         {% comment %}
