@@ -569,12 +569,13 @@ class ContestDetail(TestCase):
                 if field:
                     self.assertContains(response, getattr(contest, field))
 
-    def test_an_unknown_slug_says_so_and_offers_nothing(self):
+    def test_an_unknown_slug_is_not_a_page(self):
+        """404, а не 200 с карточкой внутри: страницы такого конкурса нет,
+        и делиться с неё нечем."""
         response = self.client.get(
             reverse('core:contest_detail', kwargs={'slug': 'ghost'}))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Байқау табылмады')
-        self.assertNotContains(response, 'Бөлісу')
+        self.assertEqual(response.status_code, 404)
+        self.assertNotContains(response, 'Бөлісу', status_code=404)
 
     def test_every_phase_can_be_shared(self):
         """FR-CONT-12: конкурс живёт тем, что о нём рассказывают."""
@@ -609,10 +610,11 @@ class ContestRail(TestCase):
     """Правый рейл конкурса: не копия страницы и не пустая колонка (DEC-25)."""
 
     def test_the_rail_appears_only_when_it_has_something_to_say(self):
+        # Неизвестного конкурса больше нет как страницы — рейлу не на чем
+        # появиться: 404 (FR-CONT-14).
         for url in ('/contests/unknown-slug/', '/contests/unknown-slug/submit/'):
             with self.subTest(url=url):
-                self.assertFalse(
-                    self.client.get(url).context['has_right_rail'])
+                self.assertEqual(self.client.get(url).status_code, 404)
         # У «Жас алдым — 2023» все этапы позади: рейлу нечего сказать.
         self.assertFalse(self.client.get(reverse(
             'core:contest_detail', args=['zhas-aldym-2023'])
@@ -922,12 +924,11 @@ class SubmitFormShowsWhatCanBeSent(TestCase):
         self.assertNotContains(
             detail, '>\n                        Қатысу\n                    </a>')
 
-    def test_an_unknown_slug_says_so(self):
+    def test_an_unknown_slug_is_not_a_page(self):
         login_as(self.client)
-        self.assertContains(
+        self.assertEqual(
             self.client.get(reverse('core:contest_submit',
-                                    kwargs={'slug': 'ghost'})),
-            'Байқау табылмады')
+                                    kwargs={'slug': 'ghost'})).status_code, 404)
 
 
 class SubmitIsGatedByPhase(TestCase):

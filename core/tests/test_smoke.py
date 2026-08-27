@@ -38,7 +38,7 @@ PUBLIC_URLS = [
     ('core:genre_detail',      {'slug': 'fantastika'},            'genre-detail'),
     ('core:tag_detail',        {'slug': 'mektep'},                'tag-detail'),
     ('core:collections',       {},                                'collections'),
-    ('core:collection_detail', {'slug': 'zhas-zhurek'},           'collection-detail'),
+    ('core:collection_detail', {'slug': 'kulki-kerek'},           'collection-detail'),
     ('core:story_detail',      {'slug': 'dalney-berega'},         'story-detail'),
     ('core:my_stories',        {},                                'my-stories'),
     ('core:new_story',         {},                                'new-story'),

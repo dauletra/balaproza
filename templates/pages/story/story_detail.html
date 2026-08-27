@@ -2,18 +2,9 @@
 {% load static %}
 {% load balaproza %}
 
-{% block title %}{% if story %}{{ story.title }} — {{ story.author.public_name }}{% else %}Шығарма{% endif %} — Balaproza{% endblock %}
+{% block title %}{{ story.title }} — {{ story.author.public_name }} — Balaproza{% endblock %}
 
 {% block content %}
-{% if not story %}
-    <div class="rounded-lg border border-slate-200 bg-white p-10 text-center">
-        <h1 class="font-display text-2xl font-bold text-slate-900">Шығарма табылмады</h1>
-        <p class="mt-2 font-sans text-sm text-slate-600">Slug: <code>{{ slug }}</code></p>
-        <a href="{% url 'core:home' %}" class="mt-4 inline-block font-sans text-sm font-semibold text-brand hover:underline">
-            ← Басты бетке
-        </a>
-    </div>
-{% else %}
 
 {# Ширину колонки держит <main> в base.html (860px) — своего max-w здесь не нужно. #}
 <div class="flex flex-col gap-8" x-data="storyReader()">
@@ -536,8 +527,6 @@
 {# Маунтим ReportModal — открывается по событию из кнопки выше #}
 {% if signed_in %}
     {% include "components/report_modal.html" %}
-{% endif %}
-
 {% endif %}
 {% endblock %}
 

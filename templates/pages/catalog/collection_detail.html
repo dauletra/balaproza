@@ -1,18 +1,9 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}{% if collection %}{{ collection.name }}{% else %}Жинақ{% endif %} — Balaproza{% endblock %}
+{% block title %}{{ collection.name }} — Balaproza{% endblock %}
 
 {% block content %}
-{% if not collection %}
-    <div class="rounded-lg border border-slate-200 bg-white p-10 text-center">
-        <h1 class="font-display text-2xl font-bold text-slate-900">Жинақ табылмады</h1>
-        <p class="mt-2 font-sans text-sm text-slate-600">Slug: <code>{{ slug }}</code></p>
-        <a href="{% url 'core:collections' %}" class="mt-4 inline-block font-sans text-sm font-semibold text-brand hover:underline">
-            ← Барлық жинақтар
-        </a>
-    </div>
-{% else %}
     <p class="mb-4 font-sans text-xs text-slate-500">
         <a href="{% url 'core:collections' %}" class="hover:text-brand">Жинақтар</a> /
         <span class="text-slate-700">{{ collection.name }}</span>
@@ -64,5 +55,4 @@
 
     {# Shared list-partial (DEC-27) — переиспользуется каталогом и коллекциями #}
     {% include "partials/catalog/_book_list.html" with results=collection.stories empty_title="Шығарма жоқ" empty_text="Бұл жинаққа әлі шығарма қосылмаған." %}
-{% endif %}
 {% endblock %}

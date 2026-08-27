@@ -1,17 +1,10 @@
 {% extends 'base.html' %}
 {% load balaproza %}
 
-{% block title %}
-    {% if contest %}{{ contest.name }} · қатысу — Balaproza{% else %}Өтінім — Balaproza{% endif %}
-{% endblock %}
+{% block title %}{{ contest.name }} · қатысу — Balaproza{% endblock %}
 
 {% block content %}
-{% if not contest %}
-    <div class="rounded-lg border border-slate-200 bg-white p-10 text-center">
-        <h1 class="font-display text-2xl font-bold text-slate-900">Байқау табылмады</h1>
-        <p class="mt-2 font-sans text-sm text-slate-600">Slug: <code>{{ slug }}</code></p>
-    </div>
-{% elif not signed_in %}
+{% if not signed_in %}
     {% include "components/auth_gate.html" with reason="Қатысу үшін" %}
 {% else %}
     <p class="mb-4 font-sans text-xs text-slate-500">

@@ -76,13 +76,13 @@ class StoryPageAnswersTheQuestionShouldIRead(TestCase):
         self.assertContains(self.response, self.story.author.bio, count=2)
         self.assertContains(self.response, 'Жазылу')
 
-    def test_an_unknown_slug_says_so_without_the_furniture(self):
+    def test_an_unknown_slug_is_not_a_page(self):
+        """404, а не 200 с карточкой «табылмады»: выдуманный slug — не
+        страница, и поисковику незачем считать его живой."""
         response = self.client.get(
             reverse('core:story_detail', kwargs={'slug': 'no-such-story'}))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Шығарма табылмады')
-        self.assertNotContains(response, 'Аннотация')
-        self.assertNotContains(response, 'Оқу панелі')
+        self.assertEqual(response.status_code, 404)
+        self.assertNotContains(response, 'Аннотация', status_code=404)
 
 
 class ChapterNavigationIsForgiving(TestCase):
@@ -979,7 +979,7 @@ class ReadingCountsAsAView(TestCase):
         self.assertEqual(
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'no-such-story'})).status_code,
-            200)
+            404)
 
 
 class ReadingRemembersWhereYouStopped(TestCase):

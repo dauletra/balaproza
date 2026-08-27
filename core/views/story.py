@@ -8,7 +8,7 @@ from django.views.decorators.http import require_POST
 
 from .. import data
 from ..forms import CommentForm
-from .common import _current_user
+from .common import _current_user, _found_or_404
 
 # Что читатель уже открывал в этой сессии — против накрутки перезагрузкой.
 # Список, а не множество: сессия сериализуется в JSON, где множества нет.
@@ -56,16 +56,13 @@ def _back_to_story(slug, chapter_number=None, anchor=None):
 
 # ───────────────────────── STORY — произведение и чтение ─────────────────
 def story_detail(request, slug):
-    # Неизвестный slug отдаёт None: страница остаётся валидной и говорит
-    # «Шығарма табылмады», а не падает 500.
-    story = data.story_by_slug(slug)
+    story = _found_or_404(data.story_by_slug(slug), f'Шығарма «{slug}» табылмады')
     chapters = data.chapters_of(slug)
     # Автор своего стори видит pending-теги (BR-TAG-07). Для прочих скрыты.
     viewer = _current_user(request)
-    is_author = bool(story and viewer and story.author_id == viewer.pk)
+    is_author = bool(viewer and story.author_id == viewer.pk)
 
-    if story is not None:
-        _count_view(request, story)
+    _count_view(request, story)
 
     # Резолв текущей главы из ?chapter=N. Невалидное/отсутствующее значение:
     #  - авторизованный с прогрессом по этому slug → его глава
@@ -102,7 +99,7 @@ def story_detail(request, slug):
     # знакомство с произведением). Возвращающийся юзер или явный выбор главы → полный текст.
     is_teaser = bool(
         current and chapter_number == 1 and not explicit_chapter
-        and not has_progress_here and not (story and story.is_single)
+        and not has_progress_here and not story.is_single
     )
 
     return render(request, 'pages/story/story_detail.html', {
@@ -124,17 +121,17 @@ def story_detail(request, slug):
         # Подсветка в правом рейле — текущая отображаемая глава.
         'current_chapter_number': chapter_number,
         # FR-STORY-02: блок «Басқа шығармалар» внизу страницы
-        'related':  data.related_stories(slug, limit=6) if story else [],
+        'related':  data.related_stories(slug, limit=6),
         # docs/ui.md: UGC-теги произведения (resolved Tag-объекты)
-        'tags':      story.tags_resolved if story else [],
+        'tags':      story.tags_resolved,
         # DEC-31: обратный вход в настроение — подборки, где лежит произведение
-        'in_collections': data.collections_of(story) if story else [],
+        'in_collections': data.collections_of(story),
         'is_author': is_author,
         # Шапка (FR-STORY-01): подпись главной кнопки — «начать» или «продолжить».
         'has_progress': bool(has_progress_here),
         # Кнопка «Сақтау» и подписка на автора в карточке автора.
         'in_library':  data.in_library(viewer, slug),
-        'is_followed': data.is_following(viewer, story.author if story else None),
+        'is_followed': data.is_following(viewer, story.author),
     })
 
 

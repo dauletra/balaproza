@@ -14,6 +14,7 @@ from django.shortcuts import render
 
 from .. import data
 from ..links import CATALOG_AXES, FILTER_GROUPS, CatalogState, catalog_links
+from .common import _found_or_404
 
 # Что показывать вместо списка. Заголовок и текст зависят от режима: «ничего
 # не найдено» на пустом жанре звучит как поломка, хотя это просто новый жанр.
@@ -48,8 +49,13 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
     """Единая точка рендера унифицированного каталога (DEC-27)."""
     genre = data.genre_by_slug(genre_slug) if genre_slug else None
     tag = _accepted_tag(tag_slug)
-    not_found = ((mode == 'genre' and genre is None)
-                 or (mode == 'tag' and tag is None))
+    if mode == 'genre':
+        _found_or_404(genre, f'Жанр «{genre_slug}» табылмады')
+    if mode == 'tag':
+        # Pending-тег для публики не существует (BR-TAG-07), и это тот же
+        # ответ, что у выдуманного слага. Автору объяснять здесь нечего: у
+        # его собственного тега чип не ссылка, а подпись «проверкада».
+        _found_or_404(tag, f'Тег «{tag_slug}» табылмады')
 
     # Вторая ось приходит query-параметром — но только если путь эту ось
     # не занял. DEC-27 это описывал, а код параметр не читал и терял его.
@@ -65,9 +71,7 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
     state = CatalogState.from_request(request, mode=mode,
                                       genre=eff_genre, tag=eff_tag)
 
-    if not_found:
-        results, (empty_title, empty_text) = [], ('', '')
-    elif mode == 'search' and not state.query:
+    if mode == 'search' and not state.query:
         results, (empty_title, empty_text) = [], _SEARCH_IDLE
     else:
         results = data.filter_catalog(query=state.query, genre=state.genre,
@@ -109,7 +113,6 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
             for name, legend in FILTER_GROUPS
         ],
         'genres':             data.all_genres(),
-        'not_found_slug':     (genre_slug or tag_slug) if not_found else '',
         'current_genre_slug': state.genre,
         'genre':              genre,
         'current_tag_slug':   state.tag,
@@ -168,7 +171,8 @@ def collections(request):
 
 
 def collection_detail(request, slug):
-    collection = data.collection_by_slug(slug)
+    collection = _found_or_404(data.collection_by_slug(slug),
+                               f'Жинақ «{slug}» табылмады')
     return render(request, 'pages/catalog/collection_detail.html', {
         'slug':       slug,
         'collection': collection,

@@ -7,7 +7,7 @@ from django.shortcuts import redirect, render
 
 from .. import data
 from ..forms import SubmissionForm
-from .common import _current_user, _page_state
+from .common import _current_user, _found_or_404, _page_state
 
 # ───────────────────────── CONT — конкурсы ───────────────────────────────
 def contest_list(request):
@@ -33,13 +33,11 @@ def _contest_rail_has_content(contest, *, submitted: bool, hide_cta: bool) -> bo
     """Есть ли что показать в правом рейле конкурса (DEC-25).
 
     Флаг ставится по наличию данных, а не безусловно: `partials/right_rail/
-    contest.html` пуст у неизвестного слага и у завершённого конкурса, все
-    этапы которого уже позади, — а пустая колонка в 300px не пустует, она
-    сдвигает контент от центра. Ровно эту ошибку в кабинете закрывал
+    contest.html` пуст у завершённого конкурса, все этапы которого уже
+    позади, — а пустая колонка в 300px не пустует, она сдвигает контент от
+    центра. Ровно эту ошибку в кабинете закрывал
     `test_write.MyStoriesGuestHasNoEmptyRail`.
     """
-    if not contest:
-        return False
     if contest.current_stage or contest.next_stage:
         return True
     # Блок «моя заявка» живёт только у активного конкурса, а на самой
@@ -48,7 +46,8 @@ def _contest_rail_has_content(contest, *, submitted: bool, hide_cta: bool) -> bo
 
 
 def contest_detail(request, slug):
-    contest = data.contest_by_slug(slug)
+    contest = _found_or_404(data.contest_by_slug(slug),
+                            f'Байқау «{slug}» табылмады')
     submitted = data.has_submission(_current_user(request), slug)
     return render(request, 'pages/contests/contest_detail.html', {
         'has_right_rail': _contest_rail_has_content(contest, submitted=submitted,
@@ -70,7 +69,8 @@ def contest_detail(request, slug):
 
 
 def contest_submit(request, slug):
-    contest = data.contest_by_slug(slug)
+    contest = _found_or_404(data.contest_by_slug(slug),
+                            f'Байқау «{slug}» табылмады')
     user = _current_user(request)
 
     if request.method == 'POST' and user and contest:

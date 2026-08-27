@@ -106,16 +106,17 @@ class GenreAndCollectionPages(TestCase):
             with self.subTest(story=story.slug):
                 self.assertContains(response, story.title)
 
-    def test_an_unknown_slug_says_what_was_not_found(self):
-        for name, kwargs, message in (
-            ('core:genre_detail', {'slug': 'no-such-genre'}, 'Жанр табылмады'),
-            ('core:collection_detail', {'slug': 'no-such'}, 'Жинақ табылмады'),
-            ('core:tag_detail', {'slug': 'no-such-tag'}, 'Тег табылмады'),
+    def test_an_unknown_slug_is_not_a_page(self):
+        """404 у всех трёх: выдуманный адрес — не страница с сообщением
+        внутри, и профиль отвечал так с первого дня (FR-PROF-02)."""
+        for name, kwargs in (
+            ('core:genre_detail', {'slug': 'no-such-genre'}),
+            ('core:collection_detail', {'slug': 'no-such'}),
+            ('core:tag_detail', {'slug': 'no-such-tag'}),
         ):
             with self.subTest(route=name):
-                response = self.client.get(reverse(name, kwargs=kwargs))
-                self.assertEqual(response.status_code, 200)
-                self.assertContains(response, message)
+                self.assertEqual(
+                    self.client.get(reverse(name, kwargs=kwargs)).status_code, 404)
 
 
 class TagPagesShowMovement(TestCase):
@@ -138,9 +139,12 @@ class TagPagesShowMovement(TestCase):
         pending = make.tag(status='pending')
         make.story(chapters=1).tags.add(pending)
 
+        # Тот же ответ, что у выдуманного слага: публично такой страницы
+        # нет. Автору объяснять здесь нечего — у его собственного тега чип
+        # не ссылка, а подпись «проверкада».
         response = self.client.get(reverse('core:tag_detail',
                                            kwargs={'slug': pending.slug}))
-        self.assertContains(response, 'Тег табылмады')
+        self.assertEqual(response.status_code, 404)
         self.assertEqual(list(data.filter_catalog(tag=pending.slug)), [])
 
         payload = self.client.get(reverse('core:api_search_index')).json()
