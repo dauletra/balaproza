@@ -860,7 +860,11 @@ class Contest(models.Model):
     таблицы: админ добавляет строки, а не редактирует кортеж в коде.
     Каждый список отдан наружу свойством (`awards`, `timeline`, `jury`,
     `conditions`), потому что шаблон перебирает их напрямую, а менеджер
-    связи в шаблоне не перебирается.
+    связи в шаблоне не перебирается. Свойства **кэшируются на экземпляре**:
+    страница спрашивает состав по нескольку раз (номинации — трижды: ряд
+    наград, разбор присуждений и словарь по слагу), а `other_editions`
+    вообще шёл запросом на каждое обращение. Экземпляр живёт один запрос,
+    и снимок не успевает устареть.
     """
 
     objects = ContestQuerySet.as_manager()
@@ -916,19 +920,19 @@ class Contest(models.Model):
         return self.name
 
     # ── Списки состава ───────────────────────────────────────────────────
-    @property
+    @cached_property
     def awards(self) -> list:
         return list(self.award_set.all())
 
-    @property
+    @cached_property
     def timeline(self) -> list:
         return list(self.stage_set.all())
 
-    @property
+    @cached_property
     def jury(self) -> list:
         return list(self.jury_set.all())
 
-    @property
+    @cached_property
     def conditions(self) -> list:
         """Условия именно этого конкурса, строками. Общие для всех живут
         в `common_rules` и здесь не повторяются (BR-48a)."""
@@ -992,16 +996,16 @@ class Contest(models.Model):
             return annotated
         return self.submission_set.count()
 
-    @property
+    @cached_property
     def awards_by_slug(self) -> dict:
         return {a.slug: a for a in self.awards}
 
-    @property
+    @cached_property
     def grants(self) -> list:
         """Присуждения этого конкурса, в порядке номинаций (DEC-46)."""
         return list(self.grant_set.all())
 
-    @property
+    @cached_property
     def winner_stories(self) -> list:
         """Произведения-победители, в порядке номинаций, без повторов.
 
@@ -1016,31 +1020,36 @@ class Contest(models.Model):
                 out.append(grant.story)
         return out
 
-    @property
+    @cached_property
     def winners(self) -> tuple:
         """Слаги победителей — производное от присуждений, не хранимый кортеж."""
         return tuple(s.slug for s in self.winner_stories)
 
-    @property
+    @cached_property
     def other_editions(self) -> list:
         """Другие выпуски того же семейства, свежие сверху (BR-47).
 
         Без них завершённый конкурс — тупик: страница кончалась составом
         жюри, и пришедший из поиска уходил ни с чем, хотя приём в выпуск
         этого года шёл прямо сейчас.
+
+        Выпуск показывается карточкой, поэтому и выбирается как карточка
+        (`for_card`): без этого каждая соседняя строка спрашивала свои
+        присуждения и своё число заявок сама.
         """
         if not self.series:
             return []
-        return list(Contest.objects.filter(series=self.series)
+        return list(Contest.objects.for_card()
+                    .filter(series=self.series)
                     .exclude(pk=self.pk).order_by('-results_on'))
 
-    @property
+    @cached_property
     def current_stage(self):
         """Этап, идущий сейчас. Нужен рейлу (FR-CONT-09) — «что происходит
         прямо сейчас» единственное, чего нет в хиро."""
         return next((s for s in self.timeline if s.state == 'active'), None)
 
-    @property
+    @cached_property
     def next_stage(self):
         return next((s for s in self.timeline if s.state == 'upcoming'), None)
 
@@ -1315,7 +1324,7 @@ class Collection(models.Model):
     def __str__(self):
         return self.name
 
-    @property
+    @cached_property
     def stories(self) -> list:
         """Работы подборки в редакционном порядке.
 

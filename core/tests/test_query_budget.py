@@ -145,6 +145,21 @@ class PagesStayWithinTheirQueryBudget(TestCase):
             self.client.get(reverse('core:contest_detail',
                                     kwargs={'slug': 'altyn-qalam'}))
 
+    def test_finished_contest_with_other_editions(self):
+        """Завершённый выпуск повторяющегося конкурса — самая дорогая
+        страница раздела: к составу добавляются победители карточками и
+        соседние выпуски (BR-47).
+
+        Бюджета у неё не было, и потому не было видно двух вещей: список
+        выпусков спрашивался дважды (`{% if %}` и `{% for %}` по свойству,
+        ходившему в базу на каждое обращение), а победитель приезжал без
+        аннотаций — число частей ему считал отдельный `COUNT`. Цена
+        соседнего выпуска теперь не зависит от их количества.
+        """
+        with self.assertNumQueries(15):
+            self.client.get(reverse('core:contest_detail',
+                                    kwargs={'slug': 'zhas-aldym-2023'}))
+
     def test_tag_page(self):
         """Витрина тега — тот же движок каталога плюс резолв самого тега.
 

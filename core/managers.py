@@ -23,6 +23,7 @@ from django.db.models import (
     F,
     IntegerField,
     OuterRef,
+    Prefetch,
     Q,
     QuerySet,
     Subquery,
@@ -233,6 +234,24 @@ class StoryQuerySet(QuerySet):
         return self.filter(tags__slug=slug, tags__status='accepted')
 
 
+def _winner_cards() -> Prefetch:
+    """Работы-победители — той же выборкой, что карточка каталога.
+
+    Только для страницы конкурса: там победитель показан карточкой, и голое
+    `grant_set__story` отдавало его без аннотаций — «сколько это читать»
+    спрашивало число частей отдельным `COUNT` на каждого. Тот же приём, что
+    у одиночной подборки (B7).
+
+    Списку конкурсов эта выборка не нужна и не даётся: его карточка называет
+    победителя строкой заголовков, и полный набор связей — лишний запрос за
+    теги, которых на экране нет.
+    """
+    from .models import Story
+
+    return Prefetch('grant_set__story',
+                    queryset=Story.objects.for_card().with_reading_effort())
+
+
 class ContestQuerySet(QuerySet):
     """Конкурсы: число заявок и три календарных вопроса.
 
@@ -261,7 +280,7 @@ class ContestQuerySet(QuerySet):
         """Конкурс со всем составом — для его собственной страницы."""
         return self.with_counts().prefetch_related(
             'award_set', 'stage_set', 'jury_set', 'condition_set',
-            'grant_set__award', 'grant_set__story__author')
+            'grant_set__award', _winner_cards())
 
     def accepting(self):
         """Идёт приём работ — это и решает кнопку «Қатысу» (DEC-45)."""
