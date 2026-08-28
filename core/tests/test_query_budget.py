@@ -100,17 +100,21 @@ class PagesStayWithinTheirQueryBudget(TestCase):
         Дальше он платит один запрос за загрузку сессии — как любой
         вошедший, — и повторный заход в ту же работу счётчика уже не
         двигает и сессию не переписывает. Тест держит худший случай:
-        клиент здесь каждый раз новый."""
-        with self.assertNumQueries(23):
+        клиент здесь каждый раз новый.
+
+        Двадцать два: число работ автора страница спрашивает дважды —
+        карточкой и сводкой, — и второй раз теперь отвечает кэш
+        экземпляра, а не база."""
+        with self.assertNumQueries(22):
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'dalney-berega'}))
 
     def test_story_chapter_with_comments_and_poll(self):
         """Глава дороже произведения: к ней добавляются комментарии с
-        ответами, ряд реакций и опрос. Было 34, стало 30, потом 35 — те же
-        три причины, что у `test_story_page`, включая заведение сессии
-        под счётчик оқылым."""
-        with self.assertNumQueries(35):
+        ответами, ряд реакций и опрос. Было 34, стало 30, потом 35 и 34 —
+        те же причины, что у `test_story_page`, включая заведение сессии
+        под счётчик оқылым и кэш числа работ автора."""
+        with self.assertNumQueries(34):
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'dalney-berega'}) + '?chapter=3')
 
@@ -230,14 +234,14 @@ class PersonalPagesStayWithinTheirQueryBudget(TestCase):
         Сессия у него уже есть, поэтому пяти запросов первого захода
         гостя здесь нет: счётчик оқылым обходится одним UPDATE.
 
-        Тридцать восемь — первое открытие работы этим читателем: и
+        Тридцать семь — первое открытие работы этим читателем: и
         закладка, и полка «оқу үстінде» здесь заводятся, а вставка тянет
         за собой транзакцию. Возвращение к работе, которая уже лежит на
         полке, дешевле на шесть: обе записи ставятся сначала UPDATE'ом и
         переходят к вставке только на ноль задетых строк.
         """
         login_as(self.client, 'bekzhan_t')
-        with self.assertNumQueries(38):
+        with self.assertNumQueries(37):
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'dalney-berega'}))
 

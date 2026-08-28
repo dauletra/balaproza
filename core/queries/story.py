@@ -37,12 +37,21 @@ def chapters_of(story_slug: str):
 
 
 def _attach_my_reaction(chapter, viewer):
-    """Аннотирует `chapter._my_reaction` голосом текущего читателя
-    (BR-REACT-02/03). Гость (`None`) не голосует — запроса нет."""
-    if chapter is not None and viewer is not None:
-        vote = ChapterReactionVote.objects.filter(
-            chapter=chapter, user=viewer).first()
-        chapter._my_reaction = vote.kind if vote else ''
+    """Ставит `chapter._my_reaction` — голос текущего читателя (BR-REACT-02/03).
+
+    Гость не голосует, и запроса за него нет, но метка ставится и ему:
+    отсутствие метки означает «главу забыли пропустить через эту дверь», а
+    не «голоса нет», и различить эти два случая может только тот, кто их
+    различает (`managers.viewer_choice`).
+    """
+    if chapter is None:
+        return chapter
+    if viewer is None:
+        chapter._my_reaction = ''
+        return chapter
+    vote = ChapterReactionVote.objects.filter(chapter=chapter,
+                                             user=viewer).first()
+    chapter._my_reaction = vote.kind if vote else ''
     return chapter
 
 
@@ -111,11 +120,16 @@ def toggle_chapter_reaction(chapter, user, kind: str) -> str:
 
 
 def _attach_my_vote(poll, viewer):
-    """Аннотирует `poll._my_vote` голосом текущего читателя (одна ставка
-    на опрос, не меняется). Гость (`None`) не голосует."""
-    if poll is not None and viewer is not None:
-        vote = PollVote.objects.filter(poll=poll, user=viewer).first()
-        poll._my_vote = vote.option.slug if vote else ''
+    """Ставит `poll._my_vote` — голос текущего читателя (одна ставка на
+    опрос, не меняется). Гостю метка ставится пустой, по той же причине,
+    что и у реакции."""
+    if poll is None:
+        return poll
+    if viewer is None:
+        poll._my_vote = ''
+        return poll
+    vote = PollVote.objects.filter(poll=poll, user=viewer).first()
+    poll._my_vote = vote.option.slug if vote else ''
     return poll
 
 

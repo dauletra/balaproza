@@ -13,7 +13,7 @@
 конкурса до всякого жюри.
 """
 
-from django.db.models import prefetch_related_objects
+from django.db.models import Prefetch, prefetch_related_objects
 from django.utils import timezone
 
 from ..domain.catalog import PUBLIC_STATUSES
@@ -25,6 +25,7 @@ from ..domain.contests import (
 )
 from ..domain.formatting import spaced_number
 from ..models import Contest, Submission
+from .catalog import all_stories
 
 # Порядок открытых конкурсов — по тому, что читатель может сделать:
 # сначала куда можно подать прямо сейчас, потом что откроется, потом что
@@ -52,10 +53,15 @@ def contest_participants(contest) -> list:
     вызов.
     """
     grants_by_story = {g.story_id: g for g in contest.grants}
+    # Работа приезжает выборкой карточки, а не `select_related`: список
+    # участников рисует её карточкой, а `select_related` аннотировать
+    # связанный объект не умеет — время чтения каждой работы спрашивалось
+    # отдельным `COUNT` по главам, и число этих запросов росло вместе с
+    # числом допущенных.
     subs = (Submission.objects
             .filter(contest=contest, status='accepted',
                     story__status__in=PUBLIC_STATUSES)
-            .select_related('story', 'story__author', 'story__primary_genre')
+            .prefetch_related(Prefetch('story', queryset=all_stories()))
             .order_by('story__title'))
     out = []
     for sub in subs:

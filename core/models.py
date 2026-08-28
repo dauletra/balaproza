@@ -44,7 +44,12 @@ from .domain.story import (
     status_after_moderation,
 )
 from .domain.tags import TAG_STATUSES
-from .managers import ContestQuerySet, StoryQuerySet
+from .managers import (
+    ContestQuerySet,
+    StoryQuerySet,
+    from_annotation,
+    viewer_choice,
+)
 
 
 # Что принимаем в `media/` (BR-46). Растр и только растр: файл из `/media/`
@@ -178,7 +183,7 @@ class User(AbstractUser):
         """Как автора называют читателю. Ник — запасной вариант, не второй."""
         return self.pen_name or f'@{self.username}'
 
-    @property
+    @cached_property
     def works(self) -> int:
         """Сколько работ автора видит читатель.
 
@@ -188,12 +193,14 @@ class User(AbstractUser):
         выдаёт читателю, что у автора есть неопубликованное.
 
         Списки авторов подставляют готовую аннотацию: без неё ряд «Жаңа
-        авторлар» на главной — это по запросу на каждое имя.
+        авторлар» на главной — это по запросу на каждое имя. У одиночного
+        автора аннотации нет, и запрос законен — но ровно один: страница
+        произведения спрашивает число дважды (карточка автора и его
+        сводка), и второй раз отвечает кэш экземпляра.
         """
-        annotated = getattr(self, 'works_count', None)
-        if annotated is not None:
-            return annotated
-        return self.stories.filter(status__in=PUBLIC_STATUSES).count()
+        return from_annotation(
+            self, 'works_count',
+            lambda: self.stories.filter(status__in=PUBLIC_STATUSES).count())
 
     # ── Снимок автора на один запрос ─────────────────────────────────────
     # Страница профиля спрашивает работы автора из восьми мест: сегменты,
@@ -355,10 +362,9 @@ class Tag(models.Model):
         считает сам. Тот же контракт, что у `Story.chapters`: молча
         неверного ответа не бывает, бывает лишний запрос.
         """
-        annotated = getattr(self, 'usage', None)
-        if annotated is not None:
-            return annotated
-        return self.stories.filter(status__in=PUBLIC_STATUSES).count()
+        return from_annotation(
+            self, 'usage',
+            lambda: self.stories.filter(status__in=PUBLIC_STATUSES).count())
 
     @property
     def weekly_count(self) -> int:
@@ -368,15 +374,15 @@ class Tag(models.Model):
         убывает, и через месяц недельная витрина стала бы копией
         накопленной, ради отличия от которой её и завели (DEC-31).
         """
-        annotated = getattr(self, 'weekly', None)
-        if annotated is not None:
-            return annotated
-        from .queries.tags import TRENDING_DAYS
+        def counted():
+            from .queries.tags import TRENDING_DAYS
 
-        since = timezone.now() - timedelta(days=TRENDING_DAYS)
-        return self.stories.filter(
-            status__in=PUBLIC_STATUSES,
-            storytag__tag=self, storytag__created_at__gte=since).count()
+            since = timezone.now() - timedelta(days=TRENDING_DAYS)
+            return self.stories.filter(
+                status__in=PUBLIC_STATUSES,
+                storytag__tag=self, storytag__created_at__gte=since).count()
+
+        return from_annotation(self, 'weekly', counted)
 
     @property
     def is_public(self) -> bool:
@@ -570,10 +576,7 @@ class Story(models.Model):
         такой выдачи честно спрашивает базу. Молча неверного ответа здесь
         не бывает — бывает лишний запрос, и его ловит `test_query_budget`.
         """
-        annotated = getattr(self, 'chapter_count', None)
-        if annotated is not None:
-            return annotated
-        return self.chapter_set.count()
+        return from_annotation(self, 'chapter_count', self.chapter_set.count)
 
     @property
     def has_chapters(self) -> bool:
@@ -587,10 +590,8 @@ class Story(models.Model):
         Выдача подставляет ответ аннотацией `has_any_chapter`: без неё
         кабинет спрашивал базу на каждую работу автора.
         """
-        annotated = getattr(self, 'has_any_chapter', None)
-        if annotated is not None:
-            return annotated
-        return self.chapter_set.exists()
+        return from_annotation(self, 'has_any_chapter',
+                               self.chapter_set.exists)
 
     @property
     def text_chapter(self):
@@ -674,10 +675,10 @@ class Story(models.Model):
         out = []
         if self.is_editorial_pick:
             out.append(BADGE_LABELS['editorial'])
-        in_contest = getattr(self, 'in_open_contest', None)
-        if in_contest is None:
-            in_contest = self.submissions.filter(
-                contest__results_on__gt=timezone.localdate()).exists()
+        in_contest = from_annotation(
+            self, 'in_open_contest',
+            lambda: self.submissions.filter(
+                contest__results_on__gt=timezone.localdate()).exists())
         if in_contest:
             out.append(BADGE_LABELS['contest'])
         return tuple(out)
@@ -696,10 +697,9 @@ class Story(models.Model):
         каталога делала по запросу за главы на каждую карточку — сорок
         два запроса на двадцать одну работу.
         """
-        annotated = getattr(self, 'effective_chars', None)
-        if annotated is not None:
-            return annotated
-        return sum(c.char_count for c in self.chapter_set.all())
+        return from_annotation(
+            self, 'effective_chars',
+            lambda: sum(c.char_count for c in self.chapter_set.all()))
 
     @property
     def read_minutes(self) -> int:
@@ -781,7 +781,7 @@ class Chapter(models.Model):
         запросе (гость, объект вне контекста страницы) свойство молча
         отвечает «нет голоса» — тот же контракт, что у `has_chapters`.
         """
-        return getattr(self, '_my_reaction', '')
+        return viewer_choice(self, '_my_reaction')
 
 
 class ChapterReaction(models.Model):
@@ -991,10 +991,8 @@ class Contest(models.Model):
         десять карточек раздела — это десять отдельных `COUNT`, и растёт
         их число вместе с разделом.
         """
-        annotated = getattr(self, 'submission_count', None)
-        if annotated is not None:
-            return annotated
-        return self.submission_set.count()
+        return from_annotation(self, 'submission_count',
+                               self.submission_set.count)
 
     @cached_property
     def awards_by_slug(self) -> dict:
@@ -1611,7 +1609,7 @@ class ChapterPoll(models.Model):
         если не голосовал. Подставляется `poll_of` (`_attach_my_vote`,
         Ф15 Этап 4) аннотацией `_my_vote` — тот же контракт, что у
         `Chapter.my_reaction`."""
-        return getattr(self, '_my_vote', '')
+        return viewer_choice(self, '_my_vote')
 
     @property
     def results(self) -> list:
