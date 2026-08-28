@@ -23,21 +23,14 @@ def contest_list(request):
 
 
 # С какого числа работ в выборе появляется поиск по ним. Ниже порога поле
-# только отнимает строку: список и так виден целиком. Выше — выбор
-# превращается в прокрутку, и работа, которую автор ищет, может быть
-# сороковой. Порог, а не «всегда»: у большинства авторов работ единицы.
+# только отнимает строку: список и так виден целиком.
 PICKER_SEARCH_FROM = 8
 
 
 def _contest_rail_has_content(contest, *, submitted: bool, hide_cta: bool) -> bool:
-    """Есть ли что показать в правом рейле конкурса (DEC-25).
-
-    Флаг ставится по наличию данных, а не безусловно: `partials/right_rail/
-    contest.html` пуст у завершённого конкурса, все этапы которого уже
-    позади, — а пустая колонка в 300px не пустует, она сдвигает контент от
-    центра. Ровно эту ошибку в кабинете закрывал
-    `test_write.MyStoriesGuestHasNoEmptyRail`.
-    """
+    """Есть ли что показать в правом рейле конкурса (DEC-25). Флаг ставится
+    по наличию данных: у завершённого конкурса рейл пуст, а пустая колонка
+    в 300px не пустует — она сдвигает контент от центра."""
     if contest.current_stage or contest.next_stage:
         return True
     # Блок «моя заявка» живёт только у активного конкурса, а на самой
@@ -74,9 +67,9 @@ def contest_submit(request, slug):
     user = _current_user(request)
 
     if request.method == 'POST' and user and contest:
-        # Кандидаты — те же публичные работы автора, что и на GET (BR-10,
-        # DEC-23): чужой или непубличный slug просто не найдётся здесь,
-        # и отдельной проверки владения форме не нужно.
+        # Кандидаты — те же публичные работы автора, что и на GET (BR-10):
+        # чужой или непубличный слаг здесь не найдётся, и отдельной
+        # проверки владения форме не нужно.
         candidates = {c['story'].slug: c['story']
                      for c in data.submission_candidates(user, contest)}
         form = SubmissionForm(request.POST, candidates=candidates,
@@ -101,14 +94,13 @@ def contest_submit(request, slug):
 
     submitted = data.has_submission(user, slug)
     # Конкурс берётся один раз и раздаётся дальше: через слаг и
-    # `submission_candidates`, и `can_withdraw` тянули бы состав конкурса
-    # заново — по шесть запросов на каждый вызов. Работы автора приходят
-    # снимком с него самого.
+    # `submission_candidates`, и `can_withdraw` тянули бы состав заново —
+    # по шесть запросов на вызов.
     candidates = data.submission_candidates(user, contest) if contest else []
 
-    # Выбранная по умолчанию — первая без заметок, иначе просто первая.
-    # Отклонять форма ничего не отклоняет (BR-24), но начинать выбор с
-    # работы, о которой есть что сказать, незачем.
+    # Выбранная по умолчанию — первая без заметок, иначе просто первая:
+    # форма ничего не отклоняет (BR-24), но начинать выбор с работы, о
+    # которой есть что сказать, незачем.
     preview = next((c for c in candidates if not c['notes']),
                    candidates[0] if candidates else None)
     preview_story = preview['story'] if preview else None
@@ -116,10 +108,8 @@ def contest_submit(request, slug):
         data.submission_checklist(preview_story, contest, chars=preview['chars'])
         if preview and contest else []
     )
-    # Чек-лист зависит от выбранной работы, а выбор меняется в браузере.
-    # Раньше он считался один раз для превью и застывал: автор переключал
-    # радио, а объём под ним оставался чужим. Пересчёт — на стороне
-    # клиента, из этой таблицы (FR-CONT-04).
+    # Чек-лист зависит от выбранной работы, а выбор меняется в браузере:
+    # пересчёт идёт на стороне клиента, из этой таблицы (FR-CONT-04).
     volumes = {}
     for item in candidates:
         # Объём уже посчитан в `submission_candidates` — передаём его, а не
@@ -171,9 +161,8 @@ def my_submissions(request):
     return render(request, 'pages/contests/my_submissions.html', {
         'page_state': _page_state(request),
         'items': items,
-        # Модалка подключается только когда ей есть что подтверждать:
-        # иначе на странице висел бы слушатель события, которое некому
-        # послать.
+        # Модалка подключается, только когда ей есть что подтверждать:
+        # иначе на странице висит слушатель события, которое некому послать.
         'any_withdrawable': any(i['can_withdraw'] for i in items),
     })
 
@@ -181,10 +170,8 @@ def my_submissions(request):
 @require_POST
 @login_required
 def contest_withdraw(request, slug):
-    """Отзыв заявки (BR-23b): настоящий POST приходит из
-    `withdraw_confirm_modal.html`. Условие (приём ещё идёт, жюри ещё не
-    решило) проверяет `data.withdraw_submission` заново — `can_withdraw` на
-    странице решает только, показать ли кнопку."""
+    """Отзыв заявки (BR-23b). Условие проверяет `data.withdraw_submission`
+    заново: `can_withdraw` на странице решает только, показать ли кнопку."""
     user = request.user
     contest = data.contest_by_slug(slug)
     if contest is not None:
