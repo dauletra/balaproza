@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load balaproza %}
 
 {% block title %}Менің өтінімдерім — Balaproza{% endblock %}
 
@@ -41,7 +42,7 @@
                 {% with sub=it.sub c=it.contest %}
                 <article class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-5 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0 flex-1">
-                        <p class="font-sans text-xs uppercase tracking-wide text-slate-500">{{ sub.submitted_label }}</p>
+                        <p class="font-sans text-xs uppercase tracking-wide text-slate-500">{{ sub.submitted_on|ago }}</p>
                         <h2 class="mt-1 font-display text-lg font-bold leading-tight text-slate-900">
                             <a href="{% url 'core:contest_detail' slug=c.slug %}" class="hover:text-brand">{{ c.name }}</a>
                         </h2>
@@ -55,14 +56,13 @@
                         {% comment %}
                             Срок вместо тишины: «Қаралуда» без даты не отвечает
                             на «а когда узнаю» — самый частый вопрос после
-                            подачи. Строку собирает сам конкурс
-                            (`Contest.timing_line`, DEC-45): её же показывает
-                            конкурсное уведомление, а две рукописные копии
-                            одной формулировки расходятся.
+                            подачи. Строку собирает `domain.contests.timing_line`
+                            (DEC-45): её же показывает конкурсное уведомление, а
+                            две рукописные копии одной формулировки расходятся.
                         {% endcomment %}
-                        {% if c.timing_line %}
-                            <p class="mt-1.5 font-sans text-xs text-slate-500">{{ c.timing_line }}</p>
-                        {% endif %}
+                        {% with timing=c|timing_line %}{% if timing %}
+                            <p class="mt-1.5 font-sans text-xs text-slate-500">{{ timing }}</p>
+                        {% endif %}{% endwith %}
 
                         {% if sub.note %}
                             <p class="mt-2 rounded-md bg-slate-50 px-3 py-2 font-sans text-xs leading-snug text-slate-700">

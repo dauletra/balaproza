@@ -1,4 +1,4 @@
-{% comment %}
+{% load balaproza %}{% comment %}
     ContestStatus (docs/ui.md, BR-40, DEC-45) — бейдж фазы конкурса
     и опциональный отсчёт.
 
@@ -11,7 +11,7 @@
     у идущего приёма и до открытия у ещё не начавшегося.
 
     Параметры:
-      contest — Contest (phase, phase_label, days_left, days_until_open)
+      contest — Contest (phase, days_left, days_until_open)
 
     Ряд переносится (`flex-wrap`). Бейдж с отсчётом вместе занимают ~264px,
     а на трёхколоночной карточке конкурса полоса афиши даёт 252px — без
@@ -20,18 +20,18 @@
 {% endcomment %}
 <div class="inline-flex flex-wrap items-center gap-2">
     {% if contest.phase == "upcoming" %}
-        {% include "components/badge.html" with kind="info" label=contest.phase_label %}
+        {% include "components/badge.html" with kind="info" label=contest|phase_label %}
         {% if contest.days_until_open %}
             {% include "components/countdown.html" with days=contest.days_until_open muted=True suffix="күннен кейін басталады" %}
         {% endif %}
     {% elif contest.phase == "accepting" %}
-        {% include "components/badge.html" with kind="published" label=contest.phase_label icon="check" %}
+        {% include "components/badge.html" with kind="published" label=contest|phase_label icon="check" %}
         {% if contest.days_left %}
             {% include "components/countdown.html" with days=contest.days_left %}
         {% endif %}
     {% elif contest.phase == "judging" %}
-        {% include "components/badge.html" with kind="attention" label=contest.phase_label %}
+        {% include "components/badge.html" with kind="attention" label=contest|phase_label %}
     {% else %}
-        {% include "components/badge.html" with kind="neutral" label=contest.phase_label %}
+        {% include "components/badge.html" with kind="neutral" label=contest|phase_label %}
     {% endif %}
 </div>

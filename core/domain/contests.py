@@ -6,7 +6,16 @@
 
 `SUBMISSION_NOTES` — заметки, а не запреты (BR-24): форма ничего не
 отклоняет, решение о работе принимает человек.
+
+Две фразы конкурса — возрастное требование и «что дальше и когда» — тоже
+живут здесь, а не свойствами `Contest`: их спрашивает не только шаблон,
+но и чек-лист подачи, и проверка формы. Функция от дат и чисел вызывается
+из обоих мест; свойство модели — только из одного.
 """
+
+from datetime import date
+
+from .formatting import kk_date
 
 # Фазы конкурса (BR-40, DEC-45). Порядок — хронологический.
 CONTEST_PHASES = ("upcoming", "accepting", "judging", "finished")
@@ -65,3 +74,36 @@ SUBMISSION_NOTES = {
     "too_long":  "Көлемі шарттан үлкен",
     "busy":      "Бұл шығарма басқа байқауда тұр",
 }
+
+
+def eligibility_line(min_age, max_age) -> str:
+    """Возрастное требование словами. Пусто — конкурс его не ставит (BR-48).
+
+    Собирать эту строку в шаблоне запрещено: её показывают чек-лист
+    подачи, секция условий и чекбокс подтверждения.
+    """
+    if min_age and max_age:
+        return f"{min_age}-{max_age} жас"
+    if min_age:
+        return f"{min_age} жастан бастап"
+    if max_age:
+        return f"{max_age} жасқа дейін"
+    return ""
+
+
+def timing_line(phase: str, opens_on: date, closes_on: date,
+                results_on: date) -> str:
+    """«Что дальше и когда» одной строкой. У завершённого — пусто.
+
+    Спрашивают об этом из трёх мест сразу: строка заявки, конкурсное
+    уведомление и рейл. Отсчёта в днях здесь нет — он протухает назавтра
+    (BR-40a).
+    """
+    if phase == "upcoming":
+        return f"Қабылдау {kk_date(opens_on)} басталады"
+    if phase == "accepting":
+        return (f"Қабылдау {kk_date(closes_on)} жабылады · "
+                f"жеңімпаздар {kk_date(results_on)} жарияланады")
+    if phase == "judging":
+        return f"Жеңімпаздар {kk_date(results_on)} жарияланады"
+    return ""

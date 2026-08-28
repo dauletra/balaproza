@@ -48,9 +48,9 @@
             </h2>
             <p class="mt-1 font-sans text-sm text-slate-700">
                 {% if contest.phase == 'upcoming' %}
-                    Қабылдау {{ contest.opens_on_label }} басталады — сол күні осында орал.
+                    Қабылдау {{ contest.opens_on|short_date }} басталады — сол күні осында орал.
                 {% elif contest.phase == 'judging' %}
-                    Қазылар алқасы жұмыстарды оқып жатыр. Жеңімпаздар {{ contest.results_on_label }} жарияланады.
+                    Қазылар алқасы жұмыстарды оқып жатыр. Жеңімпаздар {{ contest.results_on|short_date }} жарияланады.
                 {% else %}
                     Байқау аяқталды.
                 {% endif %}
@@ -235,9 +235,9 @@
                     вилкой автор подтверждал не то, а у конкурса без
                     ограничений — подтверждал несуществующее требование.
                 {% endcomment %}
-                {% if contest.eligibility_line %}
-                    {% include "components/checkbox.html" with name="confirm_age" label="Жасым байқау талабына сай: "|add:contest.eligibility_line required=True %}
-                {% endif %}
+                {% with elig=contest|eligibility_line %}{% if elig %}
+                    {% include "components/checkbox.html" with name="confirm_age" label="Жасым байқау талабына сай: "|add:elig required=True %}
+                {% endif %}{% endwith %}
                 {% include "components/checkbox.html" with name="confirm_rules" label="Байқау ережелерімен таныстым және келісемін" required=True %}
             {% endif %}
 

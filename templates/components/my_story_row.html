@@ -43,8 +43,8 @@
 
         {# Когда трогали + метрики #}
         <div class="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
-            {% if story.updated_label %}
-                <span class="font-sans text-xs text-slate-500">{{ story.updated_label }}</span>
+            {% if story.updated_at %}
+                <span class="font-sans text-xs text-slate-500">{{ story.updated_at|since }}</span>
                 <span class="font-sans text-xs text-slate-300" aria-hidden="true">·</span>
             {% endif %}
 

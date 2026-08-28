@@ -1,4 +1,4 @@
-{% comment %}
+{% load balaproza %}{% comment %}
     NotificationItem (FR-NOTIF-03). Шесть типов: comment | like | new_chapter
     | follower | moderation | contest. Непрочитанные подсвечены акцентом.
 
@@ -119,7 +119,7 @@
                     экземпляр в шаблоне разошёлся бы с реестром, как это
                     запрещено для статусов работы (BR-10) и фаз конкурса.
                 {% endcomment %}
-                <span class="font-bold">{{ n.outcome_label }}:</span>
+                <span class="font-bold">{{ n|outcome_label }}:</span>
                 {% if n.story %}
                     <a href="{% url 'core:notification_open' pk=n.pk %}" class="font-semibold hover:text-brand">«{{ n.story.title }}»</a>
                     <span class="text-slate-700">— {{ n.text }}</span>
@@ -145,9 +145,9 @@
             уведомления нет и быть не может — оно протухло бы назавтра
             (BR-40a).
         {% endcomment %}
-        {% if n.kind == 'contest' and n.contest.timing_line %}
-            <p class="mt-1 font-sans text-xs text-slate-600">{{ n.contest.timing_line }}</p>
-        {% endif %}
+        {% with timing=n.contest|timing_line %}{% if n.kind == 'contest' and timing %}
+            <p class="mt-1 font-sans text-xs text-slate-600">{{ timing }}</p>
+        {% endif %}{% endwith %}
 
         {# Текст-выдержка (для comment) #}
         {% if n.kind == 'comment' and n.text %}
@@ -156,7 +156,7 @@
             </p>
         {% endif %}
 
-        <p class="mt-1 font-sans text-xs text-slate-500">{{ n.when }}</p>
+        <p class="mt-1 font-sans text-xs text-slate-500">{{ n.created_at|ago }}</p>
     </div>
 
     {% comment %}

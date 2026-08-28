@@ -10,7 +10,7 @@ from django.urls import reverse
 from core import data
 from core.models import Chapter, Story, Tag
 from core.tests.base import login_as, login_as_newcomer, user
-from core.templatetags.balaproza import spaced
+from core.templatetags.balaproza import reading_meta, since, spaced
 
 
 # ───────────────────────── Кабинет: my_stories_of / writer_stats ─────────
@@ -56,8 +56,9 @@ class TheCabinetAnswersWhatToDoNext(TestCase):
         body = self.response.content.decode()
         self.assertEqual([body.index(s.title) for s in self.mine],
                          sorted(body.index(s.title) for s in self.mine))
-        self.assertContains(self.response,
-                            data.story_by_slug('aidana-tan').updated_label)
+        self.assertContains(
+            self.response,
+            since(data.story_by_slug('aidana-tan').updated_at))
 
     def test_metrics_are_exact_spoken_and_never_zero_filler(self):
         """Значение в `stat_pill` помечено `aria-hidden`, иконка
@@ -813,7 +814,7 @@ class ChapterEditorSavesADraft(TestCase):
 
         story = Story.objects.get(slug=self.SLUG)
         self.assertEqual(story.chapters, 3)
-        self.assertEqual(story.reading_meta_label, '3 бөлім')
+        self.assertEqual(reading_meta(story), '3 бөлім')
 
         from_feed = next(s for s in data.my_stories_of(user('aidana'))
                          if s.slug == self.SLUG)

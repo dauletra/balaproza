@@ -1,4 +1,4 @@
-{% comment %}
+{% load balaproza %}{% comment %}
     Hero для авторизованного (FR-HOME-01): один главный фокус.
 
     hero_focus:
@@ -92,7 +92,7 @@
                     <span aria-hidden="true">·</span>
                     <span>{{ progress.minutes_left }} минут</span>
                     <span aria-hidden="true">·</span>
-                    <span>{{ progress.last_read_days }} күн бұрын</span>
+                    <span>{{ progress.last_read_on|ago }}</span>
                 </div>
                 {% if story.is_single %}{% widthratio 1 1 100 as pct %}{% else %}{% widthratio progress.current_chapter story.chapters 100 as pct %}{% endif %}
                 <div class="mt-3 h-1 overflow-hidden rounded-pill bg-slate-200">

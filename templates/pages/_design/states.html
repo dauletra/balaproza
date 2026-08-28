@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load balaproza %}
 
 {% block title %}States · _design — Balaproza{% endblock %}
 
@@ -149,7 +150,7 @@
                         рисовал пустую оболочку: аватар «?», ни имени, ни
                         текста. Данные во view были, сломан был вызов.
                     {% endcomment %}
-                    {% include "components/comment.html" with comment_id=sample_comment.id author_name=sample_comment.author.public_name author_username=sample_comment.author.username date=sample_comment.date text=sample_comment.text likes=sample_comment.likes liked=sample_comment.liked %}
+                    {% include "components/comment.html" with comment_id=sample_comment.id author_name=sample_comment.author.public_name author_username=sample_comment.author.username date=sample_comment.created_at|ago text=sample_comment.text likes=sample_comment.likes liked=sample_comment.liked %}
                 </div>
             </div>
         </div>

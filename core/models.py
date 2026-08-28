@@ -27,12 +27,8 @@ from django.db import models, transaction
 from django.utils import timezone
 
 from .domain.catalog import BADGE_LABELS, PUBLIC_STATUSES
-from .domain.contests import (
-    AI_DECLARATIONS,
-    CONTEST_PHASE_LABELS,
-    SUBMISSION_STATUSES,
-)
-from .domain.formatting import kk_ago, kk_date, kk_period, kk_updated
+from .domain.contests import AI_DECLARATIONS, SUBMISSION_STATUSES
+from .domain.formatting import kk_period
 from .domain.library import LIBRARY_KINDS
 from .domain.notifications import (
     MODERATION_OUTCOME_LABELS,
@@ -560,14 +556,6 @@ class Story(models.Model):
         return self.format != 'single'
 
     @property
-    def format_label(self) -> str:
-        return 'Бір бөлімді' if self.is_single else 'Көп бөлімді'
-
-    @property
-    def format_badge_label(self) -> str:
-        return 'Бір оқылым' if self.is_single else 'Серия'
-
-    @property
     def chapters(self) -> int:
         """Сколько частей у работы. Считается по записям глав.
 
@@ -665,11 +653,9 @@ class Story(models.Model):
 
     @property
     def updated_days_ago(self) -> int:
+        """Сколько дней работу не трогали. Число, а не подпись: кабинет
+        считает им срок проверки, а подпись собирает фильтр `since`."""
         return (timezone.now() - self.updated_at).days
-
-    @property
-    def updated_label(self) -> str:
-        return kk_updated(self.updated_days_ago)
 
     # ── Знаки каталога ───────────────────────────────────────────────────
     @property
@@ -730,12 +716,6 @@ class Story(models.Model):
             return 'medium'
         return 'long'
 
-    @property
-    def reading_meta_label(self) -> str:
-        if self.is_single:
-            return f'{self.read_minutes} минут оқу'
-        return f'{self.chapters} бөлім'
-
 
 class Chapter(models.Model):
     """Глава. Запись главы обязана нести текст (docs/architecture.md).
@@ -770,13 +750,6 @@ class Chapter(models.Model):
     def save(self, *args, **kwargs):
         self.char_count = len(self.body)
         super().save(*args, **kwargs)
-
-    @property
-    def char_count_formatted(self) -> str:
-        n = self.char_count
-        if n >= 1000:
-            return f'{n // 1000},{(n % 1000) // 100} мың'
-        return str(n)
 
     @property
     def reaction_counts(self) -> dict:
@@ -980,10 +953,6 @@ class Contest(models.Model):
         return 'finished'
 
     @property
-    def phase_label(self) -> str:
-        return CONTEST_PHASE_LABELS[self.phase]
-
-    @property
     def is_accepting(self) -> bool:
         """Можно ли подать работу. Именно это, а не «конкурс активен»,
         решает судьбу кнопки «Қатысу»."""
@@ -1004,55 +973,10 @@ class Contest(models.Model):
         return (self.opens_on - timezone.localdate()).days
 
     @property
-    def opens_on_label(self) -> str:
-        return kk_date(self.opens_on)
-
-    @property
-    def closes_on_label(self) -> str:
-        return kk_date(self.closes_on)
-
-    @property
-    def results_on_label(self) -> str:
-        return kk_date(self.results_on)
-
-    @property
     def year(self) -> int:
         """Год проведения — год объявления итогов. Нужен конкурсной
         биографии автора: «1 жыл бұрын» устаревает каждый день."""
         return self.results_on.year
-
-    @property
-    def eligibility_line(self) -> str:
-        """Возрастное требование словами. Пусто — конкурс его не ставит.
-
-        Собирать эту строку в шаблоне запрещено: её показывают чек-лист
-        подачи, секция условий и чекбокс подтверждения.
-        """
-        lo, hi = self.min_age, self.max_age
-        if lo and hi:
-            return f'{lo}-{hi} жас'
-        if lo:
-            return f'{lo} жастан бастап'
-        if hi:
-            return f'{hi} жасқа дейін'
-        return ''
-
-    @property
-    def timing_line(self) -> str:
-        """«Что дальше и когда» одной строкой. У завершённого — пусто.
-
-        Спрашивают об этом из трёх мест сразу: строка заявки, конкурсное
-        уведомление и рейл. Отсчёта в днях здесь нет — он протухает
-        назавтра (BR-40a).
-        """
-        if self.phase == 'upcoming':
-            return f'Қабылдау {self.opens_on_label} басталады'
-        if self.phase == 'accepting':
-            return (f'Қабылдау {self.closes_on_label} жабылады · '
-                    f'жеңімпаздар {self.results_on_label} жарияланады')
-        if self.phase == 'judging':
-            return f'Жеңімпаздар {self.results_on_label} жарияланады'
-        return ''
 
     # ── Производное от состава ───────────────────────────────────────────
     @property
@@ -1167,11 +1091,7 @@ class TimelineStage(models.Model):
         verbose_name_plural = 'байқау кезеңдері'
 
     def __str__(self):
-        return f'{self.label} ({self.period})'
-
-    @property
-    def period(self) -> str:
-        return kk_period(self.starts, self.ends)
+        return f'{self.label} ({kk_period(self.starts, self.ends)})'
 
     @property
     def state(self) -> str:
@@ -1329,11 +1249,6 @@ class Submission(models.Model):
 
     def __str__(self):
         return f'{self.author.username} → {self.contest.slug}'
-
-    @property
-    def submitted_label(self) -> str:
-        """«5 күн бұрын» — производное от даты, а не хранимая строка."""
-        return kk_ago((timezone.localdate() - self.submitted_on).days)
 
 
 class Follow(models.Model):
@@ -1517,10 +1432,6 @@ class LibraryEntry(models.Model):
     def __str__(self):
         return f'{self.user.username} · {self.story.slug} ({self.kind})'
 
-    @property
-    def added_relative(self) -> str:
-        return kk_updated((timezone.localdate() - self.added_on).days)
-
 
 class ReadingProgress(models.Model):
     """Где читатель остановился. Двигатель «Оқуды жалғастыру» (FR-HOME-02).
@@ -1552,10 +1463,6 @@ class ReadingProgress(models.Model):
 
     def __str__(self):
         return f'{self.user.username} · {self.story.slug} → {self.current_chapter}'
-
-    @property
-    def last_read_days(self) -> int:
-        return (timezone.localdate() - self.last_read_on).days
 
 
 class StoryComment(models.Model):
@@ -1617,13 +1524,6 @@ class StoryComment(models.Model):
     def is_author_badge(self) -> bool:
         """Пишет автор произведения — выводится, не проставляется руками."""
         return self.author_id == self.story.author_id
-
-    @property
-    def date(self) -> str:
-        """«45 мин бұрын», «2 сағат бұрын», «3 күн бұрын» — из момента."""
-        delta = timezone.now() - self.created_at
-        return kk_ago(delta.days, delta.seconds // 3600,
-                      (delta.seconds % 3600) // 60)
 
     def belongs_to(self, username: str) -> bool:
         """Свой комментарий: меню предлагает «Жою», а не «Шағым» (BR-33)."""
@@ -1837,12 +1737,9 @@ class Notification(models.Model):
 
     @property
     def days_ago(self) -> int:
+        """Сколько календарных дней назад. Именно календарных: лента
+        группирует по «сегодня / вчера / за неделю», а не по суткам."""
         return (timezone.localdate() - timezone.localtime(self.created_at).date()).days
-
-    @property
-    def when(self) -> str:
-        delta = timezone.now() - self.created_at
-        return kk_ago(self.days_ago, delta.seconds // 3600)
 
     @property
     def bucket(self) -> str:
@@ -1855,12 +1752,6 @@ class Notification(models.Model):
         if days == 1:
             return 'yesterday'
         return 'past_week' if days <= 7 else ''
-
-    @property
-    def outcome_label(self) -> str:
-        """Подпись исхода — из реестра, а не из шаблона: то же правило, что
-        у статусов работы (BR-10) и фаз конкурса (BR-40)."""
-        return MODERATION_OUTCOME_LABELS.get(self.outcome, '')
 
 
 class SchoolLink(models.Model):

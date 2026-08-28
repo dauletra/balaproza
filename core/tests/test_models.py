@@ -17,7 +17,12 @@ from django.utils import timezone
 
 from core import data
 from core.models import BlockedTagPattern, Genre, StoryTag, Tag, User
-from core.templatetags.balaproza import compact_count, page_range
+from core.templatetags.balaproza import (
+    compact_count,
+    page_range,
+    reading_meta,
+    since,
+)
 from core.tests import factories as make
 from core.tests.base import TestCase, user
 
@@ -124,7 +129,7 @@ class CountersAreDerivedNotStored(TestCase):
         make.chapter(story, number=1)
         make.chapter(story, number=2)
         self.assertEqual(story.chapters, 2)
-        self.assertEqual(story.reading_meta_label, '2 бөлім')
+        self.assertEqual(reading_meta(story), '2 бөлім')
 
     def test_annotated_and_unannotated_agree(self):
         """Аннотация выдачи и одиночный объект обязаны давать одно число:
@@ -162,9 +167,9 @@ class ReadingEffortIsHonest(TestCase):
     def test_a_serial_counts_parts_and_a_single_counts_minutes(self):
         single = make.story(chapters=1)
         serial = make.story(chapters=4, format='serial')
-        self.assertIn('минут', single.reading_meta_label)
-        self.assertIn('бөлім', serial.reading_meta_label)
-        self.assertNotIn('минут', serial.reading_meta_label)
+        self.assertIn('минут', reading_meta(single))
+        self.assertIn('бөлім', reading_meta(serial))
+        self.assertNotIn('минут', reading_meta(serial))
 
     def test_text_chapter_points_at_the_only_chapter(self):
         """Кнопка «Мәтін» обязана вести в существующую главу, а не в
@@ -243,7 +248,7 @@ class TimeIsWordedNotStored(TestCase):
         for days, expected in cases.items():
             with self.subTest(days=days):
                 story = Story(updated_at=timezone.now() - timedelta(days=days))
-                self.assertEqual(story.updated_label, expected)
+                self.assertEqual(since(story.updated_at), expected)
 
 
 class ReadTiersAreLadderNotRating(TestCase):

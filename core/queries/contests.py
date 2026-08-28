@@ -21,6 +21,7 @@ from ..domain.contests import (
     CONTEST_RESULT_LABELS,
     PUBLIC_CONTEST_RESULTS,
     SUBMISSION_NOTES,
+    eligibility_line,
 )
 from ..domain.formatting import spaced_number
 from ..models import Contest, Submission
@@ -254,9 +255,10 @@ def submission_checklist(story, contest, *, chars: int = None) -> list:
         {**rule, **state.get(rule['key'], {'passed': True, 'auto': False})}
         for rule in common_rules(contest) if rule['per_work']
     ]
-    if contest.eligibility_line:
+    eligibility = eligibility_line(contest.min_age, contest.max_age)
+    if eligibility:
         items.append({'key': 'eligibility', 'per_work': False,
-                      'label': f'Қатысушы: {contest.eligibility_line}',
+                      'label': f'Қатысушы: {eligibility}',
                       'hint': 'Өтінім бергенде растайсың.',
                       'passed': True, 'auto': False})
     return items

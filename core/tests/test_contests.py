@@ -22,6 +22,8 @@ from django.test import Client
 from django.urls import reverse
 
 from core import data, views
+from core.domain.contests import eligibility_line, timing_line
+from core.templatetags.balaproza import ago, period, short_date
 from core.models import (
     AwardGrant,
     Contest,
@@ -33,6 +35,15 @@ from core.models import (
 from core.tests.base import TestCase, login_as, login_as_newcomer, user
 
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
+
+
+def _timing(contest) -> str:
+    return timing_line(contest.phase, contest.opens_on, contest.closes_on,
+                       contest.results_on)
+
+
+def _eligibility(contest) -> str:
+    return eligibility_line(contest.min_age, contest.max_age)
 
 
 def _all_submissions() -> dict:
@@ -120,8 +131,8 @@ class ContestDatesAreTheSource(TestCase):
         contest = data.contest_by_slug('zhas-aldym-2023')
         final = next(t for t in contest.timeline if t.label == 'Финал')
         intake = next(t for t in contest.timeline if t.label == 'Өтінім қабылдау')
-        self.assertEqual(final.period, '15 жел')
-        self.assertEqual(intake.period, '1 қыр — 1 жел')
+        self.assertEqual(period(final), '15 жел')
+        self.assertEqual(period(intake), '1 қыр — 1 жел')
 
 
 class ContestGroupsAndPhaseLabels(TestCase):
@@ -157,17 +168,18 @@ class ContestTimingLineIsOneImplementation(TestCase):
 
     def test_the_line_matches_the_phase_and_carries_no_countdown(self):
         for contest in data.all_contests():
-            line = contest.timing_line
+            line = timing_line(contest.phase, contest.opens_on,
+                               contest.closes_on, contest.results_on)
             with self.subTest(contest=contest.slug, phase=contest.phase):
                 if contest.phase == 'finished':
                     self.assertEqual(line, '')
                 elif contest.phase == 'upcoming':
-                    self.assertIn(contest.opens_on_label, line)
+                    self.assertIn(short_date(contest.opens_on), line)
                 elif contest.phase == 'accepting':
-                    self.assertIn(contest.closes_on_label, line)
-                    self.assertIn(contest.results_on_label, line)
+                    self.assertIn(short_date(contest.closes_on), line)
+                    self.assertIn(short_date(contest.results_on), line)
                 else:
-                    self.assertIn(contest.results_on_label, line)
+                    self.assertIn(short_date(contest.results_on), line)
                 # Числа «12 күн» в строке нет: оно протухло бы назавтра.
                 self.assertNotIn('күн қалды', line)
 
@@ -175,7 +187,7 @@ class ContestTimingLineIsOneImplementation(TestCase):
         login_as(self.client, 'dina_books')
         self.assertContains(
             self.client.get(reverse('core:my_submissions')),
-            data.contest_by_slug('bolashak-mektebi').timing_line)
+            _timing(data.contest_by_slug('bolashak-mektebi')))
 
 
 class AgeIsTheContestsRule(TestCase):
@@ -198,7 +210,7 @@ class AgeIsTheContestsRule(TestCase):
                                 ({}, '')):
             with self.subTest(**extra):
                 self.assertEqual(
-                    Contest(**self.BASE, **extra).eligibility_line, expected)
+                    _eligibility(Contest(**self.BASE, **extra)), expected)
 
     def test_the_contests_do_not_all_share_one_bracket(self):
         """Если у всех одна вилка, поле ничем не отличается от константы."""
@@ -222,10 +234,10 @@ class AgeIsTheContestsRule(TestCase):
         self.assertContains(
             self.client.get(reverse('core:contest_detail',
                                     args=[restricted.slug])),
-            restricted.eligibility_line)
+            _eligibility(restricted))
 
         free = data.contest_by_slug('qys-ertegisi')
-        self.assertEqual(free.eligibility_line, '')
+        self.assertEqual(_eligibility(free), '')
         html = self.client.get(
             reverse('core:contest_detail', args=[free.slug])).content.decode()
         self.assertNotIn('Қатысушы:', html)
@@ -551,8 +563,8 @@ class ContestDetail(TestCase):
     def test_the_hero_speaks_by_phase(self):
         cases = {
             'bolashak-mektebi': None,                    # accepting → кнопка
-            'qys-ertegisi': 'opens_on_label',            # upcoming
-            'altyn-qalam': 'results_on_label',           # judging
+            'qys-ertegisi': 'opens_on',                  # upcoming
+            'altyn-qalam': 'results_on',                 # judging
             'zhas-aldym-2023': None,                     # finished
         }
         for slug, field in cases.items():
@@ -567,7 +579,8 @@ class ContestDetail(TestCase):
                 else:
                     self.assertNotContains(response, submit)
                 if field:
-                    self.assertContains(response, getattr(contest, field))
+                    self.assertContains(response,
+                                        short_date(getattr(contest, field)))
 
     def test_an_unknown_slug_is_not_a_page(self):
         """404, а не 200 с карточкой внутри: страницы такого конкурса нет,
@@ -1141,7 +1154,7 @@ class WorkPickerScalesToManyWorks(TestCase):
 
 class ContestSubmitCreatesSubmission(TestCase):
 
-    SLUG = 'bolashak-mektebi'   # accepting, eligibility_line непустой
+    SLUG = 'bolashak-mektebi'   # accepting, возрастная вилка непустая
     STORY_SLUG = 'tunge-deiin'  # bekzhan_t-нікі, кандидат бойынша таза
 
     def setUp(self):
@@ -1191,7 +1204,7 @@ class ContestSubmitCreatesSubmission(TestCase):
             'нет согласия с правилами': {'confirm_rules': ''},
             'нет подтверждения возраста': {'confirm_age': ''},
         }
-        self.assertTrue(Contest.objects.get(slug=self.SLUG).eligibility_line)
+        self.assertTrue(_eligibility(Contest.objects.get(slug=self.SLUG)))
         for label, overrides in cases.items():
             with self.subTest(case=label):
                 self._post(**overrides)
@@ -1325,12 +1338,12 @@ class MySubmissions(TestCase):
         login_as(self.client, 'dina_books')
         accepting = data.contest_by_slug('bolashak-mektebi')
         response = self.client.get(reverse('core:my_submissions'))
-        self.assertContains(response, accepting.closes_on_label)
-        self.assertContains(response, accepting.results_on_label)
+        self.assertContains(response, short_date(accepting.closes_on))
+        self.assertContains(response, short_date(accepting.results_on))
         login_as(self.client)
         self.assertContains(
             self.client.get(reverse('core:my_submissions')),
-            data.contest_by_slug('altyn-qalam').results_on_label)
+            short_date(data.contest_by_slug('altyn-qalam').results_on))
 
     def test_accepted_stays_the_jury_word(self):
         """«Қабылданды» — решение жюри (BR-41), а не факт получения формы.
@@ -1403,12 +1416,12 @@ class SubmissionIntegrity(TestCase):
 
     def test_the_label_follows_the_date(self):
         fresh = data.submissions_of(user('aidana'))[0]
-        self.assertEqual(fresh.submitted_label,
+        self.assertEqual(ago(fresh.submitted_on),
                          data.kk_ago((date.today() - fresh.submitted_on).days))
         # Заявка 2023 года в 2026-м — не «1 жыл бұрын».
         old = data.submissions_of(user('bekzhan_t'))[0]
         years = (date.today() - old.submitted_on).days // 365
-        self.assertEqual(old.submitted_label, f'{years} жыл бұрын')
+        self.assertEqual(ago(old.submitted_on), f'{years} жыл бұрын')
 
     def test_the_rejection_note_names_the_side_of_the_threshold(self):
         sub = next(s for s in data.submissions_of(user('aidana'))

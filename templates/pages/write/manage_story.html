@@ -88,7 +88,7 @@
     <section class="rounded-lg border border-slate-200 bg-white">
         <div class="flex items-baseline justify-between border-b border-slate-100 px-5 py-4">
             <h2 class="font-display text-lg font-bold text-slate-900">{% if story.is_single %}Мәтін{% else %}Бөлімдер{% endif %}</h2>
-            <span class="font-sans text-xs text-slate-500">{{ story.reading_meta_label }}</span>
+            <span class="font-sans text-xs text-slate-500">{{ story|reading_meta }}</span>
         </div>
 
         {% if chapters %}
@@ -100,7 +100,7 @@
                         <div class="min-w-0 flex-1">
                             <div class="truncate font-sans text-sm font-semibold text-slate-900">{% if story.is_single %}Толық мәтін{% else %}{{ c.title }}{% endif %}</div>
                             <div class="flex flex-wrap items-center gap-x-2 font-sans text-xs text-slate-500">
-                                <span>{{ c.char_count_formatted }} таңба</span>
+                                <span>{{ c.char_count|spaced }} таңба</span>
                                 {% comment %}
                                     Карта качества по главам (DEC-32). Одна цифра
                                     говорит «зацепило», ведущая реакция — «чем

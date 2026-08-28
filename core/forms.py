@@ -19,7 +19,7 @@
 from django import forms
 
 from .domain.catalog import AUDIENCE_ORDER
-from .domain.contests import AI_DECLARATIONS
+from .domain.contests import AI_DECLARATIONS, eligibility_line
 from .models import Chapter, Genre, Story, User
 
 # Лимит аннотации (BR-16). У поля модели его нет — это `TextField`, — и
@@ -246,7 +246,8 @@ class SubmissionForm(forms.Form):
         # Возраст подтверждается только там, где конкурс называет вилку
         # (BR-48): у конкурса без ценза чекбокса нет вовсе.
         self.fields['confirm_age'].required = bool(
-            contest is not None and contest.eligibility_line)
+            contest is not None
+            and eligibility_line(contest.min_age, contest.max_age))
 
     def clean_story_slug(self):
         slug = self.cleaned_data['story_slug']

@@ -18,6 +18,7 @@ from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.db.models import Count
 from django.shortcuts import render
 
+from .domain.contests import CONTEST_PHASE_LABELS
 from .domain.notifications import MODERATION_OUTCOME_LABELS
 from .models import (
     AwardGrant,
@@ -366,7 +367,7 @@ class ContestAdmin(admin.ModelAdmin):
 
     @admin.display(description='кезеңі')
     def phase_label(self, obj):
-        return obj.phase_label
+        return CONTEST_PHASE_LABELS[obj.phase]
 
     @admin.display(description='өтінім', ordering='submission_count')
     def submissions(self, obj):
@@ -511,7 +512,7 @@ class NotificationAdmin(admin.ModelAdmin):
 
     @admin.display(description='нәтижесі')
     def outcome_label(self, obj):
-        return obj.outcome_label
+        return MODERATION_OUTCOME_LABELS.get(obj.outcome, '')
 
     @admin.display(description='оқиға')
     def short_text(self, obj):

@@ -37,6 +37,7 @@ from django.utils import timezone
 
 from core import data
 from core.management.commands import _corpus
+from core.templatetags.balaproza import ago, outcome_label, since
 from core.models import (
     AwardGrant,
     Chapter,
@@ -306,7 +307,7 @@ class SeededSubmissionsSitInsideTheirWindow(TestCase):
                     row = Submission.objects.get(author__username=username,
                                                  contest__slug=stub.contest_slug)
                     self.assertEqual(row.submitted_on, stub.submitted_on)
-                    self.assertTrue(row.submitted_label)
+                    self.assertTrue(ago(row.submitted_on))
 
     def test_submission_lies_inside_the_intake_window(self):
         """Инвариант данных: подача не может быть раньше открытия приёма
@@ -357,7 +358,7 @@ class SeededShelvesDoNotOverlap(TestCase):
                     row = LibraryEntry.objects.get(user__username=username,
                                                    story__slug=stub.story_slug)
                     self.assertEqual(row.added_on, today - stub.added_ago)
-                    self.assertTrue(row.added_relative)
+                    self.assertTrue(since(row.added_on))
 
     def test_a_story_lies_in_exactly_one_shelf(self):
         """Три вида не пересекаются (BR-60/61): иначе «Оқуды жалғастыру»
@@ -398,8 +399,8 @@ class SeededCommentsStayOneLevelDeep(TestCase):
         «7 күн бұрын». Лесенка в проекте одна, и рукописная строка была
         ровно тем, что BR-70a запрещает."""
         fresh = StoryComment.objects.order_by('-created_at').first()
-        self.assertIn('бұрын', fresh.date)
-        self.assertNotIn('апта', fresh.date)
+        self.assertIn('бұрын', ago(fresh.created_at))
+        self.assertNotIn('апта', ago(fresh.created_at))
 
 
 class SeededPollsDeriveTheirResults(TestCase):
@@ -453,7 +454,7 @@ class SeededNotificationsDeriveTheirTime(TestCase):
         for username, stub, row in self._pairs():
             with self.subTest(user=username, kind=stub.kind):
                 self.assertEqual(row.days_ago, stub.days_ago)
-                self.assertTrue(row.when)
+                self.assertTrue(ago(row.created_at))
                 self.assertEqual(row.bucket,
                                  {0: 'today', 1: 'yesterday'}.get(
                                      stub.days_ago, 'past_week'))
@@ -464,7 +465,7 @@ class SeededNotificationsDeriveTheirTime(TestCase):
         for username, stub, row in self._pairs():
             with self.subTest(user=username, kind=stub.kind):
                 self.assertEqual(row.outcome, stub.outcome)
-                self.assertEqual(row.outcome_label,
+                self.assertEqual(outcome_label(row),
                                  data.MODERATION_OUTCOME_LABELS[stub.outcome])
 
 

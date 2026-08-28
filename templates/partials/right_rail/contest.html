@@ -1,4 +1,4 @@
-{% comment %}
+{% load balaproza %}{% comment %}
     Правый рейл CONT.
 
     Раньше здесь стояла вторая копия страницы: күй, сыйақы и число заявок
@@ -32,14 +32,14 @@
                             Қазір
                         </dt>
                         <dd class="mt-0.5 font-semibold text-slate-900">{{ contest.current_stage.label }}</dd>
-                        <dd class="text-slate-500">{{ contest.current_stage.period }}</dd>
+                        <dd class="text-slate-500">{{ contest.current_stage|period }}</dd>
                     </div>
                 {% endif %}
                 {% if contest.next_stage %}
                     <div>
                         <dt class="text-slate-500">Келесі</dt>
                         <dd class="mt-0.5 font-semibold text-slate-900">{{ contest.next_stage.label }}</dd>
-                        <dd class="text-slate-500">{{ contest.next_stage.period }}</dd>
+                        <dd class="text-slate-500">{{ contest.next_stage|period }}</dd>
                     </div>
                 {% endif %}
             </dl>

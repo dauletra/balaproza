@@ -75,11 +75,11 @@
                     </a>
                 {% elif contest.phase == 'upcoming' %}
                     <p class="font-sans text-sm text-white/85">
-                        Өтінім қабылдау {{ contest.opens_on_label }} басталады.
+                        Өтінім қабылдау {{ contest.opens_on|short_date }} басталады.
                     </p>
                 {% else %}
                     <p class="font-sans text-sm text-white/85">
-                        Өтінім қабылдау жабылды. Жеңімпаздар {{ contest.results_on_label }} жарияланады.
+                        Өтінім қабылдау жабылды. Жеңімпаздар {{ contest.results_on|short_date }} жарияланады.
                     </p>
                 {% endif %}
             {% endif %}
@@ -128,12 +128,12 @@
     <section class="mb-8 rounded-lg border border-slate-200 bg-white p-6">
         <h2 class="font-display text-lg font-bold text-slate-900">Шарттар</h2>
         <ul class="mt-3 flex flex-col gap-2 font-sans text-sm leading-snug text-slate-700">
-            {% if contest.eligibility_line %}
+            {% with elig=contest|eligibility_line %}{% if elig %}
                 <li class="flex items-start gap-2">
                     <span class="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-pill bg-brand"></span>
-                    <span>Қатысушы: {{ contest.eligibility_line }}</span>
+                    <span>Қатысушы: {{ elig }}</span>
                 </li>
-            {% endif %}
+            {% endif %}{% endwith %}
             {% for cond in contest.conditions %}
                 <li class="flex items-start gap-2">
                     <span class="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-pill bg-brand"></span>

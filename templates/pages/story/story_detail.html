@@ -51,9 +51,9 @@
                 {# Аудитория, формат и длительность — то, по чему выбирают читать или нет #}
                 <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-sans text-xs text-slate-500">
                     {% if story.audience %}<span class="inline-flex h-6 items-center rounded-chip bg-slate-100 px-2 font-bold text-slate-600">{{ story.audience }}</span>{% endif %}
-                    <span>{{ story.format_badge_label }}</span>
+                    <span>{{ story|format_badge }}</span>
                     <span aria-hidden="true">·</span>
-                    <span>{{ story.reading_meta_label }}</span>
+                    <span>{{ story|reading_meta }}</span>
                 </p>
             </div>
         </div>
@@ -412,12 +412,12 @@
                 {% for cm in comments %}
                     {% if cm.author %}
                         <div>
-                            {% include "components/comment.html" with story_slug=story.slug chapter_number=chapter_number comment_id=cm.id author_name=cm.author.public_name author_username=cm.author.username author_avatar=cm.author.avatar date=cm.date text=cm.text likes=cm.likes liked=cm.liked badge=cm.is_author_badge|yesno:"Автор," own=cm|belongs_to:current_user_username allow_reply=True reply_avatar_name=current_user_name %}
+                            {% include "components/comment.html" with story_slug=story.slug chapter_number=chapter_number comment_id=cm.id author_name=cm.author.public_name author_username=cm.author.username author_avatar=cm.author.avatar date=cm.created_at|ago text=cm.text likes=cm.likes liked=cm.liked badge=cm.is_author_badge|yesno:"Автор," own=cm|belongs_to:current_user_username allow_reply=True reply_avatar_name=current_user_name %}
 
                             {# Replies (BR-30: один уровень — реплай-форма у реплая отсутствует) #}
                             {% for rp in cm.replies %}
                                 {% if rp.author %}
-                                    {% include "components/comment.html" with story_slug=story.slug chapter_number=chapter_number comment_id=rp.id author_name=rp.author.public_name author_username=rp.author.username author_avatar=rp.author.avatar date=rp.date text=rp.text likes=rp.likes liked=rp.liked badge=rp.is_author_badge|yesno:"Автор," own=rp|belongs_to:current_user_username depth=1 allow_reply=False %}
+                                    {% include "components/comment.html" with story_slug=story.slug chapter_number=chapter_number comment_id=rp.id author_name=rp.author.public_name author_username=rp.author.username author_avatar=rp.author.avatar date=rp.created_at|ago text=rp.text likes=rp.likes liked=rp.liked badge=rp.is_author_badge|yesno:"Автор," own=rp|belongs_to:current_user_username depth=1 allow_reply=False %}
                                 {% endif %}
                             {% endfor %}
                         </div>

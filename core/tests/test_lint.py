@@ -441,7 +441,7 @@ class PlatformDoesNotNameItsAudience(TestCase):
 
     Проверка идёт и по отрендеренному HTML, и по исходникам шаблонов:
     первое ловит текст, попавший на экран, второе — вилку, вписанную
-    литералом вместо `Contest.eligibility_line`.
+    литералом вместо `domain.contests.eligibility_line`.
     """
 
     # «14-18 жас», «14–18 жас», «10-18 лет» — вилка рядом со словом о возрасте.
@@ -494,7 +494,8 @@ class PlatformDoesNotNameItsAudience(TestCase):
                 self.assertIsNone(
                     found,
                     f'{path.name}: вилка «{found.group(0) if found else ""}» вписана '
-                    f'литералом — она должна приходить из `Contest.eligibility_line`')
+                    f'литералом — она должна приходить из '
+                    f'`domain.contests.eligibility_line`')
 
 
 # ── Раскладка: ширина колонки, брейкпоинт рейла, размер карточек ────

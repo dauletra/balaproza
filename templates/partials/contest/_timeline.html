@@ -1,4 +1,4 @@
-{% comment %}
+{% load balaproza %}{% comment %}
     Этапы конкурса — только список, без заголовка и рамки секции.
 
     Вынесен из `contest_detail.html`, потому что у завершённого конкурса тот
@@ -27,7 +27,7 @@
             </span>
             <div class="min-w-0 flex-1">
                 <p class="font-sans text-sm font-semibold text-slate-900">{{ t.label }}</p>
-                <p class="font-sans text-xs text-slate-500">{{ t.period }}</p>
+                <p class="font-sans text-xs text-slate-500">{{ t|period }}</p>
             </div>
             {% if t.state == 'active' %}
                 <span class="inline-flex h-6 items-center rounded-pill bg-status-attention-bg px-2.5 font-sans text-[11px] font-bold text-status-attention-fg">

@@ -1,9 +1,9 @@
-{% comment %}
+{% load balaproza %}{% comment %}
     LibraryRow — карточка элемента библиотеки. У 'reading' есть «Жалғастыру»
     с позицией главы; у 'saved' — «Оқу», у 'done' — «Қайта оқу».
 
     Параметры:
-      entry — LibraryEntry с .story, .kind, .added_relative, .progress_chapter
+      entry — LibraryEntry с .story, .kind, .added_on, .progress_chapter
 {% endcomment %}
 <article class="flex gap-4 rounded-lg border border-slate-200 bg-white p-4 transition-shadow hover:shadow-card-hover sm:gap-5">
     {% url 'core:story_detail' slug=entry.story.slug as cover_href %}
@@ -15,7 +15,7 @@
                class="font-sans text-base font-bold leading-tight text-slate-900 hover:text-brand">
                 {{ entry.story.title }}
             </a>
-            <span class="font-sans text-xs text-slate-500">{{ entry.added_relative }}</span>
+            <span class="font-sans text-xs text-slate-500">{{ entry.added_on|since }}</span>
         </div>
 
         <a href="{% url 'core:profile_other' username=entry.story.author.username %}"

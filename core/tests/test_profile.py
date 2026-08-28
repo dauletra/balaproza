@@ -23,7 +23,9 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core import data
+from core.domain.contests import timing_line
 from core.models import Follow, Notification, Story, User
+from core.templatetags.balaproza import outcome_label
 from core.tests.base import TestCase, login_as, login_as_newcomer, user
 
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
@@ -1255,8 +1257,10 @@ class NotificationsLeadSomewhere(TestCase):
     def test_the_deadline_is_counted_by_the_contest(self):
         """FR-NOTIF-06: срок считает конкурс, а не текст уведомления."""
         contest = data.contest_by_slug('bolashak-mektebi')
-        self.assertTrue(contest.timing_line)
-        self.assertContains(self.response, contest.timing_line)
+        line = timing_line(contest.phase, contest.opens_on,
+                           contest.closes_on, contest.results_on)
+        self.assertTrue(line)
+        self.assertContains(self.response, line)
 
 
 class ModerationNotificationNamesItsOutcome(TestCase):
@@ -1280,11 +1284,11 @@ class ModerationNotificationNamesItsOutcome(TestCase):
         for outcome, label in data.MODERATION_OUTCOME_LABELS.items():
             with self.subTest(outcome=outcome or 'pending'):
                 self.assertEqual(
-                    _notification(kind='moderation', outcome=outcome).outcome_label,
+                    outcome_label(_notification(kind='moderation', outcome=outcome)),
                     label)
         # Лучше пусто, чем чужая подпись: реестр — единственный источник.
         self.assertEqual(
-            _notification(kind='moderation', outcome='whatever').outcome_label, '')
+            outcome_label(_notification(kind='moderation', outcome='whatever')), '')
 
     def test_the_outcome_belongs_to_moderation_and_agrees_with_the_story(self):
         for notification in _aidana_notifications():

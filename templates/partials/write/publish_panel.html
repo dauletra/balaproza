@@ -1,4 +1,4 @@
-{% comment %}
+{% load balaproza %}{% comment %}
     Панель готовности произведения (FR-WRITE-09, BR-11).
 
     Контекст: story, checklist (из views._checklist_links), can_submit, missing.
@@ -30,7 +30,7 @@
                 {% endif %}
             </p>
         </div>
-        <span class="rounded-chip bg-slate-100 px-2.5 py-1 font-sans text-xs font-bold text-slate-600">{{ story.reading_meta_label }}</span>
+        <span class="rounded-chip bg-slate-100 px-2.5 py-1 font-sans text-xs font-bold text-slate-600">{{ story|reading_meta }}</span>
     </div>
 
     {# ── Незакрытые пункты ── #}

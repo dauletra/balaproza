@@ -29,6 +29,7 @@ from core.models import (
     Story,
     User,
 )
+from core.templatetags.balaproza import outcome_label
 from core.tests.base import TestCase
 
 
@@ -80,7 +81,7 @@ class ADecisionReachesTheAuthor(TestCase):
         self.assertEqual(note.outcome, 'needs_work')
         self.assertEqual(note.text, 'Диалогтар үзіліп қалған.')
         self.assertEqual(note.story, story)
-        self.assertEqual(note.outcome_label, 'Толықтыру қажет')
+        self.assertEqual(outcome_label(note), 'Толықтыру қажет')
 
     def test_what_the_door_refuses(self):
         """Отказ без причины не сообщает автору ничего (BR-11). Одобрить

@@ -38,7 +38,7 @@
                 </a>
                 <p class="font-sans text-xs text-slate-600">{{ story.author.public_name }}</p>
                 <p class="mt-auto font-sans text-xs text-slate-600">
-                    {{ story.reading_meta_label }}
+                    {{ story|reading_meta }}
                     <span aria-hidden="true" class="text-slate-400">·</span>
                     {{ story.views|compact_count }} оқыды
                 </p>
@@ -76,8 +76,8 @@
                 {% if story.audience %}
                     <span class="rounded-chip bg-white/70 px-2 py-0.5 font-sans text-xs font-bold text-slate-600">{{ story.audience }}</span>
                 {% endif %}
-                <span class="rounded-chip bg-white/70 px-2 py-0.5 font-sans text-xs font-semibold text-slate-600">{{ story.format_badge_label }}</span>
-                <span class="rounded-chip bg-white/70 px-2 py-0.5 font-sans text-xs font-semibold text-slate-600">{{ story.reading_meta_label }}</span>
+                <span class="rounded-chip bg-white/70 px-2 py-0.5 font-sans text-xs font-semibold text-slate-600">{{ story|format_badge }}</span>
+                <span class="rounded-chip bg-white/70 px-2 py-0.5 font-sans text-xs font-semibold text-slate-600">{{ story|reading_meta }}</span>
             </div>
 
             <h3 class="font-sans text-2xl font-bold leading-[1.1] -tracking-[0.01em] text-slate-900 md:text-[26px]">
