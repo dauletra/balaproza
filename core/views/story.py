@@ -78,22 +78,29 @@ def story_detail(request, slug):
         chapter_number = None
         current = None
 
-    # Запоминаем место **после** резолва: `has_progress_here` отвечает на
-    # «была ли закладка до этого захода», и от неё зависят тизер и подпись
-    # главной кнопки. Записанный раньше, прогресс сделал бы первое
-    # знакомство с работой похожим на возвращение.
-    if current is not None and request.user.is_authenticated:
-        data.record_reading_progress(request.user, story, chapter_number, chapters)
-        # BR-61 / FR-LIB-02: полку двигает само чтение, а не только кнопка.
-        data.move_to_shelf(request.user, story,
-                           finished=chapter_number == len(chapters))
-
     # Тизер с разворотом — только для гл.1 при «голом» URL без ?chapter (первое
     # знакомство с произведением). Возвращающийся юзер или явный выбор главы → полный текст.
     is_teaser = bool(
         current and chapter_number == 1 and not explicit_chapter
         and not has_progress_here and not story.is_single
     )
+
+    # Запоминаем место **после** резолва: `has_progress_here` отвечает на
+    # «была ли закладка до этого захода», и от неё зависят тизер и подпись
+    # главной кнопки. Записанный раньше, прогресс сделал бы первое
+    # знакомство с работой похожим на возвращение.
+    if current is not None and request.user.is_authenticated:
+        # Продвижение, а не повторный показ того же места: глава, отличная
+        # от закладки, либо первый заход не тизером. Полку двигает только
+        # оно (BR-61) — иначе снятие кнопкой воскресало бы на редиректе
+        # сюда же. Неравенство, а не «дальше»: повторное чтение дочитанного
+        # начинается с первой главы и обязано вернуть работу на `reading`.
+        advanced = (chapter_number != progress.current_chapter
+                    if has_progress_here else not is_teaser)
+        data.record_reading_progress(request.user, story, chapter_number, chapters)
+        # BR-61 / FR-LIB-02: полку двигает само чтение, а не только кнопка.
+        data.move_to_shelf(request.user, story, advanced=advanced,
+                           finished=chapter_number == len(chapters))
 
     return render(request, 'pages/story/story_detail.html', {
         'has_right_rail': True,

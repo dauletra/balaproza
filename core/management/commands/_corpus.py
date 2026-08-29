@@ -359,6 +359,26 @@ CHAPTERS_BY_STORY: dict = {
         _chapter("arhimag", 2, "Бөтен заң"),
         _chapter("arhimag", 3, "Үйге қайту шарты"),
     ],
+    "zhuldyz-kartasy": [
+        _chapter("zhuldyz-kartasy", 1, "Болмауға тиіс нүкте"),
+        _chapter("zhuldyz-kartasy", 2, "Курсты өзгерту"),
+        _chapter("zhuldyz-kartasy", 3, "Картаны кім салды"),
+    ],
+    "kokjal-anyzy": [
+        _chapter("kokjal-anyzy", 1, "Атаның айтуы"),
+        _chapter("kokjal-anyzy", 2, "Қыстаудағы түн"),
+        _chapter("kokjal-anyzy", 3, "Аңызды кім жалғастырады"),
+    ],
+    "keiipkerge-hat": [
+        _chapter("keiipkerge-hat", 1, "Бірінші хат"),
+        _chapter("keiipkerge-hat", 2, "Жауап"),
+        _chapter("keiipkerge-hat", 3, "Екінші бөлім"),
+    ],
+    "arqadagy-jaz": [
+        _chapter("arqadagy-jaz", 1, "Бірінші апта: велосипед"),
+        _chapter("arqadagy-jaz", 2, "Екінші апта: өзен"),
+        _chapter("arqadagy-jaz", 3, "Үшінші апта: жаңбыр"),
+    ],
     "dalney-berega": [
         # FR-STORY-12 + DEC-32: реакции — на главу, не на произведение.
         # Раскладка подобрана так, чтобы читался характер главы.

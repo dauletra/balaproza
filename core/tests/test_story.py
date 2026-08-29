@@ -235,6 +235,36 @@ class StoryDetailSaveButton(TestCase):
         self._toggle(self.IN_LIBRARY)
         self.assertIsNone(self._entry(self.IN_LIBRARY))
 
+    def test_removal_survives_landing_back_on_the_page(self):
+        """Снятие обязано пережить редирект, который его же и показывает.
+
+        Кнопка отвечает POST'ом и редиректит на страницу произведения, а та
+        по BR-61 кладёт читаемую работу на «оқу үстінде». Пока полку двигал
+        сам факт открытия, запись воскресала раньше, чем читатель видел
+        результат нажатия: снять работу с полки было нельзя ни на одном
+        произведении, у которого есть главы. Держалось это на том, что
+        единственной фикстурой «не в библиотеке» была работа **без глав**.
+        """
+        login_as(self.client)
+        page = self._url(self.NOT_IN_LIBRARY)
+
+        self.client.post(reverse('core:library_toggle',
+                                 kwargs={'slug': self.NOT_IN_LIBRARY}), follow=True)
+        self.assertEqual(self._entry(self.NOT_IN_LIBRARY).kind, 'saved')
+        # Взгляд на страницу не перебивает ручную полку на «оқу үстінде».
+        self.client.get(page)
+        self.assertEqual(self._entry(self.NOT_IN_LIBRARY).kind, 'saved')
+
+        self.client.post(reverse('core:library_toggle',
+                                 kwargs={'slug': self.NOT_IN_LIBRARY}), follow=True)
+        self.assertIsNone(self._entry(self.NOT_IN_LIBRARY))
+        self.client.get(page)
+        self.assertIsNone(self._entry(self.NOT_IN_LIBRARY))
+
+        # А настоящее продвижение по главам полку возвращает.
+        self.client.get(page, {'chapter': 2})
+        self.assertEqual(self._entry(self.NOT_IN_LIBRARY).kind, 'reading')
+
     def test_neither_a_guest_nor_a_get_writes_to_a_shelf(self):
         before = LibraryEntry.objects.count()
         self._toggle(self.NOT_IN_LIBRARY)
