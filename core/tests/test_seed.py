@@ -553,6 +553,30 @@ class SeededCorpusHoldsItsInvariants(TestCase):
             with self.subTest(channel=link.channel):
                 self.assertTrue(link.url and link.title and link.subtitle)
 
+    def test_a_work_is_never_older_than_its_author(self):
+        """Дата создания и приход автора расходились молча: `auto_now_add`
+        ставил всем работам момент запуска сида, и год в шапке профиля
+        («2025 жылдан бері») жил отдельно от того, что этот автор написал."""
+        for story in Story.objects.select_related('author'):
+            with self.subTest(story=story.slug):
+                self.assertGreaterEqual(story.created_at, story.author.date_joined)
+                self.assertGreaterEqual(story.updated_at, story.created_at)
+
+    def test_the_axes_of_the_catalog_show_different_orders(self):
+        """Три оси — три вопроса, и ответы обязаны различаться.
+
+        Пока все работы создавались в момент запуска сида, «Жаңалары»
+        давала случайный порядок; пока окно не убывало, «Қазір танымал»
+        сходилась с «Ең көп оқылған». Обе оси существовали, но ничего не
+        сообщали.
+        """
+        newest = [s.slug for s in Story.objects.order_by('-created_at')[:5]]
+        recent = [s.slug for s in Story.objects.order_by('-recent_views')[:5]]
+        alltime = [s.slug for s in Story.objects.order_by('-views')[:5]]
+        self.assertNotEqual(newest, recent)
+        self.assertNotEqual(recent, alltime)
+        self.assertNotEqual(newest, alltime)
+
     def test_the_two_tag_showcases_do_not_coincide(self):
         """Иначе «Осы аптада» — копия «Танымал тегтер» и занимает место зря
         (DEC-31). Держится это на разбросе дат правок в корпусе: сид

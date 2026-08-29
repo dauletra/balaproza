@@ -166,13 +166,16 @@ class Command(BaseCommand):
                 },
             )
             story.tags.set([tags[slug] for slug in stub.tags if slug in tags])
-            # Датируется последней правкой работы, а не сегодняшним днём:
-            # `auto_now_add` проставил бы всем момент запуска сида, и
-            # «Осы аптада» стала бы копией «Танымал тегтер» (DEC-31).
-            if stub.updated_days_ago is not None:
-                touched = timezone.now() - timedelta(days=stub.updated_days_ago)
-                Story.objects.filter(pk=story.pk).update(updated_at=touched)
-                StoryTag.objects.filter(story=story).update(created_at=touched)
+            # Обе даты — своим `update()`, в обход `auto_now_add`/`auto_now`:
+            # иначе все двадцать три работы созданы и правлены в момент
+            # запуска сида. «Жаңалары» тогда даёт случайный порядок, а
+            # «Осы аптада» становится копией «Танымал тегтер» (DEC-31) —
+            # обе витрины тегов считаются по дате связки.
+            born = timezone.now() - timedelta(days=stub.created_days_ago)
+            touched = timezone.now() - timedelta(days=stub.updated_days_ago)
+            Story.objects.filter(pk=story.pk).update(created_at=born,
+                                                     updated_at=touched)
+            StoryTag.objects.filter(story=story).update(created_at=touched)
             added += is_new
             updated += not is_new
         return added, updated
