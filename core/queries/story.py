@@ -7,10 +7,14 @@
 произведение «правильной» главы нет.
 """
 
-from django.db import transaction
-from django.db.models import F, Prefetch
+from datetime import timedelta
 
-from ..domain.story import REACTIONS
+from django.db import transaction
+from django.db.models import Count, F, OuterRef, Prefetch, Subquery
+from django.db.models.functions import Coalesce
+from django.utils import timezone
+
+from ..domain.story import REACTIONS, RECENT_VIEWS_DAYS
 from ..managers import chapter_count_subquery
 from ..models import (
     BookOfWeek,
@@ -23,6 +27,7 @@ from ..models import (
     PollVote,
     Story,
     StoryComment,
+    StoryView,
 )
 from .catalog import all_stories
 
@@ -211,22 +216,51 @@ def top_level_comment_of(story_slug: str, comment_id) -> StoryComment | None:
         pk=comment_id, story__slug=story_slug, parent__isnull=True).first()
 
 
-def record_story_view(story) -> None:
-    """Засчитать одно чтение работы.
+def record_story_view(story, viewer=None) -> None:
+    """Засчитать одно чтение работы: строка в журнал и оба счётчика.
 
-    Оба счётчика растут вместе. **Убыли у `recent_views` пока нет**:
-    журнала просмотров с датами не существует, и окно в четырнадцать дней
-    (DEC-36) остаётся обещанием — отдельная задача, PLAN §6, вопрос 4.
+    Строка нужна для убыли: без дат окно в четырнадцать дней (DEC-36) не
+    убывало, и «Қазір танымал» со временем сходилась с «Ең көп оқылған»
+    (DEC-55). Считать по журналу на каждой странице каталога дорого,
+    поэтому колонки остаются — но `recent_views` теперь пересчитывается
+    вниз (`recount_recent_views`), а не только растёт.
 
     Через `update()`, а не `save()`: гонки двух читателей складываются в
     базе, а `auto_now` у `updated_at` остаётся нетронутым — чтение работы
     не есть её правка. Объект в памяти двигается следом, иначе страница
     показала бы цифру, отставшую на этот самый заход.
     """
+    StoryView.objects.create(story=story, viewer=viewer)
     Story.objects.filter(pk=story.pk).update(
         views=F('views') + 1, recent_views=F('recent_views') + 1)
     story.views += 1
     story.recent_views += 1
+
+
+def recount_recent_views() -> tuple[int, int]:
+    """Пересчитать окно по журналу и вычистить то, что из него вышло.
+
+    Отдаёт «сколько работ тронуто, сколько строк удалено». Пересчёт, а не
+    сдвиг на единицу: колонка самоисправляется, как `Story.likes` и
+    `User.followers` — приём `toggle_comment_like`.
+
+    Вычистка идёт **после** пересчёта и по той же границе: строка старше
+    окна ни на что уже не влияет, и держать её значило бы растить таблицу
+    вместе со всем трафиком портала.
+
+    Накопленный `Story.views` не трогается: журнал за пределами окна
+    пуст, и пересчёт по нему обнулил бы историю работы.
+    """
+    edge = timezone.now() - timedelta(days=RECENT_VIEWS_DAYS)
+    fresh = StoryView.objects.filter(created_at__gte=edge, story=OuterRef('pk'))
+    touched = Story.objects.update(
+        recent_views=Coalesce(
+            Subquery(fresh.values('story').annotate(n=Count('id')).values('n')[:1]),
+            0,
+        )
+    )
+    removed, _ = StoryView.objects.filter(created_at__lt=edge).delete()
+    return touched, removed
 
 
 def add_comment(story, author, *, text: str, chapter_number=None, parent=None) -> StoryComment:

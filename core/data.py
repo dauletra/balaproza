@@ -123,6 +123,7 @@ from .queries.story import (
     poll_of,
     reactions_of,
     record_story_view,
+    recount_recent_views,
     toggle_chapter_reaction,
     toggle_comment_like,
     top_level_comment_of,

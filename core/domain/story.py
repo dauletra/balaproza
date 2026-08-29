@@ -20,6 +20,12 @@ STORY_STATUSES = ("Published", "NotPublished", "OnProcess", "Completed",
 # на старте она одна же.
 STORY_FORMATS = ("single", "serial")
 
+# Окно оси «Қазір танымал» (DEC-36) — и одновременно глубина журнала
+# просмотров: строки старше окна ни на что не влияют и вычищаются
+# пересчётом (DEC-55). Число живёт здесь, а не в модели: его спрашивают и
+# запрос, и команда пересчёта, и сид.
+RECENT_VIEWS_DAYS = 14
+
 
 def status_after_moderation(outcome: str, story_format: str) -> str:
     """Каким станет статус работы после решения модератора (BR-11).

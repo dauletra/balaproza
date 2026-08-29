@@ -363,11 +363,14 @@ class Story(models.Model):
     format = models.CharField('түрі', max_length=8, choices=FORMAT_CHOICES,
                               default='serial')
 
+    # Накопленный счёт за всё время. Колонка, а не COUNT по журналу: журнал
+    # держит только окно (DEC-55), за его пределами считать уже нечего.
     views = models.PositiveIntegerField('оқылым', default=0)
-    # Просмотры за 14 дней — ось «Қазір танымал» (DEC-36). Денормализовано:
-    # агрегат по логу с окном считался бы на каждой странице каталога.
-    # Инвариант `recent_views <= views`; убыли пока нет — журнала просмотров
-    # с датами не существует.
+    # Просмотры за окно — ось «Қазір танымал» (DEC-36). Денормализовано:
+    # агрегат по журналу с окном считался бы на каждой странице каталога.
+    # Инвариант `recent_views <= views`. Растёт по строкам `StoryView` и
+    # ими же пересчитывается вниз (`recount_views`) — как `Story.likes` и
+    # `User.followers`, колонка под ORDER BY, а не независимое число.
     recent_views = models.PositiveIntegerField('14 күндегі оқылым', default=0)
     # Голоса за реакции по всем главам (BR-14, DEC-32) и комментарии — обе
     # колонки, а не вычисление: у работы без текста глав нет вовсе, и счёт
@@ -528,6 +531,47 @@ class Story(models.Model):
         if self.read_minutes <= 30:
             return 'medium'
         return 'long'
+
+
+class StoryView(models.Model):
+    """Одно засчитанное прочтение работы — журнал под окно «Қазір танымал».
+
+    Ось DEC-36 обещает просмотры за две недели, но без дат убывать им было
+    не от чего: оба счётчика росли вместе, и окно со временем сходилось с
+    «Ең көп оқылған» — две оси показывали бы один и тот же порядок
+    (DEC-55).
+
+    Журнал держит **только окно**: `recount_views` пересчитывает по нему
+    `Story.recent_views` и тут же вычищает всё, что старше. Поэтому таблица
+    растёт с трафиком двух недель, а не с трафиком за всё время, а
+    накопленный `Story.views` остаётся колонкой — за пределами окна
+    считать уже нечего.
+
+    `viewer` пуст у гостя: читают и без входа, и это тоже прочтение.
+    Дедупликация идёт раньше вставки, по сессии (`views/story._count_view`).
+    """
+
+    story = models.ForeignKey(Story, verbose_name='шығарма',
+                              on_delete=models.CASCADE, related_name='view_set')
+    viewer = models.ForeignKey(User, verbose_name='оқырман', null=True,
+                               blank=True, on_delete=models.SET_NULL,
+                               related_name='+')
+    # Не `auto_now_add`: сид расставляет прошлые моменты по всему окну, а
+    # `auto_now_add` проставил бы всем время запуска — и весь журнал
+    # оказался бы в одном дне.
+    created_at = models.DateTimeField('оқылған сәт', default=timezone.now)
+
+    class Meta:
+        verbose_name = 'оқылым'
+        verbose_name_plural = 'оқылымдар'
+        indexes = [
+            # Пересчёт идёт по работе и дате, вычистка — по одной дате.
+            models.Index(fields=['story', '-created_at']),
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.story_id} @ {self.created_at:%Y-%m-%d}'
 
 
 class Chapter(models.Model):

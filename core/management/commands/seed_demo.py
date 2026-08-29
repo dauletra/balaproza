@@ -14,6 +14,7 @@
 """
 
 from datetime import datetime, timedelta
+from random import Random
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -41,13 +42,16 @@ from core.models import (
     Story,
     StoryComment,
     StoryTag,
+    StoryView,
     Submission,
     Tag,
     TimelineStage,
     User,
 )
 
+from core.domain.story import RECENT_VIEWS_DAYS
 from core.managers import CHARS_PER_MINUTE
+from core.queries.story import recount_recent_views
 
 from . import _corpus
 
@@ -71,6 +75,7 @@ class Command(BaseCommand):
             'tags': self._seed_tags(),
             'stories': self._seed_stories(),
             'chapters': self._seed_chapters(),
+            'views': self._seed_views(),
             'contests': self._seed_contests(),
             'grants': self._seed_grants(),
             'submissions': self._seed_submissions(),
@@ -153,7 +158,6 @@ class Command(BaseCommand):
                     'audience':        stub.audience,
                     'format':          stub.format,
                     'views':           stub.views,
-                    'recent_views':    stub.recent_views,
                     'likes':           stub.likes,
                     'comments':        stub.comments,
                     # Знак редакции — акт человека; конкурсный знак выводится
@@ -197,6 +201,39 @@ class Command(BaseCommand):
                 for kind, count in kinds.items():
                     ChapterReaction.objects.update_or_create(
                         chapter=chapter, kind=kind, defaults={'count': count})
+        return added, updated
+
+    def _seed_views(self):
+        """Журнал прочтений внутри окна (DEC-55) и счётчик по нему.
+
+        `recent_views` в корпусе — это **сколько строк завести**, а не
+        число, которое проставляется колонке: колонка считается по журналу,
+        ровно как её пересчитает `recount_views`. Разойтись им негде.
+
+        Даты раскиданы по окну неровно и детерминированно (`Random(slug)`):
+        ровное распределение сделало бы вчерашний пересчёт и завтрашний
+        неразличимыми, а случайное без ключа — сид неидемпотентным.
+
+        Накопленный `views` остаётся литералом: журнал держит только окно,
+        и прочтения годичной давности в нём не лежат по определению.
+        """
+        window = timedelta(days=RECENT_VIEWS_DAYS)
+        edge = timezone.now() - window
+        StoryView.objects.all().delete()
+
+        added = 0
+        for stub in _corpus.STORIES:
+            story = Story.objects.get(slug=stub.slug)
+            rng = Random(stub.slug)
+            StoryView.objects.bulk_create([
+                StoryView(story=story,
+                          created_at=edge + window * rng.random())
+                for _ in range(stub.recent_views)
+            ])
+            added += stub.recent_views
+
+        updated = Story.objects.count()
+        recount_recent_views()
         return added, updated
 
     def _seed_contests(self):

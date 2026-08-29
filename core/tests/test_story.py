@@ -6,6 +6,7 @@
 комментарии. Все пять до Ф15 писались только сидом.
 """
 
+from datetime import timedelta
 from pathlib import Path
 
 from core.tests import factories as make
@@ -14,6 +15,7 @@ from django.test import Client
 from django.urls import reverse
 
 from core import data
+from core.domain.story import RECENT_VIEWS_DAYS
 from core.models import (
     ChapterReactionVote,
     LibraryEntry,
@@ -21,7 +23,9 @@ from core.models import (
     ReadingProgress,
     Story,
     StoryComment,
+    StoryView,
 )
+from django.db.models import F
 from django.utils import timezone
 
 
@@ -1029,6 +1033,61 @@ class ReadingCountsAsAView(TestCase):
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'no-such-story'})).status_code,
             404)
+
+
+class TheRecentWindowActuallyShrinks(TestCase):
+    """Окно «Қазір танымал» убывает, потому что убывает журнал (DEC-55).
+
+    До журнала с датами оба счётчика росли вместе и никогда не падали: ось
+    DEC-36 обещала две недели, а показывала всё время — то есть со
+    временем повторяла «Ең көп оқылған», и главная задавала два вопроса с
+    одним ответом.
+    """
+
+    SLUG = STORY_SLUG
+
+    def _story(self):
+        return Story.objects.get(slug=self.SLUG)
+
+    def test_reading_writes_a_dated_row(self):
+        before = StoryView.objects.filter(story__slug=self.SLUG).count()
+        self.client.get(reverse('core:story_detail', kwargs={'slug': self.SLUG}))
+        self.assertEqual(
+            StoryView.objects.filter(story__slug=self.SLUG).count(), before + 1)
+        # Гость читает без входа, и это тоже прочтение.
+        self.assertIsNone(
+            StoryView.objects.filter(story__slug=self.SLUG)
+            .order_by('-created_at').first().viewer)
+
+    def test_a_view_that_left_the_window_stops_counting_and_stops_being_stored(self):
+        story = self._story()
+        old = StoryView.objects.create(story=story)
+        StoryView.objects.filter(pk=old.pk).update(
+            created_at=timezone.now() - timedelta(days=RECENT_VIEWS_DAYS + 1))
+        Story.objects.filter(pk=story.pk).update(recent_views=F('recent_views') + 1)
+
+        inside = StoryView.objects.filter(
+            story=story,
+            created_at__gte=timezone.now() - timedelta(days=RECENT_VIEWS_DAYS)).count()
+        data.recount_recent_views()
+
+        self.assertEqual(self._story().recent_views, inside)
+        self.assertFalse(StoryView.objects.filter(pk=old.pk).exists())
+        # Накопленный счёт журналом не пересчитывается: за окном он пуст.
+        self.assertGreater(self._story().views, self._story().recent_views)
+
+    def test_a_work_nobody_reads_falls_to_zero_rather_than_keeping_its_number(self):
+        quiet = Story.objects.exclude(slug=self.SLUG).first()
+        StoryView.objects.filter(story=quiet).update(
+            created_at=timezone.now() - timedelta(days=RECENT_VIEWS_DAYS + 1))
+        data.recount_recent_views()
+        self.assertEqual(Story.objects.get(pk=quiet.pk).recent_views, 0)
+
+    def test_the_recount_is_idempotent(self):
+        data.recount_recent_views()
+        first = {s.pk: s.recent_views for s in Story.objects.all()}
+        data.recount_recent_views()
+        self.assertEqual({s.pk: s.recent_views for s in Story.objects.all()}, first)
 
 
 class ReadingRemembersWhereYouStopped(TestCase):

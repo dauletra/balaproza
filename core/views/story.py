@@ -35,7 +35,8 @@ def _count_view(request, story) -> None:
         return
     seen.append(story.pk)
     request.session[_SEEN_STORIES] = seen[-_SEEN_LIMIT:]
-    data.record_story_view(story)
+    data.record_story_view(
+        story, request.user if request.user.is_authenticated else None)
 
 
 def _back_to_story(slug, chapter_number=None, anchor=None):
