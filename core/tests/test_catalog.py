@@ -11,10 +11,13 @@ DEC-27 свёл `/search/`, `/genres/<slug>/`, `/tag/<slug>/` и `/catalog/` в
 счётчики пресетов, порядок сортировок.
 """
 
+from datetime import timedelta
+
 from django.urls import reverse
+from django.utils import timezone
 
 from core import data
-from core.models import Story
+from core.models import Story, User
 from core.tests import factories as make
 from core.tests.base import TestCase, login_as
 from core.views.catalog import PAGE_SIZE
@@ -509,22 +512,47 @@ class ReadingTimeHasThreeBuckets(TestCase):
 class TheNewAuthorAxisFindsWhoIsNotReadYet(TestCase):
     """Ни одна ось не помогала найти автора, которого ещё не читают, при том
     что «новые имена» стоят отдельным блоком на главной, а культура портала
-    построена вокруг растущего автора (docs/ui.md)."""
+    построена вокруг растущего автора (docs/ui.md).
 
-    def test_it_selects_by_follower_count_and_stacks_with_genre(self):
+    Новизна — возраст аккаунта (DEC-57). По числу подписчиков ось не
+    работала ни в одну сторону: порог либо не отсекал никого, либо держал
+    в «новых» того, кто пишет второй год и просто не набрал аудиторию.
+    """
+
+    def _joined(self, days_ago: int):
+        return make.user(date_joined=timezone.now() - timedelta(days=days_ago))
+
+    def test_it_selects_by_account_age_and_stacks_with_genre(self):
         genre = data.genre_by_slug('balalar')
-        newcomer = make.story(author=make.user(followers=0), chapters=1,
-                              primary_genre=genre)
-        established = make.story(
-            author=make.user(followers=data.NEW_AUTHOR_FOLLOWERS + 1),
-            chapters=1, primary_genre=genre)
+        newcomer = make.story(author=self._joined(data.NEW_AUTHOR_DAYS - 1),
+                              chapters=1, primary_genre=genre)
+        established = make.story(author=self._joined(data.NEW_AUTHOR_DAYS + 1),
+                                 chapters=1, primary_genre=genre)
 
         slugs = {s.slug for s in data.filter_catalog(author_tier='new')}
         self.assertIn(newcomer.slug, slugs)
         self.assertNotIn(established.slug, slugs)
+
+        edge = timezone.now() - timedelta(days=data.NEW_AUTHOR_DAYS)
         for story in data.filter_catalog(genre='balalar', author_tier='new'):
             self.assertIn('balalar', [g.slug for g in story.genres_resolved])
-            self.assertLess(story.author.followers, data.NEW_AUTHOR_FOLLOWERS)
+            self.assertGreaterEqual(story.author.date_joined, edge)
+
+    def test_it_does_not_select_everyone(self):
+        """Ось, показывающая всю выдачу, ничего не сообщает: до DEC-57 порог
+        в 150 подписчиков не отсекал ни одного автора корпуса, и чип честно
+        отвечал «21 из 21»."""
+        everything = data.public_stories().count()
+        selected = data.filter_catalog(author_tier='new').count()
+        self.assertGreater(selected, 0)
+        self.assertLess(selected, everything)
+
+    def test_the_home_row_asks_the_same_question(self):
+        """Ряд «Жаңа авторлар» и ось каталога обязаны говорить об одном:
+        иначе главная зовёт читать одних, а каталог находит других."""
+        names = [u.username for u in data.new_authors(4)]
+        joined = [User.objects.get(username=n).date_joined for n in names]
+        self.assertEqual(joined, sorted(joined, reverse=True))
 
     def test_it_is_offered_both_as_a_preset_and_as_an_axis(self):
         response = self.client.get(reverse('core:catalog'))

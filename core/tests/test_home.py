@@ -192,16 +192,20 @@ class EditorialBlocksAreWiredUp(TestCase):
         self.assertContains(self.response, reverse(
             'core:genre_detail', kwargs={'slug': story.primary_genre.slug}))
 
-    def test_new_authors_are_the_least_followed_ones(self):
+    def test_new_authors_are_the_ones_who_joined_last(self):
         """Социальное доказательство: подросток должен видеть, что здесь
-        пишут такие же начинающие. Проверяется свойство, а не ники —
-        числа подписчиков считаются по строкам `Follow`, и правка графа
-        в корпусе меняла бы литерал."""
+        пишут такие же начинающие.
+
+        По дате прихода, а не по числу подписчиков (DEC-57): мало
+        подписчиков бывает и у того, кто пишет второй год, и ряд звал бы
+        читать его как новичка. Проверяется свойство, а не ники — правка
+        корпуса не должна ломать тест.
+        """
         shown = self.response.context['new_authors']
-        counts = [a.followers for a in shown]
-        self.assertEqual(counts, sorted(counts))
-        most_followed = max(data.all_authors(), key=lambda a: a.followers)
-        self.assertNotIn(most_followed.username, [a.username for a in shown])
+        joined = [a.date_joined for a in shown]
+        self.assertEqual(joined, sorted(joined, reverse=True))
+        oldest = min(data.all_authors(), key=lambda a: a.date_joined)
+        self.assertNotIn(oldest.username, [a.username for a in shown])
         # Отдельного списка авторов в проекте нет — href="#" был бы тупиком.
         self.assertNotContains(self.response, 'барлық авторлар')
 

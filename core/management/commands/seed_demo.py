@@ -13,7 +13,7 @@
 них не работает, и приезжать они обязаны со схемой.
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from random import Random
 
 from django.core.management.base import BaseCommand
@@ -96,12 +96,15 @@ class Command(BaseCommand):
         """Авторы корпуса как пользователи портала.
 
         Пароль не выдаётся: `set_unusable_password`, а не пустая строка —
-        она означала бы «вход без пароля», а не «входа нет». Из года
-        прихода собирается 1 января: в интерфейсе виден только год.
+        она означала бы «вход без пароля», а не «входа нет».
+
+        Приход — момент, а не 1 января: ось «Жаңа есімдер» смотрит на
+        возраст аккаунта (DEC-57), и год округлил бы одиннадцать месяцев
+        до нуля в одну сторону и до года в другую.
         """
         added = updated = 0
         for author in _corpus.AUTHORS:
-            joined = timezone.make_aware(datetime(author.joined_year, 1, 1))
+            joined = timezone.now() - timedelta(days=author.joined_days_ago)
             user, is_new = User.objects.update_or_create(
                 username=author.username,
                 defaults={

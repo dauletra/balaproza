@@ -210,7 +210,9 @@ class OwnProfile(TestCase):
         # Приватный блок — только владельцу
         self.assertContains(about, 'Тек саған көрінеді')
         self.assertContains(about, 'Айдана Серікқызы')      # ресми аты-жөні
-        self.assertContains(about, '2025 жылдан бері')      # joined_year
+        # Год выводится из даты прихода, а не сверяется с литералом: она
+        # относительная (DEC-57), и корпус двигает её вместе с сегодня.
+        self.assertContains(about, f'{user("aidana").joined_year} жылдан бері')
         self.assertContains(about, len(data.my_stories_of(user('aidana'))))
         self.assertContains(about, 'жобалармен бірге')
 
@@ -539,7 +541,7 @@ class AchievementsRow(TestCase):
     def test_the_facts_line_names_the_year_and_the_contests(self):
         response = self.client.get(
             reverse('core:profile_other', kwargs={'username': 'aidana'}))
-        self.assertContains(response, '2025 жылдан бері')
+        self.assertContains(response, f'{user("aidana").joined_year} жылдан бері')
         # Участие без статуса: число совпадает с длиной списка заявок и не
         # выдаёт вычитанием, что одна из них отклонена.
         self.assertContains(response,
@@ -553,7 +555,7 @@ class AchievementsRow(TestCase):
             reverse('core:profile_other', kwargs={'username': 'aygerim_k'}))
         self.assertEqual(list(data.submissions_of(user('aygerim_k'))), [])
         self.assertEqual(response.context['contests_n'], 0)
-        self.assertContains(response, '2024 жылдан бері')
+        self.assertContains(response, f'{user("aygerim_k").joined_year} жылдан бері')
         # Проверяем сегмент, а не слово: «Байқаулар» есть в шапке и подвале.
         self.assertNotContains(response, '0 байқау')
 

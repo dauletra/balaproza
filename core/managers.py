@@ -12,6 +12,7 @@
 """
 
 import logging
+from datetime import timedelta
 
 from django.conf import settings
 from django.db.models import (
@@ -30,7 +31,7 @@ from django.db.models import (
 from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone
 
-from .domain.catalog import AUDIENCE_ORDER, NEW_AUTHOR_FOLLOWERS, PUBLIC_STATUSES
+from .domain.catalog import AUDIENCE_ORDER, NEW_AUTHOR_DAYS, PUBLIC_STATUSES
 
 logger = logging.getLogger(__name__)
 
@@ -206,8 +207,14 @@ class StoryQuerySet(QuerySet):
         return self
 
     def by_author_tier(self, tier: str):
+        """Ось «Автор»: работы тех, кто пришёл недавно (DEC-57).
+
+        Граница считается от сегодня, а не хранится: «новое имя» — это
+        возраст аккаунта, и колонка с ним устаревала бы каждые сутки.
+        """
         if tier == 'new':
-            return self.filter(author__followers__lt=NEW_AUTHOR_FOLLOWERS)
+            edge = timezone.now() - timedelta(days=NEW_AUTHOR_DAYS)
+            return self.filter(author__date_joined__gte=edge)
         return self
 
     def matching(self, query: str):
