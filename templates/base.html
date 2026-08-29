@@ -25,6 +25,7 @@
         обязана успеть до старта Alpine. Поставленный ниже — в конце body —
         такой скрипт опоздал бы, и компонент остался бы неизвестным именем.
     {% endcomment %}
+    <script src="{% static 'js/components.js' %}" defer></script>
     {% block page_scripts %}{% endblock %}
 
     <script src="{% static 'vendor/htmx.min.js' %}" defer></script>

@@ -7,16 +7,15 @@
       - Событие window 'open-search'
     Закрытие: Esc, клик по бекдропу, закрытие после перехода.
 
-    Источник данных: HTML-датасет из всех произведений и авторов (тонкий index
-    в самом шаблоне). Это stub-режим — после Ф14 заменится htmx-запросом
-    к /search/api/?q=.
+    Источник данных: индекс из `core:api_search_index`, JSON'ом и один раз
+    за загрузку страницы — искать надо на каждое нажатие клавиши.
 
     Поиск: case-insensitive substring по названию/автору произведения и
     name/username автора. Лимит 5+5.
 
     Enter → переход на /search/?q= (полная страница).
 {% endcomment %}
-<div x-data="searchPopup()"
+<div x-data="searchPopup('{% url 'core:api_search_index' %}')"
      x-show="open"
      x-cloak
      @keydown.window.escape="close()"
@@ -166,55 +165,3 @@
     Lazy fetch индекса. Данные приходят с /api/search-index.json только при
     первом открытии popup. Это не нагружает каждый HTML и не ломает SEO/тесты.
 {% endcomment %}
-<script>
-function searchPopup() {
-    return {
-        open: false,
-        q: '',
-        loaded: false,
-        loading: false,
-        index: { stories: [], authors: [], tags: [] },
-        async ensureLoaded() {
-            if (this.loaded || this.loading) return;
-            this.loading = true;
-            try {
-                const r = await fetch('{% url "core:api_search_index" %}');
-                if (r.ok) this.index = await r.json();
-                this.loaded = true;
-            } catch (e) { /* offline */ }
-            this.loading = false;
-        },
-        async openPopup() {
-            this.open = true;
-            await this.$nextTick();
-            if (this.$refs.input) this.$refs.input.focus();
-            this.ensureLoaded();
-        },
-        close() {
-            this.open = false;
-            this.q = '';
-        },
-        filteredStories() {
-            const q = this.q.trim().toLowerCase();
-            if (!q) return [];
-            return this.index.stories.filter(s =>
-                s.title.toLowerCase().includes(q) || s.author.toLowerCase().includes(q)
-            ).slice(0, 5);
-        },
-        filteredAuthors() {
-            const q = this.q.trim().toLowerCase();
-            if (!q) return [];
-            return this.index.authors.filter(a =>
-                a.name.toLowerCase().includes(q) || a.username.toLowerCase().includes(q)
-            ).slice(0, 5);
-        },
-        filteredTags() {
-            const q = this.q.trim().toLowerCase();
-            if (!q) return [];
-            return (this.index.tags || []).filter(t =>
-                t.name.toLowerCase().includes(q) || t.slug.toLowerCase().includes(q)
-            ).slice(0, 5);
-        },
-    };
-}
-</script>

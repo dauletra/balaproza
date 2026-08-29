@@ -537,7 +537,8 @@ class TheChapterEditorReportsTheTruth(TestCase):
         body = self.client.get(reverse(
             'core:chapter_new', kwargs={'slug': self.SLUG})).content.decode()
         self.assertIn('x-text="count"', body)
-        self.assertIn('count = $event.target.value.length', body)
+        self.assertIn('charCounter(', body)
+        self.assertIn('@input="recount"', body)
         self.assertIn('sticky bottom-24', body)
         self.assertIn('md:bottom-0', body)
 

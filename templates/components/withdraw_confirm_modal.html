@@ -13,9 +13,7 @@
     меняется под адрес конкретной заявки из события — тот же приём, что у
     `delete_confirm_modal.html`.
 {% endcomment %}
-<div x-data="{ open: false, contest: '', story: '', withdraw_url: '' }"
-     @open-withdraw-confirm.window="open = true; contest = $event.detail?.contest || ''; story = $event.detail?.story || ''; withdraw_url = $event.detail?.withdraw_url || ''"
-     @keydown.escape.window="open = false"
+<div x-data="modal('open-withdraw-confirm', ['contest', 'story', 'withdraw_url'])"
      x-show="open" x-cloak
      class="fixed inset-0 z-50 flex items-center justify-center p-4"
      role="alertdialog" aria-modal="true" aria-labelledby="withdraw-modal-title">

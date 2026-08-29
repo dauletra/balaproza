@@ -65,7 +65,7 @@
             цифра показывала сохранённое и не двигалась при наборе, так что
             на одном экране работали две разные механики одного и того же.
         {% endcomment %}
-        <label class="flex flex-col gap-1.5" x-data="{ count: {{ current.char_count|default:0 }} }">
+        <label class="flex flex-col gap-1.5" x-data="charCounter({{ current.char_count|default:0 }})">
             <span class="flex items-baseline justify-between">
                 <span class="font-sans text-sm font-semibold text-slate-800">
                     Мәтін <span class="text-status-error-fg" aria-hidden="true">*</span>
@@ -75,7 +75,7 @@
                 </span>
             </span>
             <textarea name="body" rows="20" required
-                      @input="count = $event.target.value.length"
+                      @input="recount"
                       placeholder="{% if story.is_single %}Шығарманың толық мәтінін осында жаз. Абзацтар екі жол ауысумен бөлінеді.{% else %}Бөлімнің толық мәтінін осында жаз. Абзацтар екі жол ауысумен бөлінеді.{% endif %}"
                       class="w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-4 py-3 font-sans text-[17px] leading-[1.75] text-slate-900 placeholder:text-slate-500 placeholder:font-sans placeholder:text-sm focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30">{{ current.body|default:"" }}</textarea>
             <span class="font-sans text-xs text-slate-500">

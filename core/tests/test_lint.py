@@ -187,6 +187,59 @@ class AlpineDirectivesAreInScope(TestCase):
         )
 
 
+class NamedComponentsAreRegistered(unittest.TestCase):
+    """`x-data="имя(...)"` без `Alpine.data('имя')` — мёртвое поддерево.
+
+    Компоненты живут в `static/js/`, а зовут их из разметки по имени, и
+    связь между двумя файлами держится только на совпадении строки.
+    Промах даёт не поломку, а тишину: Alpine не находит имя, поддерево
+    не инициализируется, и элемент выглядит рабочим — та же порода
+    ошибки, что и директива вне `x-data` (класс выше).
+
+    Объектный литерал (`x-data="{ open: false }"`) регистрации не требует
+    и сюда не попадает: состояние из одного слова читается там же, где
+    используется, и имя ему только развело бы его по двум файлам.
+    """
+
+    ROOT = Path(__file__).resolve().parent.parent.parent
+
+    # `x-data="storyReader()"`, `x-data="tagInput({…"` — имя и открывающая скобка.
+    CALL = re.compile(r'x-data="([A-Za-z_]\w*)\s*\(')
+
+    def _registered(self):
+        names = set()
+        for path in (self.ROOT / "static" / "js").glob("*.js"):
+            names |= set(re.findall(r"Alpine\.data\(\s*'(\w+)'",
+                                    path.read_text(encoding="utf-8")))
+        return names
+
+    def test_every_named_component_exists_in_static_js(self):
+        registered = self._registered()
+        self.assertTrue(registered, "в static/js/ не найдено ни одного Alpine.data")
+
+        offenders = []
+        for path in _templates():
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                for name in self.CALL.findall(line):
+                    if name not in registered:
+                        rel = path.relative_to(TEMPLATES_DIR.parent)
+                        offenders.append(f"{rel}:{number}  {name}()")
+
+        self.assertFalse(
+            offenders,
+            "x-data зовёт компонент, которого нет в static/js/ — поддерево "
+            "не поднимется, и элемент останется мёртвым:\n  "
+            + "\n  ".join(offenders),
+        )
+
+    def test_no_component_is_registered_and_never_used(self):
+        """Обратная сторона: компонент, которого никто не зовёт, — мёртвый вес."""
+        used = set()
+        for path in _templates():
+            used |= set(self.CALL.findall(path.read_text(encoding="utf-8")))
+        self.assertEqual(self._registered() - used, set())
+
+
 class TabRolesPromiseAPanel(TestCase):
     """`role="tab"` без `role="tabpanel"` на той же странице — сломанное обещание.
 

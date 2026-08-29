@@ -7,7 +7,7 @@
 {% endcomment %}
 {% with st=state|default:"default" id="t-"|add:name r=rows|default:4 %}
 <div class="flex w-full flex-col gap-1.5"
-     {% if maxlength %}x-data="{ count: {{ value|default_if_none:''|length }} }"{% endif %}>
+     {% if maxlength %}x-data="charCounter({{ value|default_if_none:''|length }})"{% endif %}>
     {% if label %}
         <div class="flex items-baseline justify-between">
             <label for="{{ id }}" class="font-sans text-sm font-semibold text-slate-800">
@@ -25,7 +25,7 @@
               {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
               {% if required %}required{% endif %}
               {% if disabled %}disabled{% endif %}
-              {% if maxlength %}maxlength="{{ maxlength }}" @input="count = $event.target.value.length"{% endif %}
+              {% if maxlength %}maxlength="{{ maxlength }}" @input="recount"{% endif %}
               {% if message %}aria-describedby="{{ id }}-msg"{% endif %}
               class="w-full resize-y rounded-md bg-slate-50 px-3 py-2.5 font-sans text-sm text-slate-900 placeholder:text-slate-500
                      {% if st == 'error' %}border border-status-error-fg

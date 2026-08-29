@@ -11,11 +11,11 @@
 {% endcomment %}
 {% with id="cb-"|add:name %}
 <label for="{{ id }}"
-       x-data="{ on: {{ checked|yesno:'true,false' }} }"
+       x-data="checkedBox({{ checked|yesno:'true,false' }})"
        class="inline-flex items-start gap-2.5 {% if disabled %}cursor-not-allowed opacity-50{% else %}cursor-pointer{% endif %}">
     <input id="{{ id }}" type="checkbox" name="{{ name }}" value="{{ value|default:'on' }}"
            {% if checked %}checked{% endif %}{% if disabled %} disabled{% endif %}{% if required %} required{% endif %}
-           @change="on = $event.target.checked"
+           @change="sync"
            class="peer sr-only">
     <span aria-hidden="true"
           :class="on ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white text-transparent'"

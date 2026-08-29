@@ -2,10 +2,8 @@
     ReportModal (docs/ui.md + FR-STORY-09). Жалоба на контент.
     Триггер: $dispatch('open-report', { target: 'X' })
 {% endcomment %}
-<div x-data="{ open: false, target: '', reason: '', comment: '' }"
-     @open-report.window="open = true; target = $event.detail?.target || ''"
+<div x-data="modal('open-report', ['target', 'reason', 'comment'])"
      @close-report.window="open = false"
-     @keydown.escape.window="open = false"
      x-show="open" x-cloak
      class="fixed inset-0 z-50 flex items-center justify-center p-4"
      role="dialog" aria-modal="true" aria-labelledby="report-modal-title">

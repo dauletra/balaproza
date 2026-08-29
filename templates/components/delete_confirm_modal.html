@@ -6,10 +6,8 @@
     `:action` меняется под адрес конкретной цели из события. Вид ответа
     (редирект + toast) решает view на другом конце — здесь только запрос.
 {% endcomment %}
-<div x-data="{ open: false, name: '', confirm_url: '' }"
-     @open-delete-confirm.window="open = true; name = $event.detail?.name || ''; confirm_url = $event.detail?.confirm_url || ''"
+<div x-data="modal('open-delete-confirm', ['name', 'confirm_url'])"
      @close-delete-confirm.window="open = false"
-     @keydown.escape.window="open = false"
      x-show="open" x-cloak
      class="fixed inset-0 z-50 flex items-center justify-center p-4"
      role="alertdialog" aria-modal="true" aria-labelledby="del-modal-title">
