@@ -6,6 +6,8 @@
 комментарии. Все пять до Ф15 писались только сидом.
 """
 
+from pathlib import Path
+
 from core.tests import factories as make
 from core.tests.base import TestCase, login_as, login_as_newcomer, user
 from django.test import Client
@@ -296,7 +298,15 @@ class TheReadingSurfaceIsBuiltForAPhone(TestCase):
     оставляли тексту 295px — около 35 знаков при комфортных 45-75. Причём
     все три настройки работали против читателя: ось ширины на телефоне не
     делала ничего, крупный кегль сужал меру, а тёплый и ночной фон
-    добавляли свой padding."""
+    добавляли свой padding.
+
+    Правила и компонент живут в статике, а не в разметке страницы, поэтому
+    проверяются по своим файлам; на странице проверяется, что она их
+    подключает и ставит нужные классы."""
+
+    ROOT = Path(__file__).resolve().parent.parent.parent
+    CSS = (ROOT / 'static_src' / 'input.css').read_text(encoding='utf-8')
+    JS = (ROOT / 'static' / 'js' / 'reader.js').read_text(encoding='utf-8')
 
     def setUp(self):
         self.response = self.client.get(
@@ -304,15 +314,15 @@ class TheReadingSurfaceIsBuiltForAPhone(TestCase):
         self.html = self.response.content.decode()
 
     def test_the_measure_is_pinned_in_ch_and_the_card_goes_full_bleed(self):
-        self.assertContains(self.response, 'max-width: 68ch')
+        self.assertIn('max-width: 68ch', self.CSS)
         self.assertContains(self.response, '-mx-4')       # гасит px-4 контейнера
         self.assertContains(self.response, 'sm:mx-0')
-        self.assertContains(self.response, 'margin-inline: -1rem')   # подложка темы
-        self.assertContains(self.response, 'overflow-wrap: break-word')
+        self.assertIn('margin-inline: -1rem', self.CSS)   # подложка темы
+        self.assertIn('overflow-wrap: break-word', self.CSS)
         # Кегль и интерлиньяж — разные свойства: раньше обе оси трогали
         # `line-height`, и порядок правил в файле решал, чья возьмёт.
-        self.assertIn('.reader-size-base  { font-size: 17px; }', self.html)
-        self.assertIn('.reader-lead-tight { line-height: 1.6; }', self.html)
+        self.assertIn('.reader-size-base  { font-size: 17px; }', self.CSS)
+        self.assertIn('.reader-lead-tight { line-height: 1.6; }', self.CSS)
         # На тексте в три абзаца ни мера, ни панель не проявляются.
         self.assertGreater(len(data.chapter_of(STORY_SLUG, 3).body), 2000)
 
@@ -327,7 +337,16 @@ class TheReadingSurfaceIsBuiltForAPhone(TestCase):
                 self.assertContains(self.response, value)
         for key in ('bp-reader-size', 'bp-reader-lead', 'bp-reader-theme'):
             with self.subTest(key=key):
-                self.assertContains(self.response, key)
+                self.assertIn(key, self.JS)
+
+    def test_the_component_is_registered_before_alpine_starts(self):
+        """`defer` исполняет в порядке документа: reader.js обязан стоять
+        выше alpine.min.js, иначе `alpine:init` уже прошёл и `storyReader`
+        останется неизвестным именем — компонент молча не поднимется."""
+        self.assertContains(self.response, 'js/reader.js')
+        self.assertLess(self.html.index('js/reader.js'),
+                        self.html.index('vendor/alpine.min.js'))
+        self.assertNotIn('<style', self.html[self.html.index('</head>'):])
 
     def test_the_reading_panel_replaces_the_mobile_nav(self):
         """Две плавающие пилюли на 375px наехали бы друг на друга

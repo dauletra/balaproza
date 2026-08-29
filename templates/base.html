@@ -19,6 +19,14 @@
     {# Скрыть x-cloak элементы до старта Alpine — иначе видны на одну отрисовку #}
     <style>[x-cloak]{display:none!important}</style>
 
+    {% comment %}
+        Скрипты страниц стоят ДО alpine.min.js и оба с defer: defer исполняет
+        в порядке документа, а регистрация `Alpine.data` на `alpine:init`
+        обязана успеть до старта Alpine. Поставленный ниже — в конце body —
+        такой скрипт опоздал бы, и компонент остался бы неизвестным именем.
+    {% endcomment %}
+    {% block page_scripts %}{% endblock %}
+
     <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
     <script src="{% static 'vendor/alpine.min.js' %}" defer></script>
 
