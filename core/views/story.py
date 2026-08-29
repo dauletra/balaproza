@@ -53,7 +53,7 @@ def _back_to_story(slug, chapter_number=None, anchor=None):
 # ───────────────────────── STORY — произведение и чтение ─────────────────
 def story_detail(request, slug):
     story = _found_or_404(data.story_by_slug(slug), f'Шығарма «{slug}» табылмады')
-    chapters = data.chapters_of(slug)
+    chapters = list(data.chapters_of(slug))
     # Автор своего стори видит pending-теги (BR-TAG-07). Для прочих скрыты.
     viewer = _current_user(request)
     is_author = bool(viewer and story.author_id == viewer.pk)
@@ -74,7 +74,7 @@ def story_detail(request, slug):
             chapter_number = (
                 progress.current_chapter if has_progress_here else 1
             )
-        current = data.chapter_of(slug, chapter_number, viewer)
+        current = data.chapter_among(chapters, chapter_number, viewer)
     else:
         chapter_number = None
         current = None
@@ -118,7 +118,7 @@ def story_detail(request, slug):
         # FR-STORY-12 / DEC-32: пять реакций на главу вместо одиночного лайка
         'reactions': data.reactions_of(current) if current else [],
         # FR-STORY-13: опрос автора — необязателен, чаще всего его нет
-        'poll': data.poll_of(slug, chapter_number, viewer) if chapter_number else None,
+        'poll': data.poll_for(current, viewer),
         # Подсветка в правом рейле — текущая отображаемая глава.
         'current_chapter_number': chapter_number,
         # FR-STORY-02: блок «Басқа шығармалар» внизу страницы

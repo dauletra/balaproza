@@ -19,7 +19,7 @@ from django.utils import timezone
 from ..domain.awards import READ_TIER_ART, READ_TIERS, next_tier_for, tier_for
 from ..domain.catalog import BADGE_LABELS, PUBLIC_STATUSES
 from ..domain.notifications import NOTIF_BUCKETS
-from ..models import AwardGrant, Follow, Genre, Notification, Story, User
+from ..models import AwardGrant, Follow, Notification, User
 
 
 # ── Подписки (FR-PROF-10, BR-75) ─────────────────────────────────────────
@@ -113,14 +113,18 @@ def new_authors(limit: int = 4):
     return with_works(User.objects.order_by('followers', 'username'))[:limit]
 
 
-def portal_stats() -> dict:
-    """Счётчики масштаба в хиро гостя (FR-HOME-01), по самим данным."""
+def portal_stats(*, stories, genres) -> dict:
+    """Счётчики масштаба в хиро гостя (FR-HOME-01), по самим данным.
+
+    Два числа из трёх приходят от страницы: она держит и список публичных
+    работ, и полосу жанров целиком, и `COUNT` по тем же строкам был бы
+    вторым обращением за тем, что уже в памяти. Считать здесь остаётся
+    только авторов — их страница не перечисляет.
+    """
     return {
-        'stories': Story.objects.filter(status__in=PUBLIC_STATUSES).count(),
+        'stories': len(stories),
         'authors': User.objects.count(),
-        # Просто число строк: со счётчиками произведений жанры приходят
-        # отдельно, на полосу-вывеску, и считать их дважды незачем.
-        'genres':  Genre.objects.count(),
+        'genres':  len(genres),
     }
 
 

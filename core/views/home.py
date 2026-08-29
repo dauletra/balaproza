@@ -38,6 +38,7 @@ def home(request):
     # Не литерал 'Published': после DEC-37 опубликованный сериал носит
     # OnProcess или Completed, и по литералу с главной пропали бы все десять.
     published = list(data.public_stories())
+    genres = list(data.all_genres())
 
     # Жанры на главной — полоса-вывеска, а не навигация (DEC-31): 12 цветных слов
     # объясняют, что это литературный портал, и ведут на /genres/<slug>/.
@@ -53,7 +54,7 @@ def home(request):
         'hero_contest':    data.hero_contest(),
         'home_contests':   data.home_contests(),
         'collections':     data.all_collections(),
-        'genres':          data.all_genres(),
+        'genres':          genres,
         'book_of_week':    data.book_of_week(),
         'new_authors':     data.new_authors(4),
         'top_stories':     sorted(published, key=lambda s: s.views, reverse=True)[:5],
@@ -62,7 +63,7 @@ def home(request):
         # что продолжаются, а не все сериалы подряд.
         'serial_stories':  [s for s in published
                             if s.is_serial and s.status == 'OnProcess'][:5],
-        'portal_stats':    data.portal_stats(),
+        'portal_stats':    data.portal_stats(stories=published, genres=genres),
         'popular_tags':    data.popular_tags(8),
         'trending_tags':   data.trending_tags(6),
     })

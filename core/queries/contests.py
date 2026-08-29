@@ -81,8 +81,16 @@ def finished_contests():
 def home_contests(limit: int = 4) -> list:
     """Конкурсы для секции «Байқаулар» на главной: порядок `open_contests`,
     хвост добирают недавно завершённые — иначе секция пустеет в межсезонье.
+
+    За хвост главная платит, только когда он нужен. Сложение двух списков
+    выполняло обе выборки всегда, а вместе с завершёнными приезжали их
+    присуждения и работы победителей — три запроса за карточки, которые
+    срезал тот же `[:limit]`.
     """
-    return (open_contests() + list(finished_contests()))[:limit]
+    head = open_contests()[:limit]
+    if len(head) >= limit:
+        return head
+    return head + list(finished_contests()[:limit - len(head)])
 
 
 def hero_contest():

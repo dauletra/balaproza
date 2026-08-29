@@ -29,15 +29,27 @@ from core.tests.base import TestCase, login_as
 class PagesStayWithinTheirQueryBudget(TestCase):
 
     def test_home_guest(self):
-        """Двадцать два: ряды, жинақтар, книга недели, полоса жанров, две
+        """Пятнадцать: ряды, жинақтар, книга недели, полоса жанров, две
         витрины тегов, баннер конкурса, секция «Байқаулар», счётчики
         масштаба и новые имена.
 
-        Секция добавляет пять: `open_contests`/`finished_contests` — по
-        два запроса каждая (выдача + присуждения), плюс один за
-        `winner_stories` карточки завершённого конкурса в ряду.
+        Было двадцать два, и семь ушли тремя правками, каждая — плата за
+        то, чего на экране нет.
+
+        **Три.** Секция «Байқаулар» складывала два списка и резала сумму
+        до четырёх: завершённые выбирались всегда, вместе со своими
+        присуждениями и работами победителей, даже когда идущие занимали
+        секцию целиком. Теперь за хвост платят, только когда он нужен.
+
+        **Два.** Счётчики масштаба делали три `COUNT`, а страница уже
+        держит список публичных работ и полосу жанров целиком. Считать
+        осталось авторов — их страница не перечисляет.
+
+        **Два.** Карточка жинақа показывает три обложки, а состав
+        приезжал с автором и жанром двумя отдельными prefetch'ами.
+        Обложке нужен только оттенок жанра.
         """
-        with self.assertNumQueries(22):
+        with self.assertNumQueries(15):
             self.client.get(reverse('core:home'))
 
     def test_home_signed_in(self):
@@ -49,7 +61,7 @@ class PagesStayWithinTheirQueryBudget(TestCase):
         приветствия — отдельного обращения за автором у шапки нет.
         """
         login_as(self.client)
-        with self.assertNumQueries(28):
+        with self.assertNumQueries(21):
             self.client.get(reverse('core:home'))
 
     def test_catalog(self):
@@ -65,17 +77,18 @@ class PagesStayWithinTheirQueryBudget(TestCase):
         вместе с ключом `popular_tags` в контексте: чипы тегов панели
         приходят из `catalog_links`, а второй список тех же тегов не читал
         ни один шаблон раздела — материализованный список платил за него
-        молча.
+        молча. Ещё два ушли вместе с автором и тегами у работ жинақа:
+        рейл раздела показывает подборки обложками.
         """
-        with self.assertNumQueries(17):
+        with self.assertNumQueries(15):
             self.client.get(reverse('core:catalog'))
 
     def test_genre_page(self):
-        with self.assertNumQueries(17):
+        with self.assertNumQueries(15):
             self.client.get(reverse('core:genre_detail', kwargs={'slug': 'fantezi'}))
 
     def test_search(self):
-        with self.assertNumQueries(17):
+        with self.assertNumQueries(15):
             self.client.get(reverse('core:search_results') + '?q=жағалау')
 
     def test_story_page(self):
@@ -107,25 +120,44 @@ class PagesStayWithinTheirQueryBudget(TestCase):
         экземпляра, а не база.
 
         Двадцать три: прочтение пишется строкой в журнал (DEC-55), иначе
-        окну «Қазір танымал» не от чего убывать."""
-        with self.assertNumQueries(23):
+        окну «Қазір танымал» не от чего убывать.
+
+        Двадцать: текущая глава берётся из уже выбранного списка глав, а
+        опрос приезжает вместе с ней (`select_related('poll')`). До этого
+        страница выбирала ту же главу и её реакции второй раз, а за
+        опросом ходила третий."""
+        with self.assertNumQueries(20):
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'dalney-berega'}))
 
     def test_story_chapter_with_comments_and_poll(self):
         """Глава дороже произведения: к ней добавляются комментарии с
-        ответами, ряд реакций и опрос. Было 34, стало 30, потом 35, 34 и
-        35 — те же причины, что у `test_story_page`, включая заведение
-        сессии под счётчик оқылым, кэш числа работ автора и строку в
-        журнале прочтений."""
-        with self.assertNumQueries(35):
+        ответами, ряд реакций и опрос.
+
+        Было 35, стало 25, и десять ушли одной породой ошибки — вопрос,
+        заданный второй раз.
+
+        **Четыре.** `ChapterPoll.closed` был обычным `@property`, а
+        страница спрашивает его пятью местами: сам блок, подпись «жауап
+        келесі бөлімде», ссылка на неё и вид каждого варианта. Каждое
+        обращение шло отдельным `EXISTS`. То же с `options` — их
+        перебирают `total_votes`, `results` и шаблон.
+
+        **Три.** Текущая глава и её реакции выбирались вторым запросом
+        поверх списка глав, а опрос — третьим; теперь глава приходит из
+        списка, а опрос — `select_related`'ом вместе с ней.
+
+        **Один.** `closed` спрашивал `chapter.story`, чтобы взять у
+        работы её же главы: запрос за объектом ради одного ключа."""
+        with self.assertNumQueries(25):
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'dalney-berega'}) + '?chapter=3')
 
     def test_collections(self):
-        """Пять на десять подборок с обложками — потому что состав приходит
-        одним `prefetch_related`, а не запросом на карточку."""
-        with self.assertNumQueries(6):
+        """Три на десять подборок с обложками — потому что состав приходит
+        одним `prefetch_related`, а не запросом на карточку, и берёт ровно
+        то, что рисует обложка: название, файл и оттенок жанра."""
+        with self.assertNumQueries(4):
             self.client.get(reverse('core:collections'))
 
     def test_genre_index(self):
@@ -175,9 +207,10 @@ class PagesStayWithinTheirQueryBudget(TestCase):
         `filter_catalog`, а страница зовёт его семь раз — выдача плюс
         счётчик каждого пресета. Теперь условие стоит на той же связке,
         что и слаг, и лишнего запроса нет вовсе. Двадцатый ушёл вместе с
-        неиспользуемым `popular_tags` в контексте каталога.
+        неиспользуемым `popular_tags` в контексте каталога, а ещё два — с
+        автором и тегами у работ жинақа в рейле.
         """
-        with self.assertNumQueries(19):
+        with self.assertNumQueries(17):
             self.client.get(reverse('core:tag_detail',
                                     kwargs={'slug': 'mektep'}))
 
@@ -244,9 +277,12 @@ class PersonalPagesStayWithinTheirQueryBudget(TestCase):
         заводится: первый заход показывает тизер, то есть продвижения ещё
         нет (BR-61). Она обойдётся в четыре запроса на той главе, до
         которой читатель дойдёт сам.
+
+        Тридцать один — те же три запроса, что ушли у гостя: глава,
+        реакции и опрос из одной выборки.
         """
         login_as(self.client, 'bekzhan_t')
-        with self.assertNumQueries(34):
+        with self.assertNumQueries(31):
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'dalney-berega'}))
 

@@ -33,7 +33,12 @@ from .catalog import all_stories
 
 
 def chapters_of(story_slug: str):
+    """Все главы работы: оглавление, «N бөлімнен» и текущая — из одной
+    выборки. Опрос приезжает `select_related`'ом: он есть у одной главы из
+    двадцати, но своим запросом обходился бы дороже, чем join по пустому
+    полю (BR-POLL-01)."""
     return (Chapter.objects.filter(story__slug=story_slug)
+            .select_related('poll')
             .prefetch_related('reactions'))
 
 
@@ -58,6 +63,18 @@ def _attach_my_reaction(chapter, viewer):
 def chapter_of(story_slug: str, number: int, viewer=None):
     chapter = (Chapter.objects.filter(story__slug=story_slug, number=number)
               .prefetch_related('reactions').first())
+    return _attach_my_reaction(chapter, viewer)
+
+
+def chapter_among(chapters, number: int, viewer=None):
+    """Текущая глава из уже выбранного списка глав.
+
+    Страница произведения берёт все главы — оглавление и «N бөлімнен»
+    считают по ним, — и реакции к ним приезжают тем же `prefetch`.
+    Спрашивать текущую отдельным запросом значит выбрать её и её реакции
+    второй раз; в `chapter_of` это законно, там списка нет.
+    """
+    chapter = next((c for c in chapters if c.number == number), None)
     return _attach_my_reaction(chapter, viewer)
 
 
@@ -134,6 +151,13 @@ def poll_of(story_slug: str, chapter_number: int, viewer=None):
     chapter = (Chapter.objects
                .filter(story__slug=story_slug, number=chapter_number)
                .select_related('poll').first())
+    return poll_for(chapter, viewer)
+
+
+def poll_for(chapter, viewer=None):
+    """Опрос уже выбранной главы. Пара к `chapter_among`: страница держит
+    главу вместе с её опросом (`chapters_of` берёт его `select_related`),
+    и спрашивать ту же строку второй раз незачем."""
     poll = getattr(chapter, 'poll', None) if chapter else None
     return _attach_my_vote(poll, viewer)
 
@@ -302,8 +326,18 @@ def collections_of(story):
 
 
 def all_collections():
+    """Все жинақтар с составом — ровно под то, что рисует карточка.
+
+    Карточка подборки показывает три обложки, а `cover_placeholder` берёт
+    у работы название, файл и оттенок жанра. Автор и теги ей не нужны:
+    двумя именами связей в `prefetch_related` они приезжали двумя
+    отдельными запросами, а полный `all_stories()` добавил бы третий за
+    теги. Состав одной подборки, наоборот, рисуется полными карточками —
+    там `collection_by_slug` и берёт `all_stories()`.
+    """
     return Collection.objects.prefetch_related(
-        'item_set__story__author', 'item_set__story__primary_genre')
+        Prefetch('item_set__story',
+                 queryset=Story.objects.select_related('primary_genre')))
 
 
 def collection_by_slug(slug: str):

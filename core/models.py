@@ -1305,18 +1305,30 @@ class ChapterPoll(models.Model):
     def __str__(self):
         return self.question
 
-    @property
+    @cached_property
     def closed(self) -> bool:
-        return self.chapter.story.chapter_set.filter(
-            number__gt=self.chapter.number).exists()
+        """Опрос закрыт публикацией следующей главы (BR-POLL-05).
+
+        `cached_property`, а не `property`: страница спрашивает это пять
+        раз — сам блок, подпись «жауап келесі бөлімде», ссылка на неё и
+        вид каждого варианта, — и каждое обращение шло в базу отдельным
+        `EXISTS`. Тот же приём, что у состава конкурса (DEC-46).
+        """
+        # По `story_id`, а не через `self.chapter.story`: сама работа здесь
+        # не нужна, а её загрузка — отдельный запрос за объектом, из
+        # которого прочитали бы один ключ.
+        return Chapter.objects.filter(story_id=self.chapter.story_id,
+                                      number__gt=self.chapter.number).exists()
 
     @property
     def answer_chapter(self):
         """Глава, где ответ уже есть, — куда вести дочитавшего."""
         return self.chapter.number + 1 if self.closed else None
 
-    @property
+    @cached_property
     def options(self) -> list:
+        """Варианты ответа. Кэш обязателен: их перебирают `total_votes`,
+        `results` и сам шаблон, а `option_set.all()` каждый раз новый."""
         return list(self.option_set.all())
 
     @property
