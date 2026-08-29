@@ -24,7 +24,8 @@ Django 6 с серверным рендерингом шаблонов · Postgr
 `@tailwindcss/cli` (токены в `@theme` внутри `static_src/input.css`, конфига нет) ·
 Alpine.js 3 и htmx 2 как self-hosted `<script>` · self-hosted variable WOFF2.
 JS-сборщика, ES-модулей и клиентского стора нет и не планируется: интерактивность
-точечная.
+точечная. Свой JS — простыми файлами в `static/js/` (`Alpine.data` по имени),
+инлайновых `<script>` с логикой в шаблонах нет.
 
 ## Слои
 

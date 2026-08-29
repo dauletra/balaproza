@@ -1,0 +1,104 @@
+{% comment %}
+    Шапка произведения (FR-STORY-01), собранная mobile-first: рядом с
+    обложкой только то, что отвечает на «что это» — жанр, название, автор,
+    аудитория и длительность. Метрики, теги и действия идут полноширинными
+    рядами под сеткой, где на 375px есть место.
+{% endcomment %}
+{% load balaproza %}
+<header class="flex flex-col gap-4">
+    <div class="grid grid-cols-[104px_minmax(0,1fr)] gap-4 sm:grid-cols-[136px_minmax(0,1fr)] sm:gap-5 md:grid-cols-[156px_minmax(0,1fr)] md:gap-6">
+        {% include "components/cover_placeholder.html" with story=story cls="aspect-[2/3] w-[104px] rounded-lg shadow-sm sm:w-[136px] md:w-[156px]" letter_cls="text-5xl sm:text-6xl" %}
+
+        <div class="min-w-0 flex flex-col gap-2">
+            <div class="flex flex-wrap gap-x-2 gap-y-1">
+                {% comment %}
+                    На странице произведения жанр и теги — основная
+                    навигация «ещё такого же», поэтому здесь берём крупный
+                    размер обоих чипов, а не плотный из карточек списка.
+                {% endcomment %}
+                {% for g in story.genres_resolved %}
+                    {% include "components/genre_chip.html" with genre=g size="md" %}
+                {% endfor %}
+            </div>
+
+            <h1 class="font-sans text-[22px] font-bold leading-tight text-slate-900 sm:text-3xl md:text-4xl">
+                {{ story.title }}
+            </h1>
+
+            <a href="{% url 'core:profile_other' username=story.author.username %}"
+               class="inline-flex items-center gap-2 self-start font-sans text-sm font-semibold text-slate-700 hover:text-brand">
+                {% include "components/avatar.html" with size=24 name=story.author.public_name username=story.author.username avatar=story.author.avatar %}
+                <span class="truncate">{{ story.author.public_name }}</span>
+            </a>
+
+            {# Аудитория, формат и длительность — то, по чему выбирают читать или нет #}
+            <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-sans text-xs text-slate-500">
+                {% if story.audience %}<span class="inline-flex h-6 items-center rounded-chip bg-slate-100 px-2 font-bold text-slate-600">{{ story.audience }}</span>{% endif %}
+                <span>{{ story|format_badge }}</span>
+                <span aria-hidden="true">·</span>
+                <span>{{ story|reading_meta }}</span>
+            </p>
+        </div>
+    </div>
+
+    {% if story.badges %}
+        <div class="flex flex-wrap items-center gap-1.5">
+            {% for badge in story.badges %}
+                <span class="inline-flex h-7 items-center rounded-chip bg-brand/5 px-2.5 font-sans text-xs font-bold text-brand-dark">{{ badge }}</span>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {# docs/ui.md: UGC-теги. Pending видны только автору (BR-TAG-07). #}
+    {% include "components/tag_list.html" with tags=tags viewer_is_author=is_author size="md" %}
+
+    <div class="flex flex-wrap items-center gap-4">
+        {# FR-STORY-12 + DEC-32: общий счётчик = сумма реакций по главам #}
+        {% include "components/stat_pill.html" with icon="heart" value=story.likes|compact_count label=story.likes|spaced|add:" реакция" %}
+        {% include "components/stat_pill.html" with icon="eye" value=story.views|compact_count label=story.views|spaced|add:" оқылым" %}
+        {% include "components/stat_pill.html" with icon="message-caption" value=story.comments|compact_count label=story.comments|spaced|add:" пікір" %}
+    </div>
+
+    {% comment %}
+        Действия. На мобильном главная кнопка занимает всю ширину, а «Сақтау»
+        и «Бөлісу» делят вторую строку — так primary-действие ни с чем не
+        конкурирует. «Шағым» из этого ряда убран вниз страницы (FR-STORY-09):
+        жалоба — не то, что предлагают человеку до чтения.
+    {% endcomment %}
+    <div class="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+        <a href="#chapter-{{ chapter_number }}"
+           class="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-brand px-5 font-sans text-[15px] font-semibold text-white hover:bg-brand-dark sm:h-11 sm:w-auto sm:text-sm">
+            {% include "components/icon.html" with name="book" size=17 only %}
+            <span>{% if story.is_single %}Оқу{% elif has_progress %}Жалғастыру · {{ chapter_number }}-бөлім{% else %}Оқуды бастау{% endif %}</span>
+        </a>
+
+        <div class="flex items-center gap-2.5">
+            {% comment %}
+                Главный вход в «Кітапхана». Настоящий POST, а не
+                Alpine-состояние: до этого кнопка меняла только свой вид,
+                тост обещал «Кітапханаға сақталды», а на полке не
+                появлялось ничего — обещание жило до перезагрузки.
+                Гостя отправляет на вход с ?next=, как chapter_like.
+            {% endcomment %}
+            {% if signed_in %}
+                <form method="post" action="{% url 'core:library_toggle' slug=story.slug %}" class="flex-1 sm:flex-none">
+                    {% csrf_token %}
+                    {% if chapter_number %}<input type="hidden" name="chapter" value="{{ chapter_number }}">{% endif %}
+                    <button type="submit" aria-pressed="{{ in_library|yesno:'true,false' }}"
+                            class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border px-4 font-sans text-sm font-semibold {% if in_library %}border-brand bg-brand/5 text-brand-dark{% else %}border-slate-300 bg-white text-slate-700 hover:border-brand hover:text-brand{% endif %}">
+                        {% if in_library %}{% include "components/icon.html" with name="bookmark-filled" size=18 only %}{% else %}{% include "components/icon.html" with name="bookmark" size=18 only %}{% endif %}
+                        <span>{% if in_library %}Сақталды{% else %}Сақтау{% endif %}</span>
+                    </button>
+                </form>
+            {% else %}
+                <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}"
+                   class="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:border-brand hover:text-brand sm:flex-none">
+                    {% include "components/icon.html" with name="bookmark" size=18 only %}
+                    <span>Сақтау</span>
+                </a>
+            {% endif %}
+
+            {% include "components/share_button.html" with url=request.build_absolute_uri title=story.title wrap_cls="flex-1 sm:flex-none" btn_cls="w-full justify-center sm:w-auto" %}
+        </div>
+    </div>
+</header>

@@ -1,0 +1,61 @@
+{% comment %}
+    Разговор под главой (FR-STORY-10, BR-30: один уровень ответов).
+    Ожидает контекст `story_detail`.
+{% endcomment %}
+{% load balaproza %}
+{# ─────────────────────── Комментарии этой главы ─────────────────────── #}
+<section class="border-t border-slate-200 pt-6">
+    <div class="mb-5 rounded-md border border-status-info-fg/20 bg-status-info-bg px-4 py-3">
+        <div class="flex items-start gap-2.5">
+            <span class="mt-0.5 text-status-info-fg">{% include "components/icon.html" with name="shield" size=15 only %}</span>
+            <p class="font-sans text-xs leading-relaxed text-slate-700">
+                Пікірлер мен жарияланымдар модерация ережелерімен қорғалады. Орынсыз мәтінді байқасаң, шағым батырмасын қолдан.
+            </p>
+        </div>
+    </div>
+    <h2 class="mb-4 font-display text-xl font-bold text-slate-900">
+        {% if story.is_single %}Шығарма пікірлері{% else %}{{ chapter_number }}-бөлім пікірлері{% endif %}
+        <span class="ml-1 font-sans text-sm font-normal text-slate-500">{{ comments|length }}</span>
+    </h2>
+
+    {% if signed_in %}
+        <form method="post" action="{% url 'core:comment_create' slug=story.slug %}"
+              class="mb-6 flex items-start gap-3">
+            {% csrf_token %}
+            {% if chapter_number %}<input type="hidden" name="chapter" value="{{ chapter_number }}">{% endif %}
+            {% include "components/avatar.html" with size=36 name=current_user_name avatar=user.avatar %}
+            <div class="flex-1">
+                <textarea name="text" rows="2" required placeholder="{% if story.is_single %}Осы шығарма туралы пікіріңді жаз…{% else %}Осы бөлім туралы пікіріңді жаз…{% endif %}"
+                          class="w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-2.5 font-sans text-sm placeholder:text-slate-500 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30"></textarea>
+                <div class="mt-2 flex justify-end">
+                    {% include "components/button.html" with kind="primary" label="Жіберу" type="submit" icon="paper-plane" %}
+                </div>
+            </div>
+        </form>
+    {% else %}
+        <div class="mb-6">
+            {% include "components/comment_login_gate.html" %}
+        </div>
+    {% endif %}
+
+    <div class="flex flex-col gap-6">
+        {% for cm in comments %}
+            {% if cm.author %}
+                <div>
+                    {% include "components/comment.html" with story_slug=story.slug chapter_number=chapter_number comment_id=cm.id author_name=cm.author.public_name author_username=cm.author.username author_avatar=cm.author.avatar date=cm.created_at|ago text=cm.text likes=cm.likes liked=cm.liked badge=cm.is_author_badge|yesno:"Автор," own=cm|belongs_to:current_user_username allow_reply=True reply_avatar_name=current_user_name %}
+
+                    {# Replies (BR-30: один уровень — реплай-форма у реплая отсутствует) #}
+                    {% for rp in cm.replies %}
+                        {% if rp.author %}
+                            {% include "components/comment.html" with story_slug=story.slug chapter_number=chapter_number comment_id=rp.id author_name=rp.author.public_name author_username=rp.author.username author_avatar=rp.author.avatar date=rp.created_at|ago text=rp.text likes=rp.likes liked=rp.liked badge=rp.is_author_badge|yesno:"Автор," own=rp|belongs_to:current_user_username depth=1 allow_reply=False %}
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% empty %}
+            <p class="rounded-md bg-slate-50 px-4 py-6 text-center font-sans text-sm text-slate-500">
+                Әлі пікір жоқ. Бірінші бол.
+            </p>
+        {% endfor %}
+    </div>
+</section>

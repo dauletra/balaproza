@@ -1,0 +1,108 @@
+{% comment %}
+    Текст главы с реакциями, опросом и переходом к соседней (DEC-30:
+    отдельного маршрута `/read/` нет, глава открывается на той же
+    странице через `?chapter=N`).
+
+    На телефоне карточка раскрыта во всю ширину экрана: `-mx-4` гасит
+    `px-4` контейнера, свой `px-4` возвращает поля. Текст получает 343px
+    вместо 295 — примерно лишнее слово в каждой строке. Скругление и тень
+    появляются с `sm`, где карточка снова стоит на подложке.
+
+    Ожидает контекст `story_detail` и `x-data="storyReader()"` в предках.
+{% endcomment %}
+<section id="chapter-{{ chapter_number }}" class="-mx-4 scroll-mt-24 bg-white px-4 py-6 sm:mx-0 sm:rounded-lg sm:p-8 sm:shadow-sm">
+    <header class="mb-5">
+        <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+                <p class="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    {% if story.is_single %}Толық мәтін{% else %}{{ chapter_number }}-бөлім · {{ chapters|length }} бөлімнен{% endif %}
+                </p>
+                {% if story.is_serial %}
+                    <h2 class="mt-1 font-display text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">
+                        {{ current.title }}
+                    </h2>
+                {% endif %}
+            </div>
+
+            {% include "partials/story/reader_settings.html" %}
+        </div>
+
+        {% comment %}
+            На мобильном скрыт: панель чтения уже несёт «N / M» внизу
+            экрана, а здесь тот же счётчик отнимал ~50px первого экрана
+            главы. На sm+ панели чтения нет, и прогресс нужен.
+        {% endcomment %}
+        {% if current_chapter_number and not is_teaser and story.is_serial %}
+            {% widthratio current_chapter_number chapters|length 100 as pct %}
+            <div class="mt-4 hidden h-1.5 overflow-hidden rounded-pill bg-slate-200 sm:block">
+                <div class="h-full bg-brand" style="width: {{ pct }}%"></div>
+            </div>
+            <p class="mt-1.5 hidden font-sans text-xs text-slate-500 sm:block">
+                Оқылды: <strong class="text-slate-700">{{ current_chapter_number }}</strong> / {{ chapters|length }}
+            </p>
+        {% endif %}
+    </header>
+
+    {% if is_teaser %}
+        {# Тизер первой главы: max-h + fade-gradient, разворот по клику. #}
+        <div x-data="{ expanded: false }" class="relative">
+            {# Тема — на подложке, кегль и интервал — на тексте: иначе padding темы съедал ширину строки #}
+            <div :class="[!expanded ? 'max-h-[60vh] overflow-hidden' : '', readerTheme]" class="reader-surface">
+                <article data-chapter-body :class="[readerSize, readerLead]"
+                         class="prose-reader font-sans text-slate-800">
+                    {{ current.body|linebreaks }}
+                </article>
+            </div>
+            <div x-show="!expanded"
+                 class="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-white via-white/85 to-transparent"></div>
+
+            <div x-show="!expanded" class="mt-5 flex justify-center">
+                <button type="button" @click="expanded = true"
+                        class="inline-flex h-11 items-center gap-2 rounded-pill border-2 border-brand bg-white px-6 font-sans text-sm font-semibold text-brand hover:bg-brand hover:text-white transition-colors">
+                    Жалғастыру
+                    {% include "components/icon.html" with name="chevron-down" size=16 only %}
+                </button>
+            </div>
+        </div>
+    {% else %}
+        <div :class="readerTheme" class="reader-surface">
+            <article data-chapter-body :class="[readerSize, readerLead]"
+                     class="prose-reader font-sans text-slate-800">
+                {{ current.body|linebreaks }}
+            </article>
+        </div>
+    {% endif %}
+
+    {# FR-STORY-12 / DEC-32: реакции на главу вместо одиночного лайка #}
+    {% include "components/reaction_bar.html" with items=reactions picked=current.my_reaction story_slug=story.slug chapter_number=chapter_number %}
+
+    {# FR-STORY-13: опрос автора — необязательный, рендерится если создан #}
+    {% if poll %}
+        {% include "components/chapter_poll.html" with poll=poll story_slug=story.slug chapter_number=chapter_number %}
+    {% endif %}
+
+    {# Навигация между главами — full reload на ?chapter=N±1 с якорем на тексте #}
+    {% if story.is_serial %}
+    <nav class="mt-8 flex items-center justify-between gap-3 border-t border-slate-200 pt-6 font-sans text-sm">
+        {% if has_prev %}
+            <a href="?chapter={{ chapter_number|add:'-1' }}#chapter-{{ chapter_number|add:'-1' }}"
+               class="inline-flex items-center gap-2 font-semibold text-slate-700 hover:text-brand">
+                {% include "components/icon.html" with name="chevron-left" size=16 only %}
+                Алдыңғы бөлім
+            </a>
+        {% else %}
+            <span></span>
+        {% endif %}
+
+        {% if has_next %}
+            <a href="?chapter={{ chapter_number|add:'1' }}#chapter-{{ chapter_number|add:'1' }}"
+               class="inline-flex h-11 items-center gap-2 rounded-md bg-brand px-5 font-semibold text-white hover:bg-brand-dark">
+                Келесі бөлім
+                {% include "components/icon.html" with name="chevron-right" size=16 only %}
+            </a>
+        {% else %}
+            <span class="font-sans text-xs text-slate-500">Бұл — соңғы бөлім</span>
+        {% endif %}
+    </nav>
+    {% endif %}
+</section>

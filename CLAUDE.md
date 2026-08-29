@@ -60,7 +60,8 @@ core/
 ├── management/commands/  seed_demo + _corpus.py (демо-содержимое литералами)
 └── tests/         12 файлов; base.py (login_as), factories.py, runner.py
 templates/         base.html, components/, partials/, pages/ — всё в корневой
-static_src/input.css   @theme с токенами
+static/js/         components.js (Alpine-компоненты портала), reader.js (читалка)
+static_src/input.css   @theme с токенами и стили читалки
 media/             обложки, афиши, эмблемы наград (в .gitignore целиком)
 ```
 
@@ -95,6 +96,11 @@ media/             обложки, афиши, эмблемы наград (в .
   текстом. То же для `{% url %}` и `{% if %}`; многострочный `{# … #}` — тоже.
 - **`@click`/`@submit` требуют `x-data` в предках**, иначе директива мёртвая без
   ошибки в консоли. Лечение — пустой `x-data` на самом элементе.
+- **JS живёт в `static/js/`, а подключается блоком `page_scripts`** — то есть в
+  `<head>` и до `alpine.min.js`: `defer` исполняет в порядке документа, и
+  `Alpine.data` обязан успеть до старта. Скрипт в конце `<body>` опоздает, а
+  компонент останется неизвестным именем. Именуется то, у чего есть логика или
+  что повторяется; `x-data="{ open: false }"` остаётся в разметке.
 - **`{% include "components/icon.html" … only %}`** — без `only` подпись кнопки
   утекает в иконку и читается скринридером дважды.
 - **`aria-label` на `<span>`/`<div>` без `role` не озвучивается** — подпись идёт
