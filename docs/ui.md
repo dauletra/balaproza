@@ -196,8 +196,9 @@ Container `max-w-[1280px]`, поля `px-4` → `sm:px-6` → `lg:px-12`. Шап
 ### Глобальные события
 
 `toast` `{kind, text}` · `open-search` (Cmd+K) · `open-report` `{target}` ·
-`open-catalog-filters` · `reading-mode` `{on}` · `open-delete-confirm`
-`{name, confirm_url}` · `open-withdraw-confirm` `{contest, story}`.
+`open-share` `{url, title}` · `open-catalog-filters` · `reading-mode` `{on}` ·
+`open-delete-confirm` `{name, confirm_url}` · `open-withdraw-confirm`
+`{contest, story}`.
 
 ## Тон
 

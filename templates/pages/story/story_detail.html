@@ -100,10 +100,11 @@
     {% endif %}
 </div>
 
-{# Маунтим ReportModal — открывается по событию из кнопки выше #}
+{# Маунтим ReportModal и ShareModal — открываются по событию из кнопок выше #}
 {% if signed_in %}
     {% include "components/report_modal.html" %}
 {% endif %}
+{% include "components/share_modal.html" %}
 {% endblock %}
 
 {% block right_rail %}

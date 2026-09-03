@@ -1,0 +1,71 @@
+{% comment %}
+    ShareModal — фолбэк «Бөлісу» для сред без Web Share API (десктоп, часть
+    in-app-браузеров): Telegram, WhatsApp и явное поле со ссылкой. На
+    смартфоне с рабочим navigator.share кнопка вызывает системный шит и эта
+    модалка не открывается вовсе (см. share_button.html).
+
+    Триггер: $dispatch('open-share', { url, title })
+    Подключается один раз на странице — рядом со `share_button.html`.
+{% endcomment %}
+<div x-data="modal('open-share', ['url', 'title'])"
+     @close-share.window="open = false"
+     x-show="open" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="share-modal-title">
+
+    <div x-show="open" x-transition.opacity
+         class="absolute inset-0 bg-slate-900/60" @click="open = false"></div>
+
+    <div x-show="open"
+         x-transition:enter="ease-out duration-200"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         class="relative w-full max-w-md rounded-hero bg-white p-7 shadow-modal sm:p-9">
+
+        <button type="button" @click="open = false" aria-label="Жабу"
+                class="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-pill text-slate-500 hover:bg-slate-100">
+            {% include "components/icon.html" with name="x" size=18 only %}
+        </button>
+
+        <div class="grid h-12 w-12 place-items-center rounded-pill bg-brand/10 text-brand">
+            {% include "components/icon.html" with name="paper-plane" size=22 only %}
+        </div>
+
+        <h2 id="share-modal-title" class="mt-4 font-display text-xl font-bold text-slate-900">
+            Бөлісу
+        </h2>
+        <p class="mt-1 truncate font-sans text-sm text-slate-600" x-text="title"></p>
+
+        <div class="mt-5 grid grid-cols-2 gap-2.5">
+            <a :href="'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(title)"
+               target="_blank" rel="noopener noreferrer"
+               class="flex h-11 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white font-sans text-sm font-semibold text-slate-800 hover:bg-slate-50">
+                {% include "components/icon.html" with name="telegram" size=18 only %}
+                <span>Telegram</span>
+            </a>
+            <a :href="'https://api.whatsapp.com/send?text=' + encodeURIComponent(title + ' ' + url)"
+               target="_blank" rel="noopener noreferrer"
+               class="flex h-11 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white font-sans text-sm font-semibold text-slate-800 hover:bg-slate-50">
+                {% include "components/icon.html" with name="whatsapp" size=18 only %}
+                <span>WhatsApp</span>
+            </a>
+        </div>
+
+        <div class="mt-2.5 flex items-center gap-2" x-data="{ copied: false }">
+            <input type="text" readonly :value="url" @click="$event.target.select()"
+                   aria-label="Сілтеме"
+                   class="h-11 min-w-0 flex-1 rounded-md border border-slate-300 bg-slate-50 px-3 font-sans text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand/30">
+            <button type="button"
+                    @click="navigator.clipboard.writeText(url).then(() => {
+                        copied = true;
+                        $dispatch('toast', { kind: 'success', text: 'Сілтеме көшірілді' });
+                        setTimeout(() => copied = false, 1500);
+                    }).catch(() => $dispatch('toast', { kind: 'error', text: 'Көшіру мүмкін болмады' }))"
+                    class="inline-flex h-11 shrink-0 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                <span x-show="!copied">{% include "components/icon.html" with name="link" size=16 only %}</span>
+                <span x-show="copied" x-cloak>{% include "components/icon.html" with name="check" size=16 cls="text-status-published-fg" only %}</span>
+                <span x-text="copied ? 'Көшірілді' : 'Көшіру'"></span>
+            </button>
+        </div>
+    </div>
+</div>

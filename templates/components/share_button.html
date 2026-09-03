@@ -1,7 +1,16 @@
 {% comment %}
     ShareButton — кнопка «Бөлісу» с двумя режимами:
-      - Мобайл (поддерживает navigator.share): нативный Web Share API
-      - Десктоп (или fallback): dropdown с Telegram / WhatsApp / Copy link
+      - Мобайл (Android/iOS с navigator.share): нативный Web Share API,
+        компактный системный шит с мессенджерами именно этого телефона.
+      - Всё остальное (десктоп, включая Windows/Edge с их собственным
+        Web Share — он тянет вообще всё, что зарегистрировано в системе
+        как получатель шаринга: Zoom, Outlook, контакты, и это не
+        фильтруется со стороны сайта): открывает share_modal.html через
+        событие 'open-share' — только Telegram / WhatsApp / прямая ссылка.
+        Поэтому проверяем не факт поддержки API, а мобильную ОС.
+
+    share_modal.html подключается один раз на странице, отдельно от кнопки
+    (см. story_detail.html, contest_detail.html) — так же, как report_modal.
 
     Параметры:
       url      — абсолютный/относительный URL (обязательно)
@@ -19,38 +28,22 @@
       {% include "components/share_button.html" with url=request.build_absolute_uri title=story.title %}
 {% endcomment %}
 {% with btn_label=label|default:"Бөлісу" %}
-<div x-data="{
-        open: false,
-        canNative: typeof navigator !== 'undefined' && typeof navigator.share === 'function',
+<div class="{{ wrap_cls|default:'' }}"
+     x-data="{
         url: '{{ url|escapejs }}',
         title: '{{ title|escapejs }}',
         async share() {
-            if (this.canNative) {
+            var isMobileOS = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            if (isMobileOS && typeof navigator.share === 'function') {
                 try {
                     await navigator.share({ title: this.title, url: this.url });
                 } catch (e) { /* user dismissed */ }
             } else {
-                this.open = !this.open;
+                this.$dispatch('open-share', { url: this.url, title: this.title });
             }
-        },
-        async copy() {
-            try {
-                await navigator.clipboard.writeText(this.url);
-                this.$dispatch('toast', { kind: 'success', text: 'Сілтеме көшірілді' });
-            } catch (e) {
-                this.$dispatch('toast', { kind: 'error', text: 'Көшіру мүмкін болмады' });
-            }
-            this.open = false;
-        },
-        tgUrl() {
-            return 'https://t.me/share/url?url=' + encodeURIComponent(this.url) + '&text=' + encodeURIComponent(this.title);
-        },
-        waUrl() {
-            return 'https://api.whatsapp.com/send?text=' + encodeURIComponent(this.title + ' ' + this.url);
         }
-     }"
-     class="relative {{ wrap_cls|default:'' }}">
-    <button type="button" @click="share()" @click.outside="open = false"
+     }">
+    <button type="button" @click="share()"
             aria-label="{{ btn_label }}"
             class="inline-flex items-center gap-2 rounded-md border px-4 font-sans text-sm font-semibold
                    {% if tone == 'on-dark' %}h-10 border-white/40 bg-white/15 text-white hover:bg-white/25
@@ -58,28 +51,5 @@
         {% include "components/icon.html" with name="paper-plane" size=16 only %}
         <span>{{ btn_label }}</span>
     </button>
-
-    {# Десктопный dropdown — показывается только если нет navigator.share #}
-    <div x-show="open" x-cloak x-transition
-         role="menu" aria-label="{{ btn_label }}"
-         class="absolute right-0 z-20 mt-2 w-56 rounded-md border border-slate-200 bg-white py-1 shadow-modal">
-        <a :href="tgUrl()" target="_blank" rel="noopener noreferrer"
-           role="menuitem" @click="open = false"
-           class="flex items-center gap-3 px-4 py-2 font-sans text-sm text-slate-800 hover:bg-slate-50">
-            {% include "components/icon.html" with name="telegram" size=16 only %}
-            <span>Telegram</span>
-        </a>
-        <a :href="waUrl()" target="_blank" rel="noopener noreferrer"
-           role="menuitem" @click="open = false"
-           class="flex items-center gap-3 px-4 py-2 font-sans text-sm text-slate-800 hover:bg-slate-50">
-            {% include "components/icon.html" with name="message-caption" size=16 only %}
-            <span>WhatsApp</span>
-        </a>
-        <button type="button" @click="copy()" role="menuitem"
-                class="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-2 text-left font-sans text-sm text-slate-800 hover:bg-slate-50">
-            {% include "components/icon.html" with name="check" size=16 cls="text-slate-400" only %}
-            <span>Сілтемені көшіру</span>
-        </button>
-    </div>
 </div>
 {% endwith %}
