@@ -26,6 +26,7 @@ from core.models import (
     Chapter,
     ChapterPoll,
     ChapterReaction,
+    ChapterReactionVote,
     Contest,
     ContestAward,
     ContestCondition,
@@ -37,6 +38,7 @@ from core.models import (
     LibraryEntry,
     Notification,
     PollOption,
+    PollVote,
     ReadingProgress,
     SchoolLink,
     Story,
@@ -160,9 +162,13 @@ class Command(BaseCommand):
                     'status':          stub.status,
                     'audience':        stub.audience,
                     'format':          stub.format,
-                    'views':           stub.views,
-                    'likes':           stub.likes,
-                    'comments':        stub.comments,
+                    # `views` не входит: `_seed_views` поднимает его до
+                    # decorative-минимума корпуса, не сбрасывая то, что уже
+                    # накоплено реальным трафиком (DEC-63).
+                    # `likes` не входит: агрегат по реакциям, `_seed_chapters`
+                    # выставляет его сразу за сидированием ChapterReaction.
+                    # `comments` тоже не входит: `_seed_comments` выставляет
+                    # decorative-база-корпуса + реальные строки сверх неё.
                     # Знак редакции — акт человека; конкурсный знак выводится
                     # из заявки и в корпусе его нет (см. `Story.badges`).
                     'is_editorial_pick': stub.is_editorial_pick,
@@ -185,7 +191,16 @@ class Command(BaseCommand):
 
     def _seed_chapters(self):
         """Главы с текстом и счётчиками реакций. Лишние записи удаляются:
-        убранная из корпуса глава обязана исчезнуть и из базы."""
+        убранная из корпуса глава обязана исчезнуть и из базы.
+
+        Глава с настоящими голосами (`ChapterReactionVote`) реакции не
+        трогает: корпус кладёт декоративную массовую цифру поверх пустого
+        места, а не поверх того, что реально проголосовал человек, — сид
+        не должен стирать чужой голос при каждом перезапуске (DEC-61).
+        `Story.likes` считается здесь же, суммой по счётчикам реакций
+        всех глав (BR-14a) — не отдельным литералом в корпусе: тот молча
+        расходился с настоящими реакциями главы (DEC-60).
+        """
         added = updated = 0
         for stub in _corpus.STORIES:
             story = Story.objects.get(slug=stub.slug)
@@ -193,6 +208,7 @@ class Command(BaseCommand):
             story.chapter_set.exclude(
                 number__in=[c.number for c in chapters]).delete()
 
+            story_likes = 0
             for stub_chapter in chapters:
                 chapter, is_new = Chapter.objects.update_or_create(
                     story=story, number=stub_chapter.number,
@@ -202,41 +218,57 @@ class Command(BaseCommand):
                 added += is_new
                 updated += not is_new
 
+                if ChapterReactionVote.objects.filter(chapter=chapter).exists():
+                    story_likes += chapter.likes
+                    continue
+
                 kinds = dict(stub_chapter.reactions)
                 chapter.reactions.exclude(kind__in=kinds).delete()
                 for kind, count in kinds.items():
                     ChapterReaction.objects.update_or_create(
                         chapter=chapter, kind=kind, defaults={'count': count})
+                story_likes += sum(kinds.values())
+            Story.objects.filter(pk=story.pk).update(likes=story_likes)
         return added, updated
 
     def _seed_views(self):
         """Журнал прочтений внутри окна (DEC-55) и счётчик по нему.
 
-        `recent_views` в корпусе — это **сколько строк завести**, а не
-        число, которое проставляется колонке: колонка считается по журналу,
-        ровно как её пересчитает `recount_views`. Разойтись им негде.
+        `recent_views` в корпусе и `Story.views` — это **минимум**, а не
+        жёсткое присваивание: сид поднимает их до decorative-базы корпуса,
+        если реального трафика ещё не было, но никогда не опускает то, что
+        уже накоплено настоящими прочтениями (DEC-63 — тот же принцип, что
+        у реакции (DEC-61) и комментария (DEC-62): живое действие читателя
+        переживает пересид). Раньше `StoryView.objects.all().delete()`
+        сносил журнал целиком на каждый прогон — вместе с decorative
+        строками уходили и настоящие.
 
-        Даты раскиданы по окну неровно и детерминированно (`Random(slug)`):
-        ровное распределение сделало бы вчерашний пересчёт и завтрашний
-        неразличимыми, а случайное без ключа — сид неидемпотентным.
-
-        Накопленный `views` остаётся литералом: журнал держит только окно,
-        и прочтения годичной давности в нём не лежат по определению.
+        Даты decorative-строк раскиданы по окну неровно и детерминированно
+        (`Random(slug)`): ровное распределение сделало бы вчерашний
+        пересчёт и завтрашний неразличимыми, а случайное без ключа — сид
+        неидемпотентным. Довешивается только недостача — количество
+        случайных чисел на прогон меняется вместе с ней, но сама дата
+        конкретной decorative-строки нигде не проверяется.
         """
         window = timedelta(days=RECENT_VIEWS_DAYS)
         edge = timezone.now() - window
-        StoryView.objects.all().delete()
 
         added = 0
         for stub in _corpus.STORIES:
             story = Story.objects.get(slug=stub.slug)
-            rng = Random(stub.slug)
-            StoryView.objects.bulk_create([
-                StoryView(story=story,
-                          created_at=edge + window * rng.random())
-                for _ in range(stub.recent_views)
-            ])
-            added += stub.recent_views
+            Story.objects.filter(pk=story.pk, views__lt=stub.views).update(
+                views=stub.views)
+
+            missing = stub.recent_views - story.view_set.filter(
+                created_at__gte=edge).count()
+            if missing > 0:
+                rng = Random(stub.slug)
+                StoryView.objects.bulk_create([
+                    StoryView(story=story,
+                              created_at=edge + window * rng.random())
+                    for _ in range(missing)
+                ])
+                added += missing
 
         updated = Story.objects.count()
         recount_recent_views()
@@ -429,32 +461,57 @@ class Command(BaseCommand):
 
     def _seed_comments(self):
         """Комментарии с одним уровнем ответов (BR-30). В базе остаётся
-        момент, подпись выводится из него (BR-70a)."""
+        момент, подпись выводится из него (BR-70a).
+
+        Демо-комментарии корпуса заводятся апсертом по естественному
+        ключу (story, author, chapter_number, parent, text), а не
+        delete-и-пересоздать: иначе настоящий комментарий читателя
+        удалялся бы при каждом сиде вместе с декоративными — тот же
+        принцип, что у живого голоса реакции (DEC-61). `Story.comments`
+        — декоративная база корпуса плюс то, что сверх нее реально
+        написано; заводится здесь же, а не в `_seed_stories`, потому что
+        только тут известно, какие строки — корпус, а какие — читатель.
+        """
         added = updated = 0
-        for story_slug, comments in _corpus.COMMENTS_BY_STORY.items():
-            story = Story.objects.get(slug=story_slug)
-            story.comment_set.all().delete()
-            for stub in comments:
-                row = self._comment(story, stub, parent=None)
-                added += 1
-                for reply in stub.replies:
-                    self._comment(story, reply, parent=row)
-                    added += 1
+        for stub in _corpus.STORIES:
+            story = Story.objects.get(slug=stub.slug)
+            seeded_pks = set()
+            for c_stub in _corpus.COMMENTS_BY_STORY.get(stub.slug, ()):
+                row, is_new = self._comment(story, c_stub, parent=None)
+                seeded_pks.add(row.pk)
+                added += is_new
+                updated += not is_new
+                for reply in c_stub.replies:
+                    reply_row, is_new = self._comment(story, reply, parent=row)
+                    seeded_pks.add(reply_row.pk)
+                    added += is_new
+                    updated += not is_new
+            extra = story.comment_set.exclude(pk__in=seeded_pks).count()
+            Story.objects.filter(pk=story.pk).update(comments=stub.comments + extra)
         return added, updated
 
     def _comment(self, story, stub, *, parent):
-        return StoryComment.objects.create(
+        return StoryComment.objects.update_or_create(
             story=story,
             author=User.objects.get(username=stub.author_username),
             chapter_number=stub.chapter_number,
             parent=parent,
             text=stub.text,
-            likes=stub.likes,
-            created_at=timezone.now() - stub.ago,
+            defaults={'likes': stub.likes, 'created_at': timezone.now() - stub.ago},
         )
 
     def _seed_polls(self):
-        """Опросы под главами. Голоса — счётчиком: голосовать пока негде."""
+        """Опросы под главами (FR-STORY-13).
+
+        Опрос с хотя бы одним настоящим голосом (`PollVote`) сид больше
+        не трогает вовсе — тот же приём, что у реакции/комментария/
+        просмотра (DEC-61/62/63). Варианты апсертятся по (poll, slug),
+        а не delete-и-пересоздать: на `PollOption` ссылается
+        `PollVote.option` с `on_delete=CASCADE` — пересоздание строки
+        каскадом убивало бы чужой голос вместе со счётчиком, да ещё и
+        открывало бы повторное голосование (`cast_poll_vote` не пускает
+        второй голос именно через существование этой записи) (DEC-64).
+        """
         added = updated = 0
         for (story_slug, number), stub in _corpus.POLLS_BY_CHAPTER.items():
             chapter = Chapter.objects.get(story__slug=story_slug, number=number)
@@ -462,13 +519,19 @@ class Command(BaseCommand):
                 chapter=chapter, defaults={'question': stub.question})
             added += is_new
             updated += not is_new
+
+            if PollVote.objects.filter(poll=poll).exists():
+                continue
+
             votes = dict(stub.votes)
-            poll.option_set.all().delete()
-            PollOption.objects.bulk_create([
-                PollOption(poll=poll, slug=slug, text=text,
-                           votes=votes.get(slug, 0), position=i)
-                for i, (slug, text) in enumerate(stub.options)
-            ])
+            seen = set()
+            for i, (slug, text) in enumerate(stub.options):
+                PollOption.objects.update_or_create(
+                    poll=poll, slug=slug,
+                    defaults={'text': text, 'votes': votes.get(slug, 0),
+                             'position': i})
+                seen.add(slug)
+            poll.option_set.exclude(slug__in=seen).delete()
         return added, updated
 
     @staticmethod
@@ -488,28 +551,38 @@ class Command(BaseCommand):
         return moment
 
     def _seed_notifications(self):
-        """Уведомления. Хранится момент, «как давно» и группа выводятся."""
+        """Уведомления (FR-NOTIF-*). Хранится момент, «как давно» и
+        группа выводятся.
+
+        Апсерт по (user, kind, actor, story, contest, text) вместо
+        delete-и-пересоздать: настоящее уведомление (например, от
+        `Story.apply_moderation`, DEC-23) больше не стирается вместе с
+        декоративной лентой корпуса при каждом сиде (DEC-64 — тот же
+        приём, что у реакции/комментария/просмотра, DEC-61/62/63).
+        """
         added = updated = 0
         for username, items in _corpus.NOTIFICATIONS_BY_USER.items():
             user = User.objects.get(username=username)
-            user.notifications.all().delete()
             for stub in items:
-                Notification.objects.create(
+                _, is_new = Notification.objects.update_or_create(
                     user=user,
                     kind=stub.kind,
-                    created_at=self._moment(stub.days_ago,
-                                            stub.hours_ago or 0),
                     actor=(User.objects.filter(username=stub.actor_username).first()
                            if stub.actor_username else None),
                     story=(Story.objects.filter(slug=stub.story_slug).first()
                            if stub.story_slug else None),
                     contest=(Contest.objects.filter(slug=stub.contest_slug).first()
                              if stub.contest_slug else None),
-                    outcome=stub.outcome,
                     text=stub.text,
-                    read=stub.read,
+                    defaults={
+                        'created_at': self._moment(stub.days_ago,
+                                                   stub.hours_ago or 0),
+                        'outcome': stub.outcome,
+                        'read': stub.read,
+                    },
                 )
-                added += 1
+                added += is_new
+                updated += not is_new
         return added, updated
 
     def _seed_school_links(self):

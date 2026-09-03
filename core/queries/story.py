@@ -96,7 +96,12 @@ def reactions_of(chapter, viewer=None) -> list:
 
 def _bump_reaction_count(chapter, kind: str, delta: int) -> None:
     """+1/-1 к счётчику одной реакции главы — заводит строку, если её ещё
-    не было (ряд реакций полный, но не каждая кнопка нажата хоть раз)."""
+    не было (ряд реакций полный, но не каждая кнопка нажата хоть раз).
+
+    Сдвиг, а не пересчёт от `ChapterReactionVote` — намеренно: сид кладёт
+    в `count` декоративную массовую цифру («260 читателей»), не заводя
+    260 настоящих строк голосования, и живой голос обязан лечь поверх
+    этой цифры, а не подменить её единицей (DEC-61)."""
     row, created = ChapterReaction.objects.get_or_create(
         chapter=chapter, kind=kind, defaults={'count': max(delta, 0)})
     if not created:

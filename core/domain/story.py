@@ -48,25 +48,26 @@ def status_after_moderation(outcome: str, story_format: str) -> str:
 
 @dataclass(frozen=True)
 class Reaction:
-    """Одна реакция читателя на главу (FR-STORY-12, DEC-32).
+    """Одна реакция читателя на главу (FR-STORY-12, DEC-32/DEC-58).
 
     Словарь закрытый: пять штук, пользовательских реакций нет. Открытый
     список означал бы бесконечную модерацию и длинный хвост мёртвых кнопок.
     """
     slug: str
     label: str    # первое лицо — читатель говорит о себе, как в docs/ui.md («сен»)
-    icon: str     # symbol в спрайте; эмодзи запрещены, поэтому только SVG
+    icon: str     # symbol в спрайте — используется в разборе по главам автора (manage_story)
+    emoji: str    # DEC-58: читательский reaction_bar — точечное исключение из запрета эмодзи
     hint: str     # как это читать автору в разбивке по главам
 
 
 # Порядок фиксирован и в данных, и в интерфейсе: кнопки не должны прыгать
 # местами по мере голосования.
 REACTIONS = (
-    Reaction("kuldim",    "Күлдім",    "smile",        "күлкілі болды"),
-    Reaction("jyladym",   "Жыладым",   "drop",         "қатты әсер етті"),
-    Reaction("juregim",   "Жүрегім",   "heart-filled", "романтикалық"),
-    Reaction("shabyt",    "Шабыт",     "feather",      "жазуға шабыттандырды"),
-    Reaction("tangaldym", "Таңғалдым", "sparkle",      "күтпеген бұрылыс"),
+    Reaction("kuldim",    "Күлдім",    "smile",        "😂", "күлкілі болды"),
+    Reaction("jyladym",   "Жыладым",   "drop",         "😭", "қатты әсер етті"),
+    Reaction("juregim",   "Жүрегім",   "heart-filled", "🥰", "романтикалық"),
+    Reaction("shabyt",    "Шабыт",     "feather",      "🔥", "жазуға шабыттандырды"),
+    Reaction("tangaldym", "Таңғалдым", "sparkle",      "🤯", "күтпеген бұрылыс"),
 )
 
 REACTIONS_BY_SLUG = {r.slug: r for r in REACTIONS}

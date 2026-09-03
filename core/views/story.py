@@ -79,25 +79,30 @@ def story_detail(request, slug):
         chapter_number = None
         current = None
 
-    # Тизер с разворотом — только для гл.1 при «голом» URL без ?chapter (первое
-    # знакомство с произведением). Возвращающийся юзер или явный выбор главы → полный текст.
-    is_teaser = bool(
+    # Первый «голый» заход на гл.1 без ?chapter и без прежней закладки —
+    # первое знакомство с произведением, а не чтение: гл.1 открылась сама,
+    # читатель её не выбирал. Текст при этом показывается полностью
+    # (DEC-59 убрал обрезку тизера), но заход всё равно не считается
+    # стартом чтения — от него не двигаем полку и не показываем счётчик
+    # прогресса. Возвращающийся или тот, кто явно выбрал главу, → False.
+    is_first_look = bool(
         current and chapter_number == 1 and not explicit_chapter
         and not has_progress_here and not story.is_single
     )
 
     # Запоминаем место **после** резолва: `has_progress_here` отвечает на
-    # «была ли закладка до этого захода», и от неё зависят тизер и подпись
-    # главной кнопки. Записанный раньше, прогресс сделал бы первое
+    # «была ли закладка до этого захода», и от неё зависят is_first_look и
+    # подпись главной кнопки. Записанный раньше, прогресс сделал бы первое
     # знакомство с работой похожим на возвращение.
     if current is not None and request.user.is_authenticated:
         # Продвижение, а не повторный показ того же места: глава, отличная
-        # от закладки, либо первый заход не тизером. Полку двигает только
-        # оно (BR-61) — иначе снятие кнопкой воскресало бы на редиректе
-        # сюда же. Неравенство, а не «дальше»: повторное чтение дочитанного
-        # начинается с первой главы и обязано вернуть работу на `reading`.
+        # от закладки, либо первый заход не тем самым «голым» гл.1. Полку
+        # двигает только оно (BR-61) — иначе снятие кнопкой воскресало бы
+        # на редиректе сюда же. Неравенство, а не «дальше»: повторное
+        # чтение дочитанного начинается с первой главы и обязано вернуть
+        # работу на `reading`.
         advanced = (chapter_number != progress.current_chapter
-                    if has_progress_here else not is_teaser)
+                    if has_progress_here else not is_first_look)
         data.record_reading_progress(request.user, story, chapter_number, chapters)
         # BR-61 / FR-LIB-02: полку двигает само чтение, а не только кнопка.
         data.move_to_shelf(request.user, story, advanced=advanced,
@@ -112,7 +117,7 @@ def story_detail(request, slug):
         'current':  current,
         'has_prev': bool(current) and chapter_number > 1,
         'has_next': bool(current) and chapter_number < len(chapters),
-        'is_teaser': is_teaser,
+        'is_first_look': is_first_look,
         'comments': (data.comments_of_chapter(slug, chapter_number, viewer)
                     if chapter_number else []),
         # FR-STORY-12 / DEC-32: пять реакций на главу вместо одиночного лайка
@@ -225,11 +230,27 @@ def library_toggle(request, slug):
 @login_required
 def chapter_react(request, slug, chapter):
     """Ставит, снимает или меняет реакцию на главе; `kind` — один из пяти
-    закрытого списка (BR-REACT-01)."""
+    закрытого списка (BR-REACT-01).
+
+    htmx-запрос (`HX-Request`) получает в ответ сам компонент, заново
+    отрисованный со свежим счётом, — `reaction_bar.html` подменяет им
+    себя же (`hx-swap="outerHTML"`), без перезагрузки страницы. Обычная
+    отправка формы (JS выключен) идёт прежним путём — PRG-редирект.
+    """
     ch = data.chapter_of(slug, chapter)
     kind = request.POST.get('kind', '')
     if ch is not None and kind in data.REACTIONS_BY_SLUG:
         data.toggle_chapter_reaction(ch, request.user, kind)
+    if request.headers.get('HX-Request') == 'true':
+        # Голосование обновляет ChapterReaction отдельным UPDATE (F()),
+        # а `ch` выше пришёл с prefetch до него — счёт в объекте устарел,
+        # поэтому свежий рендер берёт главу заново, а не переиспользует `ch`.
+        fresh = data.chapter_of(slug, chapter, request.user)
+        return render(request, 'components/reaction_bar.html', {
+            'items': data.reactions_of(fresh) if fresh else [],
+            'story_slug': slug,
+            'chapter_number': chapter,
+        })
     return _back_to_story(slug, chapter)
 
 

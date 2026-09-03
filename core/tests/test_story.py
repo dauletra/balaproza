@@ -57,12 +57,15 @@ class StoryPageAnswersTheQuestionShouldIRead(TestCase):
         self.assertContains(self.response, self.story.annotation)
         self.assertNotContains(self.response, 'Авторлар әлемі')
 
-    def test_the_first_chapter_opens_as_a_teaser_with_a_way_onward(self):
+    def test_the_first_chapter_opens_in_full(self):
         """Чтение идёт inline: отдельного маршрута `/read/` нет (DEC-30),
-        и старого scrollspy-блока тоже."""
+        и старого scrollspy-блока тоже. Текст не обрезается (DEC-59) —
+        последнее предложение главы обязано попасть в ответ целиком."""
+        body = data.chapter_of(STORY_SLUG, 1).body
         self.assertContains(self.response, data.chapter_of(STORY_SLUG, 1).title)
         self.assertContains(self.response, '1-бөлім')
-        self.assertContains(self.response, 'Жалғастыру')
+        self.assertContains(self.response, body.strip().rsplit('\n', 1)[-1])
+        self.assertNotContains(self.response, 'expanded: false')
         self.assertContains(self.response, 'Келесі бөлім')
         self.assertNotContains(self.response, 'Алдыңғы бөлім')
         self.assertNotContains(self.response, f'/story/{STORY_SLUG}/read/')
@@ -103,8 +106,6 @@ class ChapterNavigationIsForgiving(TestCase):
         self.assertContains(response, 'Келесі бөлім')
         self.assertContains(response, '?chapter=3')
         self.assertContains(response, '?chapter=5')
-        # Явный выбор главы отменяет тизер.
-        self.assertNotContains(response, 'Жалғастыру')
 
     def test_the_last_chapter_offers_nothing_further(self):
         last = len(data.chapters_of(STORY_SLUG))
@@ -428,18 +429,20 @@ class TheMainButtonSaysWhatWillHappen(TestCase):
 
 
 class ReactionsReplaceTheSingleLike(TestCase):
-    """FR-STORY-12 / DEC-32: пять реакций вместо лайка. Каждая обязана
-    иметь подпись словом — эмодзи запрещены, а монохромная иконка 20px без
-    подписи неразличима."""
+    """FR-STORY-12 / DEC-32 / DEC-58: пять реакций вместо лайка. Кнопка
+    рендерится эмодзи без подписи (DEC-52), но доступное имя не теряется —
+    оно стоит в aria-label вместе со счётом."""
 
     def setUp(self):
         self.response = self.client.get(
             reverse('core:story_detail', kwargs={'slug': STORY_SLUG}))
 
-    def test_all_five_are_offered_with_words(self):
+    def test_all_five_are_offered_as_emoji(self):
+        html = self.response.content.decode()
         for reaction in data.REACTIONS:
             with self.subTest(reaction=reaction.slug):
-                self.assertContains(self.response, f'>{reaction.label}<')
+                self.assertIn(reaction.emoji, html)
+                self.assertIn(f'aria-label="{reaction.label},', html)
         self.assertNotContains(self.response, 'Бұл бөлім ұнады ма?')
         self.assertContains(self.response, reverse('core:login'))
         # Набор из пяти кнопок одинаков у первой главы и у сотой.
@@ -458,8 +461,7 @@ class ReactionsReplaceTheSingleLike(TestCase):
         first = data.chapter_of(STORY_SLUG, 1)
         self.assertTrue(first.likes, 'нужна глава с реакциями для проверки')
         self.assertContains(self.response, f'{first.likes} реакция')
-        self.assertContains(self.response, 'Авторды қолдау — бір рет басу ғана',
-                            count=1)
+        self.assertContains(self.response, 'aria-label="Бөлімге реакция"', count=1)
 
 
 class ChapterReactionVoting(TestCase):
@@ -515,6 +517,28 @@ class ChapterReactionVoting(TestCase):
             chapter__number=self.CHAPTER)
         self.assertEqual(vote.kind, 'jyladym')
 
+    def test_an_htmx_request_gets_the_component_back_instead_of_a_redirect(self):
+        """Без перезагрузки страницы: htmx подменяет сам компонент своим же
+        ответом (`hx-swap="outerHTML"`), обычная отправка формы (JS
+        выключен) остаётся PRG-редиректом."""
+        login_as(self.client)
+        plain = self.client.post(self._url(), {'kind': 'kuldim'})
+        self.assertEqual(plain.status_code, 302)
+
+        response = self.client.post(self._url(), {'kind': 'kuldim'},
+                                    HTTP_HX_REQUEST='true')  # повтор снимает
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn(f'id="reactions-{self.CHAPTER}"', html)
+        self.assertNotIn('aria-pressed="true"', html)
+
+        response = self.client.post(self._url(), {'kind': 'shabyt'},
+                                    HTTP_HX_REQUEST='true')
+        html = response.content.decode()
+        shabyt_count = self._kind_count('shabyt')
+        self.assertIn(f'aria-label="Шабыт, {shabyt_count}"', html)
+        self.assertIn('aria-pressed="true"', html)
+
     def test_neither_a_guest_nor_an_invented_kind_votes(self):
         likes_before = self._story_likes()
         self.client.post(self._url(), {'kind': 'kuldim'})
@@ -533,10 +557,13 @@ class ChapterReactionVoting(TestCase):
         self.assertEqual(chapter.my_reaction, 'shabyt')
         picked = [i['reaction'].slug for i in data.reactions_of(chapter) if i['mine']]
         self.assertEqual(picked, ['shabyt'])
+        shabyt_count = next(i['count'] for i in data.reactions_of(chapter)
+                            if i['reaction'].slug == 'shabyt')
         url = (reverse('core:story_detail', kwargs={'slug': STORY_SLUG})
                + f'?chapter={self.CHAPTER}')
-        self.assertContains(self.client.get(url),
-                            'Автор сенің реакцияңды көреді.')
+        html = self.client.get(url).content.decode()
+        self.assertIn(f'aria-label="Шабыт, {shabyt_count}"', html)
+        self.assertIn('aria-pressed="true"', html)
 
 
 class ChapterPollStates(TestCase):
@@ -1134,10 +1161,10 @@ class ReadingRemembersWhereYouStopped(TestCase):
 
     def test_the_first_visit_is_not_a_return_but_the_next_one_is(self):
         """Закладка пишется после резолва главы, а не до него: иначе первое
-        знакомство с работой выглядело бы возвращением к ней, и тизер
-        первой главы не показывался бы ни разу."""
+        знакомство с работой выглядело бы возвращением к ней, и заход не
+        засчитался бы `is_first_look` ни разу (DEC-59)."""
         first = self.client.get(self._url())
-        self.assertContains(first, 'Жалғастыру')
+        self.assertTrue(first.context['is_first_look'])
         self.assertFalse(first.context['has_progress'])
 
         self.client.get(self._url(6))

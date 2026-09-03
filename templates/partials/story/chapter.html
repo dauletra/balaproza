@@ -32,7 +32,7 @@
             экрана, а здесь тот же счётчик отнимал ~50px первого экрана
             главы. На sm+ панели чтения нет, и прогресс нужен.
         {% endcomment %}
-        {% if current_chapter_number and not is_teaser and story.is_serial %}
+        {% if current_chapter_number and not is_first_look and story.is_serial %}
             {% widthratio current_chapter_number chapters|length 100 as pct %}
             <div class="mt-4 hidden h-1.5 overflow-hidden rounded-pill bg-slate-200 sm:block">
                 <div class="h-full bg-brand" style="width: {{ pct }}%"></div>
@@ -43,38 +43,16 @@
         {% endif %}
     </header>
 
-    {% if is_teaser %}
-        {# Тизер первой главы: max-h + fade-gradient, разворот по клику. #}
-        <div x-data="{ expanded: false }" class="relative">
-            {# Тема — на подложке, кегль и интервал — на тексте: иначе padding темы съедал ширину строки #}
-            <div :class="[!expanded ? 'max-h-[60vh] overflow-hidden' : '', readerTheme]" class="reader-surface">
-                <article data-chapter-body :class="[readerSize, readerLead]"
-                         class="prose-reader font-sans text-slate-800">
-                    {{ current.body|linebreaks }}
-                </article>
-            </div>
-            <div x-show="!expanded"
-                 class="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-white via-white/85 to-transparent"></div>
-
-            <div x-show="!expanded" class="mt-5 flex justify-center">
-                <button type="button" @click="expanded = true"
-                        class="inline-flex h-11 items-center gap-2 rounded-pill border-2 border-brand bg-white px-6 font-sans text-sm font-semibold text-brand hover:bg-brand hover:text-white transition-colors">
-                    Жалғастыру
-                    {% include "components/icon.html" with name="chevron-down" size=16 only %}
-                </button>
-            </div>
-        </div>
-    {% else %}
-        <div :class="readerTheme" class="reader-surface">
-            <article data-chapter-body :class="[readerSize, readerLead]"
-                     class="prose-reader font-sans text-slate-800">
-                {{ current.body|linebreaks }}
-            </article>
-        </div>
-    {% endif %}
+    {# Текст показывается сразу целиком, сколько бы в нём ни было (DEC-59: обрезка тизера убрана) #}
+    <div :class="readerTheme" class="reader-surface">
+        <article data-chapter-body :class="[readerSize, readerLead]"
+                 class="prose-reader font-sans text-slate-800">
+            {{ current.body|linebreaks }}
+        </article>
+    </div>
 
     {# FR-STORY-12 / DEC-32: реакции на главу вместо одиночного лайка #}
-    {% include "components/reaction_bar.html" with items=reactions picked=current.my_reaction story_slug=story.slug chapter_number=chapter_number %}
+    {% include "components/reaction_bar.html" with items=reactions story_slug=story.slug chapter_number=chapter_number %}
 
     {# FR-STORY-13: опрос автора — необязательный, рендерится если создан #}
     {% if poll %}

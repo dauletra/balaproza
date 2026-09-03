@@ -74,7 +74,10 @@ class Story:
     cover: str       # путь относительно static/
     genres: tuple    # (primary_slug, secondary_slug or None)
     views: int
-    likes: int
+    # `likes` не заводится здесь: агрегат по реакциям (BR-14a) должен
+    # считаться из `Chapter.reactions`, а не вписываться отдельным
+    # числом — иначе оно молча расходится с настоящими реакциями главы
+    # (было расхождение у 19 из 23 работ, см. DEC-60).
     comments: int
     # Сколько строк журнала завести внутри окна (DEC-55): колонка
     # `Story.recent_views` считается по ним, а не берётся отсюда числом.
@@ -104,12 +107,12 @@ class Story:
 
 
 STORIES = [
-    Story("dalney-berega",  "Алыс жағалауларда",     "sayyn",      "ipad_19b0bc4bcd9c1a1dc4c3cc12cf20dce5.webp", ("fantastika",  None),          12482, 5230, 312, status="Completed", recent_views=298, annotation="Үш дос жоғалған жолды іздеп шығады. Таудағы сапар оларды өз қорқынышымен, достықпен және белгісіз ауылдың құпиясымен беттестіреді.", tags=("arman", "sayahat", "jasospirim"), audience="10+", is_editorial_pick=True, created_days_ago=400, updated_days_ago=60),
-    Story("temniy-lord",    "Күңгірт мырза",         "bekzhan_t",  "ipad_42f033cf1b9a2bcad744d05b9d429609.webp", ("fantezi",     "horror"),        8920, 2440, 156, status="OnProcess", recent_views=181, annotation="Қараңғы патшалыққа түскен жас кейіпкер биліктің бағасын түсіне бастайды. Сиқыр, қорқыныш және таңдау туралы фэнтези.", tags=("mistika", "arman", "basqa-alem"), audience="14+", created_days_ago=240, updated_days_ago=16),
-    Story("igra-kuklovoda", "Қуыршақшының ойыны",    "dina_books", "ipad_499539963221e0fe36b0888bf8601067.webp", ("triller",     "drama"),        18102, 6230, 421, status="OnProcess", recent_views=412, annotation="Мектептегі тыныш күндер бір жұмбақ ойыннан кейін өзгереді. Әр белгі жаңа күдікке апарады, ал шындық жақын жерде жасырынып тұр.", tags=("mistika", "jasospirim", "detektiv-jas"), audience="14+", created_days_ago=180, updated_days_ago=5),
-    Story("kronchessii",    "Тас уәделер",           "rudazov",    "ipad_5916b4e19c616e74d008125ba9a1be8e.webp", ("shyttyrman",  "fantezi"),      32540, 11200, 890, status="Completed", recent_views=89, annotation="Ескі қала қабырғаларындағы тасқа қашалған уәделер оянады. Кейіпкерлер өткеннің шартын бұзбай, болашақты сақтауға тырысады.", tags=("sayahat", "arman", "syikyr-akademiya"), audience="10+", created_days_ago=520, updated_days_ago=180),
-    Story("arhimag",        "Сиқыршы: бөтен әлемдер","rudazov",    "ipad_940e074d12d6c3657199601ca568f1b3.jpg",  ("fantezi",     "shyttyrman"),   12482, 4821, 312, status="OnProcess", recent_views=74, annotation="Жас сиқыршы бөтен әлемдердің есігін ашқанда, әр әлем өз ережесін ұсынады. Үйге қайту үшін ол күштен бұрын жауапкершілікті үйренеді.", tags=("syikyr-akademiya", "arman", "dostyk", "jasospirim", "mektep"), audience="10+", created_days_ago=21, updated_days_ago=3),
-    Story("sila-imperii",   "Империя құдіреті",      "aygerim_k",  "ipad_992f1631a421d74ed5e1aa72717df374.webp", ("tarih",       "drama"),        14200, 3890, 245, status="Published", recent_views=61, annotation="Көне империяның шетінде өскен жас батыр тарихтың үлкен толқынына түседі. Бұл шығарма билік, адалдық және ел алдындағы таңдау туралы.", tags=("arman", "jasospirim"), audience="10+", format="single", created_days_ago=330, updated_days_ago=120),
+    Story("dalney-berega",  "Алыс жағалауларда",     "sayyn",      "ipad_19b0bc4bcd9c1a1dc4c3cc12cf20dce5.webp", ("fantastika",  None),          12482, 312, status="Completed", recent_views=298, annotation="Үш дос жоғалған жолды іздеп шығады. Таудағы сапар оларды өз қорқынышымен, достықпен және белгісіз ауылдың құпиясымен беттестіреді.", tags=("arman", "sayahat", "jasospirim"), audience="10+", is_editorial_pick=True, created_days_ago=400, updated_days_ago=60),
+    Story("temniy-lord",    "Күңгірт мырза",         "bekzhan_t",  "ipad_42f033cf1b9a2bcad744d05b9d429609.webp", ("fantezi",     "horror"),        8920, 156, status="OnProcess", recent_views=181, annotation="Қараңғы патшалыққа түскен жас кейіпкер биліктің бағасын түсіне бастайды. Сиқыр, қорқыныш және таңдау туралы фэнтези.", tags=("mistika", "arman", "basqa-alem"), audience="14+", created_days_ago=240, updated_days_ago=16),
+    Story("igra-kuklovoda", "Қуыршақшының ойыны",    "dina_books", "ipad_499539963221e0fe36b0888bf8601067.webp", ("triller",     "drama"),        18102, 421, status="OnProcess", recent_views=412, annotation="Мектептегі тыныш күндер бір жұмбақ ойыннан кейін өзгереді. Әр белгі жаңа күдікке апарады, ал шындық жақын жерде жасырынып тұр.", tags=("mistika", "jasospirim", "detektiv-jas"), audience="14+", created_days_ago=180, updated_days_ago=5),
+    Story("kronchessii",    "Тас уәделер",           "rudazov",    "ipad_5916b4e19c616e74d008125ba9a1be8e.webp", ("shyttyrman",  "fantezi"),      32540, 890, status="Completed", recent_views=89, annotation="Ескі қала қабырғаларындағы тасқа қашалған уәделер оянады. Кейіпкерлер өткеннің шартын бұзбай, болашақты сақтауға тырысады.", tags=("sayahat", "arman", "syikyr-akademiya"), audience="10+", created_days_ago=520, updated_days_ago=180),
+    Story("arhimag",        "Сиқыршы: бөтен әлемдер","rudazov",    "ipad_940e074d12d6c3657199601ca568f1b3.jpg",  ("fantezi",     "shyttyrman"),   12482, 312, status="OnProcess", recent_views=74, annotation="Жас сиқыршы бөтен әлемдердің есігін ашқанда, әр әлем өз ережесін ұсынады. Үйге қайту үшін ол күштен бұрын жауапкершілікті үйренеді.", tags=("syikyr-akademiya", "arman", "dostyk", "jasospirim", "mektep"), audience="10+", created_days_ago=21, updated_days_ago=3),
+    Story("sila-imperii",   "Империя құдіреті",      "aygerim_k",  "ipad_992f1631a421d74ed5e1aa72717df374.webp", ("tarih",       "drama"),        14200, 245, status="Published", recent_views=61, annotation="Көне империяның шетінде өскен жас батыр тарихтың үлкен толқынына түседі. Бұл шығарма билік, адалдық және ел алдындағы таңдау туралы.", tags=("arman", "jasospirim"), audience="10+", format="single", created_days_ago=330, updated_days_ago=120),
 
     # ─ Витринный слой: заполняет ряды главной и покрывает пустые жанры ─
     # cover="" у части историй намеренно: плашка `cover_placeholder` должна
@@ -117,7 +120,7 @@ STORIES = [
     Story(
         slug="kunnin-songy-sagaty", title="Күннің соңғы сағаты", author_username="sayyn",
         cover="ipad_f8f1ea3b7e8133f930825b2da92a135e.webp", genres=("fantastika", None),
-        views=6410, likes=980, comments=64,
+        views=6410, comments=64,
         status="Published", format="single",
         recent_views=221, annotation="Күн батпай тұрып бір нәрсені үлгеру керек. Он жеті жасар бала уақыттың қалай тоқтайтынын біледі.",
         tags=("arman", "jasospirim"), audience="10+",
@@ -126,7 +129,7 @@ STORIES = [
     Story(
         slug="mektep-koridory", title="Мектеп дәлізіндегі хат", author_username="aygerim_k",
         cover="", genres=("romantika", "drama"),
-        views=9240, likes=2110, comments=188,
+        views=9240, comments=188,
         status="Published", format="single", secondary_genre="drama",
         recent_views=345, annotation="Партаның астынан табылған хат кімге жазылғаны белгісіз. Бірақ оны оқыған қыз енді бұрынғыдай жүре алмайды.",
         tags=("mektep", "gashyqtyq", "jasospirim"), audience="10+",
@@ -135,7 +138,7 @@ STORIES = [
     Story(
         slug="atam-aityp-berdi", title="Атам айтып берген ертегі", author_username="dina_books",
         cover="", genres=("erteg", None),
-        views=3120, likes=540, comments=41,
+        views=3120, comments=41,
         status="Published", format="single",
         recent_views=162, annotation="Ауылдағы жаз, кешкі шай және атаның бір ертегісі. Ол ертегіде жоғалған қой да, жоғалған бала да бар.",
         tags=("dostyk", "mektep"), audience="10+",
@@ -144,7 +147,7 @@ STORIES = [
     Story(
         slug="konshi-bala", title="Көрші бала", author_username="bekzhan_t",
         cover="", genres=("komediya", None),
-        views=7830, likes=1420, comments=133,
+        views=7830, comments=133,
         status="Published", format="single",
         recent_views=98, annotation="Көршінің баласы күнде бір нәрсе бүлдіреді. Бүгін ол менің велосипедімді ұрлады — бірақ себебі күлкілі.",
         tags=("dostyk", "mektep", "jasospirim"), audience="10+",
@@ -153,7 +156,7 @@ STORIES = [
     Story(
         slug="tunge-deiin", title="Түнге дейін үш сағат", author_username="bekzhan_t",
         cover="ipad_fe6ce3337de7c1c1bf18ef8bb0f3f9a3.webp", genres=("triller", None),
-        views=11470, likes=2890, comments=241,
+        views=11470, comments=241,
         status="Published", format="single",
         recent_views=115, annotation="Лифт екі қабат арасында тоқтады. Ішінде екеу, ал біреуі шындықты айтпай тұр.",
         tags=("mistika", "detektiv-jas"), audience="14+",
@@ -162,7 +165,7 @@ STORIES = [
     Story(
         slug="almaty-ayazy", title="Алматы аязы", author_username="aygerim_k",
         cover="", genres=("drama", None),
-        views=4980, likes=760, comments=58,
+        views=4980, comments=58,
         status="Published", format="single",
         recent_views=274, annotation="Қаңтардағы қала, жылымаған автобус және әкесімен алғаш рет ашық сөйлескен күн.",
         tags=("jasospirim", "arman"), audience="14+",
@@ -171,7 +174,7 @@ STORIES = [
     Story(
         slug="balkonnan-korinetin", title="Балконнан көрінетін әлем", author_username="dina_books",
         cover="", genres=("balalar", None),
-        views=2640, likes=430, comments=27,
+        views=2640, comments=27,
         status="Published", format="single",
         recent_views=149, annotation="Тоғызыншы қабаттан бүкіл ауланы көруге болады. Ал кейде — өзіңді де.",
         tags=("dostyk", "arman"), audience="10+",
@@ -180,7 +183,7 @@ STORIES = [
     Story(
         slug="korkynyshty-koilek", title="Қорқынышты көйлек", author_username="bekzhan_t",
         cover="", genres=("horror", None),
-        views=8150, likes=1630, comments=204,
+        views=8150, comments=204,
         status="Published", format="single",
         recent_views=62, annotation="Ескі шкафтан табылған көйлекті киген адам түнде өз атын ұмытады.",
         tags=("mistika",), audience="14+",
@@ -189,7 +192,7 @@ STORIES = [
     Story(
         slug="zhuldyz-kartasy", title="Жұлдыз картасы", author_username="rudazov",
         cover="", genres=("fantastika", "shyttyrman"),
-        views=15320, likes=3940, comments=387,
+        views=15320, comments=387,
         status="Completed", secondary_genre="shyttyrman",
         recent_views=124, annotation="Ғарыш кемесінің картасында болмауға тиіс бір нүкте бар. Экипаж соған қарай бет алады.",
         tags=("aua-ralighi", "sayahat", "arman"), audience="10+",
@@ -199,7 +202,7 @@ STORIES = [
     Story(
         slug="kokjal-anyzy", title="Көкжал аңызы", author_username="dina_books",
         cover="", genres=("tarih", "erteg"),
-        views=6720, likes=1180, comments=94,
+        views=6720, comments=94,
         status="Completed", secondary_genre="erteg",
         recent_views=43, annotation="Далада бір қасқыр туралы аңыз жүреді. Оны естіген әр ұрпақ басқаша айтады.",
         tags=("sayahat", "dostyk"), audience="10+",
@@ -208,7 +211,7 @@ STORIES = [
     Story(
         slug="keiipkerge-hat", title="Кейіпкерге жазылған хат", author_username="aygerim_k",
         cover="", genres=("fanfik", "romantika"),
-        views=10940, likes=3210, comments=452,
+        views=10940, comments=452,
         status="OnProcess", secondary_genre="romantika",
         recent_views=312, annotation="Сүйікті кітабының кейіпкеріне хат жазған қыз кенет жауап алады.",
         tags=("gashyqtyq", "syikyr-akademiya", "jasospirim"), audience="14+",
@@ -217,7 +220,7 @@ STORIES = [
     Story(
         slug="arqadagy-jaz", title="Арқадағы жаз", author_username="sayyn",
         cover="", genres=("balalar", "drama"),
-        views=3890, likes=610, comments=45,
+        views=3890, comments=45,
         status="OnProcess", secondary_genre="drama",
         recent_views=26, annotation="Жазғы каникул, ескі велосипед және ауылдағы жеті апта. Әр бөлім — бір апта.",
         tags=("dostyk", "sayahat", "mektep"), audience="10+",
@@ -228,7 +231,7 @@ STORIES = [
     Story(
         slug="aidana-tan",    title="Таң алдында",            author_username="aidana",
         cover="ipad_c9217632f98051fd88ca5763f218a9e3.webp", genres=("drama", None),
-        views=1042, likes=87, comments=12,
+        views=1042, comments=12,
         status="OnProcess", recent_views=31, annotation="Жас қыздың Алматыдан Таразға қайту туралы әңгімесі. Сегіз бөлімде, әр бөлім — жаңа қала.",
         tags=("sayahat", "jasospirim", "arman", "experimental"), audience="14+",
         created_days_ago=60, updated_days_ago=2,
@@ -236,7 +239,7 @@ STORIES = [
     Story(
         slug="aidana-koshe",  title="Көше әндері",            author_username="aidana",
         cover="ipad_e655bb59097d8f25698466168d385969.webp", genres=("drama", "komediya"),
-        views=203, likes=18, comments=4,
+        views=203, comments=4,
         status="Published", recent_views=20, annotation="Қаладағы бес адамның бір күні. Әрқайсысының өз әні.",
         secondary_genre="komediya",
         tags=("aua-ralighi", "dostyk", "mektep"), audience="10+",
@@ -248,7 +251,7 @@ STORIES = [
         cover="ipad_eec6a1375d9124c7348c7579b8d2db33.jpg", genres=("erteg", None),
         # Фикстура «произведение без глав» для manage_story: записи в
         # CHAPTERS_BY_STORY нет, и «N бөлім» считается по ней.
-        views=0, likes=0, comments=0,
+        views=0, comments=0,
         status="OnModeration", recent_views=0, annotation="Дәстүрлі ертегі формасында жазылған заманауи тарих.",
         audience="10+",
         created_days_ago=30, updated_days_ago=4,
@@ -256,7 +259,7 @@ STORIES = [
     Story(
         slug="aidana-kysh",   title="Қыстың үнсіздігі",        author_username="aidana",
         cover="ipad_f0e918b204613b38cc0e04ba74e3e3ab.webp", genres=("drama", None),
-        views=872, likes=64, comments=9,
+        views=872, comments=9,
         status="Published", recent_views=19, annotation="Қыстағы ауылда қалған әжемен өткізген бір ай. Аяқталған кітап.",
         audience="10+",
         format="single",
@@ -267,7 +270,7 @@ STORIES = [
     Story(
         slug="aidana-kus",    title="Құс жолы",                author_username="aidana",
         cover="", genres=("fantastika", None),
-        views=0, likes=0, comments=0,
+        views=0, comments=0,
         status="NotPublished", recent_views=0,
         annotation="Ауыл баласы мен түнгі аспан туралы. Әзірге бас-аяғы ойда.",
         created_days_ago=20, updated_days_ago=9,
@@ -307,9 +310,15 @@ def _chapter(story_slug: str, number: int, title: str, *,
 CHAPTERS_BY_STORY: dict = {
     # Айдана / aidana — главы для manage_story и chapter_editor
     "aidana-tan": [
-        _chapter("aidana-tan", 1, "Алматыдан шығу"),
-        _chapter("aidana-tan", 2, "Шу станциясы"),
-        _chapter("aidana-tan", 3, "Поезд жолдастары"),
+        # Небольшая, но настоящая реакция на первых главах (не 0): кабинет
+        # автора обязан показывать точное число, а не нулевой филлер
+        # (test_write.TheCabinetAnswersWhatToDoNext).
+        _chapter("aidana-tan", 1, "Алматыдан шығу",
+                 reactions=(("shabyt", 8), ("tangaldym", 5), ("juregim", 2))),
+        _chapter("aidana-tan", 2, "Шу станциясы",
+                 reactions=(("shabyt", 6), ("kuldim", 3))),
+        _chapter("aidana-tan", 3, "Поезд жолдастары",
+                 reactions=(("tangaldym", 4),)),
         _chapter("aidana-tan", 4, "Кешкі ас"),
         _chapter("aidana-tan", 5, "Қап-қараңғы"),
         _chapter("aidana-tan", 6, "Таң алдында"),
@@ -341,10 +350,12 @@ CHAPTERS_BY_STORY: dict = {
         _chapter("korkynyshty-koilek", 1, "Толық мәтін"),
     ],
     "aidana-koshe": [
-        _chapter("aidana-koshe", 1, "Толық мәтін"),
+        _chapter("aidana-koshe", 1, "Толық мәтін",
+                 reactions=(("kuldim", 7), ("shabyt", 4))),
     ],
     "aidana-kysh": [
-        _chapter("aidana-kysh", 1, "Толық мәтін"),
+        _chapter("aidana-kysh", 1, "Толық мәтін",
+                 reactions=(("jyladym", 9), ("juregim", 5))),
     ],
     "temniy-lord": [
         _chapter("temniy-lord", 1, "Қара тәж"),

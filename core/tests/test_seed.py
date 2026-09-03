@@ -48,6 +48,8 @@ from core.models import (
     Genre,
     LibraryEntry,
     Notification,
+    PollOption,
+    PollVote,
     SchoolLink,
     Story,
     StoryComment,
@@ -211,6 +213,101 @@ class SeededChapterReactionsAddUp(TestCase):
             with self.subTest(story=story.slug):
                 self.assertEqual(story.likes, sum(c.likes for c in chapters))
         self.assertTrue(checked, 'ни у одной работы нет реакций — тест пуст')
+
+
+class SeedPreservesRealVotes(TestCase):
+    """DEC-61: живой голос читателя (`ChapterReactionVote`) главнее
+    декоративного корпуса. Раньше повторный `seed_demo` стирал реакции
+    главы до состояния корпуса, не глядя, проголосовал ли уже кто-то, —
+    у `arhimag` (`reactions=()` в корпусе) это на живых данных выглядело
+    так: под главой честно «1 реакция», а в шапке произведения — «0»."""
+
+    def test_a_real_vote_survives_a_reseed(self):
+        seed()
+        chapter = Chapter.objects.get(story__slug='arhimag', number=1)
+        reader = User.objects.get(username='aidana')
+        self.assertEqual(chapter.likes, 0, 'нужна глава без затравленных реакций')
+
+        data.toggle_chapter_reaction(chapter, reader, 'juregim')
+        seed()
+
+        chapter.refresh_from_db()
+        story = Story.objects.get(slug='arhimag')
+        self.assertEqual(chapter.likes, 1)
+        self.assertEqual(story.likes,
+                         sum(c.likes for c in story.chapter_set.all()))
+
+    def test_a_real_comment_survives_a_reseed(self):
+        """Тот же приём для комментариев: `_seed_comments` апсертит по
+        (story, author, chapter_number, parent, text) вместо
+        delete-и-пересоздать, иначе настоящий текст читателя стирался бы
+        вместе с декоративными репликами корпуса при каждом сиде."""
+        seed()
+        story = Story.objects.get(slug='arhimag')
+        before = story.comments
+        aidana = User.objects.get(username='aidana')
+
+        data.add_comment(story, aidana, text='Живой комментарий читателя')
+        seed()
+
+        story.refresh_from_db()
+        self.assertEqual(story.comments, before + 1)
+        self.assertTrue(StoryComment.objects.filter(
+            story=story, text='Живой комментарий читателя').exists())
+
+    def test_real_views_survive_a_reseed(self):
+        """DEC-63: `_seed_views` поднимает `views`/`recent_views` до
+        decorative-минимума корпуса, а не присваивает его — раньше
+        `StoryView.objects.all().delete()` сносил журнал целиком на
+        каждый прогон, вместе с настоящими прочтениями."""
+        seed()
+        story = Story.objects.get(slug='dalney-berega')
+        before_views, before_recent = story.views, story.recent_views
+
+        data.record_story_view(story, None)
+        data.record_story_view(story, None)
+        seed()
+
+        story.refresh_from_db()
+        self.assertEqual(story.views, before_views + 2)
+        self.assertEqual(story.recent_views, before_recent + 2)
+
+    def test_a_real_poll_vote_survives_a_reseed_and_still_blocks_a_second(self):
+        """DEC-64: `_seed_polls` апсертит варианты по (poll, slug) вместо
+        delete-и-пересоздать. У `PollOption` раньше пересоздавалась сама
+        строка, а на неё ссылается `PollVote.option` с `on_delete=CASCADE`
+        — пересид каскадом убивал настоящий голос и открывал повторное
+        голосование, которое `cast_poll_vote` запрещает именно через
+        существование этой записи."""
+        seed()
+        poll = data.poll_of('dalney-berega', 12)
+        option = poll.option_set.first()
+        before = option.votes
+        reader = User.objects.get(username='aidana')
+
+        self.assertTrue(data.cast_poll_vote(poll, reader, option.slug))
+        seed()
+
+        option.refresh_from_db()
+        self.assertEqual(option.votes, before + 1)
+        self.assertTrue(PollVote.objects.filter(poll=poll, user=reader).exists())
+        self.assertFalse(data.cast_poll_vote(poll, reader, option.slug))
+
+    def test_a_real_notification_survives_a_reseed(self):
+        """DEC-64: `_seed_notifications` апсертит по (user, kind, actor,
+        story, contest, text) вместо delete-и-пересоздать — настоящее
+        уведомление о решении модератора (`Story.apply_moderation`,
+        DEC-23) больше не стирается вместе с декоративной лентой корпуса."""
+        seed()
+        story = Story.objects.get(slug='aidana-erteg', status='OnModeration')
+        before = Notification.objects.filter(user=story.author).count()
+
+        note = story.apply_moderation(outcome='needs_work', reason='Тест')
+        seed()
+
+        self.assertTrue(Notification.objects.filter(pk=note.pk).exists())
+        self.assertEqual(
+            Notification.objects.filter(user=story.author).count(), before + 1)
 
 
 class SeededContestsDeriveTheirPhase(TestCase):
