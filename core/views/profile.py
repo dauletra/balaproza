@@ -60,7 +60,7 @@ def profile_me(request):
     # ступени, конкурсная биография.
     author = data.author_by_username(username)
     tab = _resolve_prof_tab(request, _PROF_TABS_ME)
-    # Рейл профиля состоит из одного блока «Жазылулар»: без него шаблон
+    # Рейл профиля состоит из одного блока «Жазылымдар»: без него шаблон
     # рейла не рендерит ничего, и пустая колонка в 300px сдвигает контент.
     following = data.following_of(author)
     catalog = data.award_catalog(author)
@@ -190,7 +190,7 @@ def follow_toggle(request, username):
 
 _PEOPLE_KINDS = {
     'followers': ('Жазылушылар', data.followers_of, data.followers_count_of),
-    'following': ('Жазылулар',   data.following_of, data.following_count_of),
+    'following': ('Жазылымдар',  data.following_of, data.following_count_of),
 }
 
 

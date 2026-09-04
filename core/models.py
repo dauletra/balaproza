@@ -102,7 +102,7 @@ class User(AbstractUser):
     # Колонка, а не `follower_set.count()`: её читают `ORDER BY` ленты
     # «Жаңа авторлар» и `WHERE` оси каталога. Пересчитывается по строкам
     # `Follow`, а не сдвигается на единицу, — так она сама себя исправляет.
-    followers = models.PositiveIntegerField('оқырман саны', default=0)
+    followers = models.PositiveIntegerField('жазылушы саны', default=0)
 
     class Meta:
         verbose_name = 'пайдаланушы'
@@ -1035,7 +1035,7 @@ class Submission(models.Model):
 
 class Follow(models.Model):
     """Подписка одного автора на другого (FR-PROF-10, BR-75). Списки
-    «Жазылулар» и «Оқырмандар» публичны, но входа в контент из них нет:
+    «Жазылымдар» и «Жазылушылар» публичны, но входа в контент из них нет:
     читать зовут жинақтар и каталог (DEC-31)."""
 
     follower = models.ForeignKey('core.User', verbose_name='кім жазылды',

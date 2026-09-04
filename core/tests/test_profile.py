@@ -150,7 +150,7 @@ class OwnProfile(TestCase):
     """`/me/` — четыре вкладки, приватная половина только владельцу."""
 
     def test_guest_gets_a_gate_without_data_and_without_an_empty_rail(self):
-        # Рейл профиля состоит из одного блока «Жазылулар»; у гостя
+        # Рейл профиля состоит из одного блока «Жазылымдар»; у гостя
         # `profile_user` пуст, и от рейла оставалась пустая колонка в
         # 300px, сдвигавшая гейт от центра.
         response = self.client.get(reverse('core:profile_me'))
@@ -177,8 +177,8 @@ class OwnProfile(TestCase):
                 self.assertContains(response, f'?tab={slug}')
         self.assertEqual(len(response.context['prof_items']), 4)
         # 4 числа из reader_stats. «Оқылды» значило то просмотры, то
-        # «дочитано»; «Жазылулар» в плитке значило подписчиков, а в
-        # заголовке рейла — подписки: одно слово на два смысла.
+        # «дочитано» — теперь плитка «Жазылушы» и заголовок рейла
+        # «Жазылымдар» называют подписчиков и подписки разными словами.
         for word in ('Шығарма', 'Реакциялар', 'Оқылым', 'Жазылушы'):
             with self.subTest(tile=word):
                 self.assertContains(response, word)
@@ -348,7 +348,7 @@ class ProfileIsNotASecondCabinet(TestCase):
 class ProfileRailByViewer(TestCase):
     """Рейл профиля разный по зрителю (FR-PROF-09).
 
-    Чужой профиль показывал «Жазылулар» — на кого подписан **он**.
+    Чужой профиль показывал «Жазылымдар» — на кого подписан **он**.
     Читателю это не сообщало ничего и занимало единственный блок колонки.
     """
 
@@ -356,7 +356,7 @@ class ProfileRailByViewer(TestCase):
         response = self.client.get(
             reverse('core:profile_other', kwargs={'username': 'aygerim_k'}))
         self.assertTrue(data.following_of(user('aygerim_k')))   # подписки есть
-        self.assertNotContains(response, 'Жазылулар')     # и они не здесь
+        self.assertNotContains(response, 'Жазылымдар')     # и они не здесь
         self.assertContains(response, 'Ең көп оқылғаны')
         self.assertTrue(response.context['has_right_rail'])
         self.assertContains(response, data.top_stories_of(user('aygerim_k'))[0].title)
@@ -374,7 +374,7 @@ class ProfileRailByViewer(TestCase):
     def test_the_owner_still_gets_the_list_of_who_he_reads(self):
         login_as(self.client)
         response = self.client.get(reverse('core:profile_me'))
-        self.assertContains(response, 'Жазылулар')
+        self.assertContains(response, 'Жазылымдар')
         self.assertNotContains(response, 'Ең көп оқылғаны')
 
 
