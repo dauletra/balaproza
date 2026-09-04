@@ -9,9 +9,13 @@
 
     Параметры:
       variant     — 'rail' (default) | 'sheet'
-      filter_groups — [{name, legend, options, current}] — все пять осей
-      query       — текущий ?q=
-      mode        — 'search' | 'genre' | 'tag' | 'catalog'
+      filter_groups — [{name, legend, options, current}] — пять browse-осей.
+                    Сортировка сюда не входит ни в одном режиме — своя
+                    кнопка над списком (catalog.html, `sort_options`), она не
+                    сужает выдачу, а меняет порядок
+      query       — текущий ?q= (DEC-65: поиск — не отдельный режим, а этот
+                    же параметр на любой из страниц каталога)
+      mode        — 'genre' | 'tag' | 'catalog'
       genre_options / tag_options — [{genre|tag, href, active}] — ссылки собраны
                     во view: каждая несёт текущее состояние остальных осей
       clear_href  — сброс сүзгі без выхода из раздела
@@ -38,17 +42,12 @@
         {% if mode != 'genre' and current_genre_slug %}<input type="hidden" name="genre" value="{{ current_genre_slug }}">{% endif %}
         {% if mode != 'tag' and current_tag_slug %}<input type="hidden" name="tag" value="{{ current_tag_slug }}">{% endif %}
 
-        {# Іздеу — на search-странице поле уже в hero, там только preserve #}
-        {% if mode != 'search' %}
-            <div>
-                <label for="filter-q-{{ v }}" class="mb-1.5 block font-sans text-xs font-semibold text-slate-700">Іздеу</label>
-                <input id="filter-q-{{ v }}" type="search" name="q" value="{{ query }}"
-                       placeholder="Атау, автор..."
-                       class="w-full rounded-md border border-slate-300 bg-slate-50 px-3 font-sans text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30 {% if v == 'sheet' %}h-11{% else %}h-9{% endif %}">
-            </div>
-        {% else %}
-            <input type="hidden" name="q" value="{{ query }}">
-        {% endif %}
+        <div>
+            <label for="filter-q-{{ v }}" class="mb-1.5 block font-sans text-xs font-semibold text-slate-700">Іздеу</label>
+            <input id="filter-q-{{ v }}" type="search" name="q" value="{{ query }}"
+                   placeholder="Атау, автор..."
+                   class="w-full rounded-md border border-slate-300 bg-slate-50 px-3 font-sans text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30 {% if v == 'sheet' %}h-11{% else %}h-9{% endif %}">
+        </div>
 
         {% comment %}
             Пять осей одним циклом. Чипы вместо вертикальных radio-списков: у
@@ -86,24 +85,26 @@
         Жанр — ссылки, а не поля формы: это раздел с каноническим URL
         /genres/<slug>/. Ссылка теперь несёт текущее состояние остальных осей.
     {% endcomment %}
-    <div>
-        <p class="mb-2 font-sans text-xs font-semibold text-slate-700">Жанр</p>
-        <div class="flex flex-wrap gap-x-3 gap-y-1">
-            {% for opt in genre_options %}
-                {% if opt.active %}
-                    <a href="{{ opt.href }}"
-                       class="inline-flex min-h-9 items-center gap-1.5 font-sans text-xs font-bold"
-                       style="color: oklch(0.32 0.14 {{ opt.genre.hue }});">
-                        <span aria-hidden="true" class="h-1.5 w-1.5 rounded-pill" style="background: oklch(0.55 0.14 {{ opt.genre.hue }});"></span>
-                        {{ opt.genre.name }}
-                        {% include "components/icon.html" with name="x" size=11 only %}
-                    </a>
-                {% else %}
-                    {% include "components/genre_chip.html" with genre=opt.genre size="sm" href=opt.href %}
-                {% endif %}
-            {% endfor %}
+    {% if genre_options %}
+        <div>
+            <p class="mb-2 font-sans text-xs font-semibold text-slate-700">Жанр</p>
+            <div class="flex flex-wrap gap-x-3 gap-y-1">
+                {% for opt in genre_options %}
+                    {% if opt.active %}
+                        <a href="{{ opt.href }}"
+                           class="inline-flex min-h-9 items-center gap-1.5 font-sans text-xs font-bold"
+                           style="color: oklch(0.32 0.14 {{ opt.genre.hue }});">
+                            <span aria-hidden="true" class="h-1.5 w-1.5 rounded-pill" style="background: oklch(0.55 0.14 {{ opt.genre.hue }});"></span>
+                            {{ opt.genre.name }}
+                            {% include "components/icon.html" with name="x" size=11 only %}
+                        </a>
+                    {% else %}
+                        {% include "components/genre_chip.html" with genre=opt.genre size="sm" href=opt.href %}
+                    {% endif %}
+                {% endfor %}
+            </div>
         </div>
-    </div>
+    {% endif %}
 
     {# ── Тегтер — lightweight text links (docs/ui.md Phase 3) ── #}
     {% if tag_options %}

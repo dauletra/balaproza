@@ -88,8 +88,10 @@ class PagesStayWithinTheirQueryBudget(TestCase):
             self.client.get(reverse('core:genre_detail', kwargs={'slug': 'fantezi'}))
 
     def test_search(self):
+        """DEC-65: поиск — `?q=` на `/catalog/`, тот же движок и тот же
+        бюджет, что и у обычного каталога (`test_catalog`)."""
         with self.assertNumQueries(15):
-            self.client.get(reverse('core:search_results') + '?q=жағалау')
+            self.client.get(reverse('core:catalog') + '?q=жағалау')
 
     def test_story_page(self):
         """Девятнадцать: работа, главы, рекомендации, жинақтар, карточка

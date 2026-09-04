@@ -1,13 +1,24 @@
 {% comment %}
-    Catalog hero (neutral) — для /catalog/ (без preselected жанра/тега/поиска).
+    Catalog hero — /catalog/, включая поиск (DEC-65, отменяет часть DEC-27):
+    ?q= сюда же, отдельного search-hero больше нет. С запросом заголовок
+    называет его — так же, как раньше называла отдельная search-страница;
+    без запроса — нейтральный «Каталог».
+
+    Своего поля ввода здесь нет — вводить и менять запрос читатель может
+    только через шапочное «Іздеу» (или Cmd+K). Активный запрос показывает
+    чип в `active_chips` (снимается крестиком, catalog.html).
+
+    Контекст: query (str)
 {% endcomment %}
 <header class="mb-5 sm:mb-6">
-    <h1 class="font-display text-3xl font-bold text-slate-900 sm:text-4xl">Каталог</h1>
-    {% comment %}
-        «Оң жақтағы сүзгілер» было правдой только на десктопе: на телефоне
-        панель живёт в bottom-sheet под кнопкой. Копия не должна называть место.
-    {% endcomment %}
+    <h1 class="font-display text-3xl font-bold text-slate-900 sm:text-4xl">
+        {% if query %}«{{ query }}» бойынша іздеу{% else %}Каталог{% endif %}
+    </h1>
     <p class="mt-1 font-sans text-sm text-slate-600">
-        Барлық шығармалар. Не оқитыныңды сүзгі арқылы тап.
+        {% if query %}
+            Сүзгі арқылы нәтижені тарылт.
+        {% else %}
+            Барлық шығармалар. Не оқитыныңды сүзгі арқылы тап.
+        {% endif %}
     </p>
 </header>

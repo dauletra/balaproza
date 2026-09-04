@@ -1,14 +1,15 @@
 {% extends 'base.html' %}
 
 {% comment %}
-    Унифицированный каталог (DEC-27). Один шаблон для search/genre/tag/all.
+    Унифицированный каталог (DEC-27, DEC-65). Один шаблон для genre/tag/all —
+    поиск не отдельный режим, а `?q=` поверх любого из них (обычно catalog).
 
     Контекст (всё через view):
-      mode              — 'search' | 'genre' | 'tag' | 'catalog'
+      mode              — 'genre' | 'tag' | 'catalog'
       results           — list of Story (после filter_catalog)
       query             — текущий ?q=
       sort, sort_label  — текущая сортировка и её подпись
-      filter_groups     — пять осей сүзгі для панели
+      filter_groups     — пять browse-осей сүзгі для панели (без сортировки)
       genre_options / tag_options — ссылки жанров и тегов с сохранением состояния
       active_chips      — включённые оси, каждая со ссылкой «снять именно эту»
       active_count      — сколько осей включено (бейдж на кнопке)
@@ -18,15 +19,13 @@
 {% endcomment %}
 
 {% block title %}
-    {% if mode == 'search' and query %}Іздеу: «{{ query }}»{% elif mode == 'genre' %}{{ genre.name }}{% elif mode == 'tag' %}#{{ current_tag.name }}{% else %}Каталог{% endif %} — Balaproza
+    {% if query %}Іздеу: «{{ query }}»{% elif mode == 'genre' %}{{ genre.name }}{% elif mode == 'tag' %}#{{ current_tag.name }}{% else %}Каталог{% endif %} — Balaproza
 {% endblock %}
 
 {% block content %}
 
-    {# ── Hero (один из четырёх вариантов в зависимости от mode) ── #}
-    {% if mode == 'search' %}
-        {% include "partials/catalog/_hero_search.html" %}
-    {% elif mode == 'genre' %}
+    {# ── Hero (жанр/тег — свой, иначе нейтральный catalog-hero, который сам знает про ?q=) ── #}
+    {% if mode == 'genre' %}
         {% include "partials/catalog/_hero_genre.html" %}
     {% elif mode == 'tag' %}
         {% include "partials/catalog/_hero_tag.html" %}
@@ -93,10 +92,33 @@
         </button>
     </div>
 
-    {# ── Desktop: счётчик результатов + текущая сортировка-метка над списком ── #}
+    {# ── Desktop: счётчик результатов + сортировка над списком ── #}
     <div class="mb-4 hidden items-baseline justify-between border-b border-slate-200 pb-3 xl:flex">
         <span class="font-sans text-sm text-slate-600">{{ total_results }} шығарма</span>
-        <span class="font-sans text-xs text-slate-500">Сұрыпталу: {{ sort_label }}</span>
+        {% comment %}
+            Сортировка не входит в filter_groups (links.FILTER_GROUPS) ни в
+            одном режиме — она не сужает выдачу, а меняет порядок, и раньше
+            здесь стояла инертным текстом при живом контроле в рейле. Теперь
+            это единственное место, откуда её меняют — кнопкой с меню.
+        {% endcomment %}
+        <div class="relative" x-data="{ open: false }"
+             @click.outside="open = false" @keydown.escape.window="open = false">
+            <button type="button" @click="open = !open"
+                    :aria-expanded="open" aria-haspopup="menu"
+                    class="inline-flex items-center gap-1 font-sans text-xs font-semibold text-slate-600 hover:text-slate-900">
+                Сұрыпталу: {{ sort_label }}
+                {% include "components/icon.html" with name="chevron-down" size=12 only %}
+            </button>
+            <div x-show="open" x-cloak x-transition role="menu"
+                 class="absolute right-0 z-20 mt-1 w-52 rounded-md border border-slate-200 bg-white py-1 shadow-modal">
+                {% for opt in sort_options %}
+                    <a href="{{ opt.href }}" role="menuitem"
+                       class="flex min-h-9 items-center px-3.5 font-sans text-sm {% if opt.active %}font-semibold text-brand{% else %}text-slate-700 hover:bg-slate-50{% endif %}">
+                        {{ opt.label }}
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
     </div>
 
     {% comment %}

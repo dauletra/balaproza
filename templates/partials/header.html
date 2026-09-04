@@ -18,7 +18,7 @@
 
         {# ── Поиск: inline на md+, иконка на mobile ── #}
         {# Form работает как no-JS fallback; при наличии JS focus открывает Cmd+K popup #}
-        <form action="{% url 'core:search_results' %}" method="get"
+        <form action="{% url 'core:catalog' %}" method="get"
               class="ml-6 hidden h-9 max-w-[520px] flex-1 items-center gap-2.5 rounded-search bg-slate-100 px-4 md:flex">
             <label for="header-search" class="sr-only">Іздеу</label>
             {% include "components/icon.html" with name="search" size=20 cls="text-slate-600" only %}

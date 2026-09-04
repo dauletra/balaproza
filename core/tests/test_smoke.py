@@ -33,7 +33,8 @@ PUBLIC_URLS = [
     ('core:signup',            {},                                'auth/signup'),
     ('core:signup_success',    {},                                'auth/signup-success'),
     ('core:catalog',           {},                                'catalog'),
-    ('core:search_results',    {},                                'search-results'),
+    # search_results нет в этом списке: с DEC-65 это редирект (302), а не
+    # страница — свой тест ниже, test_search_results_redirects_to_catalog.
     ('core:genre_index',       {},                                'genre-index'),
     ('core:genre_detail',      {'slug': 'fantastika'},            'genre-detail'),
     ('core:tag_detail',        {'slug': 'mektep'},                'tag-detail'),
@@ -77,6 +78,12 @@ class EveryRouteRenders(TestCase):
 
     def test_as_a_guest(self):
         self._walk('guest')
+
+    def test_search_results_redirects_to_catalog(self):
+        """DEC-65: /search/ — legacy-адрес, не страница. Старая ссылка с
+        запросом обязана довести до тех же результатов, а не потеряться."""
+        response = self.client.get(reverse('core:search_results') + '?q=шам')
+        self.assertRedirects(response, reverse('core:catalog') + '?q=шам')
 
     def test_as_a_newcomer_with_nothing_of_their_own(self):
         """Вошедший без единой строки контента: смоук отвечает на «страница

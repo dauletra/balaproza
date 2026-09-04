@@ -1,9 +1,11 @@
-"""Каталог, поиск, жанры, теги, жинақтар — один движок на четыре режима.
+"""Каталог, поиск, жанры, теги, жинақтар — один движок на три режима.
 
-DEC-27 свёл `/search/`, `/genres/<slug>/`, `/tag/<slug>/` и `/catalog/` в
-одну выдачу с общим набором осей. Поэтому здесь почти нет тестов «на
-страницу»: проверяются оси и то, что состояние выбора не теряется при
-переходах — именно это ломалось молча, отдавая 200 без половины работ.
+DEC-27 свёл `/genres/<slug>/`, `/tag/<slug>/` и `/catalog/` в одну выдачу с
+общим набором осей; DEC-65 добавил к ним и поиск — `?q=` на `/catalog/`,
+без отдельного режима и entry-страницы (`/search/` — рабочий редирект-адрес
+для старых ссылок). Поэтому здесь почти нет тестов «на страницу»:
+проверяются оси и то, что состояние выбора не теряется при переходах —
+именно это ломалось молча, отдавая 200 без половины работ.
 
 Правила осей проверяются на своих данных (`factories`): корпус отвечает
 на вопрос «сколько сейчас работ с отметкой 14+», а ось — на вопрос
@@ -24,15 +26,11 @@ from core.views.catalog import PAGE_SIZE
 
 
 class SearchAnswersOrExplainsItself(TestCase):
+    """DEC-65: поиск — `?q=` на `/catalog/`, без своего режима и пустого
+    idle-состояния — без запроса это просто каталог."""
 
     def _search(self, query=''):
-        return self.client.get(reverse('core:search_results') + f'?q={query}')
-
-    def test_without_a_query_it_invites_instead_of_denying(self):
-        """«Ештеңе табылмады» на пустом запросе звучит как поломка."""
-        response = self._search()
-        self.assertContains(response, 'Не іздейміз?')
-        self.assertNotContains(response, 'Ештеңе табылмады')
+        return self.client.get(reverse('core:catalog') + f'?q={query}')
 
     def test_a_match_is_echoed_and_shown(self):
         story = make.story(chapters=1, title='Жалғыз шам')
@@ -166,12 +164,15 @@ class TagPagesShowMovement(TestCase):
         self.assertEqual(explicit.context['sort'], 'popularity')
 
         for name, kwargs in (('core:catalog', {}),
-                             ('core:genre_detail', {'slug': 'triller'}),
-                             ('core:search_results', {})):
+                             ('core:genre_detail', {'slug': 'triller'})):
             with self.subTest(route=name):
                 self.assertEqual(
                     self.client.get(reverse(name, kwargs=kwargs)).context['sort'],
                     'trending')
+        # `?q=` — тот же /catalog/, тот же дефолт (DEC-65).
+        self.assertEqual(
+            self.client.get(reverse('core:catalog') + '?q=x').context['sort'],
+            'trending')
 
 
 class TheEngineCombinesAxesWithAnd(TestCase):
@@ -448,7 +449,7 @@ class NothingUnmoderatedLeaksOut(TestCase):
                 self.assertNotIn(story.slug, [s.slug for s in catalog])
                 self.assertNotIn(story.slug, {s['slug'] for s in index['stories']})
                 found = self.client.get(
-                    reverse('core:search_results') + f'?q={story.title}')
+                    reverse('core:catalog') + f'?q={story.title}')
                 self.assertNotIn(story.slug,
                                  [s.slug for s in found.context['results']])
 
@@ -462,7 +463,7 @@ class AnEmptyResultIsNotADeadEnd(TestCase):
     несложившимся запросом."""
 
     def test_collections_are_offered_in_the_empty_state_and_in_the_rail(self):
-        empty = self.client.get(reverse('core:search_results') + '?q=zzzzqqq')
+        empty = self.client.get(reverse('core:catalog') + '?q=zzzzqqq')
         self.assertEqual(len(empty.context['results']), 0)
         self.assertContains(empty, 'Мүмкін, мынау қызық болар')
         self.assertContains(empty, data.all_collections()[0].name)

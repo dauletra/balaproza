@@ -77,9 +77,9 @@
             {% include "components/icon.html" with name="book" size=22 only %}
             <span class="font-sans text-[10px] font-semibold leading-none">Оқу</span>
         </a>
-        {# 3 · FAB · поиск · brand. Href — no-JS fallback на страницу поиска. #}
+        {# 3 · FAB · поиск · brand. Href — no-JS fallback на каталог. #}
         <div class="flex flex-1 items-center justify-center">
-            <a href="{% url 'core:search_results' %}" aria-label="Іздеу"
+            <a href="{% url 'core:catalog' %}" aria-label="Іздеу"
                @click.prevent="$dispatch('open-search')"
                class="grid h-11 w-11 place-items-center rounded-pill bg-brand text-white shadow-tg-btn hover:bg-brand-dark">
                 {% include "components/icon.html" with name="search" size=20 only %}

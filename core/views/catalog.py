@@ -1,15 +1,21 @@
-"""Каталог, поиск, жанры, теги и жинақтар (DEC-27, DEC-36).
+"""Каталог, поиск, жанры, теги и жинақтар (DEC-27, DEC-36, DEC-65).
 
-Один движок на четыре режима: `/search/`, `/genres/<slug>/`, `/tag/<slug>/`
-и `/catalog/`. Комбинации осей едут в query, но путь всегда сильнее —
-канонический адрес остаётся источником истины.
+Один движок на три режима: `/genres/<slug>/`, `/tag/<slug>/` и `/catalog/`.
+Поиск (DEC-65, отменяет часть DEC-27) — не отдельный режим, а обычный `?q=`
+на `/catalog/`: до публичного запуска отдельная entry-страница ради SEO не
+стоила двух копий одного движка и разного chrome вокруг одной и той же
+выдачи. `/search/` остаётся рабочим адресом — редиректом на `/catalog/`.
+
+Комбинации осей едут в query, но путь всегда сильнее — канонический адрес
+остаётся источником истины.
 
 Состояние выбора и адреса — в `links.CatalogState`; здесь остаётся разбор
 запроса, выбор пустого экрана и рендер.
 """
 
 from django.core.paginator import Paginator
-from django.shortcuts import render
+from django.shortcuts import redirect, render
+from django.urls import reverse
 
 from .. import data
 from ..links import CATALOG_AXES, FILTER_GROUPS, CatalogState, catalog_links
@@ -28,11 +34,6 @@ _EMPTY = {
 # Сколько карточек на страницу: двадцать — четыре полных ряда по пять, то
 # есть экран с небольшим запасом на прокрутку (NFR-13).
 PAGE_SIZE = 20
-
-# Поиск без запроса — не «ничего не найдено», а «ещё не искали».
-_SEARCH_IDLE = ("Не іздейміз?",
-                "Шығарманың атауын немесе автордың атын жаз. "
-                "Жанр бойынша іздесең — жанрлар бетіне өт.")
 
 
 def _accepted_tag(slug: str):
@@ -67,18 +68,18 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
     state = CatalogState.from_request(request, mode=mode,
                                       genre=eff_genre, tag=eff_tag)
 
-    if mode == 'search' and not state.query:
-        results, (empty_title, empty_text) = [], _SEARCH_IDLE
+    results = data.filter_catalog(query=state.query, genre=state.genre,
+                                  tag=state.tag, sort=state.effective_sort,
+                                  **state.axes)
+    # Пустой экран запроса — про сам запрос, а не про раздел: «в жанре пока
+    # ничего» и «по твоим словам ничего» звучат по-разному, даже когда оба
+    # случая пришли с одного и того же /catalog/.
+    if state.query:
+        empty_title = "Ештеңе табылмады"
+        empty_text = (f"«{state.query}» бойынша шығарма табылмады. "
+                      f"Атауын тексеріп көр.")
     else:
-        results = data.filter_catalog(query=state.query, genre=state.genre,
-                                      tag=state.tag, sort=state.effective_sort,
-                                      **state.axes)
-        if mode == 'search':
-            empty_title = "Ештеңе табылмады"
-            empty_text = (f"«{state.query}» бойынша шығарма табылмады. "
-                          f"Атауын тексеріп көр.")
-        else:
-            empty_title, empty_text = _EMPTY.get(mode, _EMPTY['catalog'])
+        empty_title, empty_text = _EMPTY.get(mode, _EMPTY['catalog'])
 
     # Мусор и выход за границы — первая страница, а не 404: `?page=99` это
     # старая ссылка или опечатка, и каталог обязан открыться.
@@ -100,11 +101,11 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
         'sort':           sort,
         'sort_label':     dict(data.CATALOG_SORTS).get(sort, ''),
         'sorts':          data.CATALOG_SORTS,
+        # Сортировки здесь больше нет (см. links.FILTER_GROUPS) — она своя
+        # кнопка над списком, а не пункт этого цикла.
         'filter_groups': [
-            {'name': name, 'legend': legend,
-             'options': data.CATALOG_SORTS if name == 'sort'
-                        else dict(CATALOG_AXES)[name],
-             'current': sort if name == 'sort' else getattr(state, name)}
+            {'name': name, 'legend': legend, 'options': dict(CATALOG_AXES)[name],
+             'current': getattr(state, name)}
             for name, legend in FILTER_GROUPS
         ],
         'genres':             data.all_genres(),
@@ -130,7 +131,18 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
 
 
 def search_results(request):
-    return _render_catalog(request, mode='search')
+    """Legacy-адрес (DEC-65): /search/?q=... живёт редиректом на /catalog/
+    с тем же querystring — старые ссылки и закладки не 404, а просто ведут
+    туда же, куда теперь ведёт и шапка.
+
+    `request.GET.urlencode()`, а не сырой `META['QUERY_STRING']`: последний
+    в WSGI-environ — latin1-строка из голых байт, и склеенный как есть в
+    Location-заголовок, он уходит через `iri_to_uri` на повторное
+    percent-encoding — non-ASCII запрос долетает битым. `GET` уже разобран
+    Django правильно, `urlencode()` кодирует по новой ровно один раз."""
+    qs = request.GET.urlencode()
+    target = reverse('core:catalog')
+    return redirect(f'{target}?{qs}' if qs else target)
 
 
 def catalog(request):

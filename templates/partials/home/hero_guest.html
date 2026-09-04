@@ -10,7 +10,7 @@
     механику поиска; строка счётчиков даёт масштаб портала с первого экрана.
 
     Поиск: на мобильном — поле-триггер quick-search popup (без JS деградирует
-    в обычную ссылку на /search/); на sm+ — настоящая форма.
+    в обычную ссылку на /catalog/); на sm+ — настоящая форма.
 
     Контекст: portal_stats
 {% endcomment %}
@@ -33,7 +33,7 @@
 
         <div class="mt-3 flex flex-col gap-3 sm:mt-5 lg:flex-row lg:items-center">
             {# Mobile: триггер popup. Href оставлен рабочим — это no-JS fallback. #}
-            <a href="{% url 'core:search_results' %}"
+            <a href="{% url 'core:catalog' %}"
                @click.prevent="$dispatch('open-search')"
                class="flex h-11 items-center gap-2 rounded-search border border-slate-200 bg-white px-3 shadow-sm sm:hidden">
                 {% include "components/icon.html" with name="search" size=18 cls="shrink-0 text-slate-500" only %}
@@ -41,7 +41,7 @@
             </a>
 
             {# sm+: настоящая форма поиска. #}
-            <form action="{% url 'core:search_results' %}" method="get" class="hidden min-h-[48px] flex-1 items-center gap-2 rounded-search border border-slate-200 bg-white px-3 shadow-sm focus-within:border-brand sm:flex">
+            <form action="{% url 'core:catalog' %}" method="get" class="hidden min-h-[48px] flex-1 items-center gap-2 rounded-search border border-slate-200 bg-white px-3 shadow-sm focus-within:border-brand sm:flex">
                 <label for="home-search" class="sr-only">Іздеу</label>
                 {% include "components/icon.html" with name="search" size=18 cls="shrink-0 text-slate-500" only %}
                 <input id="home-search" type="search" name="q" placeholder="Шығарма, автор, жанр немесе тег" class="min-w-0 flex-1 bg-transparent font-sans text-sm text-slate-900 outline-none placeholder:text-slate-400">

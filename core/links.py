@@ -27,22 +27,33 @@ CATALOG_AXES = (
     ('length',      data.CATALOG_LENGTH_FILTERS),
 )
 
-# Панель сүзгі рендерится одним циклом по группам. Сортировка стоит первой
-# и осью не считается — она не сужает выдачу.
+# Панель сүзгі рендерится одним циклом по группам. Сортировка сюда не
+# входит и осью не считается — она не сужает выдачу, а меняет порядок, и во
+# всех режимах живёт своей интерактивной кнопкой над списком (catalog.html,
+# `sort_options`), а не строкой в панели: там она была единственным пунктом,
+# который никогда никого не «сужал», и на search-странице это стало видно
+# особенно резко — оставлять коробку «Сүзгілер» ради одной этой строки было
+# лишним и там, и здесь.
+#
+# Легенда группы — ответ на вопрос читателя, а не имя поля в БД (docs/ui.md):
+# «Белгі» и «Автор» раньше называли сами себя как атрибут объекта и вводили
+# в заблуждение — «Автор» читался как выбор конкретного автора, хотя у оси
+# всего два значения (все / только новые). Значения (STORY_BADGES,
+# CATALOG_AUDIENCE_FILTERS и т.д.) эта правка не трогает — только подпись
+# группы над ними.
 FILTER_GROUPS = (
-    ('sort',        'Сұрыптау'),
     ('kind',        'Түрі'),
-    ('badge',       'Белгі'),
-    ('author_tier', 'Автор'),
+    ('badge',       'Ерекше'),
+    ('author_tier', 'Жаңа авторлар'),
     ('audience',    'Жасың'),
     ('length',      'Оқу уақыты'),
 )
 
 
 def catalog_default_sort(mode: str) -> str:
-    """Дефолтная сортировка режима: каталог, жанр и поиск — «Қазір танымал»
-    (DEC-36), тег — «Жаңалары». У тега роль самой быстрой оси портала
-    (DEC-31), и там ценна свежесть, а не набранные просмотры."""
+    """Дефолтная сортировка режима: каталог (в т.ч. с `?q=`, DEC-65) и жанр —
+    «Қазір танымал» (DEC-36), тег — «Жаңалары». У тега роль самой быстрой оси
+    портала (DEC-31), и там ценна свежесть, а не набранные просмотры."""
     return 'recent' if mode == 'tag' else data.CATALOG_DEFAULT_SORT
 
 
@@ -116,10 +127,8 @@ class CatalogState:
         elif st.tag:
             path = reverse('core:tag_detail', kwargs={'slug': st.tag})
             target_mode = 'tag'
-        elif st.mode == 'search':
-            path = reverse('core:search_results')
-            target_mode = 'search'
         else:
+            # `?q=` едет сюда же (DEC-65) — у поиска больше нет своего пути.
             path = reverse('core:catalog')
             target_mode = 'catalog'
 
@@ -132,16 +141,15 @@ class CatalogState:
 
     @property
     def clear_href(self) -> str:
-        """«Тазалау» снимает сүзгі, но не выкидывает из раздела: с
-        /genres/triller/ уходить в общий каталог человек не просил. Выход
-        из жанра — крестик на чипе."""
-        bare = CatalogState(mode=self.mode)
+        """«Тазалау» снимает сүзгі и сортировку, но не запрос и не раздел: с
+        /genres/triller/ уходить в общий каталог человек не просил, а с
+        ?q=... — терять сам текст поиска. Выход из жанра/тега/запроса —
+        крестик на своём чипе."""
+        bare = CatalogState(mode=self.mode, query=self.query)
         if self.mode == 'genre' and self.genre:
             return bare.replace(genre=self.genre).href()
         if self.mode == 'tag' and self.tag:
             return bare.replace(tag=self.tag).href()
-        if self.mode == 'search':
-            return bare.replace(query=self.query).href()
         return bare.href()
 
     @property
@@ -229,21 +237,33 @@ def catalog_links(state: CatalogState) -> dict:
             chips.append({'label': dict(table)[value],
                           'href': state.href(**{axis: ''})})
 
+    genre_options = [
+        {'genre': g, 'active': g.slug == state.genre,
+         'href': state.href(genre='' if g.slug == state.genre else g.slug)}
+        for g in data.all_genres()
+    ]
+    tag_options = [
+        {'tag': t, 'active': t.slug == state.tag,
+         'href': state.href(tag='' if t.slug == state.tag else t.slug)}
+        for t in data.popular_tags(8)
+    ]
+
+    # Готовые ссылки сортировки — для интерактивной кнопки над списком
+    # (catalog.html): сортировка не в filter_groups ни в одном режиме.
+    sort_options = [
+        {'key': key, 'label': label, 'active': key == state.effective_sort,
+         'href': state.href(sort=key)}
+        for key, label in data.CATALOG_SORTS
+    ]
+
     return {
         'active_chips':  chips,
         'active_count':  state.active_count,
         'clear_href':    state.clear_href,
-        'genre_options': [
-            {'genre': g, 'active': g.slug == state.genre,
-             'href': state.href(genre='' if g.slug == state.genre else g.slug)}
-            for g in data.all_genres()
-        ],
-        'tag_options': [
-            {'tag': t, 'active': t.slug == state.tag,
-             'href': state.href(tag='' if t.slug == state.tag else t.slug)}
-            for t in data.popular_tags(8)
-        ],
-        'presets': presets,
+        'genre_options': genre_options,
+        'tag_options':   tag_options,
+        'sort_options':  sort_options,
+        'presets':       presets,
     }
 
 
