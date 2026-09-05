@@ -72,6 +72,14 @@
             <span>{% if story.is_single %}Оқу{% elif has_progress %}Жалғастыру · {{ chapter_number }}-бөлім{% else %}Оқуды бастау{% endif %}</span>
         </a>
 
+        {% comment %}
+            В предпросмотре «Сақтау» и «Бөлісу» не показываются (BR-76).
+            Полка непубличной работе не заводится вовсе, а ссылка, которую
+            даёт «Бөлісу», у получателя открывается 404 — кнопка обещала бы
+            то, чего нет. Раньше она работала ровно потому, что черновик был
+            открыт всем; вместе с дырой уходит и обещание.
+        {% endcomment %}
+        {% if not is_preview %}
         <div class="flex items-center gap-2.5">
             {% comment %}
                 Главный вход в «Кітапхана». Настоящий POST, а не
@@ -100,5 +108,6 @@
 
             {% include "components/share_button.html" with url=request.build_absolute_uri title=story.title wrap_cls="flex-1 sm:flex-none" btn_cls="w-full justify-center sm:w-auto" %}
         </div>
+        {% endif %}
     </div>
 </header>

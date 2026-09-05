@@ -22,6 +22,7 @@ from django.utils import timezone
 
 from core.models import (
     Chapter,
+    ChapterRevision,
     Contest,
     Genre,
     Story,
@@ -54,12 +55,19 @@ def genre() -> Genre:
     return Genre.objects.order_by('position', 'pk').first()
 
 
-def story(*, author=None, chapters: int = 0, chars: int = 1200, **over) -> Story:
+def story(*, author=None, chapters: int = 0, chars: int = 1200,
+          published: bool = True, **over) -> Story:
     """Произведение с нужным статусом и, если попросили, с текстом.
 
     `chapters` — сколько глав написать. Именно написать: числа частей
     отдельно от текста больше не существует (DEC-51), и «сериал на три
     бөлім» в тесте означает три записи с телом.
+
+    `published` — прошли ли эти главы модерацию (BR-79). По умолчанию да, и
+    по умолчанию это правда: работа со статусом `Published` и невидимыми
+    главами — состояние, которого на портале не бывает, и тест на нём
+    отвечал бы не на тот вопрос. `published=False` заводит написанное, но
+    ещё не показанное — ровно то, ради чего ревизии и появились.
     """
     slug = over.pop('slug', None) or _uniq('story')
     fields = {
@@ -75,7 +83,41 @@ def story(*, author=None, chapters: int = 0, chars: int = 1200, **over) -> Story
     obj = Story.objects.create(slug=slug, **fields)
     for number in range(1, chapters + 1):
         chapter(obj, number=number, chars=chars)
+    if published:
+        publish(obj)
     return obj
+
+
+def publish(story_obj) -> None:
+    """Опубликовать всё написанное — как это сделал бы модератор.
+
+    Короткий путь мимо `apply_moderation`: тесту, которому нужен просто
+    читаемый текст, незачем заводить уведомление и решение.
+    """
+    now = timezone.now()
+    for chapter_obj in story_obj.chapter_set.all():
+        revision = ChapterRevision.objects.create(
+            chapter=chapter_obj, title=chapter_obj.title,
+            body=chapter_obj.body, state='approved',
+            submitted_at=now, decided_at=now)
+        chapter_obj.published_revision = revision
+        chapter_obj.save(update_fields=['published_revision'])
+
+
+def submit(story_obj) -> None:
+    """Поставить написанное в очередь модератора, не решая его судьбу.
+
+    Статус пересчитывается здесь же (BR-79): «в очереди» — это состояние
+    работы, и фабрика, оставившая его прежним, собрала бы то, чего на
+    портале не бывает, — работу со статусом `Published` и нулём
+    опубликованных глав.
+    """
+    now = timezone.now()
+    for chapter_obj in story_obj.chapter_set.all():
+        ChapterRevision.objects.create(
+            chapter=chapter_obj, title=chapter_obj.title,
+            body=chapter_obj.body, state='pending', submitted_at=now)
+    story_obj.refresh_status()
 
 
 def chapter(story_obj, *, number: int = 1, chars: int = 1200, **over) -> Chapter:

@@ -7,11 +7,17 @@
 `core/queries` в целом, только для записи, а не для чтения.
 """
 
+from django.db import transaction
 from django.db.models import Max
+from django.utils import timezone
 
 from ..domain.slugs import slugify_kz
-from ..models import Chapter, ChapterPoll, PollOption, Story
-from .author import can_submit_for_review, missing_for_review
+from ..models import Chapter, ChapterPoll, ChapterRevision, PollOption, Story
+from .author import (
+    can_submit_for_review,
+    chapter_needs_submission,
+    missing_for_review,
+)
 from .tags import resolve_story_tags
 
 
@@ -49,18 +55,52 @@ def update_story_settings(story, *, title: str, annotation: str, format: str,
     story.primary_genre = genre_primary
     story.secondary_genre = genre_secondary
     story.audience = audience
+    # Радио «Мәртебесі» больше не пишет статус — статус выводится из глав
+    # (BR-79). Оно отвечает на единственный вопрос, который в нём и был:
+    # дописана работа или продолжается. Пусто значит «не меняем» — радио
+    # рендерится только публичному сериалу (BR-10a).
     if status:
-        story.status = status
+        story.completed_by_author = status == 'Completed'
     if cover:
         story.cover = cover
     story.save()
     story.tags.set(resolve_story_tags(tag_names))
+    story.refresh_status()
     return story
 
 
-def save_chapter(story, number, *, title: str, body: str) -> Chapter:
-    """Сохранить главу — новую (`number=None` присваивает следующий
-    номер) или уже существующую (`update_or_create` по номеру)."""
+@transaction.atomic
+def save_chapter(story, number, *, title: str, body: str,
+                 poll_question: str = '', poll_options=()) -> Chapter:
+    """Сохранить главу вместе с её опросом — новую (`number=None` берёт
+    следующий номер) или существующую (`update_or_create` по номеру).
+
+    Одна дверь и одна транзакция, потому что для автора это одно действие:
+    он нажал «сохранить». Порознь они означали бы состояние «глава есть,
+    опроса нет», в которое можно попасть падением между двумя записями, —
+    и автор увидел бы «Жоба сақталды» про наполовину сохранённое.
+
+    Что вправе прийти (вопрос без двух вариантов, слишком длинный текст),
+    решено раньше — в `ChapterForm`. Здесь только применение.
+    """
+    if number is None:
+        last = story.chapter_set.aggregate(Max('number'))['number__max']
+        number = (last or 0) + 1
+    chapter, _ = Chapter.objects.update_or_create(
+        story=story, number=number, defaults={'title': title, 'body': body})
+    _save_poll(chapter, poll_question, poll_options)
+    return chapter
+
+
+def autosave_chapter(story, number, *, title: str, body: str) -> Chapter:
+    """Автосохранение черновика главы (BR-78).
+
+    Отдельная дверь от `save_chapter`, потому что у автосохранения другие
+    обязанности. Оно не трогает опрос — тот автор правит осознанно, и
+    затирать его каждые три секунды содержимым полей, которых на экране
+    может не быть, нельзя. И оно не требует законченности: пустой
+    заголовок посреди набора — состояние, а не ошибка.
+    """
     if number is None:
         last = story.chapter_set.aggregate(Max('number'))['number__max']
         number = (last or 0) + 1
@@ -69,39 +109,74 @@ def save_chapter(story, number, *, title: str, body: str) -> Chapter:
     return chapter
 
 
-def save_chapter_poll(chapter, question: str, option_texts) -> None:
+def _save_poll(chapter, question: str, option_texts) -> None:
     """Опрос под главой (FR-STORY-13, BR-POLL-01/02).
 
-    Пустой `question` — убрать опрос, если он был (автор передумал).
-    Меньше двух непустых вариантов — тоже не опрос (BR-POLL-02): без
-    выбора вопрос не имеет смысла, и лучше промолчать, чем сохранить
-    сломанным. Варианты не обновляются по одному — опрос маленький
-    (до 4), и пересобрать его целиком проще и надёжнее частичного diff.
+    Пустой `question` — убрать опрос, если он был: автор передумал, и это
+    законный исход, а не ошибка. Варианты не обновляются по одному — опрос
+    маленький, и пересобрать его целиком проще и надёжнее частичного diff.
     """
     question = (question or '').strip()
     if not question:
         ChapterPoll.objects.filter(chapter=chapter).delete()
         return
-    options = [t.strip() for t in option_texts if t and t.strip()][:4]
-    if len(options) < 2:
-        return
     poll, _ = ChapterPoll.objects.update_or_create(
-        chapter=chapter, defaults={'question': question[:120]})
+        chapter=chapter, defaults={'question': question})
     poll.option_set.all().delete()
     PollOption.objects.bulk_create([
-        PollOption(poll=poll, slug=f'option-{i + 1}', text=text[:80], position=i)
-        for i, text in enumerate(options)
+        PollOption(poll=poll, slug=f'option-{i + 1}', text=text, position=i)
+        for i, text in enumerate(option_texts)
     ])
 
 
-def submit_story_for_review(story) -> None:
-    """Черновик -> модерация (FR-WRITE-09). Автор совершает этот переход
-    сам, поэтому он отдельно от `Story.apply_moderation` — тот, наоборот,
-    решение модератора и требует `status == 'OnModeration'` на входе.
-    Спутывать нельзя: переходы смотрят в разные стороны.
+@transaction.atomic
+def withdraw_story_from_review(story) -> int:
+    """Отозвать поданное с модерации (BR-80).
+
+    Ревизия не удаляется, а возвращается в `draft`: это по-прежнему снимок
+    текста, просто больше не заявка. Опубликованного отзыв не касается —
+    читатель не должен замечать, что автор передумал.
+
+    До этого кнопки не было вовсе: заметив опечатку через минуту после
+    отправки, автор мог только ждать модератора, чтобы тот вернул работу.
+    """
+    count = ChapterRevision.objects.filter(
+        chapter__story=story, state='pending').update(state='draft')
+    story.refresh_status()
+    return count
+
+
+@transaction.atomic
+def submit_story_for_review(story) -> int:
+    """Отправить на модерацию **то, что изменилось** (FR-WRITE-09, BR-79).
+
+    Раньше это был переход статуса: `NotPublished -> OnModeration`. С
+    модерацией по главам подаётся текст — по ревизии на каждую главу, чья
+    рабочая копия расходится с тем, что уже видит читатель. Отсюда и то,
+    что публичный сериал теперь тоже подаёт: дописанная глава проходит
+    проверку, а не публикуется сама.
+
+    Правка главы, уже стоящей в очереди, не заводит вторую заявку —
+    прежняя ревизия перестаёт быть поданной и остаётся в истории
+    черновиком (V10 в AUDIT-WRITE-FLOW: до этого автор правил текст после
+    отправки, и модератор читал не то, что ему отправляли).
+
+    Возвращает число поданных глав.
     """
     if not can_submit_for_review(story):
         missing = ', '.join(missing_for_review(story))
         raise ValueError(f'«{story.title}» толық емес: {missing}.')
-    story.status = 'OnModeration'
-    story.save(update_fields=['status', 'updated_at'])
+
+    now = timezone.now()
+    submitted = 0
+    for chapter in story.chapter_set.all():
+        if not chapter_needs_submission(chapter):
+            continue
+        ChapterRevision.objects.filter(chapter=chapter, state='pending').update(
+            state='draft')
+        ChapterRevision.objects.create(
+            chapter=chapter, title=chapter.title, body=chapter.body,
+            state='pending', submitted_at=now)
+        submitted += 1
+    story.refresh_status()
+    return submitted

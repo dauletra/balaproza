@@ -12,25 +12,75 @@
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .. import data
-from ..forms import ChapterForm, NewStoryForm, StorySettingsForm
+from ..forms import (
+    POLL_OPTIONS_MAX,
+    POLL_OPTIONS_MIN,
+    ChapterAutosaveForm,
+    ChapterForm,
+    NewStoryForm,
+    StorySettingsForm,
+)
 from ..links import attention_links, checklist_links
 from .common import _current_user, _page_state
 
 
-def _report(request, form) -> None:
-    """Ошибки формы — тостами (FR-SYS-01), по одной строке на причину.
+def _settings_initial(story) -> dict:
+    """Чем заполнена форма баптаулар на первом показе.
 
-    Вернуть заполненную форму с подсветкой полей на редиректе нельзя: у
-    ответа нет тела. Сообщение называет, что поправить; хранить черновик
-    ввода между запросами — отдельная работа.
+    Жанры, формат, статус и отметка кладутся **строками-ключами**, а не
+    объектами: у связанного поля `value()` вернул бы `Genre`, и шаблон,
+    сравнивающий `g.slug == form.genre_primary.value`, тихо перестал бы
+    находить выбранное после первой же ошибки формы. Ключ один и тот же
+    и на первом показе, и на возврате с ошибкой.
     """
-    for errors in form.errors.values():
-        for error in errors:
-            messages.error(request, error)
+    return {
+        'title':           story.title,
+        'annotation':      story.annotation,
+        'format':          story.format,
+        'genre_primary':   story.primary_genre.slug,
+        'genre_secondary': (story.secondary_genre.slug
+                            if story.secondary_genre else ''),
+        'audience':        story.audience,
+        # Радио отвечает за «дописано / продолжается», а не за статус:
+        # статус выводится из глав (BR-79).
+        'status':          'Completed' if story.completed_by_author else 'OnProcess',
+        'tags':            ','.join(t.name for t in data.tags_of(story)),
+    }
+
+
+def _poll_option_slots(form) -> list:
+    """Поля вариантов опроса: столько, сколько уже набрано, но не меньше
+    двух (BR-POLL-02) и не больше четырёх.
+
+    Считается здесь, а не в шаблоне: дополнить список пустыми строками
+    средствами шаблонных тегов можно только некрасиво, а само число —
+    правило, а не вёрстка.
+    """
+    values = [v or '' for v in (form['poll_option'].value() or [])]
+    values = values[:POLL_OPTIONS_MAX]
+    return values + [''] * max(0, POLL_OPTIONS_MIN - len(values))
+
+
+def _chapter_initial(story, current, poll) -> dict:
+    """Чем заполнен редактор главы на первом показе.
+
+    У одночастной работы заголовок не спрашивают по существу — читатель
+    его не увидит, — поэтому новой она приходит с готовым «Толық мәтін».
+    """
+    single_default = 'Толық мәтін' if story is not None and story.is_single else ''
+    return {
+        'title':         current.title if current is not None else single_default,
+        'body':          current.body if current is not None else '',
+        'poll_question': poll.question if poll else '',
+        'poll_option':   [r.text for r in poll.results] if poll else [],
+    }
 
 
 def my_stories(request):
@@ -53,11 +103,15 @@ def my_stories(request):
 
 
 def new_story(request):
-    if request.method == 'POST' and request.user.is_authenticated:
-        form = NewStoryForm(request.POST)
-        if not form.is_valid():
-            _report(request, form)
-            return redirect('core:new_story')
+    """Создание черновика (FR-WRITE-01).
+
+    Неудачная отправка **возвращает форму**, а не редиректит (BR-77): у
+    редиректа нет тела, и введённое пропадало вместе с ним. Успех остаётся
+    Post/Redirect/Get — от повторной отправки защищаться всё ещё надо.
+    """
+    form = NewStoryForm(request.POST) if request.method == 'POST' else NewStoryForm()
+
+    if request.method == 'POST' and request.user.is_authenticated and form.is_valid():
         story = data.create_story(
             author=request.user,
             title=form.cleaned_data['title'],
@@ -67,6 +121,7 @@ def new_story(request):
         return redirect('core:chapter_new', slug=story.slug)
 
     return render(request, 'pages/write/new_story.html', {
+        'form': form,
         # Форма — три поля (FR-WRITE-01). Название говорит, что увидит
         # читатель: тег к ненаписанному рассказу не выбирается, аннотация
         # к нему не пишется, а «Аяқталды» у нуля бөлім — невозможное
@@ -80,31 +135,55 @@ def manage_story(request, slug):
     story = data.story_by_slug_for_author(slug, _current_user(request))
 
     if request.method == 'POST' and story is not None:
-        # Единственное действие этой страницы — «Модерацияға жіберу»
-        # (publish_panel.html). Отдельного маршрута под него нет: страница
-        # уже своя, а действие на ней ровно одно.
+        # Действий два — отправить и отозвать (BR-80), и различает их поле
+        # формы, а не отдельный маршрут: страница уже своя, обе кнопки
+        # стоят в одной панели и относятся к одному и тому же.
+        if request.POST.get('action') == 'withdraw':
+            if data.withdraw_story_from_review(story):
+                messages.success(request, 'Өтінім кері қайтарылды.')
+            return redirect('core:manage_story', slug=slug)
         try:
             data.submit_story_for_review(story)
             messages.success(request, 'Шығарма модерацияға жіберілді.')
         except ValueError:
+            # Причина называется словами и берётся из чек-листа (BR-81), а
+            # не перечисляется на память: прежняя строка говорила «толтыр
+            # міндетті тармақтарды» и не называла, какие именно.
             messages.error(
                 request,
-                'Әлі дайын емес — чек-листтегі міндетті тармақтарды толтыр.')
+                'Әлі дайын емес: ' + ', '.join(data.missing_labels(story)) + '.')
         return redirect('core:manage_story', slug=slug)
 
     return render(request, 'pages/write/manage_story.html', {
         'slug':     slug,
         'story':    story,
-        'chapters': data.chapters_of(slug),
+        # Кабинет показывает все главы, включая неопубликованные (BR-79).
+        'chapters': data.chapters_of(slug, as_author=True),
         # FR-WRITE-09: чек-лист как следующий шаг, а не как опись.
         'checklist':  checklist_links(story),
         'can_submit': data.can_submit_for_review(story),
         'missing':    data.missing_for_review(story) if story else [],
+        # Работа уже в очереди — отдельный ответ, не «нельзя отправить»
+        # (BR-79): кнопки нет по разным причинам, и автору важно, по какой.
+        # Момент, а не флаг: «сколько уже ждёт» — второй его вопрос.
+        'pending_since': data.pending_review_since(story),
+        # Замечание модератора висит на рабочем экране до повторной
+        # отправки (BR-80): помнить его наизусть, пока правишь, — не работа
+        # автора.
+        'moderation_note': data.moderation_note(story),
     })
 
 
 def story_settings(request, slug):
+    """Баптаулар (FR-WRITE-04).
+
+    Ошибка возвращает заполненную форму (BR-77). Здесь это стоило дороже
+    всего: одна отвергнутая обложка уносила и аннотацию, и отметку, и
+    теги — всё, что человек только что набрал. Файл вернуть нельзя,
+    браузер его не отдаёт; остальное возвращается целиком.
+    """
     story = data.story_by_slug_for_author(slug, _current_user(request))
+    form = None
 
     if request.method == 'POST' and story is not None:
         # Обложку проверяет валидатор поля (BR-46) — ручного вызова
@@ -126,62 +205,126 @@ def story_settings(request, slug):
                 tag_names=form.tag_names,
             )
             messages.success(request, 'Өзгертулер сақталды.')
-        else:
-            _report(request, form)
-        return redirect('core:story_settings', slug=slug)
+            return redirect('core:story_settings', slug=slug)
+    elif story is not None:
+        form = StorySettingsForm(story=story, initial=_settings_initial(story))
 
     return render(request, 'pages/write/story_settings.html', {
         'slug':   slug,
         'story':  story,
+        'form':   form,
         'genres': data.all_genres(),
         # BR-10b: отметка выбирается автором, а не достаётся дефолтом.
         'story_audiences': data.STORY_AUDIENCES,
         # docs/ui.md: данные для tag_input + текущие теги стори для edit-режима
         'accepted_tags':    data.accepted_tags_json(),
         'blocked_patterns': data.blocked_tag_patterns_list(),
-        'initial_tags':     data.tags_of(story) if story else [],
+        # Чипы тегов: сохранённые — на первом показе, набранные — на
+        # возврате с ошибкой. Второе не пишется в базу: pending-тег пережил
+        # бы работу, которая так и не сохранилась.
+        'initial_tags': (data.preview_story_tags(form.tag_names)
+                         if form is not None and form.is_bound
+                         else data.tags_of(story) if story else []),
     })
 
 
 def chapter_editor(request, slug, chapter=None):
+    """Редактор главы (FR-WRITE-05).
+
+    Здесь возврат формы стоит дороже всего на портале: тело главы —
+    единственное, что автор писал часами, и до этого любая ошибка (пустой
+    заголовок, вопрос опроса без вариантов) уносила его целиком, а тост
+    при этом требовал «жаз мәтінін» — ровно то, что только что стёрли.
+    """
     story = data.story_by_slug_for_author(slug, _current_user(request))
+    current = (data.chapter_of(slug, chapter, as_author=True)
+               if story and chapter else None)
+    poll = data.poll_of(slug, chapter) if story and chapter else None
 
     if request.method == 'POST' and story is not None:
         form = ChapterForm(request.POST)
-        if not form.is_valid():
-            _report(request, form)
-        else:
-            saved = data.save_chapter(story, chapter,
-                                      title=form.cleaned_data['title'],
-                                      body=form.cleaned_data['body'])
-            data.save_chapter_poll(saved, form.cleaned_data['poll_question'],
-                                   request.POST.getlist('poll_option'))
-            chapter = saved.number
+        if form.is_valid():
+            saved = data.save_chapter(
+                story, chapter,
+                title=form.cleaned_data['title'],
+                body=form.cleaned_data['body'],
+                poll_question=form.cleaned_data['poll_question'],
+                poll_options=form.poll_options)
             if request.POST.get('action') == 'submit_review':
                 try:
                     data.submit_story_for_review(story)
                     messages.success(request, 'Сақталды және модерацияға жіберілді.')
                 except ValueError:
+                    # Прежняя строка называла «аннотация мен жас белгісі»
+                    # на память — и врала, когда не хватало текста. Теперь
+                    # подписи живут в домене (BR-81), и причина называется
+                    # та, что есть на самом деле.
                     messages.error(
                         request,
-                        'Сақталды. Модерацияға жіберу үшін баптауларда '
-                        'аннотация мен жас белгісін толтыр.')
+                        'Сақталды. Модерацияға жіберу үшін мынау керек: '
+                        + ', '.join(data.missing_labels(story)) + '.')
             else:
                 messages.success(request, 'Жоба сақталды.')
+            return redirect('core:chapter_edit', slug=slug, chapter=saved.number)
+    else:
+        form = ChapterForm(initial=_chapter_initial(story, current, poll))
 
-        if chapter is None:
-            return redirect('core:chapter_new', slug=slug)
-        return redirect('core:chapter_edit', slug=slug, chapter=chapter)
-
-    current = data.chapter_of(slug, chapter) if chapter else None
     return render(request, 'pages/write/chapter_editor.html', {
         'slug':    slug,
         'story':   story,
+        'form':    form,
         'chapter': chapter,
         'current': current,
         'is_new':  chapter is None,
         # FR-STORY-13: опрос главы, если автор его уже создал
-        'poll':    data.poll_of(slug, chapter) if chapter else None,
+        'poll':    poll,
+        'poll_option_slots': _poll_option_slots(form),
+        # BR-78. Адрес зависит от того, есть ли у главы номер: у новой его
+        # присвоит первый же ответ сервера.
+        'autosave_url': (
+            reverse('core:chapter_autosave',
+                    kwargs={'slug': slug, 'chapter': chapter}) if chapter
+            else reverse('core:chapter_autosave_new', kwargs={'slug': slug})),
+        # Пишется рабочая копия, читателю невидимая (BR-79), — поэтому
+        # автосохранение доступно и публичной работе тоже.
+        'autosave_enabled': story is not None,
+    })
+
+
+@require_POST
+@login_required
+def chapter_autosave(request, slug, chapter=None):
+    """Автосохранение черновика главы (BR-78).
+
+    Ограничения «только непубличная работа» здесь больше нет: с
+    разделением ревизий (BR-79) автосохранение пишет в **рабочую копию**,
+    которой читатель не видит вовсе. Оно и было введено только потому, что
+    до разделения записанная глава немедленно уходила читателю.
+
+    Ответ — JSON, а не редирект: у запроса нет страницы, на которую можно
+    вернуться. `chapter` в ответе обязателен: первый автосейв новой главы
+    присваивает ей номер, и редактор обязан переключиться на него, иначе
+    следующий заход заведёт вторую главу.
+    """
+    story = data.story_by_slug_for_author(slug, request.user)
+    if story is None:
+        return JsonResponse({'ok': False, 'reason': 'not_found'}, status=404)
+
+    form = ChapterAutosaveForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse({'ok': False, 'reason': 'invalid'}, status=400)
+
+    saved = data.autosave_chapter(story, chapter,
+                                  title=form.cleaned_data['title'],
+                                  body=form.cleaned_data['body'])
+    return JsonResponse({
+        'ok': True,
+        'chapter': saved.number,
+        'url': reverse('core:chapter_edit',
+                       kwargs={'slug': slug, 'chapter': saved.number}),
+        'autosave_url': reverse('core:chapter_autosave',
+                                kwargs={'slug': slug, 'chapter': saved.number}),
+        'saved_at': timezone.localtime().strftime('%H:%M'),
     })
 
 

@@ -54,6 +54,9 @@
                         {% include "components/attention_item.html" with icon="adjustments" text=item.count|spaced|add:" шығарма модерацияда" href=item.href %}
                     {% elif item.kind == 'comments' %}
                         {% include "components/attention_item.html" with icon="message-caption" text=item.count|spaced|add:" жаңа пікір" href=item.href %}
+                    {% elif item.kind == 'returned' %}
+                        {# Возвращённое ждёт не модератора, а автора (BR-80). #}
+                        {% include "components/attention_item.html" with icon="pen" text=item.count|spaced|add:" шығарма толықтыруды күтеді" href=item.href %}
                     {% elif item.kind == 'draft' %}
                         {% include "components/attention_item.html" with icon="pen" text=item.count|spaced|add:" жоба бастамада тұр" href=item.href %}
                     {% endif %}

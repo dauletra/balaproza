@@ -8,7 +8,8 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from core import data
-from core.models import Chapter, Story, Tag
+from core.models import Chapter, ChapterPoll, Story, Tag
+from core.tests import factories
 from core.tests.base import login_as, login_as_newcomer, user
 from core.templatetags.balaproza import reading_meta, since, spaced
 
@@ -78,7 +79,8 @@ class TheCabinetAnswersWhatToDoNext(TestCase):
     def test_a_non_public_row_says_what_is_happening_instead(self):
         self.assertContains(
             self.response,
-            f"{data.story_by_slug('aidana-erteg').updated_days_ago} күн тексеруде")
+            f"{data.story_by_slug_for_author('aidana-erteg', user('aidana')).updated_days_ago}"
+            f" күн тексеруде")
         self.assertContains(self.response, 'әлі бір бөлім жоқ')
 
     def test_a_newcomer_gets_an_empty_state_with_a_way_in(self):
@@ -114,7 +116,10 @@ class TheAttentionStripSpeaksOnlyWhenThereIsSomething(TestCase):
                 if item['count'] > 1 or item['kind'] == 'comments':
                     self.assertEqual(item['slug'], '')
                 else:
-                    self.assertIsNotNone(data.story_by_slug(item['slug']))
+                    # Полоса внимания ведёт в кабинет, и работа в ней —
+                    # непубличная по определению: своя дверь, не читательская.
+                    self.assertIsNotNone(data.story_by_slug_for_author(
+                        item['slug'], user('aidana')))
 
     def test_silence_when_there_is_nothing_to_say(self):
         self.assertEqual(data.writer_attention(user('no-such-user')), [])
@@ -200,10 +205,13 @@ class StatusIsSpokenInOneVocabulary(TestCase):
             with self.subTest(author=author.username):
                 self.assertEqual(
                     stats['published'] + stats['ongoing']
-                    + stats['on_moderation'] + stats['draft'],
+                    + stats['on_moderation'] + stats['draft']
+                    + stats['needs_work'],
                     stats['total'])
+        # Шестой статус (BR-80) обязан попасть и в разбивку: иначе
+        # возвращённая работа считалась бы только в `total`.
         buckets = ('Published', 'Completed', 'OnProcess',
-                   'OnModeration', 'NotPublished')
+                   'OnModeration', 'NotPublished', 'NeedsWork')
         self.assertEqual(set(buckets), set(data.STORY_STATUSES))
 
     def test_the_helper_answers_only_about_its_own_author(self):
@@ -325,7 +333,7 @@ class ManageStoryShowsTheWorkAndItsParts(TestCase):
         login_as(self.client)
         self.assertContains(
             self.client.get(reverse('core:manage_story',
-                                    kwargs={'slug': 'aidana-erteg'})),
+                                    kwargs={'slug': 'aidana-kus'})),
             'Әлі бөлім жоқ')
         self.assertContains(
             self.client.get(reverse('core:manage_story',
@@ -429,7 +437,8 @@ class TheChecklistLeadsToTheFieldItNames(TestCase):
     def test_every_item_carries_a_link_to_where_it_is_closed(self):
         response = self.client.get(
             reverse('core:manage_story', kwargs={'slug': 'aidana-kus'}))
-        for item in data.publish_checklist(data.story_by_slug('aidana-kus')):
+        for item in data.publish_checklist(
+                data.story_by_slug_for_author('aidana-kus', user('aidana'))):
             with self.subTest(item=item['key']):
                 self.assertIn(item['target'], ('settings', 'text'))
         for item in response.context['checklist']:
@@ -451,7 +460,8 @@ class TheChecklistLeadsToTheFieldItNames(TestCase):
 
     def test_it_is_honest_about_the_age_mark_and_about_what_is_optional(self):
         """Обложка и теги улучшают карточку, но не держат публикацию."""
-        self.assertEqual(data.story_by_slug('aidana-kus').audience, '')
+        draft = data.story_by_slug_for_author('aidana-kus', user('aidana'))
+        self.assertEqual(draft.audience, '')
         self.assertContains(
             self.client.get(reverse('core:manage_story',
                                     kwargs={'slug': 'aidana-kus'})),
@@ -461,8 +471,8 @@ class TheChecklistLeadsToTheFieldItNames(TestCase):
             self.client.get(reverse('core:manage_story',
                                     kwargs={'slug': 'aidana-tan'})),
             f'Жас белгісі: {marked.audience}')
-        required = {i['key'] for i in data.publish_checklist(
-            data.story_by_slug('aidana-kus')) if i['required']}
+        required = {i['key'] for i in data.publish_checklist(draft)
+                    if i['required']}
         self.assertEqual(required, {'text', 'annotation', 'audience'})
 
 
@@ -478,7 +488,7 @@ class OnlyAReadyDraftMayBeSubmitted(TestCase):
         return self.client.get(reverse('core:manage_story', kwargs={'slug': slug}))
 
     def test_an_incomplete_draft_sees_the_button_disabled(self):
-        draft = data.story_by_slug('aidana-kus')
+        draft = data.story_by_slug_for_author('aidana-kus', user('aidana'))
         self.assertFalse(data.can_submit_for_review(draft))
         self.assertEqual(data.missing_for_review(draft), ['text', 'audience'])
         response = self._get('aidana-kus')
@@ -489,20 +499,27 @@ class OnlyAReadyDraftMayBeSubmitted(TestCase):
     def test_a_work_that_already_left_the_drafts_sees_no_button(self):
         for slug in ('aidana-tan', 'aidana-erteg'):
             with self.subTest(story=slug):
-                self.assertFalse(
-                    data.can_submit_for_review(data.story_by_slug(slug)))
+                story = data.story_by_slug_for_author(slug, user('aidana'))
+                self.assertIsNotNone(story)
+                self.assertFalse(data.can_submit_for_review(story))
                 self.assertNotContains(self._get(slug), 'Модерацияға жіберу')
 
-    def test_readiness_and_status_are_asked_separately(self):
-        """Проверяется чек-лист, а не запись: статус меняется в памяти,
-        сохранять нечего."""
-        ready = data.story_by_slug('aidana-tan')
-        ready.status = 'NotPublished'
-        self.assertEqual(data.missing_for_review(ready), [])
-        self.assertTrue(data.can_submit_for_review(ready))
-        ready.status = 'OnModeration'
-        self.assertEqual(data.missing_for_review(ready), [])
-        self.assertFalse(data.can_submit_for_review(ready))
+    def test_readiness_asks_the_text_and_not_the_status(self):
+        """BR-79: подаётся то, что изменилось, и статус тут ни при чём.
+
+        Прежняя проверка требовала `status == 'NotPublished'` — то есть
+        публичный сериал не мог отправить дописанную главу вовсе, и она
+        публиковалась мимо модерации (C1).
+        """
+        published = data.story_by_slug_for_author('aidana-tan', user('aidana'))
+        self.assertEqual(data.missing_for_review(published), [])
+        # Всё опубликовано — подавать нечего, хотя чек-лист закрыт.
+        self.assertFalse(data.can_submit_for_review(published))
+
+        chapter = published.chapter_set.first()
+        chapter.body += ' Автор бір сөйлем қосты.'
+        chapter.save()
+        self.assertTrue(data.can_submit_for_review(published))
 
 
 class TheChapterEditorReportsTheTruth(TestCase):
@@ -548,8 +565,11 @@ class TheChapterEditorReportsTheTruth(TestCase):
         рисовал прежний фейковый submit."""
         fresh = self.client.get(reverse(
             'core:chapter_new', kwargs={'slug': self.SLUG})).content.decode()
-        self.assertIn('dirty: false', fresh)
-        self.assertIn('@input="dirty = true"', fresh)
+        # Состояние ведёт `chapterEditor` (BR-78): индикатор больше не
+        # изображает автосохранение — оно у него настоящее, и «сақталды»
+        # он говорит по ответу сервера, а не по таймеру.
+        self.assertIn('chapterEditor(', fresh)
+        self.assertIn('@input="touch"', fresh)
         self.assertIn('Сақталмаған өзгеріс бар', fresh)
         self.assertNotIn('Жоба сақталды', fresh)
         self.assertNotIn('setInterval', fresh)
@@ -612,13 +632,23 @@ class NewStoryCreatesADraft(TestCase):
                     .values_list('slug', flat=True))
         self.assertEqual(len(slugs), 2)
 
-    def test_missing_required_field_creates_nothing(self):
+    def test_missing_required_field_returns_the_form_not_an_empty_page(self):
+        """BR-77. Здесь стоял `assertRedirects` — то есть тест закреплял
+        саму потерю ввода: у редиректа нет тела, и набранное пропадало
+        вместе с ним."""
         before = Story.objects.count()
         r = self.client.post(reverse('core:new_story'), {
             'title': '', 'format': 'serial', 'genre_primary': self.genre.slug,
         })
         self.assertEqual(Story.objects.count(), before)
-        self.assertRedirects(r, reverse('core:new_story'))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Атауын жаз.')
+        self.assertContains(r, 'aria-invalid="true"')
+        # Выбранное не сбрасывается к дефолтам формы.
+        self.assertContains(r, f'value="{self.genre.slug}" selected')
+        # `checked` стоит на следующей строке разметки карточки формата.
+        self.assertRegex(r.content.decode(),
+                         r'id="format-serial"[^>]*checked')
 
     def test_guest_post_creates_nothing(self):
         guest = Client()
@@ -687,7 +717,10 @@ class StorySettingsSavesFields(TestCase):
         # должен провести статус мимо модерации.
         self._post(status='Published')
         story = Story.objects.get(slug=self.SLUG)
-        self.assertEqual(story.status, 'NotPublished')
+        self.assertFalse(story.is_public)
+        # Статус вообще не берётся из формы — он выводится из глав (BR-79),
+        # а эту работу корпус вернул автору на доработку (BR-80).
+        self.assertEqual(story.status, 'NeedsWork')
 
 
 class StorySettingsCoverUpload(TestCase):
@@ -736,6 +769,33 @@ class StorySettingsCoverUpload(TestCase):
         self._post(cover=cover)
         story = Story.objects.get(slug=self.SLUG)
         self.assertTrue(story.cover.name.startswith(f'covers/{self.SLUG}'))
+
+    def test_the_refused_cover_does_not_take_the_rest_of_the_form_with_it(self):
+        """BR-77. Отказ по обложке — самая дорогая ошибка этой страницы:
+        вместе с файлом уносило аннотацию, отметку и теги, то есть всё, что
+        человек только что набрал. Файл вернуть нельзя, браузер его не
+        отдаёт, — об этом форма говорит прямо; остальное на месте."""
+        cover = SimpleUploadedFile('мұқаба.svg', b'<svg/>',
+                                   content_type='image/svg+xml')
+        r = self._post(cover=cover, annotation='Жазылған аннотация мәтіні.',
+                       audience='14+', tags='мектеп')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Жазылған аннотация мәтіні.')
+        self.assertContains(r, 'value="14+"')
+        self.assertContains(r, "name:'мектеп'")
+        self.assertContains(r, 'Файлды қайта таңда')
+        # И ничего из этого не сохранилось: отказ есть отказ.
+        story = Story.objects.get(slug=self.SLUG)
+        self.assertNotEqual(story.annotation, 'Жазылған аннотация мәтіні.')
+        self.assertEqual(story.tags.count(), 0)
+
+    def test_a_refused_form_does_not_leave_pending_tags_behind(self):
+        """Набранный тег возвращается чипом, но в базу не пишется: иначе
+        `pending`-тег пережил бы работу, которая не сохранилась."""
+        cover = SimpleUploadedFile('мұқаба.svg', b'<svg/>',
+                                   content_type='image/svg+xml')
+        self._post(cover=cover, tags='мүлдем-жаңа-тег')
+        self.assertFalse(Tag.objects.filter(name='мүлдем-жаңа-тег').exists())
 
 
 class StorySettingsTagResolution(TestCase):
@@ -814,12 +874,49 @@ class ChapterEditorSavesADraft(TestCase):
                 {'title': f'{number}-бөлім', 'body': 'Мәтін.', 'action': 'draft'})
 
         story = Story.objects.get(slug=self.SLUG)
-        self.assertEqual(story.chapters, 3)
-        self.assertEqual(reading_meta(story), '3 бөлім')
+        # Написанное, а не опубликованное (BR-79): автор, написавший три
+        # бөлім, обязан видеть три — даже пока их никто не одобрил.
+        self.assertEqual(story.chapters_written, 3)
+        self.assertEqual(story.chapters, 0)
 
         from_feed = next(s for s in data.my_stories_of(user('aidana'))
                          if s.slug == self.SLUG)
-        self.assertEqual(from_feed.chapters, 3)
+        self.assertEqual(from_feed.chapters_written, 3)
+
+    def test_a_rejected_form_gives_the_text_back(self):
+        """BR-77 — главный отказ этой страницы.
+
+        Автор набирал текст, ошибался в заголовке и получал **пустую**
+        форму с тостом «Атауын және мәтінін жаз» — требованием написать
+        ровно то, что только что стёрли вместе с редиректом.
+        """
+        body = 'Тау басында бір хат жатыр екен. ' * 60
+        r = self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.SLUG}),
+            {'title': '   ', 'body': body, 'action': 'draft'})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(Story.objects.get(slug=self.SLUG).chapter_set.count(), 0)
+        self.assertContains(r, 'Бөлім атауын жаз.')
+        self.assertContains(r, 'Тау басында бір хат жатыр екен.')
+        self.assertContains(r, 'aria-invalid="true"')
+        # И не утверждает обратного: зелёное «Жоба сақталды» рядом с
+        # красным полем — прямая ложь о том, что ничего не сохранилось.
+        self.assertNotContains(r, 'Жоба сақталды')
+
+    def test_the_form_shows_what_was_typed_not_what_is_stored(self):
+        """Значения приходят из формы, а не из базы. Иначе отказ показывал
+        бы сохранённое — то есть молча откатывал правку на экране."""
+        self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.SLUG}),
+            {'title': '1-бөлім', 'body': 'Сақталған мәтін.', 'action': 'draft'})
+        r = self.client.post(
+            reverse('core:chapter_edit', kwargs={'slug': self.SLUG, 'chapter': 1}),
+            {'title': '', 'body': 'Терілген жаңа мәтін.', 'action': 'draft'})
+        self.assertContains(r, 'Терілген жаңа мәтін.')
+        self.assertNotContains(r, 'Сақталған мәтін.')
+        self.assertEqual(
+            Story.objects.get(slug=self.SLUG).chapter_set.get(number=1).body,
+            'Сақталған мәтін.')
 
     def test_editing_an_existing_chapter_does_not_duplicate_it(self):
         self.client.post(
@@ -851,15 +948,153 @@ class ChapterEditorSavesAPoll(TestCase):
         self.assertEqual(chapter.poll.question, 'Кім жеңеді?')
         self.assertEqual(chapter.poll.option_set.count(), 2)
 
-    def test_a_single_option_does_not_create_a_poll(self):
-        # BR-POLL-02: кемінде екі нұсқа — біреуімен таңдау мағынасыз.
+    def test_a_single_option_is_an_error_and_not_silence(self):
+        """BR-POLL-02 остаётся, меняется способ сказать о нём.
+
+        Раньше глава сохранялась, опрос молча исчезал, и автор получал
+        «Жоба сақталды» — про главу правду, про опрос ложь. Молчание было
+        возможно потому, что варианты приходили мимо формы.
+        """
+        r = self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.SLUG}), {
+                'title': '1-бөлім', 'body': 'Ұзақ жазылған мәтін.',
+                'action': 'draft',
+                'poll_question': 'Кім жеңеді?', 'poll_option': ['Жалғыз нұсқа'],
+            })
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(Story.objects.get(slug=self.SLUG).chapter_set.count(), 0)
+        self.assertContains(r, 'кемінде 2 нұсқа жаз')
+        # И всё набранное — на месте, включая сам опрос.
+        self.assertContains(r, 'Ұзақ жазылған мәтін.')
+        self.assertContains(r, 'Кім жеңеді?')
+        self.assertContains(r, 'Жалғыз нұсқа')
+
+    def test_options_without_a_question_are_an_error_too(self):
+        r = self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.SLUG}), {
+                'title': '1-бөлім', 'body': 'Мәтін бар.', 'action': 'draft',
+                'poll_question': '', 'poll_option': ['Бірі', 'Екіншісі'],
+            })
+        self.assertContains(r, 'сұрақтың өзін де жаз')
+        self.assertEqual(Story.objects.get(slug=self.SLUG).chapter_set.count(), 0)
+
+    def test_clearing_the_question_removes_the_poll(self):
+        """Автор передумал — это законный исход, а не ошибка."""
+        url = reverse('core:chapter_new', kwargs={'slug': self.SLUG})
+        self.client.post(url, {
+            'title': '1-бөлім', 'body': 'Мәтін.', 'action': 'draft',
+            'poll_question': 'Кім жеңеді?', 'poll_option': ['Бірі', 'Екіншісі']})
+        chapter = Story.objects.get(slug=self.SLUG).chapter_set.get(number=1)
+        self.assertTrue(hasattr(chapter, 'poll'))
+
+        self.client.post(
+            reverse('core:chapter_edit',
+                    kwargs={'slug': self.SLUG, 'chapter': 1}),
+            {'title': '1-бөлім', 'body': 'Мәтін.', 'action': 'draft',
+             'poll_question': '', 'poll_option': ['', '']})
+        chapter.refresh_from_db()
+        self.assertFalse(ChapterPoll.objects.filter(chapter=chapter).exists())
+
+
+class AutosaveKeepsTheTextWithoutBeingAsked(TestCase):
+    """BR-78. Индикатор «Сақталмаған өзгеріс бар» честно показывал, что
+    текст не сохранён, и ничего с этим не делал: сохранить мог только сам
+    автор, нажав кнопку. Теперь черновик доезжает до сервера сам."""
+
+    SLUG = 'aidana-kus'      # NotPublished — своя работа Айданы
+
+    def setUp(self):
+        super().setUp()
+        login_as(self.client)
+
+    def _url(self, chapter=None):
+        if chapter is None:
+            return reverse('core:chapter_autosave_new', kwargs={'slug': self.SLUG})
+        return reverse('core:chapter_autosave',
+                       kwargs={'slug': self.SLUG, 'chapter': chapter})
+
+    def test_it_creates_the_chapter_and_names_its_number(self):
+        """Номер в ответе обязателен: без него редактор писал бы снова по
+        адресу новой главы и заводил вторую на каждом автосохранении."""
+        r = self.client.post(self._url(), {'title': '', 'body': 'Жаза бастадым'})
+        self.assertEqual(r.status_code, 200)
+        payload = r.json()
+        self.assertTrue(payload['ok'])
+        self.assertEqual(payload['chapter'], 1)
+        self.assertIn('/chapter/1/autosave/', payload['autosave_url'])
+        story = Story.objects.get(slug=self.SLUG)
+        self.assertEqual(story.chapter_set.get(number=1).body, 'Жаза бастадым')
+
+    def test_a_second_autosave_updates_the_same_chapter(self):
+        self.client.post(self._url(), {'title': '', 'body': 'Бірінші нұсқа'})
+        self.client.post(self._url(1), {'title': '', 'body': 'Екінші нұсқа'})
+        story = Story.objects.get(slug=self.SLUG)
+        self.assertEqual(story.chapter_set.count(), 1)
+        self.assertEqual(story.chapter_set.get(number=1).body, 'Екінші нұсқа')
+
+    def test_an_unfinished_title_is_not_an_error(self):
+        """Посреди набора пустой заголовок — состояние, а не ошибка:
+        требовать законченности каждые три секунды нельзя."""
+        r = self.client.post(self._url(), {'title': '', 'body': 'Мәтін'})
+        self.assertTrue(r.json()['ok'])
+
+    def test_it_does_not_touch_the_poll(self):
+        """Автосохранение шлёт только текст. Затирать опрос содержимым
+        полей, которых на экране может не быть, оно не вправе."""
         self.client.post(
             reverse('core:chapter_new', kwargs={'slug': self.SLUG}), {
                 'title': '1-бөлім', 'body': 'Мәтін.', 'action': 'draft',
-                'poll_question': 'Сұрақ?', 'poll_option': ['Жалғыз нұсқа'],
-            })
+                'poll_question': 'Кім жеңеді?', 'poll_option': ['Бірі', 'Екіншісі']})
+        self.client.post(self._url(1), {'title': '1-бөлім', 'body': 'Жаңа мәтін'})
         chapter = Story.objects.get(slug=self.SLUG).chapter_set.get(number=1)
-        self.assertFalse(hasattr(chapter, 'poll'))
+        self.assertEqual(chapter.body, 'Жаңа мәтін')
+        self.assertEqual(chapter.poll.question, 'Кім жеңеді?')
+        self.assertEqual(chapter.poll.option_set.count(), 2)
+
+    def test_a_public_work_may_autosave_without_showing_anything(self):
+        """Ограничение снято разделением ревизий (BR-79): автосохранение
+        пишет рабочую копию, которой читатель не видит. Раньше оно было
+        запрещено публичной работе, потому что записанная глава уходила
+        читателю немедленно."""
+        public = factories.story(author=user('aidana'), status='OnProcess',
+                                 format='serial', chapters=1)
+        r = self.client.post(
+            reverse('core:chapter_autosave_new', kwargs={'slug': public.slug}),
+            {'title': '', 'body': 'Аяқталмаған жаңа бөлім'})
+        self.assertTrue(r.json()['ok'])
+        self.assertEqual(public.chapter_set.count(), 2)
+        # И читателю новой главы по-прежнему нет.
+        self.assertEqual(len(data.chapters_of(public.slug)), 1)
+
+    def test_a_foreign_story_is_not_found(self):
+        foreign = Story.objects.exclude(author__username='aidana').first()
+        r = self.client.post(
+            reverse('core:chapter_autosave_new', kwargs={'slug': foreign.slug}),
+            {'title': '', 'body': 'Бөтен мәтін'})
+        self.assertEqual(r.status_code, 404)
+
+    def test_a_guest_is_sent_to_the_door(self):
+        guest = Client()
+        r = guest.post(self._url(), {'title': '', 'body': 'Мәтін'})
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('/auth/login/', r['Location'])
+
+    def test_get_is_not_a_way_to_save(self):
+        self.assertEqual(self.client.get(self._url()).status_code, 405)
+
+    def test_the_editor_carries_the_autosave_address_and_the_switch(self):
+        r = self.client.get(
+            reverse('core:chapter_new', kwargs={'slug': self.SLUG}))
+        self.assertContains(r, self._url())
+        self.assertContains(r, 'enabled: true')
+        self.assertContains(r, 'js/editor.js')
+
+    def test_a_public_editor_has_the_switch_on_too(self):
+        public = factories.story(author=user('aidana'), status='OnProcess',
+                                 format='serial', chapters=1)
+        r = self.client.get(
+            reverse('core:chapter_new', kwargs={'slug': public.slug}))
+        self.assertContains(r, 'enabled: true')
 
 
 class ChapterEditorSubmitsForReview(TestCase):
@@ -909,6 +1144,273 @@ class ManageStorySubmitsForReview(TestCase):
         self.client.post(reverse('core:manage_story', kwargs={'slug': self.SLUG}))
         story.refresh_from_db()
         self.assertEqual(story.status, 'OnModeration')
+
+
+class ModerationIsPerChapterNotPerWork(TestCase):
+    """BR-79 — то, ради чего заведены ревизии.
+
+    До них одобрение выдавалось работе один раз и дальше не значило
+    ничего: вторая глава публичного сериала появлялась у читателя в момент
+    сохранения, а переписанный одобренный текст — тем же движением. То
+    есть модерация фактически отсутствовала у всего длинного контента
+    (C1/C2 в AUDIT-WRITE-FLOW).
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.author = login_as_newcomer(self.client, 'revisions_author')
+        self.reader = Client()
+        self.serial = factories.story(
+            author=self.author, status='OnProcess', format='serial',
+            chapters=1, slug='revisions-serial')
+
+    def _reader_sees(self, chapter_number=None):
+        url = reverse('core:story_detail', kwargs={'slug': self.serial.slug})
+        if chapter_number:
+            url = f'{url}?chapter={chapter_number}'
+        return self.reader.get(url).content.decode()
+
+    # ── C1: новая глава ──────────────────────────────────────────────────
+    def test_a_new_chapter_waits_for_the_moderator(self):
+        self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.serial.slug}),
+            {'title': 'Екінші бөлім', 'body': 'ТЕКСЕРІЛМЕГЕН МӘТІН',
+             'action': 'draft'})
+        self.serial.refresh_from_db()
+        self.assertEqual(self.serial.chapter_set.count(), 2)
+        self.assertNotIn('ТЕКСЕРІЛМЕГЕН МӘТІН', self._reader_sees(2))
+        self.assertEqual(len(data.chapters_of(self.serial.slug)), 1)
+        # И работа не ушла из каталога: опубликованное осталось на месте.
+        self.assertEqual(self.serial.status, 'OnProcess')
+
+    def test_the_chapter_appears_only_after_approval(self):
+        self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.serial.slug}),
+            {'title': 'Екінші бөлім', 'body': 'ТЕКСЕРІЛГЕН МӘТІН',
+             'action': 'submit_review'})
+        self.assertNotIn('ТЕКСЕРІЛГЕН МӘТІН', self._reader_sees(2))
+
+        self.serial.refresh_from_db()
+        self.serial.apply_moderation('approved')
+        self.assertIn('ТЕКСЕРІЛГЕН МӘТІН', self._reader_sees(2))
+        self.assertEqual(len(data.chapters_of(self.serial.slug)), 2)
+
+    # ── C2: правка одобренного ───────────────────────────────────────────
+    def test_rewriting_an_approved_chapter_does_not_reach_the_reader(self):
+        first = self.serial.chapter_set.get(number=1)
+        published_before = first.published_revision_id
+
+        self.client.post(
+            reverse('core:chapter_edit',
+                    kwargs={'slug': self.serial.slug, 'chapter': 1}),
+            {'title': first.title, 'body': 'ТҮГЕЛ АУЫСТЫРЫЛҒАН МӘТІН',
+             'action': 'submit_review'})
+
+        first.refresh_from_db()
+        self.assertEqual(first.body, 'ТҮГЕЛ АУЫСТЫРЫЛҒАН МӘТІН')  # рабочая копия
+        self.assertEqual(first.published_revision_id, published_before)
+        self.assertNotIn('ТҮГЕЛ АУЫСТЫРЫЛҒАН МӘТІН', self._reader_sees(1))
+
+        self.serial.refresh_from_db()
+        self.serial.apply_moderation('approved')
+        first.refresh_from_db()
+        self.assertNotEqual(first.published_revision_id, published_before)
+        self.assertIn('ТҮГЕЛ АУЫСТЫРЫЛҒАН МӘТІН', self._reader_sees(1))
+
+    # ── Отказ не уносит опубликованное ───────────────────────────────────
+    def test_a_returned_chapter_leaves_the_published_ones_alone(self):
+        """Прежний исход назначал `NotPublished` любому отказу — и публичный
+        сериал, чью новую главу вернули, исчезал из каталога целиком."""
+        self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.serial.slug}),
+            {'title': 'Екінші бөлім', 'body': 'Шикі мәтін.',
+             'action': 'submit_review'})
+        self.serial.refresh_from_db()
+        self.serial.apply_moderation('needs_work', 'Соңы жоқ.')
+
+        self.serial.refresh_from_db()
+        self.assertEqual(self.serial.status, 'OnProcess')
+        self.assertTrue(self.serial.is_public)
+        self.assertEqual(len(data.chapters_of(self.serial.slug)), 1)
+        # Рабочая копия автора при этом цела — править есть что.
+        self.assertEqual(self.serial.chapter_set.get(number=2).body,
+                         'Шикі мәтін.')
+
+    # ── V10: правка во время очереди ─────────────────────────────────────
+    def test_editing_while_queued_replaces_what_was_submitted(self):
+        """Автор правил текст после отправки, и модератор читал не то, что
+        ему прислали. Вторая заявка при этом не заводится."""
+        url = reverse('core:chapter_edit',
+                      kwargs={'slug': self.serial.slug, 'chapter': 1})
+        self.client.post(url, {'title': '1-бөлім', 'body': 'Бірінші нұсқа.',
+                               'action': 'submit_review'})
+        self.client.post(url, {'title': '1-бөлім', 'body': 'Түзетілген нұсқа.',
+                               'action': 'submit_review'})
+
+        first = self.serial.chapter_set.get(number=1)
+        pending = [r for r in first.revisions.all() if r.state == 'pending']
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0].body, 'Түзетілген нұсқа.')
+
+    # ── S10: история ─────────────────────────────────────────────────────
+    def test_every_version_stays_in_history(self):
+        """Перезаписи больше нет: у главы копятся ревизии, и потерянного
+        текста, который нечем восстановить, не остаётся."""
+        first = self.serial.chapter_set.get(number=1)
+        url = reverse('core:chapter_edit',
+                      kwargs={'slug': self.serial.slug, 'chapter': 1})
+        for text in ('Бірінші түзету.', 'Екінші түзету.'):
+            self.client.post(url, {'title': '1-бөлім', 'body': text,
+                                   'action': 'submit_review'})
+            self.serial.refresh_from_db()
+            self.serial.apply_moderation('approved')
+
+        bodies = [r.body for r in first.revisions.all()]
+        self.assertIn('Бірінші түзету.', bodies)
+        self.assertIn('Екінші түзету.', bodies)
+        self.assertEqual(first.revisions.filter(state='approved').count(), 3)
+
+
+class ReturnedWorkKnowsItWasReturned(TestCase):
+    """BR-80/BR-81. Возврат «на доработку» не оставлял следа: работа падала
+    в черновики, чек-лист снова горел зелёным, кнопка отправки была
+    активна, и единственный экземпляр причины лежал в ленте уведомлений —
+    автор должен был помнить её наизусть, пока правит (S1)."""
+
+    def setUp(self):
+        super().setUp()
+        self.author = login_as_newcomer(self.client, 'returned_author')
+        self.story = factories.story(
+            author=self.author, chapters=1, format='single',
+            slug='returned-work', published=False)
+        factories.submit(self.story)
+        self.story.refresh_status()
+
+    def _manage(self):
+        return self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.story.slug}))
+
+    def test_the_reason_stays_on_the_working_screen(self):
+        self.story.apply_moderation('needs_work', 'Диалогтар үзіліп қалған.')
+        response = self._manage()
+        self.assertContains(response, 'Диалогтар үзіліп қалған.')
+        self.assertContains(response, 'Толықтыру қажет')
+        self.story.refresh_from_db()
+        self.assertEqual(self.story.status, 'NeedsWork')
+
+    def test_the_reason_goes_away_once_it_was_resubmitted(self):
+        """Замечание — про прошлую версию: после повторной подачи оно уже
+        не про то, что лежит у модератора."""
+        self.story.apply_moderation('needs_work', 'Соңы жоқ.')
+        chapter = self.story.chapter_set.first()
+        chapter.body += ' Соңы жазылды.'
+        chapter.save()
+        self.client.post(reverse('core:manage_story',
+                                 kwargs={'slug': self.story.slug}))
+        self.assertNotContains(self._manage(), 'Соңы жоқ.')
+
+    def test_a_returned_work_is_told_apart_from_an_untouched_draft(self):
+        untouched = factories.story(author=self.author, chapters=1,
+                                    format='single', published=False,
+                                    slug='untouched-draft')
+        untouched.refresh_status()
+        self.story.apply_moderation('needs_work', 'Түзет.')
+
+        self.story.refresh_from_db()
+        untouched.refresh_from_db()
+        self.assertEqual(self.story.status, 'NeedsWork')
+        self.assertEqual(untouched.status, 'NotPublished')
+
+        listing = self.client.get(reverse('core:my_stories'))
+        self.assertContains(listing, 'толықтыруды күтеді')
+
+    def test_a_public_serial_stays_public_when_a_chapter_is_returned(self):
+        """`NeedsWork` — только у непубличного: увести работу из каталога
+        значит наказать читателя за то, чего он не видел."""
+        serial = factories.story(author=self.author, chapters=1,
+                                 format='serial', status='OnProcess',
+                                 slug='public-returned')
+        factories.chapter(serial, number=2, chars=300)
+        factories.submit(serial)
+        serial.refresh_status()
+        serial.apply_moderation('needs_work', 'Екінші бөлім шикі.')
+
+        serial.refresh_from_db()
+        self.assertEqual(serial.status, 'OnProcess')
+        self.assertTrue(serial.is_public)
+
+
+class TheAuthorMayTakeTheSubmissionBack(TestCase):
+    """BR-80 (S2). Кнопки отзыва не было вовсе: заметив опечатку через
+    минуту после отправки, автор мог только ждать модератора."""
+
+    def setUp(self):
+        super().setUp()
+        self.author = login_as_newcomer(self.client, 'withdraw_author')
+        self.story = factories.story(
+            author=self.author, chapters=1, format='single',
+            slug='withdraw-work', published=False)
+        self.url = reverse('core:manage_story',
+                           kwargs={'slug': self.story.slug})
+        self.client.post(self.url)          # отправили на модерацию
+
+    def test_the_queue_shows_the_button_and_how_long_it_waits(self):
+        response = self.client.get(self.url)
+        self.assertContains(response, 'Мәтін модераторда')
+        self.assertContains(response, 'Өтінімді кері қайтару')
+
+    def test_withdrawing_empties_the_queue_without_losing_the_text(self):
+        self.client.post(self.url, {'action': 'withdraw'})
+        self.story.refresh_from_db()
+        self.assertIsNone(data.pending_review_since(self.story))
+        self.assertEqual(self.story.status, 'NotPublished')
+        # Снимок остаётся историей, а не исчезает вместе с заявкой.
+        chapter = self.story.chapter_set.first()
+        self.assertEqual(chapter.revisions.count(), 1)
+        self.assertEqual(chapter.revisions.first().state, 'draft')
+        self.assertTrue(chapter.body)
+        # И подать снова можно сразу.
+        self.assertTrue(data.can_submit_for_review(self.story))
+
+    def test_a_withdrawn_work_is_out_of_the_moderator_queue(self):
+        self.client.post(self.url, {'action': 'withdraw'})
+        self.story.refresh_from_db()
+        with self.assertRaises(ValueError):
+            self.story.apply_moderation('approved')
+
+
+class TheRefusalNamesWhatIsMissing(TestCase):
+    """BR-81 (S3). Сообщение перечисляло причины на память — «аннотация
+    мен жас белгісі», — и врало всякий раз, когда не хватало текста."""
+
+    def setUp(self):
+        super().setUp()
+        self.author = login_as_newcomer(self.client, 'refusal_author')
+
+    def test_it_names_the_missing_items_in_words(self):
+        bare = factories.story(author=self.author, chapters=0,
+                               format='serial', published=False,
+                               annotation='', audience='', slug='bare-work')
+        response = self.client.post(
+            reverse('core:manage_story', kwargs={'slug': bare.slug}),
+            follow=True)
+        text = ' '.join(m.message for m in response.context['messages'])
+        self.assertIn('Алғашқы бөлімді жаз', text)
+        self.assertIn('Аннотация жаз', text)
+        self.assertIn('Жас белгісін қой', text)
+
+    def test_the_panel_and_the_message_speak_the_same_words(self):
+        """Один список подписей: разойдясь, они снова стали бы врать."""
+        bare = factories.story(author=self.author, chapters=0,
+                               format='single', published=False,
+                               annotation='', audience='', slug='bare-single')
+        panel = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': bare.slug}))
+        for label in data.missing_labels(bare):
+            with self.subTest(label=label):
+                self.assertContains(panel, label)
+        # У одночастной работы «бөлім» не предлагают — их у неё нет.
+        self.assertIn('Мәтін жаз', data.missing_labels(bare))
 
 
 class DeleteStoryRemovesIt(TestCase):

@@ -131,19 +131,27 @@ class SeededStoriesDeriveWhatIsDerived(TestCase):
             with self.subTest(story=slug):
                 self.assertEqual(Story.objects.get(slug=slug).audience, '')
 
-    def test_reading_effort_comes_from_the_text(self):
+    def test_reading_effort_comes_from_the_published_text(self):
         """Объём чтения решает, в какой фильтр каталога работа попадёт, и
         считается из текста глав, а не из колонки. Значит, дойти до базы
-        обязан сам текст, а не число."""
+        обязан сам текст, а не число.
+
+        Считается **опубликованное** (BR-79): у работы, чьи главы ещё у
+        модератора, объём честно нулевой — обещать читателю минуты чтения,
+        которых он не получит, тот же обман, что хранимая колонка.
+        """
         for stub in _corpus.STORIES:
             chapters = _corpus.CHAPTERS_BY_STORY.get(stub.slug, ())
             if not chapters:
                 continue
             with self.subTest(story=stub.slug):
                 story = Story.objects.get(slug=stub.slug)
-                self.assertEqual(story.total_chars,
-                                 sum(len(c.body) for c in chapters))
-                self.assertGreater(story.read_minutes, 0)
+                written = sum(len(c.body) for c in chapters)
+                if story.is_public:
+                    self.assertEqual(story.total_chars, written)
+                    self.assertGreater(story.read_minutes, 0)
+                else:
+                    self.assertEqual(story.total_chars, 0)
 
     def test_editorial_badge_is_stored(self):
         """«Редакция таңдауы» — акт редакции: из данных он не выводится,

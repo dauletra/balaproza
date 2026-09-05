@@ -17,6 +17,44 @@ from .models import Chapter, Genre, Story, User
 # счётчик в шаблоне до этого был единственным местом, где число называлось.
 ANNOTATION_MAX = 500
 
+# Границы опроса (BR-POLL-02). Верхняя — не «пока столько влезло»: список
+# длиннее читателю уже не выбор, а анкета. Нижняя — условие смысла: вопрос
+# с одним вариантом выбора не предлагает.
+POLL_OPTIONS_MIN = 2
+POLL_OPTIONS_MAX = 4
+POLL_OPTION_MAX_LEN = 80
+
+
+class PollOptionsWidget(forms.TextInput):
+    """Один `name` — несколько полей ввода.
+
+    Варианты приходят повторяющимся `poll_option`, и достать их все можно
+    только `getlist`: обычный виджет вернул бы последний. Раньше это делал
+    view прямым `request.POST.getlist`, то есть в обход формы — и сказать
+    об ошибке было нечем.
+    """
+
+    def value_from_datadict(self, data, files, name):
+        getlist = getattr(data, 'getlist', None)
+        return getlist(name) if getlist else data.get(name) or []
+
+
+class PollOptionsField(forms.Field):
+    """Список вариантов опроса. Пустые строки — не ввод, а незаполненные
+    поля: их четыре всегда, а заполняют обычно два."""
+
+    widget = PollOptionsWidget
+
+    def clean(self, value):
+        options = [t.strip() for t in (value or []) if t and t.strip()]
+        if len(options) > POLL_OPTIONS_MAX:
+            raise forms.ValidationError(
+                f'Нұсқа тым көп — ең көбі {POLL_OPTIONS_MAX}.')
+        if any(len(t) > POLL_OPTION_MAX_LEN for t in options):
+            raise forms.ValidationError(
+                f'Нұсқа тым ұзын — {POLL_OPTION_MAX_LEN} таңбадан аспасын.')
+        return options
+
 
 def _genre_field(*, required: bool, message: str):
     """Жанр приходит **слагом**, а не номером строки: это его адрес во всём
@@ -130,12 +168,18 @@ class ChapterForm(forms.ModelForm):
     """Редактор главы (FR-WRITE-05) вместе с необязательным опросом.
 
     Опрос здесь, а не отдельной формой, потому что сохраняется одним
-    действием автора. Лимиты опроса (BR-POLL-02) режет слой данных: вопрос
-    без двух вариантов не опрос, а не ошибка ввода.
+    действием автора — и потому же одной транзакцией (`data.save_chapter`).
+
+    Лимиты опроса теперь проверяет форма, а не слой данных. Раньше вопрос
+    с одним вариантом молча не сохранялся: автор получал «Жоба сақталды» —
+    про главу правду, про опрос ложь. Молчание было возможно ровно потому,
+    что варианты приходили мимо формы и сказать о них было нечем.
     """
 
-    poll_question = forms.CharField(required=False, max_length=120)
-    poll_option = forms.CharField(required=False)
+    poll_question = forms.CharField(
+        required=False, max_length=120,
+        error_messages={'max_length': 'Сұрақ тым ұзын — 120 таңбадан аспасын.'})
+    poll_option = PollOptionsField(required=False)
 
     class Meta:
         model = Chapter
@@ -146,14 +190,57 @@ class ChapterForm(forms.ModelForm):
         # Пустая глава не сохраняется: у неё нет ни имени, ни текста, а
         # «Жоба сақталды» на пустом экране — обещание, которого нет.
         self.fields['body'].required = True
-        for name in ('title', 'body'):
-            self.fields[name].error_messages['required'] = 'Атауын және мәтінін жаз.'
+        self.fields['title'].error_messages['required'] = 'Бөлім атауын жаз.'
+        self.fields['body'].error_messages['required'] = 'Бөлім мәтінін жаз.'
 
     def clean_body(self):
         body = self.cleaned_data.get('body', '')
         if not body.strip():
-            raise forms.ValidationError('Атауын және мәтінін жаз.')
+            raise forms.ValidationError('Бөлім мәтінін жаз.')
         return body
+
+    def clean(self):
+        """Вопрос и варианты существуют только вместе (BR-POLL-02).
+
+        Ошибка вешается на `poll_question` — на поле, которое автор видит
+        первым в свёрнутом блоке опроса: сообщение под ним объясняет, что
+        доделать, а не просто сообщает, что что-то не так.
+        """
+        cleaned = super().clean()
+        question = (cleaned.get('poll_question') or '').strip()
+        options = cleaned.get('poll_option') or []
+
+        if question and len(options) < POLL_OPTIONS_MIN:
+            self.add_error('poll_question',
+                           f'Сұраққа кемінде {POLL_OPTIONS_MIN} нұсқа жаз — '
+                           f'біреуімен таңдау болмайды.')
+        elif options and not question:
+            self.add_error('poll_question',
+                           'Нұсқалар жазылған — сұрақтың өзін де жаз.')
+        return cleaned
+
+    @property
+    def poll_options(self) -> list:
+        return self.cleaned_data.get('poll_option') or []
+
+
+class ChapterAutosaveForm(forms.ModelForm):
+    """Автосохранение главы (BR-78) — те же два поля, но без обязательных.
+
+    Посреди набора пустой заголовок и пустой текст нормальны: автор ещё
+    пишет, и требовать от него законченности каждые три секунды нельзя.
+    Проверяется единственное, что есть и в базе, — длина заголовка;
+    остальное решается при осознанном сохранении, `ChapterForm`.
+    """
+
+    class Meta:
+        model = Chapter
+        fields = ('title', 'body')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name in ('title', 'body'):
+            self.fields[name].required = False
 
 
 class ProfileForm(forms.ModelForm):

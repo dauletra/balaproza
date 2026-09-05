@@ -25,11 +25,14 @@ from .models import (
     Chapter,
     ChapterPoll,
     ChapterReaction,
+    ChapterRevision,
     Contest,
     ContestAward,
     ContestCondition,
     Genre,
     JuryMember,
+    ModerationClaim,
+    ModerationDecision,
     Notification,
     PollOption,
     SchoolLink,
@@ -116,14 +119,32 @@ class BlockedTagPatternAdmin(admin.ModelAdmin):
 
 class ChapterInline(admin.TabularInline):
     """Главы внутри произведения: по отдельности их не ищут. `char_count`
-    только для чтения — он считается из текста при сохранении."""
+    только для чтения — он считается из текста при сохранении.
+
+    `published_revision` показывается, но не редактируется: подменить
+    опубликованный текст руками значит опубликовать непроверенное — то
+    самое, ради чего ревизии и заведены (BR-79). Меняет её только решение
+    модератора.
+    """
 
     model = Chapter
     extra = 0
-    fields = ('number', 'title', 'char_count')
-    readonly_fields = ('char_count',)
+    fields = ('number', 'title', 'char_count', 'published_revision')
+    readonly_fields = ('char_count', 'published_revision')
     ordering = ('number',)
     show_change_link = True
+
+
+class ChapterRevisionInline(admin.TabularInline):
+    """История главы и её очередь. Текст ревизии здесь и читает модератор:
+    в списке глав лежат номера, а решение принимается по написанному."""
+
+    model = ChapterRevision
+    extra = 0
+    fields = ('state', 'title', 'body', 'char_count', 'submitted_at',
+              'decided_at')
+    readonly_fields = ('char_count', 'submitted_at', 'decided_at')
+    ordering = ('-created_at',)
 
 
 class StoryTagInline(admin.TabularInline):
@@ -141,13 +162,15 @@ class StoryTagInline(admin.TabularInline):
 class StoryAdmin(admin.ModelAdmin):
     """Карточка работы и рабочий стол модератора (DEC-23, BR-11).
 
-    Решение принимается **действием**, а не правкой поля «мәртебесі»:
-    статус, изменённый в форме, ничего не сообщает автору, и работа молча
-    возвращается из очереди. Действие меняет статус и пишет уведомление
-    одним движением (`Story.apply_moderation`).
+    **Решения здесь больше не принимаются** — для них есть раздел
+    `/moderation/` (DEC-71), где рядом с кнопками лежит то, по чему решают:
+    текст поданного, сравнение с опубликованным и прошлые замечания.
+    Действия списка остались запасным путём на случай, когда раздел
+    недоступен, и ведут в ту же дверь `Story.apply_moderation`.
 
-    Поле статуса остаётся редактируемым — как путь модератора, когда автор
-    недоступен; такая правка сопровождается предупреждением.
+    Поле статуса остаётся редактируемым, но с BR-79 оно пересчитывается:
+    правка руками держится до следующего пересчёта, о чём говорит
+    предупреждение.
     """
 
     list_display = ('title', 'author', 'status', 'primary_genre',
@@ -167,11 +190,13 @@ class StoryAdmin(admin.ModelAdmin):
                            'Оны автордың орнына қоюға болмайды (BR-10b).',
         }),
         ('Модерация', {
-            'fields': ('status', 'is_editorial_pick'),
+            'fields': ('status', 'completed_by_author', 'is_editorial_pick'),
             'description': 'Модерация шешімі — тізімдегі әрекет арқылы: '
                            'сонда ғана автор хабарлама алады (BR-11). '
-                           'Мұндағы өріс — аяқталған серияны «Аяқталды» '
-                           'деп белгілеу сияқты жағдайлар үшін.',
+                           '«Мәртебесі» енді бөлімдерден есептеледі (BR-79): '
+                           'қолмен қойылғаны келесі есептеуде қайта жазылады. '
+                           '«Аяқталды» — автордың сөзі, модерацияның нәтижесі '
+                           'емес.',
         }),
         ('Сандар', {
             'fields': ('views', 'recent_views', 'likes', 'comments'),
@@ -202,7 +227,11 @@ class StoryAdmin(admin.ModelAdmin):
         передать текст не умеет. Страница одна на все три кнопки — две
         механики рядом читались бы как разные по последствиям действия.
         """
-        queue = queryset.filter(status='OnModeration')
+        # Очередь — работы с **поданной ревизией** (BR-79), а не со
+        # значением статуса: у публичного сериала, дописавшего главу,
+        # статус остаётся публичным, и фильтр по нему прятал бы от
+        # модератора ровно то, что ему прислали.
+        queue = queryset.filter(chapter__revisions__state='pending').distinct()
         skipped = queryset.count() - queue.count()
 
         error = ''
@@ -211,7 +240,9 @@ class StoryAdmin(admin.ModelAdmin):
             if outcome != 'approved' and not reason:
                 error = 'Себепті жазу керек: онсыз автор нені түзетерін білмейді.'
             else:
-                done = [story.apply_moderation(outcome, reason) for story in queue]
+                done = [story.apply_moderation(outcome, reason,
+                                               moderator=request.user)
+                        for story in queue]
                 self.message_user(
                     request,
                     f'{len(done)} шығарма: «{MODERATION_OUTCOME_LABELS[outcome]}». '
@@ -274,11 +305,15 @@ class ChapterReactionInline(admin.TabularInline):
 
 @admin.register(Chapter)
 class ChapterAdmin(admin.ModelAdmin):
-    list_display = ('story', 'number', 'title', 'char_count')
+    list_display = ('story', 'number', 'title', 'char_count', 'published')
     list_filter = ('story',)
     search_fields = ('title', 'story__title')
-    readonly_fields = ('char_count',)
-    inlines = (ChapterReactionInline,)
+    readonly_fields = ('char_count', 'published_revision')
+    inlines = (ChapterRevisionInline, ChapterReactionInline)
+
+    @admin.display(description='жарияланған', boolean=True)
+    def published(self, obj):
+        return obj.is_published
 
 
 class ContestConditionInline(admin.TabularInline):
@@ -482,3 +517,30 @@ class NotificationAdmin(admin.ModelAdmin):
 class SchoolLinkAdmin(admin.ModelAdmin):
     list_display = ('title', 'channel', 'subtitle', 'position')
     list_editable = ('position',)
+
+
+@admin.register(ModerationDecision)
+class ModerationDecisionAdmin(admin.ModelAdmin):
+    """Журнал решений — только на чтение (BR-82). Акт человека не правится
+    задним числом: исправленный, он рассказывал бы о решении, которого
+    никто не принимал, — то же правило, что у `Notification`."""
+
+    list_display = ('story', 'outcome', 'moderator', 'chapters', 'decided_at')
+    list_filter = ('outcome',)
+    search_fields = ('story__title', 'moderator__username', 'reason')
+    date_hierarchy = 'decided_at'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ModerationClaim)
+class ModerationClaimAdmin(admin.ModelAdmin):
+    """«Взял в работу». Живёт минуты и снимается решением; здесь — чтобы
+    снять забытую метку, не трогая саму работу."""
+
+    list_display = ('story', 'moderator', 'claimed_at')
+    autocomplete_fields = ('story',)

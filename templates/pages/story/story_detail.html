@@ -8,6 +8,10 @@
 {# Ширину колонки держит <main> в base.html (860px) — своего max-w здесь не нужно. #}
 <div class="flex flex-col gap-8" x-data="storyReader()">
 
+    {# Непубличную работу видят только автор и модератор (BR-76) — и обязаны #}
+    {# понимать, что перед ними предпросмотр, а не витрина. #}
+    {% if is_preview %}{% include "partials/story/preview_notice.html" %}{% endif %}
+
     {% include "partials/story/header.html" %}
 
     {# ─────────────────────── Аннотация ─────────────────────── #}

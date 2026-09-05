@@ -38,6 +38,12 @@ from .contests import (
 )
 from .design import design_components, design_states, design_tokens
 from .home import home
+from .moderation import (
+    moderation_claim,
+    moderation_decide,
+    moderation_detail,
+    moderation_queue,
+)
 from .legal import (
     legal_about,
     legal_moderation_rules,
@@ -68,6 +74,7 @@ from .story import (
     story_detail,
 )
 from .write import (
+    chapter_autosave,
     chapter_editor,
     delete_story,
     manage_story,

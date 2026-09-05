@@ -1177,3 +1177,140 @@ class ReadingRemembersWhereYouStopped(TestCase):
         self.client.get(self._url(4))
         self.assertFalse(ReadingProgress.objects.filter(story__slug=self.SLUG,
                                                         user__username=self.READER).exists())
+
+
+class AnUnpublishedWorkExistsOnlyForItsAuthorAndTheModerator(TestCase):
+    """BR-76. Страница произведения не смотрела на статус вообще: черновик
+    и работа на модерации отдавались целиком любому, кто открыл адрес, —
+    включая гостя. Слаг при этом собирается из названия (`slugify_kz`),
+    то есть подбирается, а не только утекает ссылкой.
+
+    Проверяется не «страница пустая», а «страницы нет»: 404, тот же ответ,
+    что у выдуманного адреса. Разница между «нельзя» и «не существует»
+    здесь важна — первое подтверждает, что работа есть.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.author = make.user()
+        self.draft = make.story(author=self.author, status='NotPublished',
+                                chapters=1, slug='audit-draft')
+        self.queued = make.story(author=self.author, status='OnModeration',
+                                 chapters=1, slug='audit-queued')
+        self.public = make.story(author=self.author, status='Published',
+                                 chapters=1, slug='audit-public')
+
+    def _get(self, story, client=None):
+        return (client or self.client).get(
+            reverse('core:story_detail', kwargs={'slug': story.slug}))
+
+    # ── Кому нельзя ──────────────────────────────────────────────────────
+    def test_a_guest_gets_the_same_404_as_for_a_made_up_slug(self):
+        for story in (self.draft, self.queued):
+            with self.subTest(status=story.status):
+                self.assertEqual(self._get(story).status_code, 404)
+        self.assertEqual(self._get(self.public).status_code, 200)
+
+    def test_a_signed_in_stranger_gets_404_too(self):
+        stranger = Client()
+        login_as_newcomer(stranger, 'audit_stranger')
+        for story in (self.draft, self.queued):
+            with self.subTest(status=story.status):
+                self.assertEqual(self._get(story, stranger).status_code, 404)
+
+    def test_the_text_never_reaches_the_response(self):
+        """Не только код ответа: 404-страница не должна нести ни названия,
+        ни текста — иначе правило выполнено формально."""
+        body = self._get(self.draft).content.decode()
+        self.assertNotIn(self.draft.title, body)
+        self.assertNotIn(self.draft.chapter_set.first().body[:40], body)
+
+    # ── Кому можно ───────────────────────────────────────────────────────
+    def test_the_author_sees_his_own_work_as_a_preview(self):
+        mine = Client()
+        mine.force_login(self.author)
+        for story in (self.draft, self.queued):
+            with self.subTest(status=story.status):
+                response = self._get(story, mine)
+                self.assertEqual(response.status_code, 200)
+                self.assertTrue(response.context['is_preview'])
+                self.assertContains(response, 'алдын ала қарау')
+
+    def test_the_moderator_sees_the_queue_because_he_has_to_read_it(self):
+        """Решение по работе принимается по её тексту, а в админке лежат
+        номера глав. Закрыть страницу от модератора значит закрыть
+        модерацию (BR-11)."""
+        staff = Client()
+        moderator = make.user(username='audit_moderator')
+        moderator.is_staff = True
+        moderator.save(update_fields=['is_staff'])
+        staff.force_login(moderator)
+        response = self._get(self.queued, staff)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['is_preview'])
+        # Чужая работа — не его кабинет: ссылки в управление ему не дают.
+        self.assertNotContains(response, 'Басқаруға оралу')
+
+    def test_a_preview_offers_no_shelf_and_no_share(self):
+        """Полки у непубличной работы не бывает, а ссылка из «Бөлісу» у
+        получателя открывается 404. Обе кнопки работали только потому, что
+        черновик был открыт всем; вместе с дырой уходит и обещание."""
+        mine = Client()
+        mine.force_login(self.author)
+        # Не по слову «Бөлісу»: `share_modal.html` монтируется на странице
+        # всегда и несёт то же слово. Кнопку опознаёт её `aria-label`.
+        share = 'aria-label="Бөлісу"'
+        preview = self._get(self.draft, mine)
+        self.assertNotContains(
+            preview, reverse('core:library_toggle',
+                             kwargs={'slug': self.draft.slug}))
+        self.assertNotContains(preview, share)
+        # У публичной обе на месте — иначе тест проверял бы пустоту.
+        public = self._get(self.public, mine)
+        self.assertContains(public, reverse('core:library_toggle',
+                                            kwargs={'slug': self.public.slug}))
+        self.assertContains(public, share)
+
+    def test_a_published_work_carries_no_preview_notice(self):
+        response = self._get(self.public)
+        self.assertFalse(response.context['is_preview'])
+        self.assertNotContains(response, 'алдын ала қарау')
+
+    # ── Следы, которых непубличная работа оставлять не должна ────────────
+    def test_looking_at_a_draft_does_not_count_as_a_read(self):
+        mine = Client()
+        mine.force_login(self.author)
+        self._get(self.draft, mine)
+        Client().get(reverse('core:story_detail',
+                             kwargs={'slug': self.draft.slug}))
+        self.draft.refresh_from_db()
+        self.assertEqual(self.draft.views, 0)
+        self.assertEqual(self.draft.recent_views, 0)
+        self.assertFalse(StoryView.objects.filter(story=self.draft).exists())
+
+    def test_a_draft_never_lands_on_a_shelf_or_gets_a_bookmark(self):
+        mine = Client()
+        mine.force_login(self.author)
+        self._get(self.draft, mine)
+        self.assertFalse(LibraryEntry.objects.filter(story=self.draft).exists())
+        self.assertFalse(ReadingProgress.objects.filter(story=self.draft).exists())
+
+    # ── Действия по слагу ────────────────────────────────────────────────
+    def test_no_stranger_may_act_on_a_work_he_cannot_see(self):
+        """Комментарий, полка, реакция и голос принимают слаг, а не объект,
+        и до этого отвечали на чужой черновик так же, как на витрину."""
+        stranger = Client()
+        login_as_newcomer(stranger, 'audit_actor')
+        slug, chapter = self.draft.slug, 1
+
+        stranger.post(reverse('core:comment_create', kwargs={'slug': slug}),
+                      {'text': 'Көрінбейтін пікір', 'chapter': chapter})
+        stranger.post(reverse('core:library_toggle', kwargs={'slug': slug}))
+        stranger.post(reverse('core:chapter_react',
+                              kwargs={'slug': slug, 'chapter': chapter}),
+                      {'kind': 'kuldim'})
+
+        self.assertFalse(StoryComment.objects.filter(story=self.draft).exists())
+        self.assertFalse(LibraryEntry.objects.filter(story=self.draft).exists())
+        self.assertFalse(ChapterReactionVote.objects.filter(
+            chapter__story=self.draft).exists())

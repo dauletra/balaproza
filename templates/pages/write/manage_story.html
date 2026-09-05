@@ -35,7 +35,7 @@
                 {% if story.is_single %}
                     {% include "components/stat_pill.html" with icon="book" value="бір бөлімді" %}
                 {% else %}
-                    {% include "components/stat_pill.html" with icon="book" value=story.chapters|spaced|add:" бөлім" %}
+                    {% include "components/stat_pill.html" with icon="book" value=story.chapters_written|spaced|add:" бөлім" %}
                 {% endif %}
                 {% include "components/stat_pill.html" with icon="eye" value=story.views|spaced label=story.views|spaced|add:" оқылым" %}
                 {% include "components/stat_pill.html" with icon="heart" value=story.likes|spaced label=story.likes|spaced|add:" реакция" %}
@@ -101,6 +101,24 @@
                             <div class="truncate font-sans text-sm font-semibold text-slate-900">{% if story.is_single %}Толық мәтін{% else %}{{ c.title }}{% endif %}</div>
                             <div class="flex flex-wrap items-center gap-x-2 font-sans text-xs text-slate-500">
                                 <span>{{ c.char_count|spaced }} таңба</span>
+
+                                {% comment %}
+                                    Состояние главы (BR-79). Без него автор
+                                    не отличает опубликованное от того, что
+                                    ещё у модератора, — а это теперь разные
+                                    вещи: правка одобренного текста доходит
+                                    до читателя только после проверки.
+                                {% endcomment %}
+                                <span aria-hidden="true">·</span>
+                                {% if c.pending_revision %}
+                                    <span class="rounded-chip bg-status-attention-bg px-2 py-0.5 font-semibold text-status-attention-fg">Тексеруде</span>
+                                {% elif not c.is_published %}
+                                    <span class="rounded-chip bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">Жарияланбаған</span>
+                                {% elif c.has_unpublished_changes %}
+                                    <span class="rounded-chip bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">Өзгертілген — жіберілмеген</span>
+                                {% else %}
+                                    <span class="text-status-published-fg">Жарияланған</span>
+                                {% endif %}
                                 {% comment %}
                                     Карта качества по главам (DEC-32). Одна цифра
                                     говорит «зацепило», ведущая реакция — «чем

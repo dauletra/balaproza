@@ -46,7 +46,24 @@ urlpatterns = [
     path('write/<slug:slug>/settings/', views.story_settings, name='story_settings'),
     path('write/<slug:slug>/chapter/new/', views.chapter_editor, name='chapter_new'),
     path('write/<slug:slug>/chapter/<int:chapter>/edit/', views.chapter_editor, name='chapter_edit'),
+    # Автосохранение (BR-78). Два адреса, потому что у новой главы ещё нет
+    # номера: первый ответ его и присваивает, дальше редактор пишет во
+    # второй — иначе каждое автосохранение заводило бы новую главу.
+    path('write/<slug:slug>/chapter/autosave/',
+        views.chapter_autosave, name='chapter_autosave_new'),
+    path('write/<slug:slug>/chapter/<int:chapter>/autosave/',
+        views.chapter_autosave, name='chapter_autosave'),
     path('write/<slug:slug>/delete/', views.delete_story, name='delete_story'),
+
+    # MOD — модерация как раздел (DEC-71). Открыт только `is_staff`;
+    # остальным раздела не существует — 404, а не 403.
+    path('moderation/', views.moderation_queue, name='moderation_queue'),
+    path('moderation/<slug:slug>/', views.moderation_detail,
+        name='moderation_detail'),
+    path('moderation/<slug:slug>/claim/', views.moderation_claim,
+        name='moderation_claim'),
+    path('moderation/<slug:slug>/decide/', views.moderation_decide,
+        name='moderation_decide'),
 
     # PROF — профиль
     path('me/', views.profile_me, name='profile_me'),

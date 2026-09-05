@@ -30,9 +30,10 @@ from .domain.profile import GENDERS, GENDER_LABELS
 from .domain.story import (
     REACTIONS,
     REACTIONS_BY_SLUG,
+    REVISION_STATES,
     STORY_FORMATS,
     STORY_STATUSES,
-    status_after_moderation,
+    story_status,
 )
 from .domain.tags import TAG_STATUSES
 from .managers import (
@@ -378,6 +379,12 @@ class Story(models.Model):
     likes = models.PositiveIntegerField('лайк', default=0)
     comments = models.PositiveIntegerField('пікір', default=0)
 
+    # «Дописано» — слово автора о своей работе, а не исход модерации
+    # (BR-79). Отдельным полем, потому что `status` теперь пересчитывается
+    # по главам и хранить в нём авторское решение больше негде.
+    completed_by_author = models.BooleanField('аяқталды деп белгіленген',
+                                              default=False)
+
     # Акт редакции, из данных не выводится, как `AwardGrant` (DEC-46).
     # Второй знак каталога, «Байқауға қатысады», наоборот выводится.
     is_editorial_pick = models.BooleanField('редакция таңдауы', default=False)
@@ -427,9 +434,23 @@ class Story(models.Model):
 
     @property
     def chapters(self) -> int:
-        """Сколько частей у работы — по записям глав (DEC-51). Не колонка с
-        объявленным числом: обещание ненаписанных частей портал не даёт."""
-        return from_annotation(self, 'chapter_count', self.chapter_set.count)
+        """Сколько частей **может прочесть читатель** (DEC-51, BR-79).
+
+        Считаются опубликованные: «8 бөлім» рядом с текстом на пять — то же
+        обещание ненаписанного, ради отказа от которого число и перестало
+        быть колонкой. Автору его портфель показывает `chapters_written`.
+        """
+        return from_annotation(
+            self, 'chapter_count',
+            lambda: self.chapter_set.filter(
+                published_revision__isnull=False).count())
+
+    @property
+    def chapters_written(self) -> int:
+        """Сколько частей написано, включая ждущие модератора — число
+        кабинета: автор, написавший три бөлім, обязан видеть три."""
+        return from_annotation(self, 'written_chapter_count',
+                               self.chapter_set.count)
 
     @property
     def has_chapters(self) -> bool:
@@ -459,31 +480,93 @@ class Story(models.Model):
         'Published' — иначе из выдачи молча пропадают все сериалы (DEC-37)."""
         return self.status in PUBLIC_STATUSES
 
-    def apply_moderation(self, outcome: str, reason: str = ''):
-        """Решение модератора: сменить статус и сказать об этом автору.
+    def refresh_status(self) -> str:
+        """Пересчитать `status` по главам (BR-79) и сохранить, если сдвинулся.
+
+        Единственная дверь, через которую колонка меняется. Раньше статус
+        назначали — модерация, форма настроек, админка, — и каждое из мест
+        отвечало за свой кусок правды. Теперь правда одна: что опубликовано
+        и что ждёт очереди.
+        """
+        chapters = list(self.chapter_set.all())
+        # Возвращённое отличается от нетронутого черновика (BR-80), и
+        # отличие это — последнее решение модератора, а не отдельная
+        # колонка: колонка разошлась бы с лентой уведомлений, где то же
+        # решение уже записано.
+        last_outcome = (Notification.objects
+                        .filter(story=self, kind='moderation')
+                        .order_by('-created_at', '-pk')
+                        .values_list('outcome', flat=True).first())
+        fresh = story_status(
+            has_published=any(c.published_revision_id for c in chapters),
+            has_pending=ChapterRevision.objects.filter(
+                chapter__story=self, state='pending').exists(),
+            is_single=self.is_single,
+            completed=self.completed_by_author,
+            returned=last_outcome in ('needs_work', 'rejected'),
+        )
+        if fresh != self.status:
+            self.status = fresh
+            self.save(update_fields=['status', 'updated_at'])
+        return fresh
+
+    def apply_moderation(self, outcome: str, reason: str = '', moderator=None):
+        """Решение модератора: судьба поданных ревизий и весть автору.
 
         Одна дверь на два действия, потому что порознь они бессмысленны:
         статус без уведомления оставляет автора гадать. Здесь, а не в
         `admin.py`: админка — сегодняшний инструмент модерации (DEC-23).
         Причина обязательна у обоих отрицательных исходов (BR-11, BR-72b).
+
+        Решается **поданный текст**, а не работа целиком (BR-79):
+        одобрение переводит каждую ждущую ревизию в опубликованную, отказ
+        закрывает её и **не трогает то, что уже стоит у читателя**. Это и
+        есть разница с прежней моделью: у публичного сериала, чью новую
+        главу вернули на доработку, старые главы остаются на месте, а
+        назначенный `NotPublished` увёл бы из каталога всю работу.
+
         Возвращает созданное уведомление.
         """
         if outcome not in MODERATION_OUTCOMES:
             raise ValueError(f'Белгісіз модерация нәтижесі: {outcome!r}')
-        if self.status != 'OnModeration':
+        pending = list(ChapterRevision.objects.filter(
+            chapter__story=self, state='pending').select_related('chapter'))
+        if not pending:
             raise ValueError(
-                f'«{self.title}» модерацияға жіберілмеген (қазір {self.status}).')
+                f'«{self.title}» модерацияға жіберілмеген: күтіп тұрған нұсқа жоқ.')
         reason = reason.strip()
         if outcome != 'approved' and not reason:
             raise ValueError('Себепсіз қайтаруға болмайды (BR-11).')
 
+        now = timezone.now()
         with transaction.atomic():
-            self.status = status_after_moderation(outcome, self.format)
-            self.save(update_fields=['status', 'updated_at'])
-            return Notification.objects.create(
+            for revision in pending:
+                revision.state = 'approved' if outcome == 'approved' else 'rejected'
+                revision.decided_at = now
+                revision.save(update_fields=['state', 'decided_at'])
+                if outcome == 'approved':
+                    chapter = revision.chapter
+                    chapter.published_revision = revision
+                    chapter.save(update_fields=['published_revision'])
+            # Акт решения — с тем, кто его принял (BR-82). Пишется рядом с
+            # уведомлением и в той же транзакции: это две стороны одного
+            # события, и разойтись они не должны.
+            ModerationDecision.objects.create(
+                story=self, moderator=moderator, outcome=outcome,
+                reason=reason, chapters=len(pending))
+            # Метка «взял в работу» снимается решением: она про намерение
+            # прочесть, а прочтение состоялось.
+            ModerationClaim.objects.filter(story=self).delete()
+            # Уведомление пишется **до** пересчёта: статус `NeedsWork`
+            # выводится из последнего решения (BR-80), а решение и есть эта
+            # запись. Обратный порядок оставлял бы возвращённую работу
+            # неотличимой от нетронутого черновика до следующей правки.
+            note = Notification.objects.create(
                 user=self.author, kind='moderation', story=self,
                 outcome=outcome, text=reason,
             )
+            self.refresh_status()
+            return note
 
     @property
     def updated_days_ago(self) -> int:
@@ -515,7 +598,7 @@ class Story(models.Model):
         ненаписанная работа честно показывает нижнюю границу."""
         return from_annotation(
             self, 'effective_chars',
-            lambda: sum(c.char_count for c in self.chapter_set.all()))
+            lambda: sum(c.public_char_count for c in self.chapter_set.all()))
 
     @property
     def read_minutes(self) -> int:
@@ -575,8 +658,23 @@ class StoryView(models.Model):
 
 
 class Chapter(models.Model):
-    """Глава; запись обязана нести текст (docs/architecture.md). Обратная
-    связь — `chapter_set`: имя `chapters` занято у `Story` числом частей."""
+    """Глава — единица публикации (BR-79).
+
+    Здесь лежит **рабочая копия** автора: `title`/`body`/`char_count` — то,
+    что он сейчас пишет, и то, что правит автосохранение. Читателю она не
+    показывается никогда. Читатель видит `published_revision` — снимок,
+    который прошёл модератора.
+
+    Разделение появилось потому, что до него это была одна строка: правка
+    одобренного текста доезжала до читателя мгновенно, а новая глава
+    публичного сериала публиковалась сама (C1/C2 в AUDIT-WRITE-FLOW).
+    Модерация выдавалась работе один раз и дальше ни на что не влияла.
+    """
+
+    # Метка зрителя, её ставит `queries/story.chapters_of`. По умолчанию
+    # **читатель**: промах метки должен приводить к «показать меньше», а не
+    # к утечке неодобренного текста.
+    as_author = False
 
     story = models.ForeignKey(Story, verbose_name='шығарма',
                               on_delete=models.CASCADE)
@@ -586,6 +684,12 @@ class Chapter(models.Model):
     # Денормализация от `body`: объём спрашивают на каждой странице, а
     # `len()` по тексту романа этого не стоит.
     char_count = models.PositiveIntegerField('таңба саны', default=0)
+    # Что видит читатель. Пусто — главы для него не существует: она либо
+    # ещё пишется, либо ждёт модератора. `SET_NULL`, а не `CASCADE`:
+    # удаление ревизии не должно уносить саму главу.
+    published_revision = models.ForeignKey(
+        'core.ChapterRevision', verbose_name='жарияланған нұсқа', null=True,
+        blank=True, on_delete=models.SET_NULL, related_name='+')
     created_at = models.DateTimeField('жасалған', auto_now_add=True)
 
     class Meta:
@@ -627,6 +731,178 @@ class Chapter(models.Model):
         """Slug реакции текущего читателя, '' — голоса нет. Метку ставит
         `queries/story._attach_my_reaction`, гостю тоже (BR-REACT-02)."""
         return viewer_choice(self, '_my_reaction')
+
+    # ── Опубликованное против рабочего (BR-79) ───────────────────────────
+    @property
+    def is_published(self) -> bool:
+        return self.published_revision_id is not None
+
+    @property
+    def public_title(self) -> str:
+        """Заголовок, который видит читатель. Пусто — главы для него нет."""
+        return self.published_revision.title if self.is_published else ''
+
+    @property
+    def public_body(self) -> str:
+        return self.published_revision.body if self.is_published else ''
+
+    @property
+    def public_char_count(self) -> int:
+        """Объём **опубликованного**. Рабочая копия в счёт не идёт: иначе
+        каталог обещал бы читателю знаки, которых он не увидит."""
+        return self.published_revision.char_count if self.is_published else 0
+
+    @property
+    def shown_title(self) -> str:
+        """Что стоит на читательской странице.
+
+        Читателю — одобренное; автору и модератору, открывшим предпросмотр
+        (BR-76), — рабочая копия: они смотрят на то, что пишется, иначе
+        предпросмотр черновика был бы пуст.
+        """
+        return self.title if self.as_author else self.public_title
+
+    @property
+    def shown_body(self) -> str:
+        return self.body if self.as_author else self.public_body
+
+    @property
+    def shown_char_count(self) -> int:
+        return self.char_count if self.as_author else self.public_char_count
+
+    @property
+    def pending_revision(self):
+        """Ревизия, ждущая модератора, или None. У главы она одна: подача
+        закрывает предыдущую (`submit_story_for_review`)."""
+        return next((r for r in self.revisions.all() if r.state == 'pending'),
+                    None)
+
+    @property
+    def has_unpublished_changes(self) -> bool:
+        """Расходится ли рабочая копия с тем, что видит читатель.
+
+        Сравнение по тексту, а не по времени правки: автор мог открыть
+        главу, ничего не изменить и сохранить — это не новая версия.
+        """
+        if not self.is_published:
+            return bool(self.body.strip() or self.title.strip())
+        published = self.published_revision
+        return (self.title, self.body) != (published.title, published.body)
+
+
+class ChapterRevision(models.Model):
+    """Один снимок текста главы и его судьба (BR-79).
+
+    Ревизия — то, что модератор читает и одобряет. Именно она, а не глава,
+    проходит модерацию: у главы за жизнь их много, и каждая правка
+    опубликованного текста заводит новую, пока не одобренную.
+
+    Причина отказа здесь не хранится — она живёт в `Notification.text`
+    (BR-72b): у события есть автор и адресат, у снимка текста их нет.
+    """
+
+    STATE_CHOICES = [(s, s) for s in REVISION_STATES]
+
+    chapter = models.ForeignKey(Chapter, verbose_name='бөлім',
+                                on_delete=models.CASCADE,
+                                related_name='revisions')
+    title = models.CharField('атауы', max_length=120)
+    body = models.TextField('мәтіні', blank=True)
+    char_count = models.PositiveIntegerField('таңба саны', default=0)
+    state = models.CharField('күйі', max_length=16, choices=STATE_CHOICES,
+                             default='draft')
+    created_at = models.DateTimeField('жасалған', auto_now_add=True)
+    submitted_at = models.DateTimeField('жіберілген', null=True, blank=True)
+    decided_at = models.DateTimeField('шешілген', null=True, blank=True)
+
+    class Meta:
+        # Новая сверху: и очередь модератора, и история автора читаются
+        # с последней.
+        ordering = ('-created_at', '-pk')
+        verbose_name = 'бөлім нұсқасы'
+        verbose_name_plural = 'бөлім нұсқалары'
+        indexes = [
+            # Очередь модерации и «есть ли у главы поданное» — один индекс.
+            models.Index(fields=['state', 'submitted_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.chapter_id} · {self.state}'
+
+    def save(self, *args, **kwargs):
+        self.char_count = len(self.body)
+        super().save(*args, **kwargs)
+
+
+class ModerationDecision(models.Model):
+    """Решение модератора как акт — с тем, кто его принял (BR-82).
+
+    До этой модели след решения был один: `Notification`, адресованное
+    автору. У него нет автора решения, и вопрос «кто одобрил вот это»
+    ответа не имел вовсе. Акт с датой и человеком не выводится из
+    состояния объекта — как `AwardGrant` (DEC-46).
+
+    Уведомление никуда не делось: это разные вещи. Решение — что
+    произошло; уведомление — что об этом сказали автору.
+    """
+
+    OUTCOME_CHOICES = [(o, MODERATION_OUTCOME_LABELS[o])
+                       for o in MODERATION_OUTCOMES]
+
+    story = models.ForeignKey(Story, verbose_name='шығарма',
+                              on_delete=models.CASCADE,
+                              related_name='moderation_decisions')
+    # Модератор мог уйти с портала; решение остаётся — оно уже случилось.
+    moderator = models.ForeignKey(User, verbose_name='модератор', null=True,
+                                  blank=True, on_delete=models.SET_NULL,
+                                  related_name='+')
+    outcome = models.CharField('нәтижесі', max_length=16,
+                               choices=OUTCOME_CHOICES)
+    reason = models.TextField('себебі', blank=True)
+    # Сколько глав затронуло решение: одно нажатие решает судьбу пачки
+    # ревизий (BR-79), и «одобрено 3 бөлім» — часть того, что случилось.
+    chapters = models.PositiveSmallIntegerField('бөлім саны', default=0)
+    decided_at = models.DateTimeField('шешілген', auto_now_add=True)
+
+    class Meta:
+        ordering = ('-decided_at', '-pk')
+        verbose_name = 'модерация шешімі'
+        verbose_name_plural = 'модерация шешімдері'
+        indexes = [models.Index(fields=['story', '-decided_at'])]
+
+    def __str__(self):
+        return f'{self.story_id} · {self.outcome}'
+
+    @property
+    def label(self) -> str:
+        return MODERATION_OUTCOME_LABELS.get(self.outcome, '')
+
+
+class ModerationClaim(models.Model):
+    """«Взял в работу» (BR-82).
+
+    Отдельной строкой, а не полем у `Story`: состояние живёт минуты,
+    удаляется решением и не имеет отношения к произведению как таковому.
+    Двое модераторов, открывшие одну работу, до этого узнавали друг о
+    друге только по результату — второй читал уже решённое.
+
+    Метка не запрещает решать: она предупреждает. Запрет означал бы, что
+    забытая метка блокирует очередь до вмешательства администратора.
+    """
+
+    story = models.OneToOneField(Story, verbose_name='шығарма',
+                                 on_delete=models.CASCADE,
+                                 related_name='claim')
+    moderator = models.ForeignKey(User, verbose_name='модератор',
+                                  on_delete=models.CASCADE, related_name='+')
+    claimed_at = models.DateTimeField('алынған', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'қаралуда'
+        verbose_name_plural = 'қаралуда'
+
+    def __str__(self):
+        return f'{self.story_id} → {self.moderator_id}'
 
 
 class ChapterReaction(models.Model):

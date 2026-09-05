@@ -11,6 +11,7 @@
 from datetime import timedelta
 
 from django.db.models import Count, Q
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 from ..domain.catalog import PUBLIC_STATUSES
@@ -20,6 +21,10 @@ from ..models import BlockedTagPattern, Tag
 # Ширина недельного среза («Осы аптада», DEC-31). Живёт здесь, рядом с
 # единственным запросом, который его применяет.
 TRENDING_DAYS = 7
+
+# Сколько тегов у работы (BR-TAG-01). Число называлось литералом в резолве
+# и параметром по умолчанию в `tag_input.html`; теперь у него одно место.
+TAGS_MAX = 10
 
 
 def with_counts(tags):
@@ -97,6 +102,29 @@ def _unique_tag_slug(name: str) -> str:
     return slug
 
 
+def acceptable_tag_names(names) -> list:
+    """Имена, которые вправе стать тегами (BR-TAG-01/05/06): до десяти, без
+    повторов по регистру, длиной 2–30, мимо блок-листа.
+
+    Отдельной функцией, потому что спрашивают дважды — при сохранении и при
+    возврате формы с ошибкой. Разойдись эти два правила, автор увидел бы в
+    чипах то, чего после сохранения не окажется.
+    """
+    out, seen = [], set()
+    for raw in names:
+        if len(out) >= TAGS_MAX:
+            break
+        name = (raw or '').strip()
+        if len(name) < 2 or len(name) > 30:
+            continue
+        key = name.lower()
+        if key in seen or is_blocked(name):
+            continue
+        seen.add(key)
+        out.append(name)
+    return out
+
+
 def resolve_story_tags(names) -> list:
     """Имена из `tag_input.html` (BR-TAG-01/02/03/06) -> список `Tag`.
 
@@ -106,21 +134,24 @@ def resolve_story_tags(names) -> list:
     серверной копией, на случай POST в обход JS.
     """
     result = []
-    seen = set()
-    for raw in names:
-        if len(result) >= 10:
-            break
-        name = (raw or '').strip()
-        if len(name) < 2 or len(name) > 30:
-            continue
-        key = name.lower()
-        if key in seen or is_blocked(name):
-            continue
-        seen.add(key)
+    for name in acceptable_tag_names(names):
         existing = Tag.objects.filter(name__iexact=name).first()
-        if existing:
-            result.append(existing)
-            continue
-        result.append(Tag.objects.create(
+        result.append(existing or Tag.objects.create(
             name=name, slug=_unique_tag_slug(name), status='pending'))
     return result
+
+
+def preview_story_tags(names) -> list:
+    """Те же теги, что завёл бы `resolve_story_tags`, но **без записи** —
+    для формы, вернувшейся с ошибкой (BR-77).
+
+    Незнакомое имя отдаётся несохранённым `Tag` со статусом `new`: чип
+    рисует его пунктиром, как и всякий тег, которого пока нет. Заводить
+    `pending` на неудачной отправке нельзя — тег пережил бы работу,
+    которая так и не сохранилась.
+    """
+    names = acceptable_tag_names(names)
+    known = {t.name.lower(): t for t in Tag.objects.annotate(
+        lowered=Lower('name')).filter(lowered__in=[n.lower() for n in names])}
+    return [known.get(n.lower()) or Tag(slug='', name=n, status='new')
+            for n in names]

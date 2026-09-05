@@ -18,10 +18,12 @@ from django.contrib import admin as django_admin
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.forms.models import modelform_factory
 from django.test import override_settings
+from django.utils import timezone
 from django.urls import reverse
 
 from core.models import (
     Chapter,
+    ChapterRevision,
     Contest,
     ContestAward,
     Genre,
@@ -33,15 +35,27 @@ from core.templatetags.balaproza import outcome_label
 from core.tests.base import TestCase
 
 
-def _story(author, **kwargs):
-    """Работа под тестом, а не из корпуса: статусами здесь двигают."""
+def _story(author, submitted=True, **kwargs):
+    """Работа под тестом, а не из корпуса: статусами здесь двигают.
+
+    Работа приходит **с поданной главой** (BR-79): решение принимается по
+    ревизии, а не по статусу, и работа без единой ждущей ревизии для
+    модератора пуста — решать в ней нечего.
+    """
     fields = {
         'slug': 'test-work', 'title': 'Сынақ шығармасы',
         'primary_genre': Genre.objects.first(),
         'status': 'OnModeration', 'format': 'single',
     }
     fields.update(kwargs)
-    return Story.objects.create(author=author, **fields)
+    story = Story.objects.create(author=author, **fields)
+    chapter = Chapter.objects.create(story=story, number=1,
+                                     title='1-бөлім', body='Сынақ мәтіні.')
+    if submitted:
+        ChapterRevision.objects.create(
+            chapter=chapter, title=chapter.title, body=chapter.body,
+            state='pending', submitted_at=timezone.now())
+    return story
 
 
 class ADecisionReachesTheAuthor(TestCase):
@@ -75,7 +89,9 @@ class ADecisionReachesTheAuthor(TestCase):
         story = _story(self.author)
         note = story.apply_moderation('needs_work', 'Диалогтар үзіліп қалған.')
         story.refresh_from_db()
-        self.assertEqual(story.status, 'NotPublished')
+        # Не `NotPublished`: возвращённое отличается от нетронутого
+        # черновика (BR-80) — автор обязан видеть, что работа ждёт его.
+        self.assertEqual(story.status, 'NeedsWork')
         self.assertEqual(note.user, self.author)
         self.assertEqual(note.kind, 'moderation')
         self.assertEqual(note.outcome, 'needs_work')
@@ -96,7 +112,8 @@ class ADecisionReachesTheAuthor(TestCase):
         self.assertEqual(story.status, 'OnModeration')
         self.assertFalse(Notification.objects.filter(story=story).exists())
 
-        draft = _story(self.author, slug='test-draft', status='NotPublished')
+        draft = _story(self.author, slug='test-draft',
+                       status='NotPublished', submitted=False)
         with self.assertRaises(ValueError):
             draft.apply_moderation('approved')
         draft.refresh_from_db()
@@ -137,7 +154,7 @@ class TheModeratorWorksThroughTheAdmin(TestCase):
 
         self._act('send_back', apply='1', reason='Соңы жоқ.')
         self.story.refresh_from_db()
-        self.assertEqual(self.story.status, 'NotPublished')
+        self.assertEqual(self.story.status, 'NeedsWork')
         note = Notification.objects.get(story=self.story)
         self.assertEqual(note.outcome, 'needs_work')
         self.assertEqual(note.text, 'Соңы жоқ.')
@@ -150,7 +167,11 @@ class TheModeratorWorksThroughTheAdmin(TestCase):
                          'approved')
 
     def test_a_work_outside_the_queue_is_named_not_skipped_silently(self):
-        """Иначе модератор считает решёнными все, что выбрал."""
+        """Иначе модератор считает решёнными все, что выбрал.
+
+        «Вне очереди» теперь значит «нет ждущей ревизии» (BR-79): очередь
+        собрана из поданного текста, а не из значения статуса."""
+        ChapterRevision.objects.filter(chapter__story=self.story).delete()
         self.story.status = 'NotPublished'
         self.story.save(update_fields=['status'])
         self.assertContains(self._act('approve'), 'өткізілді')

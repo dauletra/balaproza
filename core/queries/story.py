@@ -31,14 +31,37 @@ from ..models import (
 from .catalog import all_stories
 
 
-def chapters_of(story_slug: str):
-    """Все главы работы: оглавление, «N бөлімнен» и текущая — из одной
-    выборки. Опрос приезжает `select_related`'ом: он есть у одной главы из
-    двадцати, но своим запросом обходился бы дороже, чем join по пустому
-    полю (BR-POLL-01)."""
-    return (Chapter.objects.filter(story__slug=story_slug)
-            .select_related('poll')
+def chapters_of(story_slug: str, *, as_author: bool = False) -> list:
+    """Главы работы: оглавление, «N бөлімнен» и текущая — из одной выборки.
+
+    Читателю отдаются **только опубликованные** (BR-79): у главы, чья
+    ревизия ещё не одобрена, для него нет ни текста, ни строки в
+    оглавлении. Автору и модератору — все, включая ту, что пишется: это
+    их предпросмотр (BR-76).
+
+    Возвращается список, а не выдача, потому что на каждой строке ставится
+    метка зрителя: без неё `Chapter.shown_body` показал бы читателю рабочую
+    копию. Метка по умолчанию читательская — промах прячет текст, а не
+    открывает лишнее.
+
+    Опрос приезжает `select_related`'ом: он есть у одной главы из двадцати,
+    но своим запросом обходился бы дороже, чем join по пустому полю
+    (BR-POLL-01); тем же join'ом приезжает и опубликованная ревизия.
+    """
+    rows = (Chapter.objects.filter(story__slug=story_slug)
+            .select_related('poll', 'published_revision')
             .prefetch_related('reactions'))
+    if as_author:
+        # Кабинет показывает состояние каждой главы («тексеруде»,
+        # «өзгертілген»), а оно живёт в ревизиях: без prefetch это запрос
+        # на главу.
+        rows = rows.prefetch_related('revisions')
+    else:
+        rows = rows.filter(published_revision__isnull=False)
+    chapters = list(rows)
+    for chapter in chapters:
+        chapter.as_author = as_author
+    return chapters
 
 
 def _attach_my_reaction(chapter, viewer):
@@ -59,9 +82,18 @@ def _attach_my_reaction(chapter, viewer):
     return chapter
 
 
-def chapter_of(story_slug: str, number: int, viewer=None):
-    chapter = (Chapter.objects.filter(story__slug=story_slug, number=number)
-              .prefetch_related('reactions').first())
+def chapter_of(story_slug: str, number: int, viewer=None, *,
+               as_author: bool = False):
+    """Одна глава по номеру. `as_author` — та же развилка, что у
+    `chapters_of`: читателю неопубликованной главы не существует."""
+    rows = (Chapter.objects.filter(story__slug=story_slug, number=number)
+            .select_related('published_revision')
+            .prefetch_related('reactions'))
+    if not as_author:
+        rows = rows.filter(published_revision__isnull=False)
+    chapter = rows.first()
+    if chapter is not None:
+        chapter.as_author = as_author
     return _attach_my_reaction(chapter, viewer)
 
 
@@ -346,7 +378,7 @@ def book_of_week():
     """
     pick = (BookOfWeek.objects.select_related('story', 'story__author',
                                               'story__primary_genre')
-            .annotate(story_chapters=chapter_count_subquery('story'))
+            .annotate(story_chapters=chapter_count_subquery('story', published_only=True))
             .order_by('-published_on').first())
     if pick is not None:
         pick.story.chapter_count = pick.story_chapters

@@ -27,6 +27,11 @@ def _count_view(request, story) -> None:
     """
     if request.method != 'GET':
         return
+    # Непубличное не читают — его смотрят: автор свой черновик, модератор
+    # работу в очереди (BR-76). Засчитанный им оқылым — цифра, которую
+    # работа принесёт в каталог, ещё не побывав у читателя.
+    if not story.is_public:
+        return
     if request.user.is_authenticated and story.author_id == request.user.id:
         return
 
@@ -52,11 +57,19 @@ def _back_to_story(slug, chapter_number=None, anchor=None):
 
 # ───────────────────────── STORY — произведение и чтение ─────────────────
 def story_detail(request, slug):
-    story = _found_or_404(data.story_by_slug(slug), f'Шығарма «{slug}» табылмады')
-    chapters = list(data.chapters_of(slug))
-    # Автор своего стори видит pending-теги (BR-TAG-07). Для прочих скрыты.
+    # Кто смотрит — раньше, чем что показываем: от зрителя зависит само
+    # существование страницы (BR-76). Чужой черновик не «запрещён», его
+    # нет — 404, как у несуществующего слага.
     viewer = _current_user(request)
+    story = _found_or_404(data.story_by_slug(slug, viewer),
+                          f'Шығарма «{slug}» табылмады')
+    # Автор своего стори видит pending-теги (BR-TAG-07). Для прочих скрыты.
     is_author = bool(viewer and story.author_id == viewer.pk)
+    # Предпросмотр (BR-76/79): автор и модератор видят и неопубликованные
+    # главы, и рабочую копию текста. Читателю их не существует — у него
+    # только то, что прошло модератора.
+    previewing = bool(is_author or (viewer and viewer.is_staff))
+    chapters = data.chapters_of(slug, as_author=previewing)
 
     _count_view(request, story)
 
@@ -94,7 +107,10 @@ def story_detail(request, slug):
     # «была ли закладка до этого захода», и от неё зависят is_first_look и
     # подпись главной кнопки. Записанный раньше, прогресс сделал бы первое
     # знакомство с работой похожим на возвращение.
-    if current is not None and request.user.is_authenticated:
+    # Полка и закладка — тоже след чтения, и у непубличной работы его быть
+    # не может: автор не «читает» свой черновик, модератор не ставит
+    # очередь себе на полку (BR-76).
+    if current is not None and request.user.is_authenticated and story.is_public:
         # Продвижение, а не повторный показ того же места: глава, отличная
         # от закладки, либо первый заход не тем самым «голым» гл.1. Полку
         # двигает только оно (BR-61) — иначе снятие кнопкой воскресало бы
@@ -133,6 +149,11 @@ def story_detail(request, slug):
         # DEC-31: обратный вход в настроение — подборки, где лежит произведение
         'in_collections': data.collections_of(story),
         'is_author': is_author,
+        # Предпросмотр (BR-76): страница открыта, но читателю её ещё нет.
+        # Автору и модератору об этом говорится вслух — иначе публичная и
+        # непубличная работа выглядят одинаково, и «Сайтта қарау» из
+        # кабинета читается как «уже опубликовано».
+        'is_preview': not story.is_public,
         # Шапка (FR-STORY-01): подпись главной кнопки — «начать» или «продолжить».
         'has_progress': bool(has_progress_here),
         # Кнопка «Сақтау» и подписка на автора в карточке автора.
@@ -155,8 +176,9 @@ def _chapter_from_post(request) -> int | None:
 @login_required
 def comment_create(request, slug):
     """Новый комментарий или ответ. Несуществующий slug молча возвращается
-    на страницу."""
-    story = data.story_by_slug(slug)
+    на страницу — как и невидимый этому человеку (BR-76): страницы, на
+    которой он комментирует, у него нет."""
+    story = data.story_by_slug(slug, request.user)
     chapter_number = _chapter_from_post(request)
     if story is None:
         return _back_to_story(slug, chapter_number)
@@ -215,8 +237,9 @@ def comment_like(request, slug, comment_id):
 @login_required
 def library_toggle(request, slug):
     """Кнопка «Сақтау»: положить работу в библиотеку или снять с полки.
-    Гостю она не рендерится — сразу ведёт на вход."""
-    story = data.story_by_slug(slug)
+    Гостю она не рендерится — сразу ведёт на вход. Чужой черновик на полку
+    не кладётся: его для этого человека нет (BR-76)."""
+    story = data.story_by_slug(slug, request.user)
     if story is not None:
         saved = data.toggle_library_entry(request.user, story)
         messages.success(request, 'Кітапханаға сақталды' if saved
@@ -237,7 +260,11 @@ def chapter_react(request, slug, chapter):
     себя же (`hx-swap="outerHTML"`), без перезагрузки страницы. Обычная
     отправка формы (JS выключен) идёт прежним путём — PRG-редирект.
     """
-    ch = data.chapter_of(slug, chapter)
+    # Глава ищется по слагу работы, поэтому видимость проверяется по самой
+    # работе (BR-76): без этого реакция ставилась бы на главу чужого
+    # черновика — страницы нет, а кнопка отвечает.
+    visible = data.story_by_slug(slug, request.user) is not None
+    ch = data.chapter_of(slug, chapter) if visible else None
     kind = request.POST.get('kind', '')
     if ch is not None and kind in data.REACTIONS_BY_SLUG:
         data.toggle_chapter_reaction(ch, request.user, kind)
@@ -261,7 +288,10 @@ def chapter_react(request, slug, chapter):
 def poll_vote(request, slug, chapter):
     """Голос в опросе; закрытый опрос и невалидный или повторный вариант
     `data.cast_poll_vote` тихо отклоняет."""
-    poll = data.poll_of(slug, chapter)
+    # Та же проверка видимости, что у реакции: опрос живёт под главой, а
+    # глава — под работой, которой для этого человека может не быть (BR-76).
+    poll = (data.poll_of(slug, chapter)
+            if data.story_by_slug(slug, request.user) is not None else None)
     option_slug = request.POST.get('option', '')
     if poll is not None and option_slug:
         data.cast_poll_vote(poll, request.user, option_slug)

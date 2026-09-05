@@ -27,6 +27,7 @@
               {% if disabled %}disabled{% endif %}
               {% if maxlength %}maxlength="{{ maxlength }}" @input="recount"{% endif %}
               {% if message %}aria-describedby="{{ id }}-msg"{% endif %}
+              {% if st == 'error' %}aria-invalid="true"{% endif %}
               class="w-full resize-y rounded-md bg-slate-50 px-3 py-2.5 font-sans text-sm text-slate-900 placeholder:text-slate-500
                      {% if st == 'error' %}border border-status-error-fg
                      {% elif st == 'success' %}border border-status-published-fg

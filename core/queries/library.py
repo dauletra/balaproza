@@ -115,7 +115,7 @@ def reading_progress_of(user):
                 .filter(user=user)
                 .select_related('story', 'story__author',
                                 'story__primary_genre')
-                .annotate(story_chapters=chapter_count_subquery('story'))
+                .annotate(story_chapters=chapter_count_subquery('story', published_only=True))
                 .first())
     if progress is not None:
         progress.story.chapter_count = progress.story_chapters

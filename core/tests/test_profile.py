@@ -317,8 +317,9 @@ class ProfileIsNotASecondCabinet(TestCase):
         )
         for slug in ('aidana-kus', 'aidana-erteg'):
             with self.subTest(story=slug):
-                self.assertNotContains(self.response,
-                                       data.story_by_slug(slug).title)
+                self.assertNotContains(
+                    self.response,
+                    data.story_by_slug_for_author(slug, user('aidana')).title)
         # `my_story_row` — строка кабинета: статус, «когда трогали», меню.
         self.assertNotContains(self.response, 'Сайтта қарау')
 

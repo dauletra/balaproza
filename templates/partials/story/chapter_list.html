@@ -21,7 +21,7 @@
                       {% if compact == 'sm' %}px-2 py-1.5 font-sans text-xs{% else %}min-h-11 px-2 py-2 font-sans text-sm{% endif %}
                       {% if c.number == current_chapter_number %}bg-brand-light/30 text-brand{% else %}text-slate-700{% endif %}">
                 <span class="{% if compact == 'sm' %}w-5 text-[10px]{% else %}w-6 text-xs{% endif %} shrink-0 text-right font-mono text-slate-400">{{ c.number }}</span>
-                <span class="min-w-0 flex-1 truncate">{{ c.title }}</span>
+                <span class="min-w-0 flex-1 truncate">{{ c.shown_title }}</span>
                 {% comment %}
                     Подпись `sr-only`, а не `aria-label`: у `<span>` роль
                     `generic`, имя ей не выставляется — счётчик пропадал

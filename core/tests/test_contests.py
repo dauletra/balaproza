@@ -856,19 +856,23 @@ class SubmissionHelpers(TestCase):
 
     def test_the_checklist_marks_volume_and_demands_the_declaration(self):
         contest = data.contest_by_slug('altyn-qalam')
-        for slug in ('aidana-koshe',     # 4 750 знаков — меньше порога
-                     'aidana-erteg'):    # ни одной главы — ноль знаков
-            checklist = data.submission_checklist(data.story_by_slug(slug),
-                                                  contest)
+        # Кандидат на конкурс — работа автора, и берётся она авторской
+        # дверью: `aidana-erteg` стоит на модерации, читателю её нет (BR-76).
+        def mine(slug):
+            return data.story_by_slug_for_author(slug, user('aidana'))
+
+        for slug in ('aidana-koshe',   # 4 750 знаков — меньше порога
+                     'aidana-kus'):    # ни одной главы — ноль знаков
+            checklist = data.submission_checklist(mine(slug), contest)
             volume = next(i for i in checklist if i['key'] == 'volume')
             with self.subTest(story=slug):
                 self.assertFalse(volume['passed'])
         self.assertIn('Көлемі тым аз',
                       next(i for i in data.submission_checklist(
-                          data.story_by_slug('aidana-koshe'), contest)
+                          mine('aidana-koshe'), contest)
                           if i['key'] == 'volume')['hint'])
         declaration = next(i for i in data.submission_checklist(
-            data.story_by_slug('aidana-tan'), contest) if i['key'] == 'ai_decl')
+            mine('aidana-tan'), contest) if i['key'] == 'ai_decl')
         self.assertFalse(declaration['passed'])
         self.assertTrue(declaration.get('required'))
 

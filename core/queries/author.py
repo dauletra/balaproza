@@ -12,7 +12,7 @@
 """
 
 from ..domain.library import LIBRARY_KINDS
-from ..domain.story import PUBLISH_CHECKLIST
+from ..domain.story import PUBLISH_CHECKLIST, checklist_label
 from ..managers import chapter_count_subquery
 from ..models import LibraryEntry, Notification, Story
 from .catalog import all_stories
@@ -62,6 +62,9 @@ def writer_attention(user) -> list:
             })
 
     _one('moderation', [s for s in mine if s.status == 'OnModeration'])
+    # Возвращённое — первое, что требует действия автора (BR-80): работа
+    # ждёт не модератора, а его.
+    _one('returned', [s for s in mine if s.status == 'NeedsWork'])
 
     unread = Notification.objects.filter(user=user, kind='comment',
                                          read=False).count()
@@ -78,8 +81,9 @@ def writer_attention(user) -> list:
 def publish_checklist(story) -> list:
     """Готовность работы к модерации (FR-WRITE-09, BR-11).
 
-    Отдаёт `key` / `ok` / `required` / `target`. Тексты — в шаблоне
-    (docs/ui.md), ссылки — во view: URL-ы в слой данных не спускаются.
+    Отдаёт `key` / `ok` / `required` / `target` и подписи `label` / `hint`
+    из домена (BR-81) — одни и те же и для панели, и для сообщения об
+    отказе. Ссылки собирает view: URL-ы в слой данных не спускаются.
     """
     if story is None:
         return []
@@ -90,10 +94,12 @@ def publish_checklist(story) -> list:
         'cover':      bool(story.cover),
         'tags':       story.tags.exists(),
     }
-    return [
-        {'key': key, 'ok': done[key], 'required': required, 'target': target}
-        for key, target, required in PUBLISH_CHECKLIST
-    ]
+    items = []
+    for key, target, required in PUBLISH_CHECKLIST:
+        label, hint = checklist_label(key, is_single=story.is_single)
+        items.append({'key': key, 'ok': done[key], 'required': required,
+                      'target': target, 'label': label, 'hint': hint})
+    return items
 
 
 def missing_for_review(story) -> list:
@@ -102,13 +108,86 @@ def missing_for_review(story) -> list:
             if i['required'] and not i['ok']]
 
 
+def missing_labels(story) -> list:
+    """То же, но словами (BR-81) — для сообщения, которое называет причину.
+
+    Одна дверь с чек-листом панели: раньше сообщение перечисляло пункты на
+    память, и всякий раз, когда не хватало не того, о чём оно говорило,
+    оно просто врало.
+    """
+    return [i['label'] for i in publish_checklist(story)
+            if i['required'] and not i['ok']]
+
+
+def chapter_needs_submission(chapter) -> bool:
+    """Есть ли у главы что подавать модератору (BR-79).
+
+    Сравнение идёт с тем, что уже **на проверке**, если такая ревизия есть,
+    и с опубликованным, если её нет. Иначе повторное нажатие заводило бы
+    одинаковые заявки, а правка после отправки — терялась.
+    """
+    pending = chapter.pending_revision
+    if pending is not None:
+        return (chapter.title, chapter.body) != (pending.title, pending.body)
+    return chapter.has_unpublished_changes
+
+
+def pending_review_since(story):
+    """Когда работа встала в очередь модератора — или `None` (BR-79).
+
+    Момент, а не «да/нет»: автор спрашивает не только «идёт ли проверка»,
+    но и «сколько уже», и до этого страница управления не отвечала ни на
+    один из двух вопросов. Подпись собирает фильтр `ago`.
+    """
+    from ..models import ChapterRevision
+
+    if story is None:
+        return None
+    first = (ChapterRevision.objects
+             .filter(chapter__story=story, state='pending')
+             .order_by('submitted_at').values_list('submitted_at', flat=True)
+             .first())
+    return first
+
+
+def moderation_note(story):
+    """Последнее решение модератора — **пока оно ещё про сейчас** (BR-80).
+
+    Замечание живёт до повторной отправки: как только автор подал текст
+    заново, оно относится к прошлой версии и с экрана уходит. Одобрение
+    замечанием не является.
+
+    До этого следа не оставалось вовсе: работа возвращалась в черновики,
+    чек-лист снова горел зелёным, кнопка отправки была активна, а
+    единственный экземпляр причины лежал в ленте уведомлений — автор
+    должен был помнить её наизусть, пока правит.
+    """
+    if story is None:
+        return None
+    note = (Notification.objects.filter(story=story, kind='moderation')
+            .exclude(outcome='approved')
+            .select_related('story').order_by('-created_at', '-pk').first())
+    if note is None or pending_review_since(story):
+        return None
+    return note
+
+
 def can_submit_for_review(story) -> bool:
-    """Можно ли отправить работу на модерацию. Только черновик: у работы на
-    модерации кнопка означала бы повторную заявку, у публичной — откат в
-    непубличное, чего автор ею не просит."""
-    return (story is not None
-            and story.status == 'NotPublished'
-            and not missing_for_review(story))
+    """Можно ли отправить работу на модерацию.
+
+    Условий два, и оба про текст, а не про статус (BR-79): чек-лист закрыт
+    и есть что подавать. Прежняя проверка `status == 'NotPublished'`
+    запрещала подачу публичному сериалу — то есть дописанная глава
+    публиковалась в обход модерации (C1), а кнопки, которой её можно было
+    бы отправить, не существовало.
+    """
+    if story is None or missing_for_review(story):
+        return False
+    # Ревизии приезжают одним `prefetch`: `pending_revision` внутри цикла —
+    # запрос на главу, то есть N+1 на каждом показе страницы управления.
+    chapters = story.chapter_set.select_related(
+        'published_revision').prefetch_related('revisions')
+    return any(chapter_needs_submission(c) for c in chapters)
 
 
 def writer_stats(user) -> dict:
@@ -123,6 +202,9 @@ def writer_stats(user) -> dict:
         'on_moderation': sum(1 for s in mine if s.status == 'OnModeration'),
         'ongoing':       sum(1 for s in mine if s.status == 'OnProcess'),
         'draft':         sum(1 for s in mine if s.status == 'NotPublished'),
+        # Шестой статус (BR-80) обязан быть и здесь: разбивка, не дающая в
+        # сумме `total`, — то же враньё, что хранимый счётчик (BR-ACH-07).
+        'needs_work':    sum(1 for s in mine if s.status == 'NeedsWork'),
         'views':         sum(s.views for s in mine),
         'likes':         sum(s.likes for s in mine),
         'comments':      sum(s.comments for s in mine),
@@ -169,7 +251,7 @@ def library_of(user, kind: str = '') -> list:
     entries = (LibraryEntry.objects.filter(user=user)
                .select_related('story', 'story__author',
                                'story__primary_genre')
-               .annotate(story_chapters=chapter_count_subquery('story'),
+               .annotate(story_chapters=chapter_count_subquery('story', published_only=True),
                          # На какой главе читатель — из записи о прогрессе,
                          # а не своей колонкой (DEC-52).
                          progress_chapter=progress_chapter_subquery()))
@@ -200,5 +282,6 @@ def story_by_slug_for_author(slug: str, user):
             .select_related('author', 'primary_genre', 'secondary_genre')
             # Кабинет показывает «N бөлім» — без аннотации это отдельный
             # запрос за счётом глав (`Story.chapters`).
-            .annotate(chapter_count=chapter_count_subquery())
+            .annotate(chapter_count=chapter_count_subquery(published_only=True),
+                      written_chapter_count=chapter_count_subquery())
             .first())

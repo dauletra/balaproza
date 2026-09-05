@@ -71,19 +71,28 @@ def viewer_choice(instance, mark: str) -> str:
     return ''
 
 
-def chapter_count_subquery(story_ref: str = 'pk'):
+def chapter_count_subquery(story_ref: str = 'pk', *, published_only: bool = False):
     """Сколько частей у работы — подзапросом, для аннотации `chapter_count`.
 
     `story_ref` — чем внешняя выдача ссылается на произведение; выдачам, где
     строка **про** работу (полка, прогресс), передаётся `'story'`.
     Подзапросом, а не `Count` по join: фильтр по тегам размножил бы строки.
+
+    `published_only` разводит два разных вопроса (BR-79). Читателю «N бөлім»
+    означает «столько я могу прочесть», и недописанная глава в это число не
+    входит; автору в кабинете — «столько у меня есть», включая ту, что ещё
+    у модератора. До разделения ревизий вопрос был один, потому что и
+    ответ был один.
     """
     from .models import Chapter
 
+    rows = Chapter.objects.filter(story=OuterRef(story_ref))
+    if published_only:
+        rows = rows.filter(published_revision__isnull=False)
+
     return Coalesce(
         Subquery(
-            Chapter.objects.filter(story=OuterRef(story_ref)).values('story')
-            .annotate(n=Count('pk')).values('n')[:1],
+            rows.values('story').annotate(n=Count('pk')).values('n')[:1],
             output_field=IntegerField(),
         ),
         Value(0),
@@ -112,14 +121,26 @@ class StoryQuerySet(QuerySet):
         строки, и сумма знаков вырастет кратно их числу — беззвучно."""
         from .models import Chapter, Submission
 
+        # Объём **опубликованного** (BR-79): считается по одобренной
+        # ревизии, а не по рабочей копии главы. Иначе карточка обещала бы
+        # читателю знаки, которых он не увидит, — недописанная глава
+        # сериала прибавляла бы минуты чтения ещё до модерации.
         written = Subquery(
-            Chapter.objects.filter(story=OuterRef('pk')).values('story')
-            .annotate(total=Sum('char_count')).values('total')[:1],
+            Chapter.objects.filter(story=OuterRef('pk'),
+                                   published_revision__isnull=False)
+            .values('story')
+            .annotate(total=Sum('published_revision__char_count'))
+            .values('total')[:1],
             output_field=IntegerField(),
         )
         return self.annotate(
             effective_chars=Coalesce(written, Value(0)),
-            chapter_count=chapter_count_subquery(),
+            # Два разных числа, потому что это два разных вопроса (BR-79):
+            # `chapter_count` — сколько читатель может прочесть, и оно
+            # обязано сходиться с `effective_chars` рядом; `written_*` —
+            # сколько автор написал, включая то, что ждёт модератора.
+            chapter_count=chapter_count_subquery(published_only=True),
+            written_chapter_count=chapter_count_subquery(),
         ).annotate(
             # Округление вверх целочисленным делением — тот же расчёт, что в
             # `Story.read_minutes`.

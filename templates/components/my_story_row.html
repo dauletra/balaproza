@@ -54,8 +54,8 @@
             {% endcomment %}
             {% if story.is_single %}
                 {% include "components/stat_pill.html" with icon="book" value="бір бөлімді" %}
-            {% elif story.chapters %}
-                {% include "components/stat_pill.html" with icon="book" value=story.chapters|spaced|add:" бөлім" %}
+            {% elif story.chapters_written %}
+                {% include "components/stat_pill.html" with icon="book" value=story.chapters_written|spaced|add:" бөлім" %}
             {% endif %}
 
             {% comment %}
@@ -69,7 +69,7 @@
                     {% include "components/stat_pill.html" with icon="adjustments" value="тексеруде" %}
                 {% endif %}
             {% elif story.status == "NotPublished" %}
-                {% if story.chapters %}
+                {% if story.chapters_written %}
                     {% include "components/stat_pill.html" with icon="pen" value="жарияланбаған" %}
                 {% else %}
                     {% include "components/stat_pill.html" with icon="pen" value="әлі бір бөлім жоқ" %}

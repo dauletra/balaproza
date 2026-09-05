@@ -27,6 +27,7 @@ from core.models import (
     ChapterPoll,
     ChapterReaction,
     ChapterReactionVote,
+    ChapterRevision,
     Contest,
     ContestAward,
     ContestCondition,
@@ -51,11 +52,44 @@ from core.models import (
     User,
 )
 
+from core.domain.catalog import PUBLIC_STATUSES
 from core.domain.story import RECENT_VIEWS_DAYS
 from core.managers import CHARS_PER_MINUTE
 from core.queries.story import recount_recent_views
 
 from . import _corpus
+
+
+def _publish_demo_chapter(chapter, story) -> None:
+    """Выдать демо-главе ревизию по статусу её работы (BR-79).
+
+    Тот же принцип, что у миграции 0005: что должно быть видно — видно.
+    Публичная работа получает `approved` и опубликованную главу, работа на
+    модерации — `pending` (иначе очередь модератора в демо пуста), черновик
+    не получает ничего.
+
+    Правка текста корпуса заводит новую ревизию поверх старой, а не
+    подменяет одобренную втихую: демо ведёт себя так же, как портал.
+    """
+    if story.status in PUBLIC_STATUSES:
+        state = 'approved'
+    elif story.status == 'OnModeration':
+        state = 'pending'
+    else:
+        return
+
+    published = chapter.published_revision
+    if (published is not None and state == 'approved'
+            and (published.title, published.body) == (chapter.title, chapter.body)):
+        return
+
+    now = timezone.now()
+    revision = ChapterRevision.objects.create(
+        chapter=chapter, title=chapter.title, body=chapter.body, state=state,
+        submitted_at=now, decided_at=now if state == 'approved' else None)
+    if state == 'approved':
+        chapter.published_revision = revision
+        chapter.save(update_fields=['published_revision'])
 
 
 class Command(BaseCommand):
@@ -160,6 +194,9 @@ class Command(BaseCommand):
                     'primary_genre':   genres[primary],
                     'secondary_genre': genres.get(secondary) if secondary else None,
                     'status':          stub.status,
+                    # «Аяқталды» — слово автора, а не статус (BR-79):
+                    # статус пересчитывается по главам, флаг живёт сам.
+                    'completed_by_author': stub.status == 'Completed',
                     'audience':        stub.audience,
                     'format':          stub.format,
                     # `views` не входит: `_seed_views` поднимает его до
@@ -217,6 +254,12 @@ class Command(BaseCommand):
                 )
                 added += is_new
                 updated += not is_new
+
+                # Демо-глава обязана быть видна читателю, а видит он
+                # одобренную ревизию (BR-79). Заводится она здесь же, тем
+                # же проходом, что и сама глава: корпус без ревизий дал бы
+                # портал, на котором нечего читать.
+                _publish_demo_chapter(chapter, story)
 
                 if ChapterReactionVote.objects.filter(chapter=chapter).exists():
                     story_likes += chapter.likes
@@ -446,7 +489,7 @@ class Command(BaseCommand):
                     ReadingProgress.objects.filter(user=user, story=story).delete()
                     continue
                 remaining = sum(
-                    c.char_count for c in story.chapter_set.all()
+                    c.public_char_count for c in story.chapter_set.all()
                     if c.number > stub.progress_chapter)
                 ReadingProgress.objects.update_or_create(
                     user=user, story=story,

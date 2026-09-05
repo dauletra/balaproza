@@ -3,13 +3,17 @@
     Запрещено собирать руками — используй только этот компонент.
 
     Параметры:
-      key — Published | NotPublished | OnProcess | Completed | OnModeration
+      key — Published | NotPublished | NeedsWork | OnProcess | Completed | OnModeration
 {% endcomment %}
 {% if key == "Published" %}
     {% include "components/badge.html" with kind="published" label="Жарияланды" icon="check" %}
 {% elif key == "NotPublished" %}
     {# Жоба — нейтральный, не error (DEC-39): черновик ничего не нарушил #}
     {% include "components/badge.html" with kind="neutral" label="Жоба" %}
+{% elif key == "NeedsWork" %}
+    {# Возвращено автору (BR-80). Не error: работа не нарушила правил — #}
+    {# её попросили доделать, и это следующий шаг, а не приговор. #}
+    {% include "components/badge.html" with kind="attention" label="Толықтыру қажет" %}
 {% elif key == "OnProcess" %}
     {% include "components/badge.html" with kind="warning" label="Жазылып жатыр" %}
 {% elif key == "Completed" %}

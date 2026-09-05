@@ -59,15 +59,24 @@ from .domain.notifications import (
     NOTIF_BUCKETS,
     NOTIF_KINDS,
 )
+from .domain.moderation import (
+    QUEUE_FILTERS,
+    QUEUE_FILTER_KEYS,
+    QUEUE_SLOW_DAYS,
+    REASON_TEMPLATES,
+    diff_summary,
+    paragraph_diff,
+)
 from .domain.profile import GENDERS, GENDER_LABELS
 from .domain.story import (
     PUBLISH_CHECKLIST,
     REACTIONS,
     REACTIONS_BY_SLUG,
+    REVISION_STATES,
     STORY_FORMATS,
     STORY_STATUSES,
     Reaction,
-    status_after_moderation,
+    story_status,
 )
 from .domain.slugs import slugify_kz
 from .domain.tags import TAG_STATUSES
@@ -86,9 +95,13 @@ from .queries.catalog import (
 # ── Кабинет автора, профиль, библиотека ──────────────────────────────────
 from .queries.author import (
     can_submit_for_review,
+    chapter_needs_submission,
+    moderation_note,
+    pending_review_since,
     in_library,
     library_of,
     missing_for_review,
+    missing_labels,
     my_stories_of,
     public_stats,
     public_stories_of,
@@ -141,6 +154,7 @@ from .queries.tags import (
     blocked_tag_patterns_list,
     is_blocked,
     popular_tags,
+    preview_story_tags,
     resolve_story_tags,
     tag_by_slug,
     tags_of,
@@ -150,9 +164,10 @@ from .queries.tags import (
 # ── Запись: произведение, глава, опрос ───────────────────────────────────
 from .queries.write import (
     create_story,
+    autosave_chapter,
     save_chapter,
-    save_chapter_poll,
     submit_story_for_review,
+    withdraw_story_from_review,
     update_story_settings,
 )
 
@@ -201,6 +216,18 @@ from .queries.contests import (
     submission_checklist,
     submissions_of,
     withdraw_submission,
+)
+
+# ── Модерация как раздел (DEC-71) ───────────────────────────────────────
+from .queries.moderation import (
+    claim_story,
+    decision_history,
+    moderation_queue,
+    pending_revision_count,
+    queue_size,
+    release_story,
+    story_for_moderation,
+    submitted_chapters,
 )
 
 # ── Ссылки «Авторлар мектебі» (DEC-22) ───────────────────────────────────

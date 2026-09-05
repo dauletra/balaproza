@@ -71,6 +71,19 @@
                 Шығарма жазу
             </a>
 
+            {% comment %}
+                Вход в модерацию — только у `is_staff` (DEC-71). Читателю
+                ссылки нет, и самого раздела для него не существует: он
+                отвечает 404, а не 403.
+            {% endcomment %}
+            {% if user.is_staff %}
+                <a href="{% url 'core:moderation_queue' %}"
+                   class="inline-flex items-center gap-1.5 font-sans text-[13px] font-bold text-brand hover:text-brand-dark">
+                    {% include "components/icon.html" with name="adjustments" size=15 only %}
+                    Модерация
+                </a>
+            {% endif %}
+
             {% if signed_in %}
                 {# Колокольчик + красный счётчик — та же разметка, что на мобильном #}
                 {% include "components/notif_bell.html" with cls="-m-2" %}

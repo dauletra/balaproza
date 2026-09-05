@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+{% load balaproza %}
+
+{% block title %}{{ story.title }} · модерация — Balaproza{% endblock %}
+
+{% block content %}
+{% comment %}
+    Карточка решения (FR-MOD-02…05). Контекст: story, submitted, summaries,
+    history, templates, claim, viewer, has_pending.
+
+    Всё, по чему принимается решение, — на одном экране: текст поданного,
+    чем он отличается от опубликованного, что уже просили исправить и три
+    кнопки. В админке это были три разные страницы, и текста среди них не
+    было вовсе — только номера глав.
+{% endcomment %}
+<p class="mb-4 font-sans text-xs text-slate-500">
+    <a href="{% url 'core:moderation_queue' %}" class="hover:text-brand">Модерация</a> /
+    <span class="text-slate-700">{{ story.title }}</span>
+</p>
+
+<header class="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div class="min-w-0">
+        <h1 class="font-display text-3xl font-bold leading-tight text-slate-900">{{ story.title }}</h1>
+        <p class="mt-1 font-sans text-sm text-slate-600">
+            {{ story.author.public_name }} · {{ story.primary_genre.name }}
+            {% if story.audience %} · {{ story.audience }}{% endif %}
+        </p>
+        {% if story.annotation %}
+            <p class="mt-2 max-w-prose font-sans text-sm leading-relaxed text-slate-700">{{ story.annotation }}</p>
+        {% endif %}
+    </div>
+    <div class="flex shrink-0 flex-col items-end gap-2">
+        {% include "components/status_badge.html" with key=story.status %}
+        <a href="{% url 'core:story_detail' slug=story.slug %}" target="_blank"
+           class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+            {% include "components/icon.html" with name="eye" size=16 only %}
+            Бетте қарау
+        </a>
+    </div>
+</header>
+
+{% comment %}
+    «Взял в работу» (BR-82) — предупреждение, а не запрет: забытая метка не
+    должна блокировать очередь до вмешательства администратора.
+{% endcomment %}
+<section class="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-4">
+    {% if claim %}
+        <span class="inline-flex items-center gap-2 font-sans text-sm text-slate-700">
+            {% include "components/icon.html" with name="user-circle" size=16 cls="text-slate-500" only %}
+            <b class="font-semibold">{{ claim.moderator.public_name }}</b> қарауда — {{ claim.claimed_at|ago }}
+        </span>
+        {% if claim.moderator_id == viewer.pk %}
+            <form method="post" action="{% url 'core:moderation_claim' slug=story.slug %}" class="ml-auto">
+                {% csrf_token %}
+                <button type="submit" name="action" value="release"
+                        class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                    Босату
+                </button>
+            </form>
+        {% endif %}
+    {% else %}
+        <span class="font-sans text-sm text-slate-600">Бұл мәтінді әзірге ешкім алмаған.</span>
+        <form method="post" action="{% url 'core:moderation_claim' slug=story.slug %}" class="ml-auto">
+            {% csrf_token %}
+            <button type="submit" name="action" value="claim"
+                    class="inline-flex h-9 items-center gap-2 rounded-md border border-brand bg-white px-4 font-sans text-sm font-bold text-brand hover:bg-brand/5">
+                {% include "components/icon.html" with name="check" size=14 only %}
+                Мен қараймын
+            </button>
+        </form>
+    {% endif %}
+</section>
+
+{# ── История решений: что уже просили исправить ── #}
+{% if history %}
+    <details class="group mb-6 rounded-lg border border-slate-200 bg-white p-4" open>
+        <summary class="flex min-h-11 cursor-pointer list-none items-center gap-2 font-sans text-sm font-bold text-slate-900">
+            <span class="transition-transform group-open:rotate-180">{% include "components/icon.html" with name="chevron-down" size=14 only %}</span>
+            Бұрынғы шешімдер ({{ history|length }})
+        </summary>
+        <ul class="mt-3 flex flex-col gap-2">
+            {% for decision in history %}
+                <li class="rounded-md bg-slate-50 px-3 py-2.5">
+                    <p class="font-sans text-xs font-bold text-slate-800">
+                        {{ decision.label }} · {{ decision.decided_at|ago }}
+                        {% if decision.moderator %} · {{ decision.moderator.public_name }}{% endif %}
+                    </p>
+                    {% if decision.reason %}
+                        <p class="mt-1 font-sans text-sm leading-relaxed text-slate-700">{{ decision.reason }}</p>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    </details>
+{% endif %}
+
+{# ── Поданные главы: текст и что в нём изменилось ── #}
+{% if has_pending %}
+    {% for item in submitted %}
+        <section class="mb-6 rounded-lg border border-slate-200 bg-white">
+            <div class="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 px-5 py-4">
+                <h2 class="font-display text-lg font-bold text-slate-900">
+                    {{ item.chapter.number }}-бөлім · {{ item.revision.title }}
+                </h2>
+                <span class="font-sans text-xs text-slate-500">
+                    {{ item.revision.char_count|spaced }} таңба
+                    {% if not item.published %} · алғаш рет{% endif %}
+                </span>
+            </div>
+
+            {% if item.diff %}
+                {% comment %}
+                    Сравнение с опубликованным (FR-MOD-03). Повторная подача
+                    без него означает перечитывать работу целиком после
+                    каждой правки — и не видеть, ответил ли автор на
+                    собственное замечание модератора.
+                {% endcomment %}
+                    <details class="border-b border-slate-100 px-5 py-4">
+                        <summary class="flex min-h-11 cursor-pointer list-none items-center gap-2 font-sans text-sm font-semibold text-slate-700">
+                            {% include "components/icon.html" with name="adjustments" size=14 cls="text-slate-500" only %}
+                            Өзгерісті көрсету
+                            <span class="font-normal text-slate-500">
+                                (+{{ item.summary.added|spaced }} / −{{ item.summary.removed|spaced }} абзац)
+                            </span>
+                        </summary>
+                        <div class="mt-3 flex flex-col gap-1.5">
+                            {% for row in item.diff %}
+                                {% if row.kind == 'added' %}
+                                    <p class="rounded-md border-l-4 border-status-published-fg bg-status-published-bg/40 px-3 py-2 font-sans text-sm leading-relaxed text-slate-800">{{ row.text }}</p>
+                                {% elif row.kind == 'removed' %}
+                                    <p class="rounded-md border-l-4 border-status-error-fg bg-status-error-bg/30 px-3 py-2 font-sans text-sm leading-relaxed text-slate-500 line-through">{{ row.text }}</p>
+                                {% else %}
+                                    <p class="px-3 py-1 font-sans text-sm leading-relaxed text-slate-400">{{ row.text|truncatewords:14 }}</p>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </details>
+            {% endif %}
+
+            <div class="px-5 py-5 font-sans text-[17px] leading-[1.75] text-slate-900">
+                {{ item.revision.body|linebreaks }}
+            </div>
+        </section>
+    {% endfor %}
+
+    {# ── Решение ── #}
+    <section class="rounded-lg border border-slate-200 bg-white p-5" x-data="{ reason: '' }">
+        <h2 class="font-display text-lg font-bold text-slate-900">Шешім</h2>
+        <p class="mt-1 font-sans text-xs leading-relaxed text-slate-500">
+            Шешім бірден барлық жіберілген бөлімге қатысты. Қайтару мен қабылдамауда себеп міндетті — онсыз автор нені түзетерін білмейді.
+        </p>
+
+        <form method="post" action="{% url 'core:moderation_decide' slug=story.slug %}" class="mt-4 flex flex-col gap-4">
+            {% csrf_token %}
+
+            <label class="flex flex-col gap-1.5">
+                <span class="font-sans text-sm font-semibold text-slate-800">Себебі</span>
+                <textarea name="reason" rows="4" x-model="reason"
+                          placeholder="Автор нені түзетуі керек екенін нақты жаз."
+                          class="w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-2.5 font-sans text-sm text-slate-900 placeholder:text-slate-500 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30"></textarea>
+            </label>
+
+            {% comment %}
+                Готовые причины (FR-MOD-04) — защита от главной беды
+                обязательного поля: когда причину требуют, а писать долго,
+                в неё попадает «жоқ», и автор остаётся с тем же незнанием,
+                что и без причины вовсе. Шаблон вставляется и дописывается.
+            {% endcomment %}
+            <div class="flex flex-wrap gap-2">
+                {% for text in templates %}
+                    <button type="button" @click="reason = reason ? reason + ' ' + '{{ text|escapejs }}' : '{{ text|escapejs }}'"
+                            class="rounded-pill border border-slate-300 bg-slate-50 px-3 py-1.5 text-left font-sans text-xs text-slate-700 hover:border-brand hover:text-brand">
+                        {{ text }}
+                    </button>
+                {% endfor %}
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2.5 border-t border-slate-100 pt-4">
+                <button type="submit" name="outcome" value="approved"
+                        class="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-5 font-sans text-sm font-bold text-white hover:bg-brand-dark">
+                    {% include "components/icon.html" with name="check" size=16 only %}
+                    Жариялау
+                </button>
+                <button type="submit" name="outcome" value="needs_work"
+                        class="inline-flex h-10 items-center gap-2 rounded-md border border-status-attention-fg bg-white px-5 font-sans text-sm font-bold text-status-attention-fg hover:bg-status-attention-bg">
+                    {% include "components/icon.html" with name="arrow-left" size=16 only %}
+                    Толықтыруға қайтару
+                </button>
+                <button type="submit" name="outcome" value="rejected"
+                        class="inline-flex h-10 items-center gap-2 rounded-md border border-status-error-fg bg-white px-5 font-sans text-sm font-bold text-status-error-fg hover:bg-status-error-bg">
+                    {% include "components/icon.html" with name="x" size=16 only %}
+                    Қабылдамау
+                </button>
+            </div>
+        </form>
+    </section>
+{% else %}
+    {% comment %}
+        Автор мог отозвать заявку, пока модератор читал (BR-80). Три кнопки
+        в этом случае молчали бы о том, что решать уже нечего.
+    {% endcomment %}
+    {% url 'core:moderation_queue' as queue_href %}
+    {% include "components/empty_state.html" with icon="check" title="Шешетін нәрсе жоқ" text="Автор өтінімін кері қайтарған немесе шешім қабылданып қойған." cta_label="Кезекке оралу" cta_href=queue_href %}
+{% endif %}
+{% endblock %}

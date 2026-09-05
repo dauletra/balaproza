@@ -1,0 +1,40 @@
+{% comment %}
+    Плашка предпросмотра (BR-76). Контекст: story, is_author.
+
+    Читательская страница непубличной работы открыта ровно двоим — её
+    автору и модератору, — и до этой плашки они не отличали её от
+    опубликованной ничем: «Сайтта қарау» из кабинета вело на страницу,
+    которая выглядела как витрина, и автор имел все основания считать, что
+    работа уже стоит в каталоге.
+
+    Разные слова автору и модератору: первому важно «тебя ещё не видно»,
+    второму — «это очередь, а не витрина». Ссылка в кабинет — только
+    автору: чужая работа у модератора там не открывается.
+{% endcomment %}
+<aside class="rounded-lg border border-status-attention-fg/30 bg-status-attention-bg/40 p-4">
+    <div class="flex flex-wrap items-start gap-3">
+        <span class="mt-0.5 shrink-0 text-status-attention-fg">{% include "components/icon.html" with name="eye" size=16 only %}</span>
+
+        <div class="min-w-0 flex-1">
+            <p class="font-sans text-sm font-bold text-slate-900">
+                {% if is_author %}Бұл — алдын ала қарау{% else %}Жарияланбаған шығарма{% endif %}
+            </p>
+            <p class="mt-1 font-sans text-xs leading-relaxed text-slate-700">
+                {% if is_author %}
+                    Оқырман бұл бетті көрмейді — оны сен және модератор ғана аша аласың. Оқылым мен пікір саналмайды.
+                {% else %}
+                    Бұл бет модерацияға ашылған. Оқырманға шығарма әлі көрінбейді.
+                {% endif %}
+            </p>
+            {% if is_author %}
+                <a href="{% url 'core:manage_story' slug=story.slug %}"
+                   class="mt-2 inline-flex items-center gap-1.5 font-sans text-xs font-semibold text-brand hover:underline">
+                    {% include "components/icon.html" with name="arrow-right" size=14 only %}
+                    Басқаруға оралу
+                </a>
+            {% endif %}
+        </div>
+
+        {% include "components/status_badge.html" with key=story.status %}
+    </div>
+</aside>

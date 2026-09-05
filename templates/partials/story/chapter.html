@@ -19,7 +19,7 @@
                 </p>
                 {% if story.is_serial %}
                     <h2 class="mt-1 font-display text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">
-                        {{ current.title }}
+                        {{ current.shown_title }}
                     </h2>
                 {% endif %}
             </div>
@@ -47,7 +47,7 @@
     <div :class="readerTheme" class="reader-surface">
         <article data-chapter-body :class="[readerSize, readerLead]"
                  class="prose-reader font-sans text-slate-800">
-            {{ current.body|linebreaks }}
+            {{ current.shown_body|linebreaks }}
         </article>
     </div>
 

@@ -32,7 +32,15 @@
           class="flex flex-col gap-7 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
         {% csrf_token %}
 
-        {% include "components/input_field.html" with name="title" label="Атауы" placeholder="Шығарманың атауын жаз" required=True autofocus=True maxlength=120 hint="Кейін өзгертуге болады." %}
+        {% comment %}
+            Значение приходит из формы, а не из пустоты (BR-77): ошибка
+            возвращает набранное на место, а не стирает его вместе с
+            редиректом. `err|yesno` переводит наличие ошибки в состояние
+            компонента — красная рамка, `aria-invalid` и текст под полем.
+        {% endcomment %}
+        {% with err=form.title.errors.0 %}
+        {% include "components/input_field.html" with name="title" label="Атауы" value=form.title.value placeholder="Шығарманың атауын жаз" required=True autofocus=True maxlength=120 hint="Кейін өзгертуге болады." state=err|yesno:"error,default" message=err %}
+        {% endwith %}
 
         {% comment %}
             Формат — первым из выборов и карточками (docs/ui.md).
@@ -43,10 +51,18 @@
             <legend class="mb-2 font-sans text-sm font-semibold text-slate-800">
                 Формат <span class="text-status-error-fg" aria-hidden="true">*</span>
             </legend>
+            {# Выбранное переживает ошибку; на первом показе — «Бір бөлімді». #}
+            {% with picked=form.format.value|default:"single" %}
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {% include "components/format_card.html" with value="single" icon="book" label="Бір бөлімді" hint="Оқырман цельный мәтін көреді: әңгіме, ертегі, эссе, новелла." checked=True %}
-                {% include "components/format_card.html" with value="serial" icon="list" label="Көп бөлімді" hint="Оқырман бөлімдер тізімін және бөлімнен бөлімге өтуді көреді." %}
+                {% if picked == "serial" %}
+                    {% include "components/format_card.html" with value="single" icon="book" label="Бір бөлімді" hint="Оқырман цельный мәтін көреді: әңгіме, ертегі, эссе, новелла." %}
+                    {% include "components/format_card.html" with value="serial" icon="list" label="Көп бөлімді" hint="Оқырман бөлімдер тізімін және бөлімнен бөлімге өтуді көреді." checked=True %}
+                {% else %}
+                    {% include "components/format_card.html" with value="single" icon="book" label="Бір бөлімді" hint="Оқырман цельный мәтін көреді: әңгіме, ертегі, эссе, новелла." checked=True %}
+                    {% include "components/format_card.html" with value="serial" icon="list" label="Көп бөлімді" hint="Оқырман бөлімдер тізімін және бөлімнен бөлімге өтуді көреді." %}
+                {% endif %}
             </div>
+            {% endwith %}
             <p class="mt-2 font-sans text-xs leading-relaxed text-slate-500">
                 Форматты баптауларда өзгертуге болады.
             </p>
@@ -57,14 +73,21 @@
             <span class="font-sans text-sm font-semibold text-slate-800">
                 Негізгі жанр <span class="text-status-error-fg" aria-hidden="true">*</span>
             </span>
+            {% with picked=form.genre_primary.value err=form.genre_primary.errors.0 %}
             <select name="genre_primary" required
-                    class="h-9 rounded-md border border-slate-300 bg-slate-50 px-3 font-sans text-sm text-slate-900 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30">
-                <option value="" disabled selected>Жанрды таңда</option>
+                    {% if err %}aria-invalid="true" aria-describedby="genre-primary-msg"{% endif %}
+                    class="h-9 rounded-md bg-slate-50 px-3 font-sans text-sm text-slate-900 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30 {% if err %}border border-status-error-fg{% else %}border border-slate-300{% endif %}">
+                <option value="" disabled {% if not picked %}selected{% endif %}>Жанрды таңда</option>
                 {% for g in genres %}
-                    <option value="{{ g.slug }}">{{ g.name }}</option>
+                    <option value="{{ g.slug }}" {% if g.slug == picked %}selected{% endif %}>{{ g.name }}</option>
                 {% endfor %}
             </select>
-            <span class="font-sans text-xs text-slate-500">Қосымша жанр мен тегтерді баптауларда қосасың.</span>
+            {% if err %}
+                <span id="genre-primary-msg" class="font-sans text-xs text-status-error-fg">{{ err }}</span>
+            {% else %}
+                <span class="font-sans text-xs text-slate-500">Қосымша жанр мен тегтерді баптауларда қосасың.</span>
+            {% endif %}
+            {% endwith %}
         </label>
 
         {% comment %}

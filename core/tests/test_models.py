@@ -124,10 +124,24 @@ class CountersAreDerivedNotStored(TestCase):
     """
 
     def test_chapter_count_follows_the_written_text(self):
+        """DEC-51 про написанное — значит про `chapters_written` (BR-79).
+        Число, которое видит читатель, отвечает на другой вопрос и считает
+        только опубликованные главы: проверяется ниже."""
         story = make.story(chapters=0, format='serial')
-        self.assertEqual(story.chapters, 0)
+        self.assertEqual(story.chapters_written, 0)
         make.chapter(story, number=1)
         make.chapter(story, number=2)
+        self.assertEqual(story.chapters_written, 2)
+
+    def test_the_reader_is_counted_only_what_he_can_read(self):
+        """«8 бөлім» рядом с текстом на пять — то же обещание ненаписанного,
+        ради отказа от которого число и перестало быть колонкой."""
+        story = make.story(chapters=2, format='serial', published=False)
+        self.assertEqual(story.chapters_written, 2)
+        self.assertEqual(story.chapters, 0)
+        self.assertEqual(story.total_chars, 0)
+
+        make.publish(story)
         self.assertEqual(story.chapters, 2)
         self.assertEqual(reading_meta(story), '2 бөлім')
 
@@ -135,7 +149,7 @@ class CountersAreDerivedNotStored(TestCase):
         """Аннотация выдачи и одиночный объект обязаны давать одно число:
         иначе карточка каталога и страница произведения расходятся."""
         story = make.story(chapters=3, format='serial')
-        from_feed = next(s for s in data.public_stories() if s.pk == story.pk)
+        from_feed = next(s for s in data.public_stories() if s.pk == story.pk)  # noqa: E501
         self.assertEqual(from_feed.chapters, 3)
         self.assertEqual(from_feed.chapters, story.chapters)
 
