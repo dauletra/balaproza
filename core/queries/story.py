@@ -10,20 +10,19 @@
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models import Count, F, OuterRef, Prefetch, Subquery
+from django.db.models import Count, OuterRef, Prefetch, Subquery
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from ..counters import bump_reaction_count
 from ..domain.story import REACTIONS, RECENT_VIEWS_DAYS
 from ..managers import chapter_count_subquery
 from ..models import (
     BookOfWeek,
     Chapter,
-    ChapterReaction,
     ChapterReactionVote,
     Collection,
     CommentLike,
-    PollOption,
     PollVote,
     Story,
     StoryComment,
@@ -94,46 +93,32 @@ def reactions_of(chapter, viewer=None) -> list:
     ]
 
 
-def _bump_reaction_count(chapter, kind: str, delta: int) -> None:
-    """+1/-1 к счётчику одной реакции главы — заводит строку, если её ещё
-    не было (ряд реакций полный, но не каждая кнопка нажата хоть раз).
-
-    Сдвиг, а не пересчёт от `ChapterReactionVote` — намеренно: сид кладёт
-    в `count` декоративную массовую цифру («260 читателей»), не заводя
-    260 настоящих строк голосования, и живой голос обязан лечь поверх
-    этой цифры, а не подменить её единицей (DEC-61)."""
-    row, created = ChapterReaction.objects.get_or_create(
-        chapter=chapter, kind=kind, defaults={'count': max(delta, 0)})
-    if not created:
-        ChapterReaction.objects.filter(pk=row.pk).update(count=F('count') + delta)
-
-
 def toggle_chapter_reaction(chapter, user, kind: str) -> str:
     """Ставит, снимает или меняет реакцию на главе (BR-REACT-02/03).
 
     Одна активная реакция на пользователя и главу: повтор того же `kind`
-    снимает её, другой — заменяет. `Story.likes` — агрегат по числу
-    голосов, а не реакций (BR-14a): смена вида его не трогает. Возвращает
-    новый slug реакции, '' — если снята.
+    снимает её, другой — заменяет. `Story.likes` и `ChapterReaction.count`
+    для создания/удаления голоса сдвигает сигнал (`core/counters.py`) —
+    здесь остаётся только смена вида на месте (`vote.kind = kind`), под
+    которую сигналу зацепиться не за что: строка голоса не создаётся и не
+    удаляется. `Story.likes` — агрегат по числу голосов, а не реакций
+    (BR-14a), поэтому смена вида его не трогает. Возвращает новый slug
+    реакции, '' — если снята.
     """
     with transaction.atomic():
         vote = (ChapterReactionVote.objects.select_for_update()
                 .filter(chapter=chapter, user=user).first())
         if vote is None:
             ChapterReactionVote.objects.create(chapter=chapter, user=user, kind=kind)
-            _bump_reaction_count(chapter, kind, 1)
-            Story.objects.filter(pk=chapter.story_id).update(likes=F('likes') + 1)
             return kind
         if vote.kind == kind:
             vote.delete()
-            _bump_reaction_count(chapter, kind, -1)
-            Story.objects.filter(pk=chapter.story_id).update(likes=F('likes') - 1)
             return ''
         old_kind = vote.kind
         vote.kind = kind
         vote.save(update_fields=['kind'])
-        _bump_reaction_count(chapter, old_kind, -1)
-        _bump_reaction_count(chapter, kind, 1)
+        bump_reaction_count(chapter.pk, old_kind, -1)
+        bump_reaction_count(chapter.pk, kind, 1)
         return kind
 
 
@@ -177,10 +162,8 @@ def cast_poll_vote(poll, user, option_slug: str) -> bool:
     if option is None:
         return False
     with transaction.atomic():
-        vote, created = PollVote.objects.get_or_create(
+        _vote, created = PollVote.objects.get_or_create(
             user=user, poll=poll, defaults={'option': option})
-        if created:
-            PollOption.objects.filter(pk=option.pk).update(votes=F('votes') + 1)
         return created
 
 
@@ -246,7 +229,8 @@ def top_level_comment_of(story_slug: str, comment_id) -> StoryComment | None:
 
 
 def record_story_view(story, viewer=None) -> None:
-    """Засчитать одно чтение работы: строка в журнал и оба счётчика.
+    """Засчитать одно чтение работы: строка в журнал, оба счётчика на
+    `Story` двигает сигнал (`core/counters.py`) на её создании.
 
     Строка нужна для убыли: без дат окно в четырнадцать дней (DEC-36) не
     убывало, и «Қазір танымал» со временем сходилась с «Ең көп оқылған»
@@ -254,14 +238,10 @@ def record_story_view(story, viewer=None) -> None:
     поэтому колонки остаются — но `recent_views` теперь пересчитывается
     вниз (`recount_recent_views`), а не только растёт.
 
-    Через `update()`, а не `save()`: гонки двух читателей складываются в
-    базе, а `auto_now` у `updated_at` остаётся нетронутым — чтение работы
-    не есть её правка. Объект в памяти двигается следом, иначе страница
-    показала бы цифру, отставшую на этот самый заход.
-    """
+    Объект в памяти двигается отдельной строкой, а не подхватывает сигнал:
+    иначе страница показала бы цифру, отставшую на этот самый заход, пока
+    сигнал не долетел до базы и обратно."""
     StoryView.objects.create(story=story, viewer=viewer)
-    Story.objects.filter(pk=story.pk).update(
-        views=F('views') + 1, recent_views=F('recent_views') + 1)
     story.views += 1
     story.recent_views += 1
 
@@ -295,32 +275,34 @@ def recount_recent_views() -> tuple[int, int]:
 def add_comment(story, author, *, text: str, chapter_number=None, parent=None) -> StoryComment:
     """Новый комментарий или ответ (BR-30/BR-33). Валидность `parent`
     (свой ли уровень, та ли работа) проверяет вызывающая сторона —
-    `top_level_comment_of` уже это гарантирует к моменту вызова."""
-    comment = StoryComment.objects.create(
+    `top_level_comment_of` уже это гарантирует к моменту вызова.
+    `Story.comments` двигает сигнал на создании строки."""
+    return StoryComment.objects.create(
         story=story, author=author, chapter_number=chapter_number,
         parent=parent, text=text)
-    Story.objects.filter(pk=story.pk).update(comments=F('comments') + 1)
-    return comment
 
 
 def delete_comment(comment) -> None:
     """Удаляет комментарий вместе с его ответами (каскад, BR-30 — уровень
-    один, ответам своих ответов нет) и синхронизирует `Story.comments`."""
-    removed = 1 + len(comment.replies)
-    story_id = comment.story_id
+    один, ответам своих ответов нет). `Story.comments` подстраивается сам:
+    сигнал (`core/counters.py`) срабатывает на каждую удалённую строку,
+    включая ответы, разнесённые тем же каскадом — отдельно считать `removed`
+    больше не нужно."""
     comment.delete()
-    Story.objects.filter(pk=story_id).update(comments=F('comments') - removed)
 
 
 def toggle_comment_like(comment, user) -> bool:
     """Лайк комментария — toggle (BR-31): повторный клик снимает.
+    `StoryComment.likes` пересчитывает сигнал (`core/counters.py`) —
+    полным `count()`, а не сдвигом: у демо-комментария декоративное число
+    без единой настоящей строки, и первый живой лайк обязан ответить
+    правдой, а не суммой с придуманной историей. Здесь — то же самое на
+    уже загруженном объекте, чтобы не отставала текущая страница.
     Возвращает новое состояние (True — лайкнул)."""
     like, created = CommentLike.objects.get_or_create(user=user, comment=comment)
     if not created:
         like.delete()
-    count = comment.like_set.count()
-    StoryComment.objects.filter(pk=comment.pk).update(likes=count)
-    comment.likes = count
+    comment.likes = comment.like_set.count()
     return created
 
 

@@ -131,6 +131,9 @@ from .queries.story import (
     top_level_comment_of,
 )
 
+# ── Счётчики-кэши: сверка сигналов из core/counters.py ──────────────────
+from .counters import recount_engagement
+
 # ── Теги (docs/ui.md) ───────────────────────────────────────────────────────
 from .queries.tags import (
     accepted_tags_json,

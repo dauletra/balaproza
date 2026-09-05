@@ -32,9 +32,10 @@ def is_following(me, them) -> bool:
 def toggle_follow(follower, following) -> bool:
     """Подписка на автора — toggle (FR-PROF-04). Возвращает новое состояние.
 
-    `User.followers` пересчитывается по строкам, а не сдвигается на
-    единицу: сдвиг однажды разъезжается и остаётся неверным навсегда. На
-    себя не подписываются — это держит `CheckConstraint` в базе.
+    `User.followers` двигает сигнал (`core/counters.py`) на создании и
+    удалении строки `Follow` — в том числе когда строка уходит не отсюда, а
+    каскадом от удаления аккаунта. На себя не подписываются — это держит
+    `CheckConstraint` в базе.
     """
     if follower.pk == following.pk:
         return False
@@ -46,8 +47,6 @@ def toggle_follow(follower, following) -> bool:
         else:
             link.delete()
             now_following = False
-        User.objects.filter(pk=following.pk).update(
-            followers=Follow.objects.filter(following=following).count())
     return now_following
 
 
