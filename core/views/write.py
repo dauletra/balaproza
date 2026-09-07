@@ -269,6 +269,13 @@ def manage_story(request, slug):
         context.update(_chapter_pane_context(
             story, slug, _active_chapter_id(request, story),
             can_submit, context['missing']))
+    if request.headers.get('HX-Request') == 'true':
+        # 11.1c: клик по строке главы или «Болдырмау» подменяет только
+        # #editor-pane (hx-target, hx-swap="outerHTML") — без полной
+        # перезагрузки списка глав и чек-листа рядом. Тот же приём, что
+        # у chapter_react (HX-Request ветвит ответ на компонент, не
+        # страницу целиком).
+        return render(request, 'partials/write/editor_pane_section.html', context)
     return render(request, 'pages/write/manage_story.html', context)
 
 
@@ -398,6 +405,10 @@ def chapter_editor(request, slug, chapter=None):
         context.update(_chapter_pane_context(
             story, slug, chapter, can_submit, context['missing'],
             form=rejected_form, current=current))
+    if request.headers.get('HX-Request') == 'true':
+        # 11.1c: см. manage_story — тот же ответ на переключение главы,
+        # только с другой стороны (URL уже содержит выбранную главу).
+        return render(request, 'partials/write/editor_pane_section.html', context)
     return render(request, 'pages/write/chapter_editor.html', context)
 
 

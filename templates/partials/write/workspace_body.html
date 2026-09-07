@@ -112,15 +112,9 @@
     {% comment %}
         Редактор активной главы (11.1b, AUDIT-WRITE-FLOW): раньше отдельный
         экран `/chapter/<id>/edit/`, теперь встроен прямо здесь — переход
-        со страницы на страницу не нужен, чтобы дописать текст. Заголовок —
-        то же условие, что раньше стояло в `<h1>` `chapter_editor.html`.
+        со страницы на страницу не нужен, чтобы дописать текст.
     {% endcomment %}
-    <section class="mt-8">
-        <h2 class="mb-3 font-display text-lg font-bold text-slate-900">
-            {% if story.is_single %}Мәтінді өңдеу{% elif is_new %}Жаңа бөлім{% else %}{{ current.number }}-бөлім · «{{ current.title|default:"" }}»{% endif %}
-        </h2>
-        {% include "partials/write/chapter_editor_pane.html" %}
-    </section>
+    {% include "partials/write/editor_pane_section.html" %}
 
     {# ── Список глав / цельный текст ── #}
     <section class="mt-8 rounded-lg border border-slate-200 bg-white">
@@ -200,7 +194,18 @@
                         {% endif %}
 
                         <div class="flex shrink-0 items-center gap-1.5">
+                            {% comment %}
+                                11.1c: обычная ссылка — рабочий адрес и
+                                фолбэк без JS (та же основа, что у
+                                reaction_bar.html — action/href настоящий,
+                                hx-* поверх). С htmx подменяет только
+                                #editor-pane, без перезагрузки списка глав
+                                и чек-листа рядом; hx-push-url держит адрес
+                                строки в синхроне с открытой главой.
+                            {% endcomment %}
                             <a href="{% url 'core:chapter_edit' slug=story.slug chapter=c.pk %}"
+                               hx-get="{% url 'core:chapter_edit' slug=story.slug chapter=c.pk %}"
+                               hx-target="#editor-pane" hx-swap="outerHTML" hx-push-url="true"
                                aria-label="Өңдеу"
                                class="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700">
                                 {% include "components/icon.html" with name="pen" size=14 only %}

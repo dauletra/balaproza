@@ -1,0 +1,18 @@
+{% comment %}
+    EditorPaneSection (11.1c, AUDIT-WRITE-FLOW). Редактор активной главы —
+    вынесен из `workspace_body.html` собственным партиалом, потому что
+    это ровно то, чем подменяет себя htmx при переключении главы
+    (`hx-target="#editor-pane"`, `hx-swap="outerHTML"`): ответ на
+    `HX-Request` рендерит этот партиал в одиночку, полный показ —
+    `workspace_body.html`, который его же и инклюдит.
+
+    `id="editor-pane"` обязан остаться в ответе на htmx-запрос: swap
+    заменяет весь элемент, и без совпадающего id следующее переключение
+    главы было бы уже не на что нацелить.
+{% endcomment %}
+<section id="editor-pane" class="mt-8">
+    <h2 class="mb-3 font-display text-lg font-bold text-slate-900">
+        {% if story.is_single %}Мәтінді өңдеу{% elif is_new %}Жаңа бөлім{% else %}{{ current.number }}-бөлім · «{{ current.title|default:"" }}»{% endif %}
+    </h2>
+    {% include "partials/write/chapter_editor_pane.html" %}
+</section>

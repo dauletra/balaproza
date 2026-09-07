@@ -186,7 +186,15 @@
     {% endcomment %}
     <div class="sticky bottom-24 z-20 -mx-6 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-2.5 sm:-mx-8 sm:gap-3 sm:bg-white/95 sm:px-8 sm:py-4 sm:backdrop-blur md:bottom-0">
         <div class="flex items-center gap-2 sm:gap-3">
+            {% comment %}
+                11.1c: href настоящий (фолбэк без JS — уводит на
+                manage_story целиком); hx-* поверх — тот же приём, что у
+                строки главы в списке — подменяет только #editor-pane
+                дефолтной главой, без перезагрузки списка и чек-листа.
+            {% endcomment %}
             <a href="{% url 'core:manage_story' slug=story.slug %}"
+               hx-get="{% url 'core:manage_story' slug=story.slug %}"
+               hx-target="#editor-pane" hx-swap="outerHTML" hx-push-url="true"
                aria-label="Болдырмау"
                class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-2.5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100 sm:px-5">
                 {% include "components/icon.html" with name="arrow-left" size=14 only %}

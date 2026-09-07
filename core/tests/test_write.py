@@ -421,6 +421,46 @@ class TheWorkspaceMergesListAndEditor(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f'value="{last.title}"')
 
+    def test_switching_chapter_links_carry_htmx(self):
+        """11.1c: строка главы и «Болдырмау» — обычные ссылки (рабочий
+        адрес, фолбэк без JS, как у reaction_bar.html) с htmx поверх,
+        подменяющим только #editor-pane."""
+        chapter = self.story.chapter_set.first()
+        response = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.SLUG}))
+        edit_url = reverse('core:chapter_edit',
+                           kwargs={'slug': self.SLUG, 'chapter': chapter.pk})
+        self.assertContains(response, f'hx-get="{edit_url}"')
+        self.assertContains(response, 'hx-target="#editor-pane"')
+        self.assertContains(response, 'hx-swap="outerHTML"')
+        self.assertContains(response, 'hx-push-url="true"')
+
+    def test_hx_request_returns_only_the_editor_pane(self):
+        """Полный показ несёт список глав и опасную зону; ответ на
+        `HX-Request` — только `#editor-pane`, без остального тела."""
+        full = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.SLUG}))
+        self.assertContains(full, 'Бөлімдер')
+        self.assertContains(full, 'Қауіпті аймақ')
+
+        fragment = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.SLUG}),
+            HTTP_HX_REQUEST='true')
+        self.assertContains(fragment, 'id="editor-pane"')
+        self.assertContains(fragment, 'name="body"')
+        self.assertNotContains(fragment, 'Бөлімдер')
+        self.assertNotContains(fragment, 'Қауіпті аймақ')
+
+    def test_hx_request_on_chapter_edit_also_returns_only_the_pane(self):
+        chapter = self.story.chapter_set.first()
+        fragment = self.client.get(
+            reverse('core:chapter_edit',
+                   kwargs={'slug': self.SLUG, 'chapter': chapter.pk}),
+            HTTP_HX_REQUEST='true')
+        self.assertContains(fragment, 'id="editor-pane"')
+        self.assertContains(fragment, f'value="{chapter.title}"')
+        self.assertNotContains(fragment, 'Бөлімдер')
+
 
 class SettingsOfferOnlyWhatMayBeChanged(TestCase):
     """BR-10a/BR-11: радио «Мәртебесі» рендерилось всегда и в ветке `else`
