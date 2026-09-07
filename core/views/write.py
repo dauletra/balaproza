@@ -12,7 +12,7 @@
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -334,13 +334,23 @@ def story_settings(request, slug):
                 tag_names=form.tag_names,
             )
             messages.success(request, 'Өзгертулер сақталды.')
+            if request.headers.get('HX-Request') == 'true':
+                # 11.3: панель закрывается перезагрузкой текущей страницы
+                # рабочего места (`HX-Refresh` — встроенная директива
+                # htmx, без неё пришлось бы отдельно подменять и шапку
+                # рабочего места, где показаны title/cover/status). Адрес
+                # в браузере — уже сама рабочая страница, не `/settings/`:
+                # панель не переходила туда, только грузила форму в себя.
+                response = HttpResponse(status=204)
+                response['HX-Refresh'] = 'true'
+                return response
             # `story.slug`, а не URL-параметр: переименование до публикации
             # (M1, BR-87) могло сдвинуть адрес прямо в этом запросе.
             return redirect('core:story_settings', slug=story.slug)
     elif story is not None:
         form = StorySettingsForm(story=story, initial=_settings_initial(story))
 
-    return render(request, 'pages/write/story_settings.html', {
+    context = {
         'slug':   slug,
         'story':  story,
         'form':   form,
@@ -356,7 +366,14 @@ def story_settings(request, slug):
         'initial_tags': (data.preview_story_tags(form.tag_names)
                          if form is not None and form.is_bound
                          else data.tags_of(story) if story else []),
-    })
+    }
+    if request.headers.get('HX-Request') == 'true':
+        # 11.3: то же, что chapter_editor/manage_story — панель грузит
+        # только форму (`settings_drawer_body.html`), не всю страницу.
+        # Отклонённая форма (BR-77) перерисовывает этот же фрагмент —
+        # набранное не пропадает, панель не закрывается.
+        return render(request, 'partials/write/settings_drawer_body.html', context)
+    return render(request, 'pages/write/story_settings.html', context)
 
 
 def chapter_editor(request, slug, chapter=None):

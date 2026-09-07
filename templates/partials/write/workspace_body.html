@@ -83,8 +83,23 @@
                     {% include "components/button.html" with kind="primary" label="Бөлім қосу" icon="plus" href=new_ch_href %}
                 {% endif %}
 
+                {% comment %}
+                    11.3 (AUDIT-WRITE-FLOW): href настоящий — фолбэк без
+                    JS уводит на полную страницу баптаулар, как раньше.
+                    С Alpine+htmx клик одновременно открывает панель
+                    (`$dispatch`, слушает settings_drawer.html) и
+                    загружает форму в неё (`hx-get`); htmx сам гасит
+                    переход по ссылке, когда запрос успешен, — обе части
+                    не конфликтуют.
+                {% endcomment %}
                 {% url 'core:story_settings' slug=story.slug as settings_href %}
-                {% include "components/button.html" with kind="secondary" label="Баптаулар" icon="cog" href=settings_href %}
+                <a href="{{ settings_href }}" x-data
+                   @click="$dispatch('open-settings-drawer')"
+                   hx-get="{{ settings_href }}" hx-target="#settings-drawer-body" hx-swap="innerHTML"
+                   class="inline-flex h-9 items-center gap-2 rounded-md border border-brand bg-white px-5 font-sans text-sm font-semibold text-brand hover:bg-slate-50">
+                    {% include "components/icon.html" with name="cog" size=16 only %}
+                    Баптаулар
+                </a>
 
                 {% url 'core:story_detail' slug=story.slug as view_href %}
                 <a href="{{ view_href }}"
@@ -254,4 +269,6 @@
             Шығарманы өшіру
         </button>
     </section>
+
+    {% include "partials/write/settings_drawer.html" %}
 {% endif %}

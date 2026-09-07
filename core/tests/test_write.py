@@ -994,6 +994,71 @@ class StorySettingsSavesFields(TestCase):
         self.assertEqual(story.status, 'NeedsWork')
 
 
+class TheSettingsDrawerLoadsViaHtmx(TestCase):
+    """11.3 (AUDIT-WRITE-FLOW): баптаулар — выезжающая панель поверх
+    рабочего места. `StorySettingsForm`/`update_story_settings` не
+    тронуты — меняется только транспорт (HX-Request), не форма."""
+
+    SLUG = 'aidana-kus'
+
+    def setUp(self):
+        login_as(self.client)
+        self.genre = data.all_genres()[0]
+        self.pk = Story.objects.get(slug=self.SLUG).pk
+
+    def test_the_trigger_link_opens_the_drawer_and_loads_it(self):
+        response = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.SLUG}))
+        settings_url = reverse('core:story_settings', kwargs={'slug': self.SLUG})
+        self.assertContains(response, "$dispatch('open-settings-drawer')")
+        self.assertContains(response, f'hx-get="{settings_url}"')
+        self.assertContains(response, 'hx-target="#settings-drawer-body"')
+
+    def test_hx_request_returns_only_the_form_not_the_full_page(self):
+        """Полный показ несёт брэдкрамб и `<h1>`; фрагмент — только форму
+        (плюс мини-шапка с названием и статусом)."""
+        full = self.client.get(
+            reverse('core:story_settings', kwargs={'slug': self.SLUG}))
+        self.assertContains(full, 'Менің шығармаларым')
+
+        fragment = self.client.get(
+            reverse('core:story_settings', kwargs={'slug': self.SLUG}),
+            HTTP_HX_REQUEST='true')
+        self.assertContains(fragment, 'name="title"')
+        self.assertContains(fragment, 'hx-target="#settings-drawer-body"')
+        self.assertNotContains(fragment, 'Менің шығармаларым')
+
+    def test_hx_success_closes_the_drawer_with_a_refresh_not_a_redirect(self):
+        """Успех отвечает `HX-Refresh`, а не редиректом (BR-77-совместимо):
+        htmx перезагружает текущую страницу рабочего места целиком —
+        адрес в браузере и не был `/settings/`, панель туда не уводила."""
+        r = self.client.post(
+            reverse('core:story_settings', kwargs={'slug': self.SLUG}),
+            {'title': 'Жаңа атау', 'annotation': 'Жаңа аннотация мәтіні.',
+             'format': 'serial', 'genre_primary': self.genre.slug,
+             'genre_secondary': '', 'audience': '10+', 'tags': ''},
+            HTTP_HX_REQUEST='true')
+        self.assertEqual(r.status_code, 204)
+        self.assertEqual(r['HX-Refresh'], 'true')
+        self.assertEqual(Story.objects.get(pk=self.pk).title, 'Жаңа атау')
+
+    def test_hx_rejected_form_redraws_the_fragment_not_a_redirect(self):
+        """Отклонённая форма (BR-77) перерисовывает тот же фрагмент —
+        панель остаётся открытой с набранным, а не закрывается и не
+        уводит на отдельную страницу."""
+        before = Story.objects.get(pk=self.pk).annotation
+        r = self.client.post(
+            reverse('core:story_settings', kwargs={'slug': self.SLUG}),
+            {'title': '', 'annotation': 'Жазылған аннотация.',
+             'format': 'serial', 'genre_primary': self.genre.slug,
+             'genre_secondary': '', 'audience': '10+', 'tags': ''},
+            HTTP_HX_REQUEST='true')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Атауын жаз.')
+        self.assertContains(r, 'Жазылған аннотация.')
+        self.assertEqual(Story.objects.get(pk=self.pk).annotation, before)
+
+
 class StorySettingsCoverUpload(TestCase):
     """Тот же валидатор, что у User.avatar (BR-46) — SVG не проходит.
 

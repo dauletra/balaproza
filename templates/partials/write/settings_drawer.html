@@ -1,0 +1,47 @@
+{% comment %}
+    SettingsDrawer (11.3, AUDIT-WRITE-FLOW). Баптаулар — выезжающая панель
+    вместо перехода на `/settings/`: тот же приём, что у
+    `_filter_sheet.html` (открытие window-событием, decoupled от того, где
+    в разметке стоит кнопка-триггер), только справа и без bottom-sheet —
+    форма шире, чем удобно листу снизу.
+
+    Триггер («Баптаулар» в шапке workspace_body.html) шлёт два независимых
+    действия одним кликом: `$dispatch('open-settings-drawer')` открывает
+    панель (Alpine), `hx-get` на `story_settings` загружает форму в
+    `#settings-drawer-body` (htmx). Прямой URL `/write/<slug>/settings/`
+    остаётся рабочим отдельно — панель его не заменяет, а даёт быстрый
+    путь, не покидая рабочее место.
+
+    Пусто при первом рендере — контент приезжает только по клику,
+    поэтому лишнего запроса на каждый показ рабочего места (genres,
+    accepted_tags, tags_of и так далее) нет.
+{% endcomment %}
+<div x-data="{ open: false }"
+     @open-settings-drawer.window="open = true"
+     @keydown.escape.window="open = false">
+
+    <div x-show="open" x-cloak x-transition.opacity
+         @click="open = false"
+         class="fixed inset-0 z-40 bg-slate-900/50" aria-hidden="true"></div>
+
+    <div x-show="open" x-cloak
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="translate-x-full"
+         x-transition:enter-end="translate-x-0"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="translate-x-0"
+         x-transition:leave-end="translate-x-full"
+         role="dialog" aria-modal="true" aria-label="Баптаулар"
+         class="fixed inset-y-0 right-0 z-50 flex w-full flex-col overflow-y-auto bg-white shadow-modal sm:w-[440px]">
+
+        <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
+            <span class="font-display text-lg font-bold text-slate-900">Баптаулар</span>
+            <button type="button" @click="open = false" aria-label="Жабу"
+                    class="-mr-2 grid h-9 w-9 place-items-center rounded-pill text-slate-500 hover:bg-slate-100">
+                {% include "components/icon.html" with name="x" size=18 only %}
+            </button>
+        </div>
+
+        <div id="settings-drawer-body" class="px-5 py-5"></div>
+    </div>
+</div>

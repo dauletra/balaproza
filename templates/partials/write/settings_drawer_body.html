@@ -1,0 +1,20 @@
+{% comment %}
+    SettingsDrawerBody (11.3, AUDIT-WRITE-FLOW). Ответ `story_settings` на
+    `HX-Request` — то, чем htmx заполняет `#settings-drawer-body` при
+    открытии панели и чем сама себя подменяет отклонённая форма
+    (`hx-target="#settings-drawer-body"` в `story_settings_form.html`).
+
+    `StorySettingsForm`/`update_story_settings` не тронуты этим этапом —
+    меняется только транспорт: форма та же, что на полной странице
+    (`story_settings_form.html` с `drawer=True`), отдельной логики
+    валидации здесь нет.
+{% endcomment %}
+{% if not signed_in %}
+    {% include "components/auth_gate.html" with reason="Баптауларды өзгерту үшін" %}
+{% else %}
+    <div class="mb-4 flex items-center justify-between gap-3">
+        <p class="font-sans text-sm text-slate-600">«{{ story.title }}» туралы метадеректер.</p>
+        {% include "components/status_badge.html" with key=story.status %}
+    </div>
+    {% include "partials/write/story_settings_form.html" with drawer=True %}
+{% endif %}
