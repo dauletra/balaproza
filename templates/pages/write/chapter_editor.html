@@ -108,11 +108,21 @@
                     <span x-text="count">{{ body|length }}</span> таңба
                 </span>
             </span>
-            <textarea name="body" rows="20" required
+            {% comment %}
+                V5 (AUDIT-WRITE-FLOW): `rows=20` на 375×812 оставлял от
+                текста полосу в четыре строки со своим внутренним скроллом
+                поверх скролла страницы. `min-h` вместо жёсткого `rows` —
+                коробка большая с самого начала, а не растёт до неё; на
+                поддерживающих браузерах `field-sizing: content` растит её
+                вслед за текстом по-настоящему, и внутренний скролл вообще
+                не наступает — прогрессивное улучшение, без него коробка
+                просто остаётся высокой.
+            {% endcomment %}
+            <textarea name="body" rows="8" required
                       @input="recount"
                       {% if err %}aria-invalid="true" aria-describedby="body-msg"{% endif %}
                       placeholder="{% if story.is_single %}Шығарманың толық мәтінін осында жаз. Абзацтар екі жол ауысумен бөлінеді.{% else %}Бөлімнің толық мәтінін осында жаз. Абзацтар екі жол ауысумен бөлінеді.{% endif %}"
-                      class="w-full resize-y rounded-md bg-slate-50 px-4 py-3 font-sans text-[17px] leading-[1.75] text-slate-900 placeholder:text-slate-500 placeholder:font-sans placeholder:text-sm focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30 {% if err %}border border-status-error-fg{% else %}border border-slate-300{% endif %}">{{ body }}</textarea>
+                      class="w-full min-h-[62vh] resize-y rounded-md bg-slate-50 px-4 py-3 font-sans text-[17px] leading-[1.75] text-slate-900 [field-sizing:content] placeholder:text-slate-500 placeholder:font-sans placeholder:text-sm focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30 sm:min-h-[26rem] {% if err %}border border-status-error-fg{% else %}border border-slate-300{% endif %}">{{ body }}</textarea>
             {% if err %}
                 <span id="body-msg" class="font-sans text-xs text-status-error-fg">{{ err }}</span>
             {% else %}
@@ -176,20 +186,35 @@
         {% endwith %}
 
         {% comment %}
-            Панель действий липкая (FR-WRITE-05). Textarea в 20 строк уводит
-            кнопки за нижний край экрана, и автор, дописав абзац, не видит ни
+            Панель действий липкая (FR-WRITE-05). Textarea в 20 строк уводила
+            кнопки за нижний край экрана, и автор, дописав абзац, не видел ни
             одного способа сохранить — на телефоне до них пролистывать весь
             набранный текст.
 
             `bottom-24` на мобильном разводит панель с плавающей пилюлей
             mobile_nav (она `bottom-4` + `h-16`, docs/ui.md); с `md` пилюли
             нет и панель садится на низ кадра.
+
+            Компактная на мобильном (V5, AUDIT-WRITE-FLOW): три кнопки в
+            столбик и индикатор вместе занимали около половины экрана. Текст
+            подписей уходит в `sr-only` — остаётся цвет и форма иконки, а
+            для скринридера имя кнопки и живое `aria-live` не меняются: это
+            не `hidden` (display:none, вырезает из accessibility-дерева), а
+            только визуальное сжатие. С `sm` подписи возвращаются целиком —
+            на этой ширине их уже есть куда деть.
+
+            Фон — сплошной на мобильном: полупрозрачный `bg-white/95` с
+            `backdrop-blur` просвечивал набранным текстом снизу и читался
+            грязно на короткой панели. С `sm` панель ниже и просвечивать
+            уже почти нечему.
         {% endcomment %}
-        <div class="sticky bottom-24 z-20 -mx-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-6 py-4 backdrop-blur sm:-mx-8 sm:px-8 md:bottom-0">
-            <div class="flex items-center gap-3">
+        <div class="sticky bottom-24 z-20 -mx-6 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-2.5 sm:-mx-8 sm:gap-3 sm:bg-white/95 sm:px-8 sm:py-4 sm:backdrop-blur md:bottom-0">
+            <div class="flex items-center gap-2 sm:gap-3">
                 <a href="{% url 'core:manage_story' slug=story.slug %}"
-                   class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
-                    Болдырмау
+                   aria-label="Болдырмау"
+                   class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-2.5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100 sm:px-5">
+                    {% include "components/icon.html" with name="arrow-left" size=14 only %}
+                    <span class="sr-only sm:not-sr-only">Болдырмау</span>
                 </a>
 
                 {% comment %}
@@ -201,7 +226,7 @@
                 <span class="font-sans text-xs text-slate-500" aria-live="polite">
                     <span x-show="saving" x-cloak class="inline-flex items-center gap-1.5">
                         <span class="h-1.5 w-1.5 shrink-0 rounded-pill bg-slate-400" aria-hidden="true"></span>
-                        Сақталуда…
+                        <span class="sr-only sm:not-sr-only">Сақталуда…</span>
                     </span>
 
                     {% comment %}
@@ -210,18 +235,18 @@
                     {% endcomment %}
                     <span x-show="!saving && failed" x-cloak class="inline-flex items-center gap-1.5 text-status-error-fg">
                         {% include "components/icon.html" with name="x" size=12 only %}
-                        Серверге сақталмады — мәтін браузерде тұр
+                        <span class="sr-only sm:not-sr-only">Серверге сақталмады — мәтін браузерде тұр</span>
                     </span>
 
                     <span x-show="!saving && !failed && dirty" x-cloak class="inline-flex items-center gap-1.5">
                         <span class="h-1.5 w-1.5 shrink-0 rounded-pill bg-status-warning-fg" aria-hidden="true"></span>
-                        Сақталмаған өзгеріс бар
+                        <span class="sr-only sm:not-sr-only">Сақталмаған өзгеріс бар</span>
                     </span>
 
                     {# Время — доказательство, что автосохранение произошло. #}
                     <span x-show="!saving && !failed && !dirty && savedAt" x-cloak class="inline-flex items-center gap-1.5 text-status-published-fg">
                         {% include "components/icon.html" with name="check" size=12 only %}
-                        Автоматты сақталды · <span x-text="savedAt"></span>
+                        <span class="sr-only sm:not-sr-only">Автоматты сақталды · <span x-text="savedAt"></span></span>
                     </span>
                     {% comment %}
                         `is_new` — серверлік шындық: жаңа бөлім әлі сақталған
@@ -236,17 +261,18 @@
                     {% if not is_new and not form.errors %}
                         <span x-show="!saving && !failed && !dirty && !savedAt" class="inline-flex items-center gap-1.5 text-status-published-fg">
                             {% include "components/icon.html" with name="check" size=12 only %}
-                            Жоба сақталды
+                            <span class="sr-only sm:not-sr-only">Жоба сақталды</span>
                         </span>
                     {% endif %}
                 </span>
             </div>
 
-            <div class="flex flex-wrap items-center gap-2.5">
+            <div class="flex flex-wrap items-center gap-2 sm:gap-2.5">
                 <button type="submit" name="action" value="draft"
-                        class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                        aria-label="Жоба ретінде сақтау"
+                        class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-2.5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100 sm:px-5">
                     {% include "components/icon.html" with name="check" size=14 only %}
-                    Жоба ретінде сақтау
+                    <span class="sr-only sm:not-sr-only">Жоба ретінде сақтау</span>
                 </button>
                 {% comment %}
                     Кнопка называлась «Жариялау», а тост рядом говорил
@@ -262,9 +288,10 @@
                 {% endcomment %}
                 {% if can_submit %}
                     <button type="submit" name="action" value="submit_review"
-                            class="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-5 font-sans text-sm font-bold text-white hover:bg-brand-dark">
+                            aria-label="Модерацияға жіберу"
+                            class="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-2.5 font-sans text-sm font-bold text-white hover:bg-brand-dark sm:px-5">
                         {% include "components/icon.html" with name="paper-plane" size=14 only %}
-                        Модерацияға жіберу
+                        <span class="sr-only sm:not-sr-only">Модерацияға жіберу</span>
                     </button>
                 {% elif missing %}
                     {% comment %}
@@ -278,10 +305,11 @@
                         тогда кнопка молчит совсем, как и там.
                     {% endcomment %}
                     <button type="button" disabled
+                            aria-label="Модерацияға жіберу"
                             title="Жоғарыда {{ missing|length }} міндетті тармақ ашық тұр — баптауларда толтыр."
-                            class="inline-flex h-9 cursor-not-allowed items-center gap-2 rounded-md bg-slate-200 px-5 font-sans text-sm font-bold text-slate-500">
+                            class="inline-flex h-9 cursor-not-allowed items-center gap-2 rounded-md bg-slate-200 px-2.5 font-sans text-sm font-bold text-slate-500 sm:px-5">
                         {% include "components/icon.html" with name="paper-plane" size=14 only %}
-                        Модерацияға жіберу
+                        <span class="sr-only sm:not-sr-only">Модерацияға жіберу</span>
                     </button>
                 {% endif %}
             </div>

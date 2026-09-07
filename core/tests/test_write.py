@@ -641,6 +641,24 @@ class TheChapterEditorReportsTheTruth(TestCase):
         self.assertIn('sticky bottom-24', body)
         self.assertIn('md:bottom-0', body)
 
+    def test_the_mobile_panel_is_compact_and_the_box_is_tall(self):
+        """V5: на 375×812 панель в три строки плюс плавающая пилюля
+        занимали около половины экрана, а от textarea `rows=20` со своим
+        внутренним скроллом оставалась полоса в четыре строки.
+
+        Подписи уходят в `sr-only`, не `hidden`: скринридер видит их и на
+        узком экране, только зрячий — нет (`not-sr-only` возвращает их с
+        `sm`). Панель — сплошная на мобильном, а не просвечивающая
+        `backdrop-blur`; коробка текста — высотой во вьюпорт, а не строками."""
+        body = self.client.get(reverse(
+            'core:chapter_new', kwargs={'slug': self.SLUG})).content.decode()
+        self.assertIn('sr-only sm:not-sr-only', body)
+        self.assertNotIn('rows="20"', body)
+        self.assertIn('min-h-[62vh]', body)
+        self.assertIn('[field-sizing:content]', body)
+        self.assertIn('bg-white px-4 py-2.5', body)
+        self.assertIn('sm:bg-white/95', body)
+
     def test_saved_state_is_server_truth_not_a_timer(self):
         """На новой главе «Жоба сақталды» не должно быть вовсе: сообщать о
         сохранении того, что ни разу не сохранялось, — та же ложь, что
