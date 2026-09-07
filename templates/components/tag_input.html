@@ -20,7 +20,8 @@
 {{ accepted_tags|json_script:"tag-input-accepted" }}
 {{ blocked_patterns|json_script:"tag-input-blocked" }}
 
-<div x-data="tagInput({
+<div id="{{ input_name }}"
+     x-data="tagInput({
         initial: [{% for t in tags %}{slug:'{{ t.slug|escapejs }}',name:'{{ t.name|escapejs }}',status:'{{ t.status }}'}{% if not forloop.last %},{% endif %}{% endfor %}],
         maxTags: {{ max_n }}
      })"
@@ -28,7 +29,7 @@
 
     <span class="font-sans text-sm font-semibold text-slate-800">
         Тегтер
-        <span class="font-normal text-slate-500">— ключевые сөздер</span>
+        <span class="font-normal text-slate-500">— түйінді сөздер</span>
     </span>
 
     {# Поле ввода + dropdown #}

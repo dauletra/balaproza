@@ -52,6 +52,16 @@ class ValidateRasterImageChecksContentNotJustTheName(TestCase):
         with self.assertRaises(ValidationError):
             validate_raster_image(upload)
 
+    def test_the_rejection_does_not_name_an_internal_rule_code(self):
+        """V2 (AUDIT-WRITE-FLOW): тост показывал «(BR-46)» — идентификатор
+        внутреннего требования ребёнку-автору. Пометка нужна в коде и в
+        docs/, не в сообщении."""
+        upload = SimpleUploadedFile('cover.svg', b'<svg/>',
+                                    content_type='image/svg+xml')
+        with self.assertRaises(ValidationError) as caught:
+            validate_raster_image(upload)
+        self.assertNotIn('BR-', str(caught.exception))
+
     def test_an_oversized_file_is_refused(self):
         upload = SimpleUploadedFile('cover.png', _image_bytes(),
                                     content_type='image/png')

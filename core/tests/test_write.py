@@ -343,6 +343,18 @@ class ManageStoryShowsTheWorkAndItsParts(TestCase):
                                     kwargs={'slug': 'no-such-story'})).status_code,
             404)
 
+    def test_a_draft_shows_no_zero_metrics(self):
+        """V8: «0 оқылым · 0 реакция · 0 пікір» у непубличной работы читалось
+        как провал на пустом месте, хотя других значений там быть не может.
+        Тот же приём, что у my_story_row.html в кабинете."""
+        login_as(self.client)
+        response = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': 'aidana-kus'}))
+        self.assertContains(response, 'жарияланбаған')
+        for zero in ('оқылым', 'реакция', 'пікір'):
+            with self.subTest(metric=zero):
+                self.assertNotIn(f'0 {zero}', response.content.decode())
+
     def test_a_guest_is_shown_the_door_not_a_404(self):
         """M4/M7: гостю на кабинет — auth_gate (как у my_stories/new_story),
         а не та же карточка, что у вошедшего на чужой слаг."""
@@ -475,6 +487,28 @@ class TheChecklistLeadsToTheFieldItNames(TestCase):
             'core:chapter_edit',
             kwargs={'slug': 'aidana-koshe', 'chapter': story.text_chapter}))
 
+    def test_settings_items_carry_their_own_field_anchor(self):
+        """V6: пункт «Аннотация жаз» вёл на верх `/settings/` целиком —
+        якорь есть, поля в нём нет. Теперь у каждого пункта баптаулар
+        свой `#id`, и он совпадает с полем, которое реально существует
+        на странице (иначе браузер просто не проскроллит)."""
+        response = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': 'aidana-kus'}))
+        settings_page = self.client.get(
+            reverse('core:story_settings', kwargs={'slug': 'aidana-kus'})).content.decode()
+        anchors = {
+            'annotation': 't-annotation', 'audience': 'audience',
+            'cover': 'cover', 'tags': 'tags',
+        }
+        settings_href = reverse('core:story_settings', kwargs={'slug': 'aidana-kus'})
+        for item in response.context['checklist']:
+            if item['key'] not in anchors:
+                continue
+            with self.subTest(item=item['key']):
+                anchor = anchors[item['key']]
+                self.assertEqual(item['href'], f'{settings_href}#{anchor}')
+                self.assertIn(f'id="{anchor}"', settings_page)
+
     def test_it_is_honest_about_the_age_mark_and_about_what_is_optional(self):
         """Обложка и теги улучшают карточку, но не держат публикацию."""
         draft = data.story_by_slug_for_author('aidana-kus', user('aidana'))
@@ -538,6 +572,31 @@ class OnlyAReadyDraftMayBeSubmitted(TestCase):
         chapter.save()
         self.assertTrue(data.can_submit_for_review(published))
 
+    def test_a_brand_new_work_sees_the_editor_button_disabled_not_a_trap(self):
+        """V14: на первой странице совсем новой работы кнопка была активна,
+        хотя аннотации и жас белгісі ещё нет и быть не может, — нажатие
+        гарантированно било мимо. Здесь — та же неактивная кнопка с
+        подсказкой, что и на manage_story, а не молчаливая (см. ниже)."""
+        draft = data.story_by_slug_for_author('aidana-kus', user('aidana'))
+        self.assertEqual(data.missing_for_review(draft), ['text', 'audience'])
+        response = self.client.get(
+            reverse('core:chapter_new', kwargs={'slug': 'aidana-kus'}))
+        self.assertFalse(response.context['can_submit'])
+        self.assertContains(response, 'Модерацияға жіберу')
+        self.assertContains(response, 'disabled')
+
+    def test_nothing_to_submit_hides_the_editor_button_quietly(self):
+        """Чек-лист закрыт, слать нечего (test_readiness_asks_the_text_...)
+        — кнопка молчит совсем, а не остаётся мимо-кнопкой и не врёт
+        disabled-подсказкой про несуществующие незакрытые пункты."""
+        published = data.story_by_slug_for_author('aidana-tan', user('aidana'))
+        self.assertEqual(data.missing_for_review(published), [])
+        self.assertFalse(data.can_submit_for_review(published))
+        chapter = published.chapter_set.first()
+        response = self.client.get(reverse(
+            'core:chapter_edit', kwargs={'slug': 'aidana-tan', 'chapter': chapter.pk}))
+        self.assertNotContains(response, 'Модерацияға жіберу')
+
 
 class TheChapterEditorReportsTheTruth(TestCase):
     """FR-WRITE-05. Счётчик знаков не двигался при вводе, кнопки уходили за
@@ -552,15 +611,21 @@ class TheChapterEditorReportsTheTruth(TestCase):
         """BR-11: автор не публикует, публикует модератор. Кнопка
         называлась «Жариялау», а тост рядом говорил «модерацияға
         жіберілді» — правду говорил тост. «Тексеруге» тоже не годится:
-        docs/ui.md отводит ему оттенок экзамена."""
+        docs/ui.md отводит ему оттенок экзамена.
+
+        'aidana-kus' — черновик без бөлім и жас белгісі: кнопка здесь
+        стоит неактивной с самого начала (V14), а не самим же 'aidana-tan',
+        у которого слать нечего и кнопки нет вовсе (см.
+        OnlyAReadyDraftMayBeSubmitted)."""
         response = self.client.get(
-            reverse('core:chapter_new', kwargs={'slug': self.SLUG}))
+            reverse('core:chapter_new', kwargs={'slug': 'aidana-kus'}))
         body = response.content.decode()
         self.assertContains(response, 'Жаңа бөлім')
         self.assertContains(response, 'name="title"')
         self.assertContains(response, 'name="body"')
         self.assertContains(response, 'Жоба ретінде сақтау')
         self.assertIn('Модерацияға жіберу', body)
+        self.assertContains(response, 'disabled')
         self.assertNotIn('Тексеруге жіберу', body)
 
     def test_the_counter_counts_typing_and_the_actions_stay_in_view(self):

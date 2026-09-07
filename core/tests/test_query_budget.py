@@ -354,12 +354,16 @@ class PersonalPagesStayWithinTheirQueryBudget(TestCase):
         """Редактор главы — форма, а не выдача: дороже одной работы с её
         главами она быть не должна.
 
-        Шесть, не восемь: `chapter_by_id` (BR-83) везёт главу вместе с
-        опросом одним `select_related`, вместо прежних отдельных
-        `chapter_of` + `poll_of`."""
+        Шесть уходило на саму главу: `chapter_by_id` (BR-83) везёт её
+        вместе с опросом одним `select_related`, вместо прежних отдельных
+        `chapter_of` + `poll_of`. Плюс шесть — готовность кнопки
+        «Модерацияға жіберу» (V14): чек-лист (`missing_for_review`) и
+        «есть ли что подавать» (`can_submit_for_review`) считаются тем же
+        приёмом, что уже на manage_story — второй зовёт чек-лист снова
+        внутри себя, и это тот же двойной счёт, что уже оплачен там."""
         login_as(self.client)
         chapter_id = Chapter.objects.get(story__slug='aidana-tan', number=1).pk
-        with self.assertNumQueries(6):
+        with self.assertNumQueries(12):
             self.client.get(reverse('core:chapter_edit',
                                     kwargs={'slug': 'aidana-tan', 'chapter': chapter_id}))
 

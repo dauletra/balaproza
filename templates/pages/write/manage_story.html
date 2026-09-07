@@ -31,9 +31,26 @@
                 {% else %}
                     {% include "components/stat_pill.html" with icon="book" value=story.chapters_written|spaced|add:" бөлім" %}
                 {% endif %}
-                {% include "components/stat_pill.html" with icon="eye" value=story.views|spaced label=story.views|spaced|add:" оқылым" %}
-                {% include "components/stat_pill.html" with icon="heart" value=story.likes|spaced label=story.likes|spaced|add:" реакция" %}
-                {% include "components/stat_pill.html" with icon="message-caption" value=story.comments|spaced label=story.comments|spaced|add:" пікір" %}
+                {% comment %}
+                    V8 (AUDIT-WRITE-FLOW): непубличная работа других значений,
+                    кроме нуля, показать не может — «0 оқылым · 0 реакция ·
+                    0 пікір» читается как провал на пустом месте, не как
+                    честная нулевая метрика. Тот же приём, что у
+                    my_story_row.html в кабинете.
+                {% endcomment %}
+                {% if story.status == "OnModeration" %}
+                    {% if story.updated_days_ago %}
+                        {% include "components/stat_pill.html" with icon="adjustments" value=story.updated_days_ago|spaced|add:" күн тексеруде" %}
+                    {% else %}
+                        {% include "components/stat_pill.html" with icon="adjustments" value="тексеруде" %}
+                    {% endif %}
+                {% elif not story.is_public %}
+                    {% include "components/stat_pill.html" with icon="pen" value="жарияланбаған" %}
+                {% else %}
+                    {% include "components/stat_pill.html" with icon="eye" value=story.views|spaced label=story.views|spaced|add:" оқылым" %}
+                    {% include "components/stat_pill.html" with icon="heart" value=story.likes|spaced label=story.likes|spaced|add:" реакция" %}
+                    {% include "components/stat_pill.html" with icon="message-caption" value=story.comments|spaced label=story.comments|spaced|add:" пікір" %}
+                {% endif %}
             </div>
 
             <div class="mt-2 flex flex-wrap items-center gap-2.5">

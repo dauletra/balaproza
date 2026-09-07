@@ -260,11 +260,30 @@
                     отводит второму оттенок экзамена и держит статус
                     нейтральной констатацией.
                 {% endcomment %}
-                <button type="submit" name="action" value="submit_review"
-                        class="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-5 font-sans text-sm font-bold text-white hover:bg-brand-dark">
-                    {% include "components/icon.html" with name="paper-plane" size=14 only %}
-                    Модерацияға жіберу
-                </button>
+                {% if can_submit %}
+                    <button type="submit" name="action" value="submit_review"
+                            class="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-5 font-sans text-sm font-bold text-white hover:bg-brand-dark">
+                        {% include "components/icon.html" with name="paper-plane" size=14 only %}
+                        Модерацияға жіберу
+                    </button>
+                {% elif missing %}
+                    {% comment %}
+                        V14 (AUDIT-WRITE-FLOW): кнопка стояла активной и на
+                        первой главе новой работы, где аннотации и жас
+                        белгісі ещё нет и быть не может, — гарантированный
+                        отказ сразу после нажатия. Тот же вопрос, что уже
+                        отвечает publish_panel.html на manage_story, и тот
+                        же вид ответа. `missing` пуст, когда чек-лист
+                        закрыт, а слать просто нечего (ничего не менялось) —
+                        тогда кнопка молчит совсем, как и там.
+                    {% endcomment %}
+                    <button type="button" disabled
+                            title="Жоғарыда {{ missing|length }} міндетті тармақ ашық тұр — баптауларда толтыр."
+                            class="inline-flex h-9 cursor-not-allowed items-center gap-2 rounded-md bg-slate-200 px-5 font-sans text-sm font-bold text-slate-500">
+                        {% include "components/icon.html" with name="paper-plane" size=14 only %}
+                        Модерацияға жіберу
+                    </button>
+                {% endif %}
             </div>
         </div>
     </form>

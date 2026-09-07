@@ -4,7 +4,11 @@
         $dispatch('toast', { kind:'success'|'info'|'error', text:'…', timeout:4000 })
 
     Каждый toast живёт `timeout` мс (по умолч. 4000), автоскрытие.
-    Неблокирующий — складывается стопкой снизу-справа.
+    Неблокирующий — складывается стопкой снизу-слева на десктопе (V4,
+    AUDIT-WRITE-FLOW): панель действий формы везде по проекту прижата
+    вправо (`justify-end` — new_story, story_settings, contest_submit),
+    и справа тост вставал ровно поверх «Сақтау»/«Болдырмау». На мобильном
+    — по центру снизу, как раньше.
 {% endcomment %}
 <div aria-live="polite" aria-atomic="true"
      x-data="{
@@ -18,7 +22,7 @@
          remove(id) { this.items = this.items.filter(i => i.id !== id); }
      }"
      @toast.window="add($event.detail)"
-     class="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex flex-col items-center gap-2 px-4 sm:right-6 sm:inset-x-auto sm:items-end">
+     class="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex flex-col items-center gap-2 px-4 sm:left-6 sm:inset-x-auto sm:items-start">
 
     <template x-for="t in items" :key="t.id">
         <div role="status"

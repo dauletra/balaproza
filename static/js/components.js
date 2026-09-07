@@ -229,3 +229,22 @@ document.addEventListener('alpine:init', function () {
         };
     });
 });
+
+/* Открытие страницы с #якорем ведёт не только к месту, но и в поле —
+ * иначе якорь без фокуса заставляет искать поле самому (V6,
+ * AUDIT-WRITE-FLOW: чек-лист вёл на верх /settings/, а не в аннотацию).
+ * Браузер сам докручивает до цели; здесь только фокус — на самой цели,
+ * если она поле ввода, иначе на первом поле внутри нее (тег и якорь
+ * вида #cover указывают на обёртку, а не на настоящий input). Не в
+ * `alpine:init`: цель — обычный DOM-узел, отрисованный сервером, и
+ * Alpine над ним ничего не пересоздаёт. */
+document.addEventListener('DOMContentLoaded', function () {
+    if (!location.hash) return;
+    var target;
+    try { target = document.querySelector(location.hash); } catch (e) { return; }
+    if (!target) return;
+    var field = target.matches('input, textarea, select')
+        ? target
+        : target.querySelector('input, textarea, select');
+    if (field) field.focus({ preventScroll: true });
+});

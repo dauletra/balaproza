@@ -318,6 +318,13 @@ def chapter_editor(request, slug, chapter=None):
         # Пишется рабочая копия, читателю невидимая (BR-79), — поэтому
         # автосохранение доступно и публичной работе тоже.
         'autosave_enabled': story is not None,
+        # V14 (AUDIT-WRITE-FLOW): «Модерацияға жіберу» стояла активной и
+        # на первой главе новой работы, где аннотации и жас белгісі ещё
+        # нет и быть не может, — гарантированный отказ после нажатия.
+        # Тот же вопрос, что уже отвечает publish_panel.html на
+        # manage_story.
+        'can_submit': data.can_submit_for_review(story) if story else False,
+        'missing':    data.missing_for_review(story) if story else [],
     })
 
 

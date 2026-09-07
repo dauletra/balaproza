@@ -108,25 +108,29 @@
             <span>Шығарма <b class="font-semibold text-slate-800">жоба</b> болып құрылады — оны әзірге сен ғана көресің. Дайын болғанда модерацияға жібересің.</span>
         </p>
 
-        <div class="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-5">
-            <a href="{% url 'core:my_stories' %}"
-               class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
-                Болдырмау
-            </a>
-            {% include "components/button.html" with kind="primary" size="md" label="Жазуға кірісу" icon="pen" type="submit" %}
+        <div class="flex flex-col gap-3 border-t border-slate-100 pt-5">
+            {% comment %}
+                Согласие было отдельным чекбоксом — девятым шагом формы,
+                который ничего не добавляет: согласие на детской платформе
+                даёт законный представитель при регистрации, а здесь оно
+                работало трением. Строкой — но **перед** кнопкой и весом
+                обычного текста, а не мельче и правым подвалом после неё
+                (V15, AUDIT-WRITE-FLOW): юридически значимая строка не
+                должна быть самым незаметным элементом экрана.
+            {% endcomment %}
+            <p class="font-sans text-sm leading-relaxed text-slate-700">
+                «Жазуға кірісу» дегенде
+                <a href="{% url 'core:legal_publishing' %}" class="font-semibold text-brand hover:underline">жариялау ережелерімен</a>
+                келісесің.
+            </p>
+            <div class="flex flex-wrap items-center justify-end gap-3">
+                <a href="{% url 'core:my_stories' %}"
+                   class="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                    Болдырмау
+                </a>
+                {% include "components/button.html" with kind="primary" size="md" label="Жазуға кірісу" icon="pen" type="submit" %}
+            </div>
         </div>
-
-        {% comment %}
-            Согласие было отдельным чекбоксом — девятым шагом формы, который
-            ничего не добавляет: согласие на детской платформе даёт законный
-            представитель при регистрации, а здесь оно работало трением.
-            Строкой под кнопкой оно остаётся на виду и остаётся ссылкой.
-        {% endcomment %}
-        <p class="text-right font-sans text-xs leading-relaxed text-slate-500">
-            «Жазуға кірісу» дегенде
-            <a href="{% url 'core:legal_publishing' %}" class="font-semibold text-brand hover:underline">жариялау ережелерімен</a>
-            келісесің.
-        </p>
     </form>
 {% endif %}
 {% endblock %}

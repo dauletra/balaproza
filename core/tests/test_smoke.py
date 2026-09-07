@@ -346,6 +346,14 @@ class MessagesReachTheToastHost(TestCase):
     def test_no_messages_no_script(self):
         self.assertNotIn('DOMContentLoaded', self._rendered_base())
 
+    def test_the_host_stacks_on_the_left_not_over_the_action_bar(self):
+        """V4 (AUDIT-WRITE-FLOW): справа тост вставал ровно поверх
+        «Сақтау»/«Болдырмау» — панели действий по проекту прижаты вправо
+        (`justify-end`: new_story, story_settings, contest_submit)."""
+        html = self._rendered_base()
+        self.assertIn('sm:left-6', html)
+        self.assertNotIn('sm:right-6', html)
+
     def test_each_message_becomes_its_own_event_with_a_matching_kind(self):
         """`message.tags` дословно совпадает со словарём `kind` у
         `toast_host` — своего маппинга уровень → kind не требуется."""

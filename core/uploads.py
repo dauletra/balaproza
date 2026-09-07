@@ -46,8 +46,11 @@ def validate_raster_image(file) -> None:
     """
     ext = _ext(file.name)
     if ext not in RASTER_FORMATS:
+        # V2 (AUDIT-WRITE-FLOW): пометка правила — читателю коду, не
+        # автору-ребёнку в тосте. `(BR-46)` в самом сообщении здесь не
+        # место; ссылка на правило остаётся в докстринге и в docs/.
         raise ValidationError(
-            'Тек растр сурет: png, jpg, webp. SVG қабылданбайды (BR-46).')
+            'Тек растр сурет: png, jpg, webp. SVG қабылданбайды.')
     if file.size > RASTER_MAX_BYTES:
         raise ValidationError(
             f'Файл тым үлкен — {RASTER_MAX_BYTES // (1024 * 1024)} '

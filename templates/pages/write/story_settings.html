@@ -100,7 +100,7 @@
             рисовал за него зелёную галку. Пустое значение — отдельное
             состояние «әлі таңдалмаған», из черновика с ним не выйти.
         {% endcomment %}
-        <fieldset class="flex flex-col gap-2">
+        <fieldset id="audience" class="flex flex-col gap-2">
             <legend class="mb-1 font-sans text-sm font-semibold text-slate-800">
                 Жас белгісі <span class="text-status-error-fg" aria-hidden="true">*</span>
             </legend>
@@ -151,7 +151,7 @@
             встретиться раньше единственного поля, которое можно пропустить
             (V13 в AUDIT-WRITE-FLOW.md).
         {% endcomment %}
-        <div class="grid grid-cols-1 gap-4 border-t border-slate-100 pt-5 sm:grid-cols-[120px_1fr] sm:items-start">
+        <div id="cover" class="grid grid-cols-1 gap-4 border-t border-slate-100 pt-5 sm:grid-cols-[120px_1fr] sm:items-start">
             {% include "components/cover_placeholder.html" with story=story cls="aspect-[2/3] w-[120px] rounded-md shadow-sm" letter_cls="text-5xl" %}
 
             <div class="flex flex-col gap-2">

@@ -293,6 +293,12 @@ def checklist_links(story) -> list:
     `publish_checklist` отдаёт только состояние. Пункт без адреса — пункт,
     который автор не может закрыть: чек-лист, показывающий недостачу и не
     ведущий к полю, заставляет искать это поле самому.
+
+    Пункты, ведущие в баптаулар, несут ещё и якорь своего поля (V6,
+    AUDIT-WRITE-FLOW) — без него ссылка отправляла на верх `/settings/`
+    целиком, а панель обещала ровно обратное. `id` совпадает с тем, что
+    несёт поле в `story_settings.html` (`t-annotation` — префикс
+    `textarea.html`, остальные — свои разделы).
     """
     if story is None:
         return []
@@ -302,8 +308,14 @@ def checklist_links(story) -> list:
                             kwargs={'slug': story.slug, 'chapter': story.text_chapter})
     else:
         text_href = reverse('core:chapter_new', kwargs={'slug': story.slug})
-    hrefs = {'settings': settings_href, 'text': text_href}
-    return [{**item, 'href': hrefs[item['target']]}
+    field_anchor = {
+        'annotation': 't-annotation', 'audience': 'audience',
+        'cover': 'cover', 'tags': 'tags',
+    }
+    hrefs = {'text': text_href}
+    for key, anchor in field_anchor.items():
+        hrefs[key] = f'{settings_href}#{anchor}'
+    return [{**item, 'href': hrefs.get(item['key'], settings_href)}
             for item in data.publish_checklist(story)]
 
 
