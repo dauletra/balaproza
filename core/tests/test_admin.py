@@ -32,6 +32,7 @@ from core.models import (
     User,
 )
 from core.templatetags.balaproza import outcome_label
+from core.tests import factories
 from core.tests.base import TestCase
 
 
@@ -224,8 +225,7 @@ class MediaUploadsTakeRasterOnly(TestCase):
                     {'image': upload})
 
     def test_a_raster_lands_under_its_contest_and_an_svg_does_not_land(self):
-        png = self._form(SimpleUploadedFile('эмблема.png', b'\x89PNG demo',
-                                            content_type='image/png'))
+        png = self._form(factories.tiny_image('эмблема.png'))
         self.assertTrue(png.is_valid(), png.errors)
         award = png.save()
         self.assertTrue(award.image.name.startswith(f'awards/{award.contest.slug}/'))

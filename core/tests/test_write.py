@@ -248,8 +248,9 @@ class TheTextButtonOpensTheTextThatExists(TestCase):
 
         manage = self.client.get(
             reverse('core:manage_story', kwargs={'slug': 'aidana-koshe'}))
+        chapter_id = Chapter.objects.get(story__slug='aidana-koshe', number=1).pk
         self.assertContains(manage, reverse(
-            'core:chapter_edit', kwargs={'slug': 'aidana-koshe', 'chapter': 1}))
+            'core:chapter_edit', kwargs={'slug': 'aidana-koshe', 'chapter': chapter_id}))
         self.assertNotContains(manage, reverse(
             'core:chapter_new', kwargs={'slug': 'aidana-koshe'}))
 
@@ -324,7 +325,7 @@ class ManageStoryShowsTheWorkAndItsParts(TestCase):
                 self.assertContains(response, chapter.title)
                 self.assertContains(response, reverse(
                     'core:chapter_edit',
-                    kwargs={'slug': self.SLUG, 'chapter': chapter.number}))
+                    kwargs={'slug': self.SLUG, 'chapter': chapter.pk}))
         for route in ('core:chapter_new', 'core:story_settings', 'core:story_detail'):
             self.assertContains(response, reverse(route, kwargs={'slug': self.SLUG}))
         self.assertContains(response, 'open-delete-confirm')
@@ -574,11 +575,11 @@ class TheChapterEditorReportsTheTruth(TestCase):
         self.assertNotIn('Жоба сақталды', fresh)
         self.assertNotIn('setInterval', fresh)
 
+        first_chapter = Chapter.objects.get(story__slug=self.SLUG, number=1)
         existing = self.client.get(reverse(
-            'core:chapter_edit', kwargs={'slug': self.SLUG, 'chapter': 1}))
+            'core:chapter_edit', kwargs={'slug': self.SLUG, 'chapter': first_chapter.pk}))
         self.assertContains(existing, 'Жоба сақталды')
-        self.assertContains(existing,
-                            f'value="{data.chapter_of(self.SLUG, 1).title}"')
+        self.assertContains(existing, f'value="{first_chapter.title}"')
         self.assertContains(existing, 'Бірде ерте таңда')
 
     def test_an_unknown_work_has_no_editor(self):
@@ -764,9 +765,7 @@ class StorySettingsCoverUpload(TestCase):
         self.assertEqual(Story.objects.get(slug=self.SLUG).title, before)
 
     def test_png_is_accepted(self):
-        cover = SimpleUploadedFile('мұқаба.png', b'\x89PNG demo',
-                                   content_type='image/png')
-        self._post(cover=cover)
+        self._post(cover=factories.tiny_image('мұқаба.png'))
         story = Story.objects.get(slug=self.SLUG)
         self.assertTrue(story.cover.name.startswith(f'covers/{self.SLUG}'))
 
@@ -796,6 +795,19 @@ class StorySettingsCoverUpload(TestCase):
                                    content_type='image/svg+xml')
         self._post(cover=cover, tags='мүлдем-жаңа-тег')
         self.assertFalse(Tag.objects.filter(name='мүлдем-жаңа-тег').exists())
+
+    def test_remove_cover_clears_it_without_a_new_file(self):
+        """BR-86: третье состояние рядом с «новый файл» и «пусто значит не
+        меняем» — раньше убрать обложку, не заменив её другой, было нечем."""
+        self._post(cover=factories.tiny_image('мұқаба.png'))
+        self.assertTrue(Story.objects.get(slug=self.SLUG).cover)
+        self._post(remove_cover='on')
+        self.assertFalse(Story.objects.get(slug=self.SLUG).cover)
+
+    def test_a_new_file_wins_over_remove_cover(self):
+        self._post(cover=factories.tiny_image('бірінші.png'))
+        self._post(cover=factories.tiny_image('екінші.jpg'), remove_cover='on')
+        self.assertTrue(Story.objects.get(slug=self.SLUG).cover)
 
 
 class StorySettingsTagResolution(TestCase):
@@ -851,7 +863,7 @@ class ChapterEditorSavesADraft(TestCase):
         self.assertEqual(chapter.char_count, len('Бір кездері...'))
         self.assertEqual(story.status, 'NotPublished')
         self.assertRedirects(r, reverse(
-            'core:chapter_edit', kwargs={'slug': self.SLUG, 'chapter': 1}))
+            'core:chapter_edit', kwargs={'slug': self.SLUG, 'chapter': chapter.pk}))
 
     def test_empty_body_saves_nothing(self):
         self.client.post(
@@ -909,8 +921,9 @@ class ChapterEditorSavesADraft(TestCase):
         self.client.post(
             reverse('core:chapter_new', kwargs={'slug': self.SLUG}),
             {'title': '1-бөлім', 'body': 'Сақталған мәтін.', 'action': 'draft'})
+        chapter_id = Chapter.objects.get(story__slug=self.SLUG, number=1).pk
         r = self.client.post(
-            reverse('core:chapter_edit', kwargs={'slug': self.SLUG, 'chapter': 1}),
+            reverse('core:chapter_edit', kwargs={'slug': self.SLUG, 'chapter': chapter_id}),
             {'title': '', 'body': 'Терілген жаңа мәтін.', 'action': 'draft'})
         self.assertContains(r, 'Терілген жаңа мәтін.')
         self.assertNotContains(r, 'Сақталған мәтін.')
@@ -922,8 +935,9 @@ class ChapterEditorSavesADraft(TestCase):
         self.client.post(
             reverse('core:chapter_new', kwargs={'slug': self.SLUG}),
             {'title': '1-бөлім', 'body': 'Бастапқы мәтін.', 'action': 'draft'})
+        chapter_id = Chapter.objects.get(story__slug=self.SLUG, number=1).pk
         self.client.post(
-            reverse('core:chapter_edit', kwargs={'slug': self.SLUG, 'chapter': 1}),
+            reverse('core:chapter_edit', kwargs={'slug': self.SLUG, 'chapter': chapter_id}),
             {'title': '1-бөлім (өңделген)', 'body': 'Жаңа мәтін.', 'action': 'draft'})
         story = Story.objects.get(slug=self.SLUG)
         self.assertEqual(story.chapter_set.count(), 1)
@@ -989,7 +1003,7 @@ class ChapterEditorSavesAPoll(TestCase):
 
         self.client.post(
             reverse('core:chapter_edit',
-                    kwargs={'slug': self.SLUG, 'chapter': 1}),
+                    kwargs={'slug': self.SLUG, 'chapter': chapter.pk}),
             {'title': '1-бөлім', 'body': 'Мәтін.', 'action': 'draft',
              'poll_question': '', 'poll_option': ['', '']})
         chapter.refresh_from_db()
@@ -1014,20 +1028,23 @@ class AutosaveKeepsTheTextWithoutBeingAsked(TestCase):
                        kwargs={'slug': self.SLUG, 'chapter': chapter})
 
     def test_it_creates_the_chapter_and_names_its_number(self):
-        """Номер в ответе обязателен: без него редактор писал бы снова по
-        адресу новой главы и заводил вторую на каждом автосохранении."""
+        """`pk` в ответе обязателен (BR-83): без него редактор писал бы
+        снова по адресу новой главы и заводил вторую на каждом
+        автосохранении."""
         r = self.client.post(self._url(), {'title': '', 'body': 'Жаза бастадым'})
         self.assertEqual(r.status_code, 200)
         payload = r.json()
         self.assertTrue(payload['ok'])
-        self.assertEqual(payload['chapter'], 1)
-        self.assertIn('/chapter/1/autosave/', payload['autosave_url'])
         story = Story.objects.get(slug=self.SLUG)
-        self.assertEqual(story.chapter_set.get(number=1).body, 'Жаза бастадым')
+        chapter = story.chapter_set.get(number=1)
+        self.assertEqual(payload['chapter'], chapter.pk)
+        self.assertIn(f'/chapter/{chapter.pk}/autosave/', payload['autosave_url'])
+        self.assertEqual(chapter.body, 'Жаза бастадым')
 
     def test_a_second_autosave_updates_the_same_chapter(self):
         self.client.post(self._url(), {'title': '', 'body': 'Бірінші нұсқа'})
-        self.client.post(self._url(1), {'title': '', 'body': 'Екінші нұсқа'})
+        chapter_id = Story.objects.get(slug=self.SLUG).chapter_set.get(number=1).pk
+        self.client.post(self._url(chapter_id), {'title': '', 'body': 'Екінші нұсқа'})
         story = Story.objects.get(slug=self.SLUG)
         self.assertEqual(story.chapter_set.count(), 1)
         self.assertEqual(story.chapter_set.get(number=1).body, 'Екінші нұсқа')
@@ -1045,7 +1062,8 @@ class AutosaveKeepsTheTextWithoutBeingAsked(TestCase):
             reverse('core:chapter_new', kwargs={'slug': self.SLUG}), {
                 'title': '1-бөлім', 'body': 'Мәтін.', 'action': 'draft',
                 'poll_question': 'Кім жеңеді?', 'poll_option': ['Бірі', 'Екіншісі']})
-        self.client.post(self._url(1), {'title': '1-бөлім', 'body': 'Жаңа мәтін'})
+        chapter_id = Story.objects.get(slug=self.SLUG).chapter_set.get(number=1).pk
+        self.client.post(self._url(chapter_id), {'title': '1-бөлім', 'body': 'Жаңа мәтін'})
         chapter = Story.objects.get(slug=self.SLUG).chapter_set.get(number=1)
         self.assertEqual(chapter.body, 'Жаңа мәтін')
         self.assertEqual(chapter.poll.question, 'Кім жеңеді?')
@@ -1202,7 +1220,7 @@ class ModerationIsPerChapterNotPerWork(TestCase):
 
         self.client.post(
             reverse('core:chapter_edit',
-                    kwargs={'slug': self.serial.slug, 'chapter': 1}),
+                    kwargs={'slug': self.serial.slug, 'chapter': first.pk}),
             {'title': first.title, 'body': 'ТҮГЕЛ АУЫСТЫРЫЛҒАН МӘТІН',
              'action': 'submit_review'})
 
@@ -1240,8 +1258,9 @@ class ModerationIsPerChapterNotPerWork(TestCase):
     def test_editing_while_queued_replaces_what_was_submitted(self):
         """Автор правил текст после отправки, и модератор читал не то, что
         ему прислали. Вторая заявка при этом не заводится."""
+        first_id = self.serial.chapter_set.get(number=1).pk
         url = reverse('core:chapter_edit',
-                      kwargs={'slug': self.serial.slug, 'chapter': 1})
+                      kwargs={'slug': self.serial.slug, 'chapter': first_id})
         self.client.post(url, {'title': '1-бөлім', 'body': 'Бірінші нұсқа.',
                                'action': 'submit_review'})
         self.client.post(url, {'title': '1-бөлім', 'body': 'Түзетілген нұсқа.',
@@ -1258,7 +1277,7 @@ class ModerationIsPerChapterNotPerWork(TestCase):
         текста, который нечем восстановить, не остаётся."""
         first = self.serial.chapter_set.get(number=1)
         url = reverse('core:chapter_edit',
-                      kwargs={'slug': self.serial.slug, 'chapter': 1})
+                      kwargs={'slug': self.serial.slug, 'chapter': first.pk})
         for text in ('Бірінші түзету.', 'Екінші түзету.'):
             self.client.post(url, {'title': '1-бөлім', 'body': text,
                                    'action': 'submit_review'})
@@ -1476,3 +1495,199 @@ class OwnershipIsEnforced(TestCase):
         self.client.post(
             reverse('core:delete_story', kwargs={'slug': self.foreign.slug}))
         self.assertTrue(Story.objects.filter(pk=self.foreign.pk).exists())
+
+    def test_a_foreign_chapter_id_is_not_editable_deletable_or_movable(self):
+        """S5/BR-83: адрес кабинета — `pk`, но `pk` чужой главы своей
+        работой всё равно не находится."""
+        foreign_chapter = self.foreign.chapter_set.first()
+        if foreign_chapter is None:
+            foreign_chapter = Chapter.objects.create(
+                story=self.foreign, number=1, position=1, title='Бөтен', body='Мәтін.')
+        mine = factories.story(author=user('aidana'), chapters=1,
+                               format='serial', published=False, slug='aidana-idor-target')
+
+        edit = self.client.get(reverse(
+            'core:chapter_edit', kwargs={'slug': mine.slug, 'chapter': foreign_chapter.pk}))
+        self.assertEqual(edit.status_code, 404)
+
+        before = self.foreign.chapter_set.count()
+        self.client.post(reverse(
+            'core:chapter_delete', kwargs={'slug': mine.slug, 'chapter': foreign_chapter.pk}))
+        self.assertEqual(self.foreign.chapter_set.count(), before)
+
+        before_position = foreign_chapter.position
+        self.client.post(
+            reverse('core:chapter_move',
+                    kwargs={'slug': mine.slug, 'chapter': foreign_chapter.pk}),
+            {'direction': 'down'})
+        foreign_chapter.refresh_from_db()
+        self.assertEqual(foreign_chapter.position, before_position)
+
+        r = self.client.post(
+            reverse('core:chapter_autosave',
+                    kwargs={'slug': mine.slug, 'chapter': foreign_chapter.pk}),
+            {'title': 'Басып алынды', 'body': 'Мәтін'})
+        self.assertEqual(r.status_code, 404)
+
+
+class ChapterAddressIsAStableIdNotItsNumber(TestCase):
+    """S5 (AUDIT-WRITE-FLOW.md): кабинет адресует главу `pk` (BR-83).
+    Раньше GET на несуществующий номер рисовал пустой «новый» редактор, а
+    POST по тому же адресу заводил главу с этим самым номером — дыру в
+    нумерации."""
+
+    def setUp(self):
+        self.author = login_as_newcomer(self.client, 'stable_id_author')
+        self.story = factories.story(author=self.author, chapters=1,
+                                     format='serial', published=False,
+                                     slug='stable-id-work')
+
+    def test_an_unknown_chapter_id_is_not_found(self):
+        missing_id = Chapter.objects.order_by('-pk').first().pk + 1000
+        r = self.client.get(reverse(
+            'core:chapter_edit', kwargs={'slug': self.story.slug, 'chapter': missing_id}))
+        self.assertEqual(r.status_code, 404)
+
+    def test_posting_to_an_unknown_chapter_id_does_not_create_one(self):
+        missing_id = Chapter.objects.order_by('-pk').first().pk + 1000
+        before = self.story.chapter_set.count()
+        self.client.post(
+            reverse('core:chapter_edit',
+                    kwargs={'slug': self.story.slug, 'chapter': missing_id}),
+            {'title': 'Аты', 'body': 'Мәтіні осында', 'action': 'draft'})
+        self.assertEqual(self.story.chapter_set.count(), before)
+
+
+class SingleFormatCapsAtOneChapter(TestCase):
+    """S6 (AUDIT-WRITE-FLOW.md, BR-85): обратный переход формата запрещала
+    только форма настроек — прямой `/chapter/new/` был открыт всегда и
+    заводил `single`-работе вторую главу в обход интерфейса."""
+
+    def setUp(self):
+        self.author = login_as_newcomer(self.client, 'single_cap_author')
+        self.story = factories.story(author=self.author, chapters=1,
+                                     format='single', published=False,
+                                     slug='single-cap-work')
+
+    def test_a_direct_get_redirects_to_the_existing_chapter(self):
+        r = self.client.get(
+            reverse('core:chapter_new', kwargs={'slug': self.story.slug}))
+        self.assertRedirects(r, reverse(
+            'core:chapter_edit',
+            kwargs={'slug': self.story.slug, 'chapter': self.story.text_chapter}))
+
+    def test_a_direct_post_does_not_create_a_second_chapter(self):
+        self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.story.slug}),
+            {'title': 'Екінші мәтін', 'body': 'Мәтін.', 'action': 'draft'})
+        self.assertEqual(self.story.chapter_set.count(), 1)
+
+    def test_autosave_writes_into_the_existing_chapter_too(self):
+        self.client.post(
+            reverse('core:chapter_autosave_new', kwargs={'slug': self.story.slug}),
+            {'title': '', 'body': 'Жаңа нұсқа'})
+        self.assertEqual(self.story.chapter_set.count(), 1)
+        self.assertEqual(self.story.chapter_set.get().body, 'Жаңа нұсқа')
+
+
+class ChaptersCanBeDeletedAndReordered(TestCase):
+    """M3 (AUDIT-WRITE-FLOW.md, BR-84): ни удаления, ни перестановки не
+    было вовсе — таких маршрутов в `urls.py` не было."""
+
+    def setUp(self):
+        self.author = login_as_newcomer(self.client, 'reorder_author')
+        self.story = factories.story(author=self.author, chapters=3,
+                                     format='serial', published=False,
+                                     slug='reorder-work')
+        self.chapters = list(self.story.chapter_set.order_by('number'))
+
+    def test_deleting_a_chapter_closes_the_gap_in_numbering(self):
+        middle = self.chapters[1]
+        r = self.client.post(reverse(
+            'core:chapter_delete',
+            kwargs={'slug': self.story.slug, 'chapter': middle.pk}))
+        self.assertRedirects(r, reverse(
+            'core:manage_story', kwargs={'slug': self.story.slug}))
+        self.assertEqual(self.story.chapter_set.count(), 2)
+        remaining = list(self.story.chapter_set.order_by('position'))
+        self.assertEqual([c.number for c in remaining], [1, 2])
+        self.assertEqual([c.pk for c in remaining],
+                         [self.chapters[0].pk, self.chapters[2].pk])
+
+    def test_deleting_the_last_chapter_returns_the_work_to_draft(self):
+        for c in self.chapters:
+            self.client.post(reverse(
+                'core:chapter_delete', kwargs={'slug': self.story.slug, 'chapter': c.pk}))
+        self.story.refresh_from_db()
+        self.assertEqual(self.story.chapter_set.count(), 0)
+        self.assertEqual(self.story.status, 'NotPublished')
+
+    def test_moving_a_chapter_down_swaps_it_with_its_neighbor(self):
+        first = self.chapters[0]
+        self.client.post(
+            reverse('core:chapter_move',
+                    kwargs={'slug': self.story.slug, 'chapter': first.pk}),
+            {'direction': 'down'})
+        ordered = list(self.story.chapter_set.order_by('position'))
+        self.assertEqual([c.pk for c in ordered],
+                         [self.chapters[1].pk, self.chapters[0].pk, self.chapters[2].pk])
+        self.assertEqual([c.number for c in ordered], [1, 2, 3])
+
+    def test_moving_the_first_chapter_up_is_a_no_op(self):
+        first = self.chapters[0]
+        r = self.client.post(
+            reverse('core:chapter_move',
+                    kwargs={'slug': self.story.slug, 'chapter': first.pk}),
+            {'direction': 'up'})
+        self.assertEqual(r.status_code, 302)
+        ordered = list(self.story.chapter_set.order_by('position'))
+        self.assertEqual([c.pk for c in ordered], [c.pk for c in self.chapters])
+
+    def test_a_guest_cannot_delete_or_move(self):
+        guest = Client()
+        chapter = self.chapters[0]
+        for name in ('core:chapter_delete', 'core:chapter_move'):
+            r = guest.post(reverse(
+                name, kwargs={'slug': self.story.slug, 'chapter': chapter.pk}))
+            self.assertEqual(r.status_code, 302)
+            self.assertIn('/auth/login/', r['Location'])
+        self.assertEqual(self.story.chapter_set.count(), 3)
+
+    def test_deleting_a_chapter_detaches_its_comments_instead_of_relabeling(self):
+        """Комментарий швартуется к номеру (`StoryComment.chapter_number`),
+        не к `pk` главы. Без пересчёта удаление второй из трёх глав отдало
+        бы её номер прежней третьей — и комментарий про удалённый текст
+        читался бы как комментарий про чужой, занявший освободившийся
+        номер."""
+        about_first = factories.comment(self.story, chapter_number=1)
+        about_deleted = factories.comment(self.story, chapter_number=2)
+        about_last = factories.comment(self.story, chapter_number=3)
+        middle = self.chapters[1]
+
+        self.client.post(reverse(
+            'core:chapter_delete',
+            kwargs={'slug': self.story.slug, 'chapter': middle.pk}))
+
+        about_first.refresh_from_db()
+        about_deleted.refresh_from_db()
+        about_last.refresh_from_db()
+        self.assertEqual(about_first.chapter_number, 1)
+        self.assertIsNone(about_deleted.chapter_number)
+        self.assertEqual(about_last.chapter_number, 2)
+
+    def test_moving_a_chapter_carries_its_comments_along(self):
+        """Перестановка меняет номера местами — комментарий обязан
+        переехать вместе со своей главой, а не остаться на номере."""
+        about_first = factories.comment(self.story, chapter_number=1)
+        about_second = factories.comment(self.story, chapter_number=2)
+        first = self.chapters[0]
+
+        self.client.post(
+            reverse('core:chapter_move',
+                    kwargs={'slug': self.story.slug, 'chapter': first.pk}),
+            {'direction': 'down'})
+
+        about_first.refresh_from_db()
+        about_second.refresh_from_db()
+        self.assertEqual(about_first.chapter_number, 2)
+        self.assertEqual(about_second.chapter_number, 1)

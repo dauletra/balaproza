@@ -12,7 +12,7 @@
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -202,6 +202,7 @@ def story_settings(request, slug):
                 audience=form.cleaned_data['audience'],
                 status=form.cleaned_data['status'],
                 cover=form.cleaned_data['cover'],
+                remove_cover=form.cleaned_data['remove_cover'],
                 tag_names=form.tag_names,
             )
             messages.success(request, 'Өзгертулер сақталды.')
@@ -235,11 +236,26 @@ def chapter_editor(request, slug, chapter=None):
     единственное, что автор писал часами, и до этого любая ошибка (пустой
     заголовок, вопрос опроса без вариантов) уносила его целиком, а тост
     при этом требовал «жаз мәтінін» — ровно то, что только что стёрли.
+
+    `chapter` в адресе — `pk`, а не номер (BR-83): кабинет не должен
+    зависеть от значения, которое сдвигается при удалении или перестановке
+    соседних глав.
     """
     story = data.story_by_slug_for_author(slug, _current_user(request))
-    current = (data.chapter_of(slug, chapter, as_author=True)
-               if story and chapter else None)
-    poll = data.poll_of(slug, chapter) if story and chapter else None
+    if (story is not None and chapter is None
+            and story.is_single and story.chapter_set.exists()):
+        # Прямой `/chapter/new/` на уже написанном `single` заводил бы
+        # вторую главу в обход интерфейса (S6, BR-85) — интерфейс всегда
+        # ведёт «Мәтінді өңдеу» в существующую.
+        messages.info(request, 'Бір бөлімді жұмыста бір ғана мәтін болады.')
+        return redirect('core:chapter_edit', slug=slug, chapter=story.text_chapter)
+
+    current = data.chapter_by_id(story, chapter) if story and chapter else None
+    if story is not None and chapter is not None and current is None:
+        # Несуществующий или чужой `pk` — 404, а не пустой «новый» редактор:
+        # тем и заводилась дыра в нумерации до этого (S5).
+        raise Http404
+    poll = getattr(current, 'poll', None)
 
     if request.method == 'POST' and story is not None:
         form = ChapterForm(request.POST)
@@ -265,7 +281,7 @@ def chapter_editor(request, slug, chapter=None):
                         + ', '.join(data.missing_labels(story)) + '.')
             else:
                 messages.success(request, 'Жоба сақталды.')
-            return redirect('core:chapter_edit', slug=slug, chapter=saved.number)
+            return redirect('core:chapter_edit', slug=slug, chapter=saved.pk)
     else:
         form = ChapterForm(initial=_chapter_initial(story, current, poll))
 
@@ -302,12 +318,14 @@ def chapter_autosave(request, slug, chapter=None):
     до разделения записанная глава немедленно уходила читателю.
 
     Ответ — JSON, а не редирект: у запроса нет страницы, на которую можно
-    вернуться. `chapter` в ответе обязателен: первый автосейв новой главы
-    присваивает ей номер, и редактор обязан переключиться на него, иначе
-    следующий заход заведёт вторую главу.
+    вернуться. `chapter` в ответе (`pk`, BR-83) обязателен: первый автосейв
+    новой главы присваивает ей id, и редактор обязан переключиться на него,
+    иначе следующий заход заведёт вторую главу.
     """
     story = data.story_by_slug_for_author(slug, request.user)
     if story is None:
+        return JsonResponse({'ok': False, 'reason': 'not_found'}, status=404)
+    if chapter is not None and data.chapter_by_id(story, chapter) is None:
         return JsonResponse({'ok': False, 'reason': 'not_found'}, status=404)
 
     form = ChapterAutosaveForm(request.POST)
@@ -319,13 +337,37 @@ def chapter_autosave(request, slug, chapter=None):
                                   body=form.cleaned_data['body'])
     return JsonResponse({
         'ok': True,
-        'chapter': saved.number,
+        'chapter': saved.pk,
         'url': reverse('core:chapter_edit',
-                       kwargs={'slug': slug, 'chapter': saved.number}),
+                       kwargs={'slug': slug, 'chapter': saved.pk}),
         'autosave_url': reverse('core:chapter_autosave',
-                                kwargs={'slug': slug, 'chapter': saved.number}),
+                                kwargs={'slug': slug, 'chapter': saved.pk}),
         'saved_at': timezone.localtime().strftime('%H:%M'),
     })
+
+
+@require_POST
+@login_required
+def chapter_delete(request, slug, chapter):
+    """Удалить главу (FR-WRITE-05, BR-84) — опасная зона, как и вся работа:
+    POST только из `delete_confirm_modal.html`. Чужая работа не находится
+    (IDOR, `story_by_slug_for_author`), чужой `pk` внутри своей — тоже
+    (`delete_chapter` фильтрует через `story.chapter_set`)."""
+    story = data.story_by_slug_for_author(slug, request.user)
+    if story is not None and data.delete_chapter(story, chapter):
+        messages.success(request, 'Бөлім өшірілді.')
+    return redirect('core:manage_story', slug=slug)
+
+
+@require_POST
+@login_required
+def chapter_move(request, slug, chapter):
+    """Главу на место выше/ниже (FR-WRITE-05, BR-84). Без toast — новый
+    порядок в списке кабинета виден и так."""
+    story = data.story_by_slug_for_author(slug, request.user)
+    if story is not None:
+        data.move_chapter(story, chapter, request.POST.get('direction', ''))
+    return redirect('core:manage_story', slug=slug)
 
 
 @require_POST

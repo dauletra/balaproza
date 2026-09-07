@@ -188,8 +188,9 @@ class ReadingEffortIsHonest(TestCase):
     def test_text_chapter_points_at_the_only_chapter(self):
         """Кнопка «Мәтін» обязана вести в существующую главу, а не в
         пустой редактор: у `single` глава ровно одна, и второй быть не
-        должно."""
-        self.assertEqual(make.story(chapters=1).text_chapter, 1)
+        должно. Адрес — `pk` главы (BR-83), не её отображаемый номер."""
+        single = make.story(chapters=1)
+        self.assertEqual(single.text_chapter, single.chapter_set.get().pk)
         self.assertIsNone(make.story(chapters=0, format='single').text_chapter)
         self.assertIsNone(make.story(chapters=3, format='serial').text_chapter)
 

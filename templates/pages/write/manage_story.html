@@ -136,8 +136,33 @@
                             </div>
                         </div>
 
+                        {% if not story.is_single %}
+                        <div class="flex shrink-0 items-center gap-0.5">
+                            {% if not forloop.first %}
+                            <form method="post" action="{% url 'core:chapter_move' slug=story.slug chapter=c.pk %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="direction" value="up">
+                                <button type="submit" aria-label="Жоғары жылжыту"
+                                        class="grid h-8 w-8 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                                    {% include "components/icon.html" with name="chevron-down" size=14 cls="rotate-180" only %}
+                                </button>
+                            </form>
+                            {% endif %}
+                            {% if not forloop.last %}
+                            <form method="post" action="{% url 'core:chapter_move' slug=story.slug chapter=c.pk %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="direction" value="down">
+                                <button type="submit" aria-label="Төмен жылжыту"
+                                        class="grid h-8 w-8 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                                    {% include "components/icon.html" with name="chevron-down" size=14 only %}
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
                         <div class="flex shrink-0 items-center gap-1.5">
-                            <a href="{% url 'core:chapter_edit' slug=story.slug chapter=c.number %}"
+                            <a href="{% url 'core:chapter_edit' slug=story.slug chapter=c.pk %}"
                                aria-label="Өңдеу"
                                class="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700">
                                 {% include "components/icon.html" with name="pen" size=14 only %}
@@ -150,6 +175,17 @@
                                 {% include "components/icon.html" with name="eye" size=14 only %}
                             </a>
                             {% endwith %}
+                            <button type="button" x-data
+                                    @click="$dispatch('open-delete-confirm', {
+                                        name: '{{ c.title|escapejs }}',
+                                        confirm_url: '{% url 'core:chapter_delete' slug=story.slug chapter=c.pk %}',
+                                        title: 'Бөлімді өшіру керек пе?',
+                                        body: '«{{ c.title|escapejs }}» бөлімі қайтарылмастай өшіріледі. Пікірлер мен реакциялар да жоғалады.'
+                                    })"
+                                    aria-label="Өшіру"
+                                    class="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-status-error-bg hover:text-status-error-fg">
+                                {% include "components/icon.html" with name="trash" size=14 only %}
+                            </button>
                         </div>
                     </li>
                 {% endfor %}

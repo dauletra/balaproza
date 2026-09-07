@@ -92,10 +92,11 @@ def author_by_username(username: str):
 
 
 def update_profile(user, *, pen_name: str, name: str, bio: str,
-                   age, gender: str, avatar) -> None:
+                   age, gender: str, avatar, remove_avatar: bool = False) -> None:
     """Сохранить свой профиль (FR-PROF-01). `age`/`gender` — самодекларация
     (DEC-24); пустой `avatar` значит «не меняем»: автор не переизбирает файл
-    при каждом сохранении."""
+    при каждом сохранении. `remove_avatar` — явное снятие (BR-86), третье
+    состояние рядом с «не меняем»; новый файл важнее снятия."""
     user.pen_name = pen_name
     user.name = name
     user.bio = bio
@@ -103,6 +104,8 @@ def update_profile(user, *, pen_name: str, name: str, bio: str,
     user.gender = gender
     if avatar:
         user.avatar = avatar
+    elif remove_avatar:
+        user.avatar = ''
     user.save()
 
 

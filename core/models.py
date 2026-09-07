@@ -9,11 +9,10 @@
 
 from datetime import timedelta
 from functools import cached_property
-from pathlib import Path
 
 from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.indexes import GinIndex
-from django.core.validators import FileExtensionValidator, MaxValueValidator
+from django.core.validators import MaxValueValidator
 from django.db import models, transaction
 from django.utils import timezone
 
@@ -42,19 +41,7 @@ from .managers import (
     from_annotation,
     viewer_choice,
 )
-
-
-# Растр и только растр (BR-46): файл из `/media/` открывается в origin сайта,
-# а SVG — документ со скриптами. По расширению, а не по содержимому:
-# `ImageField` потребовал бы Pillow ради одного поля.
-RASTER_ONLY = FileExtensionValidator(
-    ['png', 'jpg', 'jpeg', 'webp'],
-    message='Тек растр сурет: png, jpg, webp. SVG қабылданбайды (BR-46).',
-)
-
-
-def _ext(filename: str) -> str:
-    return Path(filename).suffix.lower()
+from .uploads import _ext, validate_raster_image
 
 
 def story_cover_path(instance, filename):
@@ -99,7 +86,7 @@ class User(AbstractUser):
     gender = models.CharField('жынысы', max_length=4, choices=GENDER_CHOICES,
                               blank=True)
     avatar = models.FileField('аватар', upload_to=user_avatar_path, blank=True,
-                              max_length=200, validators=[RASTER_ONLY])
+                              max_length=200, validators=[validate_raster_image])
     # Колонка, а не `follower_set.count()`: её читают `ORDER BY` ленты
     # «Жаңа авторлар» и `WHERE` оси каталога. Пересчитывается по строкам
     # `Follow`, а не сдвигается на единицу, — так она сама себя исправляет.
@@ -339,7 +326,7 @@ class Story(models.Model):
                                on_delete=models.CASCADE, related_name='stories')
     # Пусто — `cover_placeholder.html` рисует плашку по тону жанра.
     cover = models.FileField('мұқаба', upload_to=story_cover_path, blank=True,
-                             max_length=200, validators=[RASTER_ONLY])
+                             max_length=200, validators=[validate_raster_image])
     annotation = models.TextField('аннотация', blank=True)
 
     primary_genre = models.ForeignKey(Genre, verbose_name='негізгі жанр',
@@ -462,16 +449,17 @@ class Story(models.Model):
 
     @property
     def text_chapter(self):
-        """Номер главы одночастного произведения; None — текста нет.
+        """`pk` главы одночастного произведения; None — текста нет.
 
         У `single` глава ровно одна, и «Мәтін» обязана вести в неё, а не в
         пустой редактор: иначе автор заведёт вторую там, где текст один по
-        определению.
+        определению. Отдаёт `pk`, а не `number` (BR-83): адрес кабинета
+        держится на стабильном id, номер — читательский и им не адресуют.
         """
         if not self.is_single:
             return None
         first = self.chapter_set.first()
-        return first.number if first else None
+        return first.pk if first else None
 
     # ── Статус и время ───────────────────────────────────────────────────
     @property
@@ -678,7 +666,15 @@ class Chapter(models.Model):
 
     story = models.ForeignKey(Story, verbose_name='шығарма',
                               on_delete=models.CASCADE)
+    # Читательский номер — контиг 1..N, пересчитывается вслед за `position`
+    # (`queries/write._renumber_chapters`, BR-84). Кабинет адресует главу
+    # не им, а `pk` (BR-83): номер сдвигается при удалении/перестановке
+    # соседей, и адрес, завязанный на него, тихо открывал бы другую главу.
     number = models.PositiveSmallIntegerField('нөмірі')
+    # Порядок глав — то, чем управляет перестановка автора. Отдельно от
+    # `number`, чтобы кабинет не путал «на каком месте» с «под каким видом
+    # читателю» — они пересчитываются одной функцией, но это разные вопросы.
+    position = models.PositiveSmallIntegerField('реті', default=0)
     title = models.CharField('атауы', max_length=120)
     body = models.TextField('мәтіні', blank=True)
     # Денормализация от `body`: объём спрашивают на каждой странице, а
@@ -693,7 +689,7 @@ class Chapter(models.Model):
     created_at = models.DateTimeField('жасалған', auto_now_add=True)
 
     class Meta:
-        ordering = ('number',)
+        ordering = ('position', 'number')
         constraints = [
             models.UniqueConstraint(fields=('story', 'number'),
                                     name='unique_chapter_number_per_story'),
@@ -985,7 +981,7 @@ class Contest(models.Model):
     # Афиша грузится админом (BR-47a). Пусто — платформа рисует свою.
     poster = models.FileField('афиша', upload_to=contest_poster_path,
                               blank=True, max_length=200,
-                              validators=[RASTER_ONLY])
+                              validators=[validate_raster_image])
     # Семейство повторяющегося конкурса (BR-47); пусто — разовый. Слагом,
     # а не совпадением имён: у выпусков имена расходятся.
     series = models.SlugField('серия', max_length=64, blank=True)
@@ -1215,7 +1211,7 @@ class ContestAward(models.Model):
     title = models.CharField('атауы', max_length=80)
     image = models.FileField('эмблема', upload_to=award_image_path,
                              blank=True, max_length=200,
-                             validators=[RASTER_ONLY])
+                             validators=[validate_raster_image])
     description = models.CharField('сипаттамасы', max_length=200, blank=True)
     position = models.PositiveSmallIntegerField('реті', default=0)
 

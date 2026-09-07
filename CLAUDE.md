@@ -9,7 +9,7 @@
 
 **Переделка авторского флоу по аудиту** — разбор, план на 11 этапов и
 текущее положение в [`AUDIT-WRITE-FLOW.md`](AUDIT-WRITE-FLOW.md).
-**Этапы 0–5 сделаны, 6–11 впереди** (что дальше и чем рискован каждый —
+**Этапы 0–7 сделаны, 8–11 впереди** (что дальше и чем рискован каждый —
 раздел 9 того же файла).
 
 Аудит разбирал путь от `/write/new/` до появления работы в каталоге без
@@ -44,8 +44,9 @@
 ## Стек и команды
 
 Python 3.13 · uv · Django 6.0.5 · PostgreSQL (`DATABASE_URL` в `.env`, образец —
-`.env.example`; роли нужен `CREATEDB` для тестов) · Tailwind CSS v4 через
-`@tailwindcss/cli` · Alpine.js 3 и htmx 2 self-hosted.
+`.env.example`; роли нужен `CREATEDB` для тестов) · Pillow (растровые поля,
+BR-86) · Tailwind CSS v4 через `@tailwindcss/cli` · Alpine.js 3 и htmx 2
+self-hosted.
 
 ```
 uv run python manage.py runserver
@@ -81,8 +82,13 @@ core/
 ├── admin.py       редакционный инструмент: теги, конкурсы, справочники.
 │                  Модерация переехала в раздел /moderation/ (DEC-71) —
 │                  действия списка остались запасным путём
+├── uploads.py     растровые поля: проверка контента и пережатие (Pillow,
+│                  BR-86). Чистые функции, моделей не знает
+├── counters.py    │ сигналы post_save/post_delete — то, что доменные
+├── media_cleanup.py │ функции не видят (массовое удаление, каскад):
+│                  счётчики и уборка файла обложки/аватара/афиши/эмблемы
 ├── management/commands/  seed_demo + _corpus.py (демо-содержимое литералами)
-└── tests/         13 файлов; base.py (login_as), factories.py, runner.py
+└── tests/         base.py (login_as), factories.py, runner.py
 templates/         base.html, components/, partials/, pages/ — всё в корневой
 static/js/         components.js (Alpine-компоненты портала), reader.js (читалка),
                    editor.js (автосохранение редактора, BR-78)

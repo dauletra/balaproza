@@ -17,7 +17,7 @@
         <a href="{% url 'core:my_stories' %}" class="hover:text-brand">Менің шығармаларым</a> /
         <a href="{% url 'core:manage_story' slug=story.slug %}" class="hover:text-brand">{{ story.title }}</a> /
         <span class="text-slate-700">
-            {% if story.is_single %}мәтін{% elif is_new %}жаңа бөлім{% else %}{{ chapter }}-бөлім{% endif %}
+            {% if story.is_single %}мәтін{% elif is_new %}жаңа бөлім{% else %}{{ current.number }}-бөлім{% endif %}
         </span>
     </p>
 
@@ -32,7 +32,7 @@
                 {% elif is_new %}
                     Атау + мәтін. Жіберген соң модерациядан өтеді.
                 {% else %}
-                    {{ chapter }}-бөлім · «{{ current.title|default:"" }}»
+                    {{ current.number }}-бөлім · «{{ current.title|default:"" }}»
                 {% endif %}
             </p>
         </div>

@@ -8,11 +8,13 @@
 """
 
 from django.db import transaction
-from django.db.models import Max
+from django.db.models import Case, Max, PositiveSmallIntegerField, Value, When
 from django.utils import timezone
 
 from ..domain.slugs import slugify_kz
-from ..models import Chapter, ChapterPoll, ChapterRevision, PollOption, Story
+from ..models import (
+    Chapter, ChapterPoll, ChapterRevision, PollOption, Story, StoryComment,
+)
 from .author import (
     can_submit_for_review,
     chapter_needs_submission,
@@ -42,12 +44,16 @@ def create_story(author, *, title: str, format: str, genre_primary) -> Story:
 
 def update_story_settings(story, *, title: str, annotation: str, format: str,
                           genre_primary, genre_secondary, audience: str,
-                          status: str, cover, tag_names) -> Story:
+                          status: str, cover, remove_cover: bool = False,
+                          tag_names) -> Story:
     """Сохранить баптаулар (FR-WRITE-04).
 
     `status` и `cover` — пусто значит «не меняем»: радио статуса рендерится
     только для публичного сериала (BR-10a), а файл обложки автор не
-    выбирает при каждом сохранении настроек.
+    выбирает при каждом сохранении настроек. `remove_cover` — третье
+    состояние (BR-86): явно убрать обложку, не заменяя её другой. Новый
+    файл важнее снятия — отмеченный чекбокс рядом с выбранным файлом
+    значения не имеет.
     """
     story.title = title
     story.annotation = annotation
@@ -63,17 +69,54 @@ def update_story_settings(story, *, title: str, annotation: str, format: str,
         story.completed_by_author = status == 'Completed'
     if cover:
         story.cover = cover
+    elif remove_cover:
+        story.cover = ''
     story.save()
     story.tags.set(resolve_story_tags(tag_names))
     story.refresh_status()
     return story
 
 
+def chapter_by_id(story, chapter_id):
+    """Глава этой работы по `pk` — стабильный адрес кабинета (BR-83).
+
+    Фильтр идёт через `story.chapter_set`, а не голый `Chapter.objects`:
+    чужой `pk` той же дорогой не находится (IDOR) — так же, как
+    `story_by_slug_for_author` режет по автору выше по цепочке.
+    """
+    if chapter_id is None:
+        return None
+    chapter = (story.chapter_set.filter(pk=chapter_id)
+              .select_related('poll', 'published_revision').first())
+    if chapter is not None:
+        chapter.as_author = True
+    return chapter
+
+
+def _next_chapter_slot(story) -> int:
+    last = story.chapter_set.aggregate(Max('number'))['number__max']
+    return (last or 0) + 1
+
+
+def _resolve_chapter_id(story, chapter_id):
+    """Куда на самом деле пишет `chapter_id is None` (BR-85).
+
+    У `single` глава ровно одна: прямой POST на `/chapter/new/` в обход
+    интерфейса не должен заводить вторую — он дописывает существующую.
+    `chapter_editor` уже отводит такой запрос редиректом; здесь та же
+    защита на случай прямого POST/автосохранения мимо страницы.
+    """
+    if chapter_id is not None or not story.is_single:
+        return chapter_id
+    existing = story.chapter_set.first()
+    return existing.pk if existing is not None else None
+
+
 @transaction.atomic
-def save_chapter(story, number, *, title: str, body: str,
+def save_chapter(story, chapter_id, *, title: str, body: str,
                  poll_question: str = '', poll_options=()) -> Chapter:
-    """Сохранить главу вместе с её опросом — новую (`number=None` берёт
-    следующий номер) или существующую (`update_or_create` по номеру).
+    """Сохранить главу вместе с её опросом — новую (`chapter_id=None` берёт
+    следующий номер) или существующую, по `pk` (BR-83).
 
     Одна дверь и одна транзакция, потому что для автора это одно действие:
     он нажал «сохранить». Порознь они означали бы состояние «глава есть,
@@ -83,16 +126,21 @@ def save_chapter(story, number, *, title: str, body: str,
     Что вправе прийти (вопрос без двух вариантов, слишком длинный текст),
     решено раньше — в `ChapterForm`. Здесь только применение.
     """
-    if number is None:
-        last = story.chapter_set.aggregate(Max('number'))['number__max']
-        number = (last or 0) + 1
-    chapter, _ = Chapter.objects.update_or_create(
-        story=story, number=number, defaults={'title': title, 'body': body})
+    chapter_id = _resolve_chapter_id(story, chapter_id)
+    if chapter_id is None:
+        number = _next_chapter_slot(story)
+        chapter = Chapter.objects.create(
+            story=story, number=number, position=number, title=title, body=body)
+    else:
+        chapter = story.chapter_set.get(pk=chapter_id)
+        chapter.title = title
+        chapter.body = body
+        chapter.save()
     _save_poll(chapter, poll_question, poll_options)
     return chapter
 
 
-def autosave_chapter(story, number, *, title: str, body: str) -> Chapter:
+def autosave_chapter(story, chapter_id, *, title: str, body: str) -> Chapter | None:
     """Автосохранение черновика главы (BR-78).
 
     Отдельная дверь от `save_chapter`, потому что у автосохранения другие
@@ -100,13 +148,121 @@ def autosave_chapter(story, number, *, title: str, body: str) -> Chapter:
     затирать его каждые три секунды содержимым полей, которых на экране
     может не быть, нельзя. И оно не требует законченности: пустой
     заголовок посреди набора — состояние, а не ошибка.
+
+    `None` — если `chapter_id` не находится в этой работе (BR-83): чужой
+    или устаревший id не заводит главу заново, вызывающая сторона отвечает
+    404, а не тихо создаёт дубль.
     """
-    if number is None:
-        last = story.chapter_set.aggregate(Max('number'))['number__max']
-        number = (last or 0) + 1
-    chapter, _ = Chapter.objects.update_or_create(
-        story=story, number=number, defaults={'title': title, 'body': body})
+    chapter_id = _resolve_chapter_id(story, chapter_id)
+    if chapter_id is None:
+        number = _next_chapter_slot(story)
+        return Chapter.objects.create(
+            story=story, number=number, position=number, title=title, body=body)
+    chapter = story.chapter_set.filter(pk=chapter_id).first()
+    if chapter is None:
+        return None
+    chapter.title = title
+    chapter.body = body
+    chapter.save()
     return chapter
+
+
+def _remap_comment_chapter_numbers(story, mapping: dict[int, int]) -> None:
+    """Перевести `StoryComment.chapter_number` вслед за пересчётом номеров
+    (BR-84). Комментарий швартуется к номеру, а не к `pk` главы, и без
+    этого перестановка сдвигала бы комментарии на чужой текст: правка
+    первой главы главой номер два делает старый комментарий про вторую
+    выглядящим так, будто он про то, что раньше было третьей.
+
+    Один `UPDATE` через `CASE` — не построчный цикл: SQL считает `CASE` по
+    значению до изменения, так что перестановка номеров (1↔2 и подобные)
+    не задевает сама себя, как задевал бы последовательный `filter().update()`
+    на пересекающихся значениях.
+    """
+    mapping = {old: new for old, new in mapping.items() if old != new}
+    if not mapping:
+        return
+    whens = [
+        When(chapter_number=old,
+            then=Value(new, output_field=PositiveSmallIntegerField(null=True)))
+        for old, new in mapping.items()
+    ]
+    StoryComment.objects.filter(
+        story=story, chapter_number__in=list(mapping.keys()),
+    ).update(chapter_number=Case(*whens))
+
+
+@transaction.atomic
+def _renumber_chapters(story) -> None:
+    """Пересчитать `number`/`position` контигом 1..N по текущему порядку
+    (BR-84) — после удаления главы или перестановки соседних.
+
+    Двухпроходный `bulk_update`: `unique(story, number)` не отложен
+    (Postgres проверяет его посуше, а не в конце транзакции), и прямая
+    перестановка двух номеров упёрлась бы в чужое ещё не освобождённое
+    значение. Временный сдвиг в заведомо свободный диапазон (по номеру
+    строки в списке, а не по `pk`: `number` — `PositiveSmallIntegerField`,
+    и глобально растущий `pk` рано или поздно вышел бы за его границы)
+    обходит это без снятия constraint.
+    """
+    chapters = list(story.chapter_set.order_by('position', 'id'))
+    old_numbers = [chapter.number for chapter in chapters]
+    for i, chapter in enumerate(chapters):
+        chapter.number = 10_000 + i
+    Chapter.objects.bulk_update(chapters, ['number'])
+    for i, chapter in enumerate(chapters, start=1):
+        chapter.number = i
+        chapter.position = i
+    Chapter.objects.bulk_update(chapters, ['number', 'position'])
+    _remap_comment_chapter_numbers(story, dict(zip(
+        old_numbers, (c.number for c in chapters))))
+
+
+def delete_chapter(story, chapter_id) -> bool:
+    """Удалить главу автора (BR-84) — безвозвратно, как и всю работу
+    («Қауіпті аймақ» в `manage_story.html`). Оставшиеся смыкаются в контиг,
+    статус работы пересчитывается — удаление последней главы, например,
+    возвращает её в черновик.
+
+    Комментарии удалённой главы не удаляются вслед за ней — текст, который
+    они разбирали, ушёл, но не мнение о нём. Они становятся общими
+    (`chapter_number=None`), той же категории, что и комментарий ко всему
+    произведению, а не молча переезжают на главу, занявшую освободившийся
+    номер (BR-84)."""
+    chapter = story.chapter_set.filter(pk=chapter_id).first()
+    if chapter is None:
+        return False
+    with transaction.atomic():
+        deleted_number = chapter.number
+        chapter.delete()
+        StoryComment.objects.filter(
+            story=story, chapter_number=deleted_number).update(
+            chapter_number=None)
+        _renumber_chapters(story)
+    story.refresh_status()
+    return True
+
+
+def move_chapter(story, chapter_id, direction: str) -> bool:
+    """Переставить главу с соседом (BR-84). No-op на границе списка и на
+    неизвестном `direction` — кнопки вверх/вниз сами не рисуются на
+    границах, но прямой POST не должен падать."""
+    chapters = list(story.chapter_set.order_by('position', 'id'))
+    index = next((i for i, c in enumerate(chapters) if c.pk == chapter_id), None)
+    if index is None:
+        return False
+    offset = {'up': -1, 'down': 1}.get(direction)
+    if offset is None:
+        return False
+    neighbor = index + offset
+    if not 0 <= neighbor < len(chapters):
+        return False
+    with transaction.atomic():
+        a, b = chapters[index], chapters[neighbor]
+        a.position, b.position = b.position, a.position
+        Chapter.objects.bulk_update([a, b], ['position'])
+        _renumber_chapters(story)
+    return True
 
 
 def _save_poll(chapter, question: str, option_texts) -> None:

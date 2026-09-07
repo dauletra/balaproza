@@ -75,7 +75,9 @@ from .story import (
 )
 from .write import (
     chapter_autosave,
+    chapter_delete,
     chapter_editor,
+    chapter_move,
     delete_story,
     manage_story,
     my_stories,

@@ -23,6 +23,7 @@
 
 from django.urls import reverse
 
+from core.models import Chapter
 from core.tests.base import TestCase, login_as
 
 
@@ -351,11 +352,16 @@ class PersonalPagesStayWithinTheirQueryBudget(TestCase):
 
     def test_chapter_editor(self):
         """Редактор главы — форма, а не выдача: дороже одной работы с её
-        главами она быть не должна."""
+        главами она быть не должна.
+
+        Шесть, не восемь: `chapter_by_id` (BR-83) везёт главу вместе с
+        опросом одним `select_related`, вместо прежних отдельных
+        `chapter_of` + `poll_of`."""
         login_as(self.client)
-        with self.assertNumQueries(8):
+        chapter_id = Chapter.objects.get(story__slug='aidana-tan', number=1).pk
+        with self.assertNumQueries(6):
             self.client.get(reverse('core:chapter_edit',
-                                    kwargs={'slug': 'aidana-tan', 'chapter': 1}))
+                                    kwargs={'slug': 'aidana-tan', 'chapter': chapter_id}))
 
     def test_profile_me_edit(self):
         """Форма профиля читает одного пользователя — того, кто вошёл."""

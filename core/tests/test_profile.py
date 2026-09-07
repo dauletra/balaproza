@@ -26,6 +26,7 @@ from core import data
 from core.domain.contests import timing_line
 from core.models import Follow, Notification, Story, User
 from core.templatetags.balaproza import outcome_label
+from core.tests import factories
 from core.tests.base import TestCase, login_as, login_as_newcomer, user
 
 TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
@@ -937,8 +938,7 @@ class ProfileEdit(TestCase):
 
     def test_the_avatar_takes_raster_only_and_a_refusal_blocks_the_form(self):
         """Тот же валидатор, что у Story.cover (BR-46) — SVG не проходит."""
-        self._post(avatar=SimpleUploadedFile('фото.png', b'\x89PNG demo',
-                                             content_type='image/png'))
+        self._post(avatar=factories.tiny_image('фото.png'))
         user = self._aidana()
         self.assertTrue(user.avatar.name.startswith('avatars/aidana'))
         self.assertTrue(user.avatar.name.endswith('.png'))
@@ -952,6 +952,13 @@ class ProfileEdit(TestCase):
                                              content_type='image/svg+xml'))
         self.assertFalse(self._aidana().avatar)
         self.assertEqual(self._aidana().pen_name, before)
+
+    def test_remove_avatar_clears_it_without_a_new_file(self):
+        """BR-86: убрать фото, не заменив его другим."""
+        self._post(avatar=factories.tiny_image('фото.png'))
+        self.assertTrue(self._aidana().avatar)
+        self._post(remove_avatar='on')
+        self.assertFalse(self._aidana().avatar)
 
     def test_a_guest_writes_nothing(self):
         before = self._aidana().pen_name

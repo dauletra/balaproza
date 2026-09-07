@@ -1,12 +1,14 @@
 {% comment %}
     DeleteConfirm (docs/ui.md + FR-WRITE-06). Подтверждение удаления.
     Триггер: $dispatch('open-delete-confirm', { name: 'X', confirm_url: '/path/' })
+    Опционально — `title`/`body`, если дефолтная («шығарманы өшіру...») речь
+    не подходит цели (например, глава, а не всё произведение целиком, BR-84).
 
     Настоящий POST на `confirm_url` (Ф15, Этап 1): csrf-токен один на форму,
     `:action` меняется под адрес конкретной цели из события. Вид ответа
     (редирект + toast) решает view на другом конце — здесь только запрос.
 {% endcomment %}
-<div x-data="modal('open-delete-confirm', ['name', 'confirm_url'])"
+<div x-data="modal('open-delete-confirm', ['name', 'confirm_url', 'title', 'body'])"
      @close-delete-confirm.window="open = false"
      x-show="open" x-cloak
      class="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -26,10 +28,15 @@
         </div>
 
         <h2 id="del-modal-title" class="mt-4 font-display text-xl font-bold text-slate-900">
-            Шығарманы өшіру керек пе?
+            <span x-text="title || 'Шығарманы өшіру керек пе?'"></span>
         </h2>
         <p class="mt-2 font-sans text-sm leading-relaxed text-slate-600">
-            «<span x-text="name"></span>» қайтарылмастай өшіріледі. Барлық бөлімдер, пікірлер және статистика жоғалады.
+            <template x-if="!body">
+                <span>«<span x-text="name"></span>» қайтарылмастай өшіріледі. Барлық бөлімдер, пікірлер және статистика жоғалады.</span>
+            </template>
+            <template x-if="body">
+                <span x-text="body"></span>
+            </template>
         </p>
 
         <form method="post" :action="confirm_url" class="mt-6 flex justify-end gap-2.5">

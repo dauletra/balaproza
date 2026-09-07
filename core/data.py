@@ -165,6 +165,9 @@ from .queries.tags import (
 from .queries.write import (
     create_story,
     autosave_chapter,
+    chapter_by_id,
+    delete_chapter,
+    move_chapter,
     save_chapter,
     submit_story_for_review,
     withdraw_story_from_review,

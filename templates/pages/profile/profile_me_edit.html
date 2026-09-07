@@ -33,6 +33,10 @@
                     <input type="file" name="avatar" accept="image/*" class="sr-only">
                 </label>
                 <span class="font-sans text-xs text-slate-500">PNG/JPG/WEBP.</span>
+                {# Убрать без замены (BR-86) — см. тот же чекбокс у обложки. #}
+                {% if profile_user.avatar %}
+                    {% include "components/checkbox.html" with name="remove_avatar" label="Фотоны алып тастау" %}
+                {% endif %}
             </div>
         </div>
 

@@ -16,9 +16,12 @@
 разным базам.
 """
 
+from io import BytesIO
 from itertools import count
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
+from PIL import Image
 
 from core.models import (
     Chapter,
@@ -36,6 +39,15 @@ _seq = count(1)
 
 def _uniq(prefix: str) -> str:
     return f'{prefix}-{next(_seq)}'
+
+
+def tiny_image(name: str = 'cover.png') -> SimpleUploadedFile:
+    """Настоящий растр в один пиксель — для тестов загрузки обложки,
+    аватара и эмблемы. `validate_raster_image` (BR-86) декодирует файл
+    по-настоящему, и фейковых байт под нужным расширением ей мало."""
+    buffer = BytesIO()
+    Image.new('RGB', (1, 1)).save(buffer, format='PNG')
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type='image/png')
 
 
 def user(**over) -> User:
@@ -121,7 +133,7 @@ def submit(story_obj) -> None:
 
 
 def chapter(story_obj, *, number: int = 1, chars: int = 1200, **over) -> Chapter:
-    fields = {'title': f'{number}-бөлім', 'body': 'а' * chars}
+    fields = {'title': f'{number}-бөлім', 'body': 'а' * chars, 'position': number}
     fields.update(over)
     return Chapter.objects.create(story=story_obj, number=number, **fields)
 

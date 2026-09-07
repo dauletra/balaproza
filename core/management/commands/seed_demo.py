@@ -250,7 +250,10 @@ class Command(BaseCommand):
                 chapter, is_new = Chapter.objects.update_or_create(
                     story=story, number=stub_chapter.number,
                     defaults={'title': stub_chapter.title,
-                              'body': stub_chapter.body},
+                              'body': stub_chapter.body,
+                              # Порядок глав держится на `position` (BR-84);
+                              # корпус глав уже перечислен по номеру.
+                              'position': stub_chapter.number},
                 )
                 added += is_new
                 updated += not is_new

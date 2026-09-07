@@ -97,6 +97,10 @@ class StorySettingsForm(forms.ModelForm):
     # Не поля модели: теги приходят строкой из `tag_input` и резолвятся
     # слоем данных (pending → accepted, BR-TAG-03), жанры — слагами.
     tags = forms.CharField(required=False)
+    # Явное снятие обложки (BR-86) — третье состояние рядом с «новый файл»
+    # и «пусто значит не меняем»: без него убрать обложку, не заменив её
+    # другой, было нельзя вовсе.
+    remove_cover = forms.BooleanField(required=False)
     genre_primary = _genre_field(required=True, message='Негізгі жанрды таңда.')
     genre_secondary = _genre_field(required=False, message='Жанрды таңда.')
     # Объявлено полем, а не правкой `max_length` у готового: валидатор длины
@@ -246,6 +250,9 @@ class ChapterAutosaveForm(forms.ModelForm):
 class ProfileForm(forms.ModelForm):
     """Редактирование своего профиля (FR-PROF-05). `age` и `gender` —
     самодекларация (DEC-24); пустой `avatar` значит «не меняем»."""
+
+    # Явное снятие аватара (BR-86) — см. `remove_cover` у `StorySettingsForm`.
+    remove_avatar = forms.BooleanField(required=False)
 
     class Meta:
         model = User

@@ -53,6 +53,10 @@ urlpatterns = [
         views.chapter_autosave, name='chapter_autosave_new'),
     path('write/<slug:slug>/chapter/<int:chapter>/autosave/',
         views.chapter_autosave, name='chapter_autosave'),
+    path('write/<slug:slug>/chapter/<int:chapter>/delete/',
+        views.chapter_delete, name='chapter_delete'),
+    path('write/<slug:slug>/chapter/<int:chapter>/move/',
+        views.chapter_move, name='chapter_move'),
     path('write/<slug:slug>/delete/', views.delete_story, name='delete_story'),
 
     # MOD — модерация как раздел (DEC-71). Открыт только `is_staff`;

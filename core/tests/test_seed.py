@@ -181,15 +181,14 @@ class SeededStoriesDeriveWhatIsDerived(TestCase):
 
     def test_single_story_points_at_its_own_chapter(self):
         """Кнопка «Мәтін» у одночастного ведёт в существующую главу, а не
-        в пустой редактор."""
+        в пустой редактор. Адрес — `pk` главы (BR-83), не её номер."""
         for stub in _corpus.STORIES:
             if stub.format != 'single':
                 continue
-            chapters = _corpus.CHAPTERS_BY_STORY.get(stub.slug, ())
-            expected = chapters[0].number if chapters else None
+            story = Story.objects.get(slug=stub.slug)
+            first = story.chapter_set.order_by('number').first()
             with self.subTest(story=stub.slug):
-                self.assertEqual(Story.objects.get(slug=stub.slug).text_chapter,
-                                 expected)
+                self.assertEqual(story.text_chapter, first.pk if first else None)
 
 
 class SeededChapterReactionsAddUp(TestCase):
