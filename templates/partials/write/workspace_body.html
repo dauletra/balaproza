@@ -19,12 +19,18 @@
 {% if not signed_in %}
     {% include "components/auth_gate.html" with reason="Шығармаңды басқару үшін" %}
 {% else %}
+    {% comment %}
+        11.1c (AUDIT-WRITE-FLOW): без третьего звена «N-бөлім». Оно
+        показывало активную главу, но живёт вне #editor-pane — после
+        переключения главы через htmx (hx-swap на саму панель) крошка
+        оставалась бы со старым номером, а верный уже показывает
+        заголовок над самой формой (editor_pane_section.html), который
+        и обновляется вместе с ней. Дублировать то, что не может
+        оставаться синхронным, — хуже, чем не показывать вовсе.
+    {% endcomment %}
     <p class="mb-4 font-sans text-xs text-slate-500">
         <a href="{% url 'core:my_stories' %}" class="hover:text-brand">Менің шығармаларым</a> /
-        <a href="{% url 'core:manage_story' slug=story.slug %}" class="hover:text-brand">{{ story.title }}</a> /
-        <span class="text-slate-700">
-            {% if story.is_single %}мәтін{% elif is_new %}жаңа бөлім{% else %}{{ current.number }}-бөлім{% endif %}
-        </span>
+        <span class="text-slate-700">{{ story.title }}</span>
     </p>
 
     {# ── Шапка ── #}
