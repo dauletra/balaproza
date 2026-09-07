@@ -118,17 +118,57 @@
     </header>
 
     {% comment %}
-        Чек-лист готовности (FR-WRITE-09). Раньше это была опись: шесть
-        одинаковых серо-зелёных строк, ни одна не кликалась, «Жас белгісі»
-        было зелёным за отметку, проставленную дефолтом (BR-10b), а «Мәртебе
-        тексеруге дайын» загоралось уже после отправки — то есть отчитывалось
-        о прошлом вместо следующего шага.
+        11.4 (AUDIT-WRITE-FLOW): на мобильном чек-лист, редактор и список
+        глав — вкладки, а не всё подряд одной длинной прокруткой (раздел
+        5.7). `tab` живёт здесь, а не в отдельном компоненте: три блока
+        ниже — прямые потомки, и Alpine ищет `x-data` вверх по дереву.
+        С `lg` вкладки не участвуют — `lg:block` в паре с условным
+        `hidden` показывает все три блока сразу (тот же приём каскада,
+        что у `sr-only`/`not-sr-only`, V5, этап 10 — responsive-вариант
+        компилируется позже и побеждает при равной специфичности).
+        Редактор — вкладка по умолчанию: это то, ради чего сюда идут.
 
-        Теперь: недоделанное сверху и со ссылкой в своё поле, сделанное
-        свёрнуто, обязательное отделено от советов, а внизу — то, ради чего
-        список существует: кнопка отправки на модерацию.
+        Переключатель без `role="tablist"`/`role="tab"`/`aria-selected` —
+        ровно то, что DEC-15 уже разбирал на `segmented_control.html`:
+        роли обещают скринридеру стрелочную навигацию и связанные
+        `tabpanel`, а тут просто три кнопки без клавиатурной раскладки
+        табов. Вид — тот же трек `rounded-pill`/`bg-slate-100`/белая
+        активная таблетка, что у `segmented_control`, чтобы не заводить
+        второй визуальный язык переключателя в проекте.
     {% endcomment %}
-    {% include "partials/write/publish_panel.html" %}
+    <div class="mt-8" x-data="{ tab: 'editor' }">
+        <div class="mb-4 flex gap-1 rounded-pill bg-slate-100 p-1 lg:hidden">
+            <button type="button" @click="tab = 'chapters'"
+                    :class="tab === 'chapters' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'"
+                    class="flex-1 rounded-pill px-3 py-1.5 font-sans text-sm font-semibold">
+                Бөлімдер
+            </button>
+            <button type="button" @click="tab = 'editor'"
+                    :class="tab === 'editor' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'"
+                    class="flex-1 rounded-pill px-3 py-1.5 font-sans text-sm font-semibold">
+                Жазу
+            </button>
+            <button type="button" @click="tab = 'checklist'"
+                    :class="tab === 'checklist' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'"
+                    class="flex-1 rounded-pill px-3 py-1.5 font-sans text-sm font-semibold">
+                Дайындық
+            </button>
+        </div>
+
+        {% comment %}
+            Чек-лист готовности (FR-WRITE-09). Раньше это была опись: шесть
+            одинаковых серо-зелёных строк, ни одна не кликалась, «Жас белгісі»
+            было зелёным за отметку, проставленную дефолтом (BR-10b), а «Мәртебе
+            тексеруге дайын» загоралось уже после отправки — то есть отчитывалось
+            о прошлом вместо следующего шага.
+
+            Теперь: недоделанное сверху и со ссылкой в своё поле, сделанное
+            свёрнуто, обязательное отделено от советов, а внизу — то, ради чего
+            список существует: кнопка отправки на модерацию.
+        {% endcomment %}
+        <div class="lg:block" :class="tab === 'checklist' ? '' : 'hidden'">
+            {% include "partials/write/publish_panel.html" %}
+        </div>
 
     {% comment %}
         Редактор активной главы (11.1b) слева от списка глав узкой
@@ -141,11 +181,14 @@
         (`publish_panel.html`) — компактность оттуда, а не из третьей
         колонки.
     {% endcomment %}
-    <div class="mt-8 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start lg:gap-6">
+    <div class="lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start lg:gap-6">
+    <div class="lg:block" :class="tab === 'editor' ? '' : 'hidden'">
     {% include "partials/write/editor_pane_section.html" %}
+    </div>
 
     {# ── Список глав / цельный текст ── #}
-    <section class="mt-8 rounded-lg border border-slate-200 bg-white lg:order-1 lg:mt-0">
+    <div class="lg:order-1 lg:block" :class="tab === 'chapters' ? '' : 'hidden'">
+    <section class="rounded-lg border border-slate-200 bg-white">
         <div class="flex items-baseline justify-between border-b border-slate-100 px-5 py-4">
             <h2 class="font-display text-lg font-bold text-slate-900">{% if story.is_single %}Мәтін{% else %}Бөлімдер{% endif %}</h2>
             <span class="font-sans text-xs text-slate-500">{{ story|reading_meta }}</span>
@@ -166,9 +209,16 @@
                         текстом, а не вперемешку с остальным.
                     {% endcomment %}
                     <li class="border-b border-slate-100 px-4 py-3 last:border-b-0">
+                        {% comment %}
+                            11.4: @click переключает вкладку на «Жазу» —
+                            на мобильном #editor-pane лежит в скрытой
+                            вкладке, и без этого свап пройдёт незаметно
+                            для читателя строки.
+                        {% endcomment %}
                         <a href="{% url 'core:chapter_edit' slug=story.slug chapter=c.pk %}"
                            hx-get="{% url 'core:chapter_edit' slug=story.slug chapter=c.pk %}"
                            hx-target="#editor-pane" hx-swap="outerHTML" hx-push-url="true"
+                           @click="tab = 'editor'"
                            class="block rounded-md hover:bg-slate-50">
                             <div class="flex items-baseline gap-2">
                                 <span class="shrink-0 font-display text-sm font-bold text-slate-400">{{ c.number }}</span>
@@ -260,6 +310,8 @@
             </div>
         {% endif %}
     </section>
+    </div>
+    </div>
     </div>
 
     {# ── Опасная зона ── #}

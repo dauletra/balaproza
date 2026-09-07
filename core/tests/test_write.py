@@ -496,6 +496,53 @@ class TheWorkspaceMergesListAndEditor(TestCase):
         self.assertNotContains(fragment, 'Бөлімдер')
 
 
+class TheMobileLayoutTabsInsteadOfStacking(TestCase):
+    """11.4 (AUDIT-WRITE-FLOW): на узком экране чек-лист, редактор и
+    список глав переключаются вкладками (`x-data`), а не идут одна под
+    другой длинной прокруткой. С `lg` все три показаны разом — вкладки
+    только прячут/показывают то, что и так есть в разметке."""
+
+    SLUG = 'aidana-tan'
+
+    def setUp(self):
+        login_as(self.client)
+
+    def test_the_three_panes_carry_lg_block_for_the_wide_layout(self):
+        response = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.SLUG}))
+        self.assertContains(response, "x-data=\"{ tab: 'editor' }\"")
+        self.assertContains(response, 'lg:block" :class="tab === \'checklist\'')
+        self.assertContains(response, 'lg:block" :class="tab === \'editor\'')
+        self.assertContains(response, 'lg:order-1 lg:block" :class="tab === \'chapters\'')
+
+    def test_no_aria_tablist_role_is_claimed(self):
+        """DEC-15: `role="tablist"`/`role="tab"`/`aria-selected` обещают
+        скринридеру клавиатурную раскладку табов, которой тут нет —
+        только три кнопки, переключающие видимость. Тот же разбор, что
+        уже привёл к правке `segmented_control.html`."""
+        response = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.SLUG}))
+        body = response.content.decode()
+        self.assertNotIn('role="tablist"', body)
+        self.assertNotIn('role="tab"', body)
+        self.assertNotIn('aria-selected', body)
+
+    def test_picking_a_chapter_on_the_list_tab_switches_to_the_editor_tab(self):
+        """Строка главы живёт на вкладке «Бөлімдер»; без переключения
+        обратно на «Жазу» свап #editor-pane прошёл бы незаметно для
+        автора — панель обновилась бы за скрытой вкладкой."""
+        story = Story.objects.get(slug=self.SLUG)
+        chapter = story.chapter_set.first()
+        edit_url = reverse('core:chapter_edit',
+                           kwargs={'slug': self.SLUG, 'chapter': chapter.pk})
+        response = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.SLUG}))
+        body = response.content.decode()
+        row = re.search(rf'<a href="{re.escape(edit_url)}".*?</a>', body, flags=re.S)
+        self.assertIsNotNone(row)
+        self.assertIn("@click=\"tab = 'editor'\"", row.group())
+
+
 class SettingsOfferOnlyWhatMayBeChanged(TestCase):
     """BR-10a/BR-11: радио «Мәртебесі» рендерилось всегда и в ветке `else`
     подставляло черновику отмеченным «Аяқталды» — статус, которого у
