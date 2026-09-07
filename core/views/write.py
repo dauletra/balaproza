@@ -28,7 +28,7 @@ from ..forms import (
     StorySettingsForm,
 )
 from ..links import attention_links, checklist_links
-from .common import _current_user, _page_state
+from .common import _current_user, _found_or_404, _page_state
 
 
 def _settings_initial(story) -> dict:
@@ -109,7 +109,9 @@ def new_story(request):
     редиректа нет тела, и введённое пропадало вместе с ним. Успех остаётся
     Post/Redirect/Get — от повторной отправки защищаться всё ещё надо.
     """
-    form = NewStoryForm(request.POST) if request.method == 'POST' else NewStoryForm()
+    author = _current_user(request)
+    form = (NewStoryForm(request.POST, author=author) if request.method == 'POST'
+           else NewStoryForm())
 
     if request.method == 'POST' and request.user.is_authenticated and form.is_valid():
         story = data.create_story(
@@ -132,7 +134,13 @@ def new_story(request):
 
 
 def manage_story(request, slug):
-    story = data.story_by_slug_for_author(slug, _current_user(request))
+    # Гостю — «кір» (auth_gate, как у my_stories/new_story), не найденному
+    # и чужому слагу (уже вошедшему) — 404 (M6/M8 в AUDIT-WRITE-FLOW):
+    # раньше оба случая рисовали одну и ту же карточку «табылмады» с кодом
+    # 200, и POST на чужой слаг тихо проваливался в неё же.
+    user = _current_user(request)
+    story = (_found_or_404(data.story_by_slug_for_author(slug, user), f'story {slug!r}')
+            if user is not None else None)
 
     if request.method == 'POST' and story is not None:
         # Действий два — отправить и отозвать (BR-80), и различает их поле
@@ -182,7 +190,9 @@ def story_settings(request, slug):
     теги — всё, что человек только что набрал. Файл вернуть нельзя,
     браузер его не отдаёт; остальное возвращается целиком.
     """
-    story = data.story_by_slug_for_author(slug, _current_user(request))
+    user = _current_user(request)
+    story = (_found_or_404(data.story_by_slug_for_author(slug, user), f'story {slug!r}')
+            if user is not None else None)
     form = None
 
     if request.method == 'POST' and story is not None:
@@ -206,7 +216,9 @@ def story_settings(request, slug):
                 tag_names=form.tag_names,
             )
             messages.success(request, 'Өзгертулер сақталды.')
-            return redirect('core:story_settings', slug=slug)
+            # `story.slug`, а не URL-параметр: переименование до публикации
+            # (M1, BR-87) могло сдвинуть адрес прямо в этом запросе.
+            return redirect('core:story_settings', slug=story.slug)
     elif story is not None:
         form = StorySettingsForm(story=story, initial=_settings_initial(story))
 
@@ -241,7 +253,9 @@ def chapter_editor(request, slug, chapter=None):
     зависеть от значения, которое сдвигается при удалении или перестановке
     соседних глав.
     """
-    story = data.story_by_slug_for_author(slug, _current_user(request))
+    user = _current_user(request)
+    story = (_found_or_404(data.story_by_slug_for_author(slug, user), f'story {slug!r}')
+            if user is not None else None)
     if (story is not None and chapter is None
             and story.is_single and story.chapter_set.exists()):
         # Прямой `/chapter/new/` на уже написанном `single` заводил бы

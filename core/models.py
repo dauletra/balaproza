@@ -701,6 +701,13 @@ class Chapter(models.Model):
         return f'{self.story.slug} · {self.number}. {self.title}'
 
     def save(self, *args, **kwargs):
+        # Браузер шлёт `\r\n` (HTML нормализует перевод строки в textarea на
+        # отправке), живой счётчик в редакторе считает JS-строку с голым
+        # `\n` — без нормализации здесь объём расходился на число абзацев
+        # (V1 в AUDIT-WRITE-FLOW): автор видел 1588 при наборе и 1646 после
+        # сохранения. Одно место, потому что char_count кормит read_minutes,
+        # length_bucket каталога и условия конкурса min_chars/max_chars.
+        self.body = self.body.replace('\r\n', '\n').replace('\r', '\n')
         self.char_count = len(self.body)
         super().save(*args, **kwargs)
 

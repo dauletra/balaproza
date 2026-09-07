@@ -4,14 +4,8 @@
 {% block title %}{% if story %}{{ story.title }} · басқару{% else %}Шығарма{% endif %} — Balaproza{% endblock %}
 
 {% block content %}
-{% if not story %}
-    <div class="rounded-lg border border-slate-200 bg-white p-10 text-center">
-        <h1 class="font-display text-2xl font-bold text-slate-900">Шығарма табылмады</h1>
-        <p class="mt-2 font-sans text-sm text-slate-600">Slug: <code>{{ slug }}</code></p>
-        <a href="{% url 'core:my_stories' %}" class="mt-4 inline-block font-sans text-sm font-semibold text-brand hover:underline">
-            ← Менің шығармаларым
-        </a>
-    </div>
+{% if not signed_in %}
+    {% include "components/auth_gate.html" with reason="Шығармаңды басқару үшін" %}
 {% else %}
     <p class="mb-4 font-sans text-xs text-slate-500">
         <a href="{% url 'core:my_stories' %}" class="hover:text-brand">Менің шығармаларым</a> /

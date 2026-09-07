@@ -32,6 +32,13 @@
           class="flex flex-col gap-7 rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
         {% csrf_token %}
 
+        {% if form.non_field_errors %}
+            {# BR-88: потолок пустых черновиков — единственная ошибка формы, не привязанная ни к одному полю. #}
+            <p class="rounded-md bg-status-error-bg px-3 py-2.5 font-sans text-sm text-status-error-fg" role="alert">
+                {{ form.non_field_errors.0 }}
+            </p>
+        {% endif %}
+
         {% comment %}
             Значение приходит из формы, а не из пустоты (BR-77): ошибка
             возвращает набранное на место, а не стирает его вместе с

@@ -43,10 +43,11 @@ PUBLIC_URLS = [
     ('core:story_detail',      {'slug': 'dalney-berega'},         'story-detail'),
     ('core:my_stories',        {},                                'my-stories'),
     ('core:new_story',         {},                                'new-story'),
-    ('core:manage_story',      {'slug': 'sample'},                'manage-story'),
-    ('core:story_settings',    {'slug': 'sample'},                'story-settings'),
-    ('core:chapter_new',       {'slug': 'sample'},                'chapter-new'),
-    ('core:chapter_edit',      {'slug': 'sample', 'chapter': 1},  'chapter-edit'),
+    # `manage_story`/`story_settings`/`chapter_new`/`chapter_edit` со
+    # слагом 'sample' здесь не стоят: с BR-89 они отвечают по-разному в
+    # разных режимах (гостю — auth_gate 200, вошедшему без такой работы —
+    # 404), а не одним 200 во всех трёх, — свой обход в
+    # `test_write_pages_gate_guests_and_404_the_rest` ниже.
     ('core:profile_me',        {},                                'profile-me'),
     ('core:profile_other',     {'username': 'rudazov'},           'profile-other'),
     ('core:profile_people',    {'username': 'aidana', 'kind': 'followers'}, 'profile-followers'),
@@ -96,6 +97,25 @@ class EveryRouteRenders(TestCase):
         только при непустых данных: полки, полоса внимания, заявки."""
         login_as(self.client)
         self._walk('authored')
+
+    def test_write_pages_gate_guests_and_404_the_rest(self):
+        """BR-89: кабинет автора отвечает гостю и вошедшему по-разному на
+        один и тот же несуществующий слаг — auth_gate (200) против 404,
+        а не одним и тем же 200 для всех, как раньше (M4–M8)."""
+        urls = [
+            reverse('core:manage_story', kwargs={'slug': 'sample'}),
+            reverse('core:story_settings', kwargs={'slug': 'sample'}),
+            reverse('core:chapter_new', kwargs={'slug': 'sample'}),
+            reverse('core:chapter_edit', kwargs={'slug': 'sample', 'chapter': 1}),
+        ]
+        for url in urls:
+            with self.subTest(url=url, mode='guest'):
+                self.assertEqual(self.client.get(url).status_code, 200)
+
+        login_as(self.client)
+        for url in urls:
+            with self.subTest(url=url, mode='authored'):
+                self.assertEqual(self.client.get(url).status_code, 404)
 
 
 class DesignPagesAreDebugOnly(TestCase):

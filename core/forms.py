@@ -11,6 +11,7 @@ from django import forms
 
 from .domain.catalog import AUDIENCE_ORDER
 from .domain.contests import AI_DECLARATIONS, eligibility_line
+from .domain.story import MAX_DRAFT_STORIES
 from .models import Chapter, Genre, Story, User
 
 # Лимит аннотации (BR-16). У поля модели его нет — это `TextField`, — и
@@ -79,6 +80,23 @@ class NewStoryForm(forms.ModelForm):
             'format': {'required': 'Форматты таңда.',
                        'invalid_choice': 'Форматты таңда.'},
         }
+
+    def __init__(self, *args, author=None, **kwargs):
+        self.author = author
+        super().__init__(*args, **kwargs)
+
+    def clean(self):
+        """Потолок пустых черновиков (BR-88, M2 в AUDIT-WRITE-FLOW): ничем
+        не ограниченное создание заводило горы работ без единой публикации
+        — 25 POST подряд давали 25 работ. Считаются только `NotPublished`:
+        работа, дошедшая до модерации или до читателя, потолка не держит."""
+        cleaned = super().clean()
+        if self.author is not None and Story.objects.filter(
+                author=self.author, status='NotPublished').count() >= MAX_DRAFT_STORIES:
+            raise forms.ValidationError(
+                f'Аяқталмаған жобалар тым көп ({MAX_DRAFT_STORIES}) — '
+                'алдымен біреуін жариялап немесе өшір.')
+        return cleaned
 
 
 class StorySettingsForm(forms.ModelForm):

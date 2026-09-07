@@ -1,13 +1,16 @@
 """WRITE: авторский кабинет — my_stories, new, manage, settings, chapter_editor."""
 
 import re
+from datetime import timedelta
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.template.loader import render_to_string
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from core import data
+from core.domain.story import MAX_DRAFT_STORIES
 from core.models import Chapter, ChapterPoll, Story, Tag
 from core.tests import factories
 from core.tests.base import login_as, login_as_newcomer, user
@@ -156,8 +159,7 @@ class TheCabinetCarriesNoAuthorTotals(TestCase):
         self.assertNotContains(Client().get(reverse('core:my_stories')), '<aside')
         unknown = self.client.get(
             reverse('core:manage_story', kwargs={'slug': 'no-such-story'}))
-        self.assertContains(unknown, 'Шығарма табылмады')
-        self.assertNotContains(unknown, '<aside')
+        self.assertNotContains(unknown, '<aside', status_code=404)
 
     def test_the_only_way_to_totals_is_the_profile(self):
         login_as(self.client)
@@ -336,10 +338,18 @@ class ManageStoryShowsTheWorkAndItsParts(TestCase):
             self.client.get(reverse('core:manage_story',
                                     kwargs={'slug': 'aidana-kus'})),
             'Әлі бөлім жоқ')
-        self.assertContains(
+        self.assertEqual(
             self.client.get(reverse('core:manage_story',
-                                    kwargs={'slug': 'no-such-story'})),
-            'Шығарма табылмады')
+                                    kwargs={'slug': 'no-such-story'})).status_code,
+            404)
+
+    def test_a_guest_is_shown_the_door_not_a_404(self):
+        """M4/M7: гостю на кабинет — auth_gate (как у my_stories/new_story),
+        а не та же карточка, что у вошедшего на чужой слаг."""
+        response = Client().get(
+            reverse('core:manage_story', kwargs={'slug': self.SLUG}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Шығармаңды басқару үшін')
 
 
 class SettingsOfferOnlyWhatMayBeChanged(TestCase):
@@ -400,6 +410,12 @@ class SettingsOfferOnlyWhatMayBeChanged(TestCase):
             self.client.get(reverse('core:manage_story',
                                     kwargs={'slug': 'aidana-tan'})),
             "$dispatch('open-delete-confirm'")
+
+    def test_a_guest_is_shown_the_door_not_a_404(self):
+        response = Client().get(
+            reverse('core:story_settings', kwargs={'slug': 'aidana-tan'}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Баптауларды өзгерту үшін')
 
 
 class TheAgeMarkIsChosenNotDefaulted(TestCase):
@@ -583,10 +599,16 @@ class TheChapterEditorReportsTheTruth(TestCase):
         self.assertContains(existing, 'Бірде ерте таңда')
 
     def test_an_unknown_work_has_no_editor(self):
-        self.assertContains(
+        self.assertEqual(
             self.client.get(reverse('core:chapter_new',
-                                    kwargs={'slug': 'no-such-story'})),
-            'Шығарма табылмады')
+                                    kwargs={'slug': 'no-such-story'})).status_code,
+            404)
+
+    def test_a_guest_is_shown_the_door_not_a_404(self):
+        response = Client().get(
+            reverse('core:chapter_new', kwargs={'slug': self.SLUG}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Бөлімді жазу үшін')
 
 
 # ═════════════════════ Ф15, Этап 1: запись (POST) ══════════════════════════
@@ -660,6 +682,29 @@ class NewStoryCreatesADraft(TestCase):
         })
         self.assertEqual(Story.objects.count(), before)
 
+    def test_a_pile_of_empty_drafts_hits_a_ceiling(self):
+        """M2/BR-88: ничем не ограниченное создание заводило горы черновиков
+        — 25 POST подряд давали 25 работ. Опубликованное или поданное на
+        модерацию в потолок не идёт — считаются только `NotPublished`, и
+        корпус уже даёт автору один такой (`aidana-kus`)."""
+        already = Story.objects.filter(author=user('aidana'), status='NotPublished').count()
+        for _ in range(MAX_DRAFT_STORIES - already):
+            self.client.post(reverse('core:new_story'), {
+                'title': 'Жоба', 'format': 'serial',
+                'genre_primary': self.genre.slug,
+            })
+        self.assertEqual(
+            Story.objects.filter(author=user('aidana'), status='NotPublished').count(),
+            MAX_DRAFT_STORIES)
+
+        before = Story.objects.count()
+        r = self.client.post(reverse('core:new_story'), {
+            'title': 'Артық жоба', 'format': 'serial',
+            'genre_primary': self.genre.slug,
+        })
+        self.assertEqual(Story.objects.count(), before)
+        self.assertContains(r, 'тым көп')
+
 
 class StorySettingsSavesFields(TestCase):
 
@@ -668,6 +713,10 @@ class StorySettingsSavesFields(TestCase):
     def setUp(self):
         login_as(self.client)
         self.genre = data.all_genres()[0]
+        # `title='Жаңа атау'` в дефолте `_post` меняет название, а с ним, у
+        # непубличной работы, и слаг (M1, BR-87) — дальше по классу объект
+        # ищется по `pk`, застрахованному от этого сдвига, а не по слагу.
+        self.pk = Story.objects.get(slug=self.SLUG).pk
 
     def _post(self, **overrides):
         payload = {
@@ -681,21 +730,24 @@ class StorySettingsSavesFields(TestCase):
 
     def test_saves_title_annotation_and_audience(self):
         r = self._post()
-        story = Story.objects.get(slug=self.SLUG)
+        story = Story.objects.get(pk=self.pk)
         self.assertEqual(story.title, 'Жаңа атау')
         self.assertEqual(story.annotation, 'Жаңа аннотация мәтіні.')
         self.assertEqual(story.audience, '10+')
+        # M1/BR-87: переименование до публикации сдвигает и адрес — работа
+        # не живёт вечно по адресу первого черновика.
+        self.assertNotEqual(story.slug, self.SLUG)
         self.assertRedirects(
-            r, reverse('core:story_settings', kwargs={'slug': self.SLUG}))
+            r, reverse('core:story_settings', kwargs={'slug': story.slug}))
 
     def test_missing_title_saves_nothing(self):
         self._post(title='')
-        story = Story.objects.get(slug=self.SLUG)
+        story = Story.objects.get(pk=self.pk)
         self.assertNotEqual(story.title, '')
         self.assertNotEqual(story.audience, '10+')
 
     def test_cannot_switch_to_single_with_more_than_one_chapter(self):
-        story = Story.objects.get(slug=self.SLUG)
+        story = Story.objects.get(pk=self.pk)
         Chapter.objects.create(story=story, number=1, title='1', body='т')
         Chapter.objects.create(story=story, number=2, title='2', body='т')
         self._post(format='single')
@@ -706,18 +758,18 @@ class StorySettingsSavesFields(TestCase):
         """BR-16: 500 знаков. Число жило в поле счётчика шаблона и в этом
         правиле, но в проверке не участвовало вовсе — сохранялось что
         угодно."""
-        before = Story.objects.get(slug=self.SLUG).annotation
+        before = Story.objects.get(pk=self.pk).annotation
         self._post(annotation='ә' * 501)
-        self.assertEqual(Story.objects.get(slug=self.SLUG).annotation, before)
+        self.assertEqual(Story.objects.get(pk=self.pk).annotation, before)
         self._post(annotation='ә' * 500)
-        self.assertEqual(len(Story.objects.get(slug=self.SLUG).annotation), 500)
+        self.assertEqual(len(Story.objects.get(pk=self.pk).annotation), 500)
 
     def test_status_field_outside_the_allowed_set_is_ignored(self):
         # 'aidana-kus' — черновик, радио «Мәртебесі» на этой странице у
         # него вообще не рендерится (BR-10a) — POST в обход формы не
         # должен провести статус мимо модерации.
         self._post(status='Published')
-        story = Story.objects.get(slug=self.SLUG)
+        story = Story.objects.get(pk=self.pk)
         self.assertFalse(story.is_public)
         # Статус вообще не берётся из формы — он выводится из глав (BR-79),
         # а эту работу корпус вернул автору на доработку (BR-80).
@@ -738,10 +790,14 @@ class StorySettingsCoverUpload(TestCase):
     def setUp(self):
         login_as(self.client)
         self.genre = data.all_genres()[0]
+        # Название в payload остаётся тем же, что уже стоит: смена вызвала
+        # бы сдвиг слага непубличной работы (M1, BR-87), а эти тесты про
+        # обложку, не про адрес.
+        self.title = Story.objects.get(slug=self.SLUG).title
 
     def _post(self, **overrides):
         payload = {
-            'title': 'Жаңа атау', 'annotation': 'Жаңа аннотация мәтіні.',
+            'title': self.title, 'annotation': 'Жаңа аннотация мәтіні.',
             'format': 'serial', 'genre_primary': self.genre.slug,
             'genre_secondary': '', 'audience': '10+', 'tags': '',
         }
@@ -817,11 +873,14 @@ class StorySettingsTagResolution(TestCase):
     def setUp(self):
         login_as(self.client)
         self.genre = data.all_genres()[0]
+        # Тот же довод, что у StorySettingsCoverUpload: неизменное название
+        # не сдвигает слаг непубличной работы (M1, BR-87).
+        self.title = Story.objects.get(slug=self.SLUG).title
 
     def _post(self, tags):
         return self.client.post(
             reverse('core:story_settings', kwargs={'slug': self.SLUG}),
-            {'title': 'Атау', 'annotation': 'Аннотация.', 'format': 'serial',
+            {'title': self.title, 'annotation': 'Аннотация.', 'format': 'serial',
              'genre_primary': self.genre.slug, 'audience': '10+', 'tags': tags})
 
     def test_existing_accepted_tag_is_reused_not_duplicated(self):
@@ -871,6 +930,30 @@ class ChapterEditorSavesADraft(TestCase):
             {'title': '1-бөлім', 'body': '  ', 'action': 'draft'})
         story = Story.objects.get(slug=self.SLUG)
         self.assertEqual(story.chapter_set.count(), 0)
+
+    def test_saving_a_chapter_touches_the_story(self):
+        """S4: письмо главы — правка работы. Кабинет сортирует «что трогал
+        последним» по `Story.updated_at`, а `Chapter.save()` его не
+        трогал — автор писал часами и не поднимался в списке."""
+        old = timezone.now() - timedelta(days=1)
+        Story.objects.filter(slug=self.SLUG).update(updated_at=old)
+        self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.SLUG}),
+            {'title': '1-бөлім', 'body': 'Мәтін.', 'action': 'draft'})
+        self.assertGreater(Story.objects.get(slug=self.SLUG).updated_at, old)
+
+    def test_line_endings_are_normalized_before_counting(self):
+        """V1: браузер шлёт textarea нормализованным в `\\r\\n`, живой
+        счётчик в редакторе считает JS-строку с голым `\\n` — без
+        нормализации здесь объём расходился на число абзацев."""
+        body_with_crlf = 'Бірінші жол.\r\nЕкінші жол.\r\nҮшінші жол.'
+        self.client.post(
+            reverse('core:chapter_new', kwargs={'slug': self.SLUG}),
+            {'title': '1-бөлім', 'body': body_with_crlf, 'action': 'draft'})
+        chapter = Story.objects.get(slug=self.SLUG).chapter_set.get(number=1)
+        normalized = body_with_crlf.replace('\r\n', '\n')
+        self.assertEqual(chapter.body, normalized)
+        self.assertEqual(chapter.char_count, len(normalized))
 
     def test_written_chapters_show_up_in_the_count(self):
         """«N бөлім» на карточке — то, что автор написал.
@@ -1469,10 +1552,13 @@ class OwnershipIsEnforced(TestCase):
         login_as(self.client)  # aidana
         self.foreign = Story.objects.exclude(author__username='aidana').first()
 
-    def test_manage_story_of_a_foreign_slug_shows_not_found(self):
+    def test_manage_story_of_a_foreign_slug_is_not_found(self):
+        # M6/M8: раньше чужой слаг рисовал ту же карточку «табылмады» кодом
+        # 200, что и у вошедшего гостя на любую страницу, — теперь у уже
+        # вошедшего это настоящий 404 (BR-89), а auth_gate остаётся у гостя.
         r = self.client.get(
             reverse('core:manage_story', kwargs={'slug': self.foreign.slug}))
-        self.assertContains(r, 'Шығарма табылмады')
+        self.assertEqual(r.status_code, 404)
 
     def test_story_settings_post_does_not_touch_a_foreign_story(self):
         original_title = self.foreign.title

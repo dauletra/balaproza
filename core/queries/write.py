@@ -23,11 +23,12 @@ from .author import (
 from .tags import resolve_story_tags
 
 
-def _unique_story_slug(title: str) -> str:
+def _unique_story_slug(title: str, *, exclude_pk=None) -> str:
     base = slugify_kz(title, fallback='shygarma')
     slug = base
     n = 2
-    while Story.objects.filter(slug=slug).exists():
+    taken = Story.objects.exclude(pk=exclude_pk) if exclude_pk else Story.objects.all()
+    while taken.filter(slug=slug).exists():
         slug = f'{base}-{n}'
         n += 1
     return slug
@@ -55,6 +56,13 @@ def update_story_settings(story, *, title: str, annotation: str, format: str,
     файл важнее снятия — отмеченный чекбокс рядом с выбранным файлом
     значения не имеет.
     """
+    if title != story.title and not story.is_public:
+        # Слаг живёт названием, пока у работы нет читателя (M1, BR-87):
+        # переименованная до публикации живёт по адресу первого черновика
+        # иначе — постоянного адреса ещё ни у кого нет, менять нечего. После
+        # первой опубликованной главы название и адрес расходятся насовсем:
+        # ссылка на публичную работу не должна тихо ломаться от правки.
+        story.slug = _unique_story_slug(title, exclude_pk=story.pk)
     story.title = title
     story.annotation = annotation
     story.format = format
@@ -98,6 +106,20 @@ def _next_chapter_slot(story) -> int:
     return (last or 0) + 1
 
 
+def _touch_story(story) -> None:
+    """Написание главы — правка работы (S4, AUDIT-WRITE-FLOW): без этого
+    автор, писавший часами через автосохранение, не поднимался в списке
+    кабинета «что трогал последним» (`latest_edited()` смотрит на
+    `Story.updated_at`, а `Chapter.save()` его не трогает).
+
+    Здесь, а не в `Chapter.save()`: там же создают демо-корпус (сид бэкдейтит
+    `updated_at` отдельным `update()` сразу после `_seed_stories` — см. её
+    docstring) и фабрики тестов, и тронуть его на каждую главу означало бы
+    молча стирать нарочно выставленную давность.
+    """
+    Story.objects.filter(pk=story.pk).update(updated_at=timezone.now())
+
+
 def _resolve_chapter_id(story, chapter_id):
     """Куда на самом деле пишет `chapter_id is None` (BR-85).
 
@@ -137,6 +159,7 @@ def save_chapter(story, chapter_id, *, title: str, body: str,
         chapter.body = body
         chapter.save()
     _save_poll(chapter, poll_question, poll_options)
+    _touch_story(story)
     return chapter
 
 
@@ -156,14 +179,17 @@ def autosave_chapter(story, chapter_id, *, title: str, body: str) -> Chapter | N
     chapter_id = _resolve_chapter_id(story, chapter_id)
     if chapter_id is None:
         number = _next_chapter_slot(story)
-        return Chapter.objects.create(
+        chapter = Chapter.objects.create(
             story=story, number=number, position=number, title=title, body=body)
+        _touch_story(story)
+        return chapter
     chapter = story.chapter_set.filter(pk=chapter_id).first()
     if chapter is None:
         return None
     chapter.title = title
     chapter.body = body
     chapter.save()
+    _touch_story(story)
     return chapter
 
 
