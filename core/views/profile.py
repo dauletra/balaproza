@@ -108,7 +108,10 @@ def profile_me_edit(request):
     if request.method == 'POST' and author is not None:
         # Аватар проверяет валидатор поля (BR-46), лимиты имён и био — сама
         # модель: третьего места для тех же чисел здесь быть не должно.
-        form = ProfileForm(request.POST, request.FILES)
+        # `current_user` нужен `clean_username` (BR-91) — без него
+        # уникальность ника проверялась бы без исключения самого владельца.
+        # Не `instance=`: см. комментарий в `ProfileForm.__init__`.
+        form = ProfileForm(request.POST, request.FILES, current_user=request.user)
         if not form.is_valid():
             _report(request, form)
             return redirect('core:profile_me_edit')

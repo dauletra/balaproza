@@ -40,6 +40,9 @@
             </div>
         </div>
 
+        {# ── Ник (BR-91): публичный адрес /u/<username>/ ── #}
+        {% include "components/input_field.html" with name="username" label="Ник" value=profile_user.username required=True maxlength=30 hint="Профиль сілтемесі: balaproza.kz/u/…/. Кіші әріп, сан, «_» — 3–30 таңба." %}
+
         {# ── Авторлық аты (FR-AUTH-04) ── #}
         {% include "components/input_field.html" with name="pen_name" label="Авторлық атың" value=profile_user.pen_name required=True maxlength=60 %}
 

@@ -886,7 +886,7 @@ class FollowingAnAuthorIsWrittenDown(TestCase):
 class ProfileEdit(TestCase):
     """Ф15, Этап 6: `/me/edit/` — настоящий POST, ошибка поля = no-op."""
 
-    FIELDS = {'pen_name': 'Аты', 'name': 'Есім',
+    FIELDS = {'username': 'aidana', 'pen_name': 'Аты', 'name': 'Есім',
               'bio': '', 'gender': '', 'age': ''}
 
     def setUp(self):
@@ -921,6 +921,7 @@ class ProfileEdit(TestCase):
 
     def test_a_bad_field_saves_nothing_and_returns_to_the_form(self):
         cases = {
+            'username': ('ab', 'a' * 31, 'has space', 'a-b', 'rudazov'),
             'pen_name': ('', 'ә' * 61),
             'name': ('',),
             'bio': ('ә' * 201,),
@@ -952,6 +953,27 @@ class ProfileEdit(TestCase):
                                              content_type='image/svg+xml'))
         self.assertFalse(self._aidana().avatar)
         self.assertEqual(self._aidana().pen_name, before)
+
+    def test_resubmitting_the_same_username_is_not_a_conflict_with_self(self):
+        """BR-91: `clean_username` исключает себя из проверки уникальности —
+        иначе форма без единого изменения ника всегда отвечала бы «занят»."""
+        response = self._post()
+        self.assertRedirects(response, reverse('core:profile_me'))
+        self.assertEqual(self._aidana().username, 'aidana')
+
+    def test_changing_the_username_moves_the_public_address_and_frees_the_old_one(self):
+        """BR-91: адрес меняется вместе с ником, старый — обычный 404
+        (BR-76), не редирект и не «занято навсегда»."""
+        pk = self._aidana().pk
+        response = self._post(username='zhanaidana')
+        self.assertRedirects(response, reverse('core:profile_me'))
+
+        renamed = User.objects.get(pk=pk)
+        self.assertEqual(renamed.username, 'zhanaidana')
+        self.assertEqual(self.client.get(reverse(
+            'core:profile_other', kwargs={'username': 'zhanaidana'})).status_code, 200)
+        self.assertEqual(self.client.get(reverse(
+            'core:profile_other', kwargs={'username': 'aidana'})).status_code, 404)
 
     def test_remove_avatar_clears_it_without_a_new_file(self):
         """BR-86: убрать фото, не заменив его другим."""

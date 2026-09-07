@@ -7,6 +7,8 @@
 Тексты ошибок — на «сен» и говорят, что сделать (docs/ui.md).
 """
 
+import re
+
 from django import forms
 
 from .domain.catalog import AUDIENCE_ORDER
@@ -265,12 +267,24 @@ class ChapterAutosaveForm(forms.ModelForm):
             self.fields[name].required = False
 
 
+_USERNAME_RE = re.compile(r'^[a-z0-9_]{3,30}$')
+
+
 class ProfileForm(forms.ModelForm):
     """Редактирование своего профиля (FR-PROF-05). `age` и `gender` —
     самодекларация (DEC-24); пустой `avatar` значит «не меняем»."""
 
     # Явное снятие аватара (BR-86) — см. `remove_cover` у `StorySettingsForm`.
     remove_avatar = forms.BooleanField(required=False)
+
+    # Вне Meta.fields (BR-91): `username` у модели `blank=False`, и
+    # автосинхронизация `ModelForm._post_clean()` уронила бы
+    # `instance.full_clean()` на пустом значении раньше, чем форма решит,
+    # что пусто значит «не меняем», — тот же класс проблемы, что развели
+    # `remove_avatar` отдельным полем. Здесь пусто значить не может: поле
+    # всегда предзаполнено текущим ником, очистка — осознанное действие.
+    username = forms.CharField(required=True, max_length=30, error_messages={
+        'required': 'Никті жаз.'})
 
     class Meta:
         model = User
@@ -285,7 +299,15 @@ class ProfileForm(forms.ModelForm):
             'age':      {'invalid': 'Жасын дұрыс жаз.'},
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, current_user=None, **kwargs):
+        # `current_user` — не Django-шный `instance=`: связать форму с
+        # инстансом означало бы, что `FileField.clean()` на несменённом
+        # аватаре тихо подставляет **текущий** файл вместо пустоты (Django
+        # так помогает `ClearableFileInput`), и `update_profile` перестаёт
+        # отличать «не меняли» от «отправили тот же файл заново» — ровно
+        # то состояние, в котором `remove_avatar` перестаёт работать.
+        # Нужен только pk для исключения себя из проверки уникальности ника.
+        self._exclude_pk = current_user.pk if current_user else None
         super().__init__(*args, **kwargs)
         self.fields['pen_name'].required = True
         self.fields['name'].required = True
@@ -299,6 +321,17 @@ class ProfileForm(forms.ModelForm):
         if age is not None and not (1 <= age <= 120):
             raise forms.ValidationError('Жасын дұрыс жаз.')
         return age
+
+    def clean_username(self):
+        value = self.cleaned_data['username'].strip().lower()
+        if not _USERNAME_RE.match(value):
+            raise forms.ValidationError(
+                'Ник тек кіші әріп, сан және «_» болуы керек, 3–30 таңба.')
+        # Исключаем себя — иначе пересохранение без изменения ника всегда
+        # било бы «ник занят», найдя самого владельца.
+        if User.objects.exclude(pk=self._exclude_pk).filter(username=value).exists():
+            raise forms.ValidationError('Бұл ник бос емес — басқасын таңда.')
+        return value
 
 
 class OnboardingForm(forms.ModelForm):
