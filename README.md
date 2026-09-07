@@ -233,7 +233,7 @@ uv run python manage.py recount_engagement
 | 9 | `sitemap.xml` и `robots.txt` | ⛔ |
 | 10 | Логирование ошибок настроено | `LOGGING` в `config/settings.py`, вывод в stdout |
 | 11 | Бэкап `media/` и базы | ⛔ |
-| 12 | Решён вопрос OKLCH-fallback (DEC-12) | ⛔ |
+| 12 | Решён вопрос OKLCH-fallback (DEC-12) | закрыт без кода — DEC-80: NFR-40 уже требует браузеры с поддержкой OKLCH |
 | 13 | Telegram-бот зарегистрирован, `/setdomain` указывает на прод-домен, `TELEGRAM_BOT_TOKEN`/`TELEGRAM_BOT_USERNAME` заданы | ⛔ |
 
 Код пункта 13 закрыт (NFR-25, BR-90) — Telegram Login Widget с проверкой
