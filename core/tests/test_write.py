@@ -364,6 +364,64 @@ class ManageStoryShowsTheWorkAndItsParts(TestCase):
         self.assertContains(response, 'Шығармаңды басқару үшін')
 
 
+class TheWorkspaceMergesListAndEditor(TestCase):
+    """11.1b (AUDIT-WRITE-FLOW): `manage_story` и `chapter_edit`/
+    `chapter_new` рендерят одно тело (`partials/write/workspace_body.html`)
+    — список глав и редактор активной главы на одном экране, не два
+    отдельных шаблона с половиной разметки, повторённой один в один."""
+
+    SLUG = 'aidana-tan'
+
+    def setUp(self):
+        login_as(self.client)
+        self.story = Story.objects.get(slug=self.SLUG)
+
+    def test_manage_story_embeds_the_chapter_editor_form(self):
+        response = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.SLUG}))
+        self.assertContains(response, 'name="body"')
+        self.assertContains(response, 'chapterEditor(')
+        self.assertContains(response, 'Жоба ретінде сақтау')
+
+    def test_chapter_edit_embeds_the_chapters_list(self):
+        chapter = self.story.chapter_set.first()
+        response = self.client.get(reverse(
+            'core:chapter_edit', kwargs={'slug': self.SLUG, 'chapter': chapter.pk}))
+        self.assertContains(response, 'Бөлімдер')
+        for c in self.story.chapter_set.all():
+            with self.subTest(chapter=c.number):
+                self.assertContains(response, reverse(
+                    'core:chapter_edit', kwargs={'slug': self.SLUG, 'chapter': c.pk}))
+
+    def test_no_chapter_param_shows_the_last_chapter(self):
+        """`_active_chapter_id`: без явного выбора — последняя по порядку
+        написанная, а не первая (автор чаще всего продолжает, а не
+        перечитывает начало)."""
+        last = self.story.chapter_set.order_by('position', 'id').last()
+        response = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.SLUG}))
+        self.assertContains(response, f'value="{last.title}"')
+
+    def test_chapter_param_picks_that_chapter(self):
+        first = self.story.chapter_set.order_by('position', 'id').first()
+        response = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.SLUG})
+            + f'?chapter={first.pk}')
+        self.assertContains(response, f'value="{first.title}"')
+
+    def test_a_foreign_chapter_param_falls_back_quietly(self):
+        """Чужой или несуществующий `?chapter=` — не 404 на всю страницу
+        (в отличие от `/chapter/<id>/edit/`, где id — часть адреса, а не
+        подсказка): молча возвращается дефолт."""
+        foreign = Chapter.objects.exclude(story=self.story).first()
+        last = self.story.chapter_set.order_by('position', 'id').last()
+        response = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.SLUG})
+            + f'?chapter={foreign.pk}')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'value="{last.title}"')
+
+
 class SettingsOfferOnlyWhatMayBeChanged(TestCase):
     """BR-10a/BR-11: радио «Мәртебесі» рендерилось всегда и в ветке `else`
     подставляло черновику отмеченным «Аяқталды» — статус, которого у
@@ -688,10 +746,13 @@ class TheChapterEditorReportsTheTruth(TestCase):
             404)
 
     def test_a_guest_is_shown_the_door_not_a_404(self):
+        """11.1b: `chapter_edit`/`chapter_new` рендерят то же тело, что
+        `manage_story` (`workspace_body.html`) — один и тот же
+        auth_gate на весь объединённый экран, не свой на каждый URL."""
         response = Client().get(
             reverse('core:chapter_new', kwargs={'slug': self.SLUG}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Бөлімді жазу үшін')
+        self.assertContains(response, 'Шығармаңды басқару үшін')
 
 
 # ═════════════════════ Ф15, Этап 1: запись (POST) ══════════════════════════

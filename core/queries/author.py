@@ -172,7 +172,7 @@ def moderation_note(story):
     return note
 
 
-def can_submit_for_review(story) -> bool:
+def can_submit_for_review(story, missing=...) -> bool:
     """Можно ли отправить работу на модерацию.
 
     Условий два, и оба про текст, а не про статус (BR-79): чек-лист закрыт
@@ -180,8 +180,18 @@ def can_submit_for_review(story) -> bool:
     запрещала подачу публичному сериалу — то есть дописанная глава
     публиковалась в обход модерации (C1), а кнопки, которой её можно было
     бы отправить, не существовало.
+
+    `missing=...` (Ellipsis-заглушка, не `None` — тот законный ответ
+    «ничего не осталось») — посчитать самой; страница управления (11.1b,
+    рабочее место) уже зовёт `missing_for_review` для чек-листа и
+    передаёт готовое, чтобы `publish_checklist` не считался на одном
+    показе трижды (чек-лист, `missing_for_review`, и эта проверка).
     """
-    if story is None or missing_for_review(story):
+    if story is None:
+        return False
+    if missing is ...:
+        missing = missing_for_review(story)
+    if missing:
         return False
     # Ревизии приезжают одним `prefetch`: `pending_revision` внутри цикла —
     # запрос на главу, то есть N+1 на каждом показе страницы управления.

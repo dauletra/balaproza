@@ -83,6 +83,101 @@ def _chapter_initial(story, current, poll) -> dict:
     }
 
 
+def _active_chapter_id(request, story):
+    """Какая глава открыта в редакторе рабочего места (11.1b): явно —
+    `?chapter=<id>`, если она правда принадлежит этой работе (иначе
+    параметр — чужой мусор, и его молча игнорируют, а не 404 на всю
+    страницу — в отличие от `/chapter/<id>/edit/`, где id — часть
+    адреса, а не подсказка); иначе — последняя по порядку написанная;
+    иначе — новая (`None`, `is_new=True`), потому что писать больше
+    нечего.
+    """
+    raw = request.GET.get('chapter', '')
+    if raw.isdigit() and data.chapter_by_id(story, int(raw)) is not None:
+        return int(raw)
+    last = story.chapter_set.order_by('position', 'id').last()
+    return last.pk if last is not None else None
+
+
+def _chapter_pane_context(story, slug, chapter, can_submit, missing, *,
+                          form=None, current=...) -> dict:
+    """Контекст встроенного редактора главы (BR-83) — общий для
+    `manage_story` (глава выбрана `?chapter=`, 11.1b) и `chapter_edit`/
+    `chapter_new` (глава — часть адреса).
+
+    `can_submit`/`missing` приходят готовыми, а не считаются здесь: это
+    ровно то же `can_submit_for_review`/`missing_for_review` от того же
+    `story`, что уже посчитала вызывающая сторона для чек-листа —
+    второй счёт удвоил бы разбор `publish_checklist` без всякой пользы.
+
+    `current=...` (Ellipsis-заглушка, не `None` — тот законное значение
+    «главы нет») — посчитать самой; `chapter_editor` передаёт уже
+    посчитанный, тем же запросом, что и её собственная проверка 404, —
+    иначе тот же `chapter_by_id` спрашивал бы базу дважды за один показ.
+
+    `form=None` — GET, форма строится начальными значениями главы;
+    отклонённый POST передаёт уже провалидированную форму с ошибками.
+    """
+    if current is ...:
+        current = data.chapter_by_id(story, chapter) if story and chapter else None
+    poll = getattr(current, 'poll', None)
+    if form is None:
+        form = ChapterForm(initial=_chapter_initial(story, current, poll))
+    return {
+        'chapter':   chapter,
+        'current':   current,
+        'is_new':    chapter is None,
+        'form':      form,
+        # FR-STORY-13: опрос главы, если автор его уже создал
+        'poll':      poll,
+        'poll_option_slots': _poll_option_slots(form),
+        # BR-78. Адрес зависит от того, есть ли у главы номер: у новой его
+        # присвоит первый же ответ сервера.
+        'autosave_url': (
+            reverse('core:chapter_autosave',
+                    kwargs={'slug': slug, 'chapter': chapter}) if chapter
+            else reverse('core:chapter_autosave_new', kwargs={'slug': slug})),
+        # Пишется рабочая копия, читателю невидимая (BR-79), — поэтому
+        # автосохранение доступно и публичной работе тоже.
+        'autosave_enabled': story is not None,
+        # V14 (AUDIT-WRITE-FLOW): «Модерацияға жіберу» стояла активной и
+        # на первой главе новой работы, где аннотации и жас белгісі ещё
+        # нет и быть не может, — гарантированный отказ после нажатия.
+        # Тот же вопрос, что уже отвечает publish_panel.html.
+        'can_submit': can_submit,
+        'missing':    missing,
+    }
+
+
+def _workspace_context(story, slug) -> dict:
+    """Общее для `manage_story` и `chapter_editor` (11.1b): список глав
+    и готовность к отправке — то, что видит `publish_panel.html`
+    независимо от того, какая глава сейчас открыта в редакторе рядом.
+
+    `missing` выводится из уже посчитанного `checklist`, а не отдельным
+    `missing_for_review(story)`: оба зовут один и тот же
+    `publish_checklist` (`has_chapters`, `tags.exists()`), и слитые в
+    одну страницу `manage_story`/`chapter_editor` считали бы его дважды
+    на одном показе без единой причины.
+    """
+    checklist = checklist_links(story)
+    return {
+        # Кабинет показывает все главы, включая неопубликованные (BR-79).
+        'chapters': data.chapters_of(slug, as_author=True),
+        # FR-WRITE-09: чек-лист как следующий шаг, а не как опись.
+        'checklist': checklist,
+        'missing': [i['key'] for i in checklist if i['required'] and not i['ok']],
+        # Работа уже в очереди — отдельный ответ, не «нельзя отправить»
+        # (BR-79): кнопки нет по разным причинам, и автору важно, по какой.
+        # Момент, а не флаг: «сколько уже ждёт» — второй его вопрос.
+        'pending_since': data.pending_review_since(story),
+        # Замечание модератора висит на рабочем экране до повторной
+        # отправки (BR-80): помнить его наизусть, пока правишь, — не работа
+        # автора.
+        'moderation_note': data.moderation_note(story),
+    }
+
+
 def my_stories(request):
     user = _current_user(request)
     # Агрегатов автора здесь больше нет — DEC-48. Они жили в правом рейле и
@@ -162,24 +257,19 @@ def manage_story(request, slug):
                 'Әлі дайын емес: ' + ', '.join(data.missing_labels(story)) + '.')
         return redirect('core:manage_story', slug=slug)
 
-    return render(request, 'pages/write/manage_story.html', {
-        'slug':     slug,
-        'story':    story,
-        # Кабинет показывает все главы, включая неопубликованные (BR-79).
-        'chapters': data.chapters_of(slug, as_author=True),
-        # FR-WRITE-09: чек-лист как следующий шаг, а не как опись.
-        'checklist':  checklist_links(story),
-        'can_submit': data.can_submit_for_review(story),
-        'missing':    data.missing_for_review(story) if story else [],
-        # Работа уже в очереди — отдельный ответ, не «нельзя отправить»
-        # (BR-79): кнопки нет по разным причинам, и автору важно, по какой.
-        # Момент, а не флаг: «сколько уже ждёт» — второй его вопрос.
-        'pending_since': data.pending_review_since(story),
-        # Замечание модератора висит на рабочем экране до повторной
-        # отправки (BR-80): помнить его наизусть, пока правишь, — не работа
-        # автора.
-        'moderation_note': data.moderation_note(story),
-    })
+    context = {'slug': slug, 'story': story}
+    if story is not None:
+        # 11.1b: рабочее место показывает список глав и редактор
+        # выбранной главы на одном экране — `chapter_editor.html` как
+        # отдельная страница исчез, `manage_story.html` и `chapter_edit`/
+        # `chapter_new` рендерят одно и то же тело
+        # (`partials/write/workspace_body.html`).
+        context.update(_workspace_context(story, slug))
+        can_submit = data.can_submit_for_review(story, context['missing'])
+        context.update(_chapter_pane_context(
+            story, slug, _active_chapter_id(request, story),
+            can_submit, context['missing']))
+    return render(request, 'pages/write/manage_story.html', context)
 
 
 def story_settings(request, slug):
@@ -269,8 +359,8 @@ def chapter_editor(request, slug, chapter=None):
         # Несуществующий или чужой `pk` — 404, а не пустой «новый» редактор:
         # тем и заводилась дыра в нумерации до этого (S5).
         raise Http404
-    poll = getattr(current, 'poll', None)
 
+    rejected_form = None
     if request.method == 'POST' and story is not None:
         form = ChapterForm(request.POST)
         if form.is_valid():
@@ -296,36 +386,19 @@ def chapter_editor(request, slug, chapter=None):
             else:
                 messages.success(request, 'Жоба сақталды.')
             return redirect('core:chapter_edit', slug=slug, chapter=saved.pk)
-    else:
-        form = ChapterForm(initial=_chapter_initial(story, current, poll))
+        # Форма невалидна — рендерим страницу заново с ошибками, вместе с
+        # остальным телом рабочего места (BR-77): редирект стёр бы набранное.
+        rejected_form = form
 
-    return render(request, 'pages/write/chapter_editor.html', {
-        'slug':    slug,
-        'story':   story,
-        'form':    form,
-        'chapter': chapter,
-        'current': current,
-        'is_new':  chapter is None,
-        # FR-STORY-13: опрос главы, если автор его уже создал
-        'poll':    poll,
-        'poll_option_slots': _poll_option_slots(form),
-        # BR-78. Адрес зависит от того, есть ли у главы номер: у новой его
-        # присвоит первый же ответ сервера.
-        'autosave_url': (
-            reverse('core:chapter_autosave',
-                    kwargs={'slug': slug, 'chapter': chapter}) if chapter
-            else reverse('core:chapter_autosave_new', kwargs={'slug': slug})),
-        # Пишется рабочая копия, читателю невидимая (BR-79), — поэтому
-        # автосохранение доступно и публичной работе тоже.
-        'autosave_enabled': story is not None,
-        # V14 (AUDIT-WRITE-FLOW): «Модерацияға жіберу» стояла активной и
-        # на первой главе новой работы, где аннотации и жас белгісі ещё
-        # нет и быть не может, — гарантированный отказ после нажатия.
-        # Тот же вопрос, что уже отвечает publish_panel.html на
-        # manage_story.
-        'can_submit': data.can_submit_for_review(story) if story else False,
-        'missing':    data.missing_for_review(story) if story else [],
-    })
+    context = {'slug': slug, 'story': story}
+    if story is not None:
+        # 11.1b: то же тело, что у `manage_story` — см. её docstring.
+        context.update(_workspace_context(story, slug))
+        can_submit = data.can_submit_for_review(story, context['missing'])
+        context.update(_chapter_pane_context(
+            story, slug, chapter, can_submit, context['missing'],
+            form=rejected_form, current=current))
+    return render(request, 'pages/write/chapter_editor.html', context)
 
 
 @require_POST

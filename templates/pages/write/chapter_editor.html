@@ -6,51 +6,17 @@
     {% if story %}{{ story.title }}{% else %}{{ slug }}{% endif %} — Balaproza
 {% endblock %}
 
-{% block content %}
-{% if not signed_in %}
-    {% include "components/auth_gate.html" with reason="Бөлімді жазу үшін" %}
-{% else %}
-    <p class="mb-4 font-sans text-xs text-slate-500">
-        <a href="{% url 'core:my_stories' %}" class="hover:text-brand">Менің шығармаларым</a> /
-        <a href="{% url 'core:manage_story' slug=story.slug %}" class="hover:text-brand">{{ story.title }}</a> /
-        <span class="text-slate-700">
-            {% if story.is_single %}мәтін{% elif is_new %}жаңа бөлім{% else %}{{ current.number }}-бөлім{% endif %}
-        </span>
-    </p>
-
-    <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-            <h1 class="font-display text-3xl font-bold text-slate-900">
-                {% if story.is_single %}Мәтінді өңдеу{% elif is_new %}Жаңа бөлім{% else %}Бөлімді өңдеу{% endif %}
-            </h1>
-            <p class="mt-1 font-sans text-sm text-slate-600">
-                {% if story.is_single %}
-                    Толық мәтін. Жіберген соң модерациядан өтеді.
-                {% elif is_new %}
-                    Атау + мәтін. Жіберген соң модерациядан өтеді.
-                {% else %}
-                    {{ current.number }}-бөлім · «{{ current.title|default:"" }}»
-                {% endif %}
-            </p>
-        </div>
-    </header>
-
-    {% comment %}
-        11.1a (AUDIT-WRITE-FLOW): форма редактора вынесена в партиал —
-        первый шаг слияния списка глав и редактора в один экран (11.1),
-        чтобы `manage_story.html` могла встроить её же (11.1b), не заводя
-        второй копии разметки.
-    {% endcomment %}
-    {% include "partials/write/chapter_editor_pane.html" %}
-{% endif %}
-{% endblock %}
-
 {% comment %}
-    `page_scripts` — то есть в <head> и ДО alpine.min.js: `defer` исполняет
-    в порядке документа, и `Alpine.data('chapterEditor')` обязан успеть до
-    старта Alpine. В конце <body> он бы опоздал, а компонент остался бы
-    неизвестным именем без единой ошибки в консоли.
+    11.1b (AUDIT-WRITE-FLOW): `/chapter/<id>/edit/` и `/chapter/new/`
+    остаются рабочими адресами — прямая ссылка, обновление страницы,
+    закладка на конкретную главу продолжают работать один в один, — но
+    рендерят то же тело, что и `manage_story.html`
+    (`partials/write/workspace_body.html`): список глав и редактор на
+    одном экране, а не два отдельных шаблона с половиной разметки,
+    повторённой один в один.
 {% endcomment %}
+{% block content %}{% include "partials/write/workspace_body.html" %}{% endblock %}
+
 {% block page_scripts %}
 <script src="{% static 'js/editor.js' %}" defer></script>
 {% endblock %}
