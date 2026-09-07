@@ -12,10 +12,10 @@ from ..models import User
 
 def _demo_user():
     """Автор демо-корпуса — витрине состояний нужен живой человек с полкой
-    и лентой, а слой данных принимает пользователя, а не ник."""
-    from .auth import DEMO_USERNAME
-
-    return User.objects.filter(username=DEMO_USERNAME).first()
+    и лентой, а слой данных принимает пользователя, а не ник. `aidana` —
+    тот же корпусный автор, что и раньше у демо-входа (`_corpus.py`), к
+    механизму авторизации отношения не имеет."""
+    return User.objects.filter(username='aidana').first()
 
 def design_components(request):
     """Каталог всех атомов во всех состояниях. Только при DEBUG."""

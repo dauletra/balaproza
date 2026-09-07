@@ -81,6 +81,9 @@ from .domain.story import (
 from .domain.slugs import slugify_kz
 from .domain.tags import TAG_STATUSES
 
+# ── Вход и онбординг ──────────────────────────────────────────────────────
+from .queries.auth import complete_onboarding, get_or_create_telegram_user
+
 # ── Каталог, поиск, жанры: уже на моделях ────────────────────────────────
 from .queries.catalog import (
     all_authors,

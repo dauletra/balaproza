@@ -22,27 +22,39 @@
                 {% include "components/error_state.html" with title="Кіру сәтсіз аяқталды" message=error compact=True %}
             </div>
         {% endif %}
-        <form method="post" action="{% url 'core:login' %}{% if next %}?next={{ next|urlencode }}{% endif %}"
-              class="flex flex-col gap-4">
-            {% csrf_token %}
-            {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
-
-            {# TelegramLoginPill — pill 999px с фирменным градиентом #}
-            <button type="submit"
-                    class="inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-pill font-sans text-sm font-bold text-white shadow-tg-btn hover:opacity-90"
-                    style="background: linear-gradient(180deg, var(--color-tg-1), var(--color-tg-2))">
-                {% include "components/icon.html" with name="telegram" size=18 only %}
-                Сайтқа кіру
-            </button>
+        <div class="flex flex-col gap-4">
+            {% comment %}
+                Telegram Login Widget (NFR-25): redirect-режим, без своего
+                JS — кнопку рисует и подписывает сам Telegram, на наш
+                callback попадают только уже подписанные данные.
+            {% endcomment %}
+            {% if telegram_bot_username %}
+                <div class="flex justify-center">
+                    <script async src="https://telegram.org/js/telegram-widget.js?22"
+                            data-telegram-login="{{ telegram_bot_username }}"
+                            data-size="large"
+                            data-radius="999"
+                            data-auth-url="{{ telegram_auth_url }}"
+                            data-request-access="write"></script>
+                </div>
+            {% else %}
+                {% comment %}
+                    Dev/CI без зарегистрированного бота: виджет Telegram сам
+                    не рисуется без домена, привязанного через @BotFather.
+                {% endcomment %}
+                <p class="rounded-md bg-status-warning-bg px-3 py-2.5 text-center font-sans text-xs text-status-warning-fg">
+                    TELEGRAM_BOT_USERNAME бапталмаған — кіру түймесі осы ортада көрінбейді.
+                </p>
+            {% endif %}
 
             <p class="text-center font-sans text-[11px] leading-relaxed text-slate-500">
                 Жалғастыра отырып,
-                <a href="#" class="text-brand hover:underline">пайдалану ережелеріне</a>
+                <a href="{% url 'core:legal_terms' %}" class="text-brand hover:underline">пайдалану ережелеріне</a>
                 және
-                <a href="#" class="text-brand hover:underline">құпиялылық саясатына</a>
+                <a href="{% url 'core:legal_privacy' %}" class="text-brand hover:underline">құпиялылық саясатына</a>
                 келісесің.
             </p>
-        </form>
+        </div>
 
         <div class="my-5 flex items-center gap-3">
             <span class="h-px flex-1 bg-slate-200"></span>

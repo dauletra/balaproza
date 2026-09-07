@@ -13,11 +13,12 @@
 
 from .api import search_index_json
 from .auth import (
-    DEMO_USERNAME,
     login_view,
     logout_view,
+    onboarding,
     signup,
     signup_success,
+    telegram_callback,
 )
 from .catalog import (
     catalog,

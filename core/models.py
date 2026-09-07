@@ -91,6 +91,17 @@ class User(AbstractUser):
     # «Жаңа авторлар» и `WHERE` оси каталога. Пересчитывается по строкам
     # `Follow`, а не сдвигается на единицу, — так она сама себя исправляет.
     followers = models.PositiveIntegerField('жазылушы саны', default=0)
+    # Провайдер личности (NFR-25). `null=True` — у сидовых и тестовых
+    # пользователей его нет и не будет. Не участвует в `username`: тот —
+    # случайный плейсхолдер (BR-90), telegram_id только связывает
+    # повторный вход с уже существующим аккаунтом.
+    telegram_id = models.BigIntegerField('telegram id', unique=True,
+                                         null=True, blank=True)
+    # Акт согласия (FR-AUTH-05), не булев флаг — с датой, как
+    # `AwardGrant`/`Notification.outcome`. Онбординг завершён ⟺ это поле
+    # не `None` (BR-90); отдельного флага «завершил онбординг» не заводим.
+    terms_accepted_at = models.DateTimeField('ережелерге келісті',
+                                             null=True, blank=True)
 
     class Meta:
         verbose_name = 'пайдаланушы'

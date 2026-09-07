@@ -301,6 +301,41 @@ class ProfileForm(forms.ModelForm):
         return age
 
 
+class OnboardingForm(forms.ModelForm):
+    """Онбординг после первого Telegram-входа (FR-AUTH-04). Без `pen_name`:
+    регистрация требует только официальное имя (BR-15…19), авторлық аты
+    правится потом на `/me/edit/` — `ProfileForm` его уже покрывает."""
+
+    agree_rules = forms.BooleanField(required=True, error_messages={
+        'required': 'Жариялау ережелерімен келісу қажет.'})
+    agree_privacy = forms.BooleanField(required=True, error_messages={
+        'required': 'Құпиялылық саясатымен келісу қажет.'})
+
+    class Meta:
+        model = User
+        fields = ('name', 'bio', 'age', 'gender')
+        error_messages = {
+            'name':   {'required':   'Ресми атыңды жаз.',
+                       'max_length': 'Ресми атың тым ұзын — 120 таңбадан аспасын.'},
+            'bio':    {'max_length': 'Өзің туралы мәтін тым ұзын — 200 таңбадан аспасын.'},
+            'gender': {'invalid_choice': 'Жынысын дұрыс таңда.'},
+            'age':    {'invalid': 'Жасын дұрыс жаз.'},
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['name'].required = True
+        self.fields['bio'].required = False
+        self.fields['age'].required = False
+        self.fields['gender'].required = False
+
+    def clean_age(self):
+        age = self.cleaned_data.get('age')
+        if age is not None and not (1 <= age <= 120):
+            raise forms.ValidationError('Жасын дұрыс жаз.')
+        return age
+
+
 class SubmissionForm(forms.Form):
     """Подача работы на конкурс (FR-CONT-04, BR-22…25).
 

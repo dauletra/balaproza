@@ -227,6 +227,21 @@ class PagesStayWithinTheirQueryBudget(TestCase):
                                     kwargs={'slug': 'kulki-kerek'}))
 
 
+class AuthPagesStayWithinTheirQueryBudget(TestCase):
+
+    def test_login_page(self):
+        """Один — ссылки «Авторлар мектебі», как у любой страницы."""
+        with self.assertNumQueries(1):
+            self.client.get(reverse('core:login'))
+
+    def test_onboarding_page(self):
+        """Плюс сессия, сам вошедший и бейдж уведомлений — цена любой
+        личной страницы (см. `test_home_signed_in`)."""
+        login_as(self.client)
+        with self.assertNumQueries(4):
+            self.client.get(reverse('core:onboarding'))
+
+
 class PersonalPagesStayWithinTheirQueryBudget(TestCase):
     """Страницы вошедшего: профиль, кабинет, библиотека, конкурсные заявки.
 

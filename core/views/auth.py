@@ -1,60 +1,78 @@
-"""Вход, выход и регистрация (FR-AUTH-*).
+"""Вход, выход и онбординг (FR-AUTH-*, NFR-25).
 
-Сессия настоящая: `django.contrib.auth` кладёт в неё пользователя, а на
-«кто это» отвечает база через `request.user`.
-
-Чего здесь пока нет — **провайдера личности**. Вход идёт через Telegram
-(FR-AUTH-01), а проверка подписи Login Widget (NFR-25) требует бота и его
-токена: их заводят при деплое (README). До тех пор «Сайтқа кіру»
-подписывает в демо-аккаунт; пароля у сидовых пользователей нет вовсе.
+Провайдер личности — Telegram Login Widget, redirect-режим: кнопка ведёт
+на Telegram, тот подписывает данные пользователя и редиректит браузер на
+`telegram_callback` с параметрами в query string. Проверка подписи —
+`domain.telegram.verify_telegram_auth`, чистая функция без Django;
+здесь только её вызов и то, что вокруг: логин сессии, онбординг.
 """
 
 import logging
+from urllib.parse import urlencode
 
+from django.conf import settings
 from django.contrib.auth import login as auth_login, logout as auth_logout
-from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from ..models import User
+from .. import data
+from ..domain.telegram import verify_telegram_auth
+from ..forms import OnboardingForm
 from .common import _safe_next
 
 logger = logging.getLogger(__name__)
 
-# Кого подписывает демо-кнопка входа. Ровно один аккаунт и ровно на время,
-# пока нет Telegram: у `aidana` есть работы во всех четырёх статусах, и
-# только под ней проверяются кабинет, профиль и библиотека.
-DEMO_USERNAME = 'aidana'
+# Поля, которые действительно шлёт Telegram (документация Login Widget).
+# `request.GET` может нести и наше собственное `next` — оно не входит в
+# подписанные данные, и если пропустить его в проверку подписи, hash
+# никогда не совпадёт: Telegram подписывал данные без него.
+_TELEGRAM_FIELDS = ('id', 'first_name', 'last_name', 'username', 'photo_url',
+                    'auth_date', 'hash')
+
+# Что видит человек при неудачном входе. Причина — в лог, не на страницу.
+_SIGN_IN_FAILED = 'Кіру сәтсіз аяқталды. Сәл кейінірек қайта көр.'
 
 
-def _sign_in_demo_user(request) -> bool:
-    """Подписать в демо-аккаунт. False — если его нет в базе.
-
-    `backend` передаётся явно: пользователь взят запросом, а не через
-    `authenticate()`, и Django неоткуда узнать, кто за него отвечает.
-    """
-    user = User.objects.filter(username=DEMO_USERNAME, is_active=True).first()
-    if user is None:
-        logger.warning(
-            'Демо-вход невозможен: пользователя %r нет в базе. '
-            'Корпус кладёт команда `manage.py seed_demo`.', DEMO_USERNAME)
-        return False
-    auth_login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-    return True
-
-
-# Что видит человек, когда демо-аккаунта нет. Причину — в лог, не на
-# страницу: «выполните seed_demo» адресовано не тому, кто это читает.
-_SIGN_IN_FAILED = 'Кіру уақытша мүмкін емес. Сәл кейінірек қайта көр.'
+def _telegram_login_context(request) -> dict:
+    """Данные для кнопки виджета: куда слать (с сохранённым `next`) и чей
+    бот. Пустой `TELEGRAM_BOT_USERNAME` — только в dev без бота (шаблон
+    показывает заглушку вместо виджета)."""
+    next_url = request.GET.get('next', '')
+    auth_url = request.build_absolute_uri(reverse('core:telegram_callback'))
+    if next_url:
+        auth_url = f'{auth_url}?{urlencode({"next": next_url})}'
+    return {
+        'telegram_bot_username': settings.TELEGRAM_BOT_USERNAME,
+        'telegram_auth_url':     auth_url,
+        'next':                  next_url,
+    }
 
 
 def login_view(request):
-    if request.method == 'POST' and _sign_in_demo_user(request):
-        return HttpResponseRedirect(_safe_next(request))
-    return render(request, 'pages/auth/login.html', {
-        'next': request.POST.get('next') or request.GET.get('next', ''),
-        'error': _SIGN_IN_FAILED if request.method == 'POST' else '',
-    })
+    return render(request, 'pages/auth/login.html', _telegram_login_context(request))
+
+
+def telegram_callback(request):
+    """Куда Telegram редиректит после согласия пользователя. `id` — telegram_id
+    (FR-AUTH-01); первый вход заводит аккаунт (FR-AUTH-03) и ведёт на
+    онбординг, повторный — сразу на `next`."""
+    params = {k: v for k, v in request.GET.items() if k in _TELEGRAM_FIELDS}
+    reason = verify_telegram_auth(params, settings.TELEGRAM_BOT_TOKEN)
+    if reason:
+        logger.warning('Telegram-кіру қабылданбады: %s', reason)
+        return render(request, 'pages/auth/login.html', {
+            **_telegram_login_context(request),
+            'error': _SIGN_IN_FAILED,
+        })
+
+    user, created = data.get_or_create_telegram_user(int(params['id']))
+    auth_login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+
+    next_url = _safe_next(request)
+    if created:
+        return redirect(f"{reverse('core:onboarding')}?{urlencode({'next': next_url})}")
+    return redirect(next_url)
 
 
 @require_POST
@@ -65,19 +83,36 @@ def logout_view(request):
     return redirect('core:home')
 
 
-def signup(request):
-    """Регистрация — та же дверь, что и вход (FR-AUTH-03).
+def onboarding(request):
+    """Онбординг после первого входа (FR-AUTH-03/04/05/06). Завершённость —
+    `terms_accepted_at` (BR-90): повторный заход сюда уже онбордившегося
+    автора не должен спрашивать те же поля снова."""
+    if not request.user.is_authenticated:
+        return redirect(f"{reverse('core:login')}?{urlencode({'next': _safe_next(request)})}")
+    if request.user.terms_accepted_at:
+        return redirect('core:profile_me')
 
-    Форма свёрстана, но ничего не записывает: профиль заводится при первой
-    авторизации через Telegram, а до неё придуманный ник некуда сохранять.
-    Поля не читаются вовсе — читать их наполовину значило бы приветствовать
-    человека, которого в базе не существует.
-    """
-    if request.method == 'POST' and _sign_in_demo_user(request):
-        return redirect('core:signup_success')
-    return render(request, 'pages/auth/signup.html', {
-        'error': _SIGN_IN_FAILED if request.method == 'POST' else '',
-    })
+    if request.method == 'POST':
+        form = OnboardingForm(request.POST)
+        if form.is_valid():
+            data.complete_onboarding(
+                request.user,
+                name=form.cleaned_data['name'],
+                bio=form.cleaned_data['bio'],
+                age=form.cleaned_data['age'],
+                gender=form.cleaned_data['gender'],
+            )
+            return redirect('core:signup_success')
+    else:
+        form = OnboardingForm()
+
+    return render(request, 'pages/auth/onboarding.html', {'form': form})
+
+
+def signup(request):
+    """Тіркелу — та же дверь, что и вход (FR-AUTH-03): аккаунт заводит
+    Telegram, отдельной ветки создания здесь нет."""
+    return render(request, 'pages/auth/signup.html', _telegram_login_context(request))
 
 
 def signup_success(request):

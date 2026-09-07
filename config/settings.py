@@ -76,6 +76,31 @@ if not ALLOWED_HOSTS:
     ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]', 'testserver']
 
 
+# ── Telegram Login Widget (NFR-25) ────────────────────────────────────────
+#
+# Токен подписывает проверку личности — обязателен в проде, как SECRET_KEY
+# выше. В dev/тестах бот не зарегистрирован: подпись всё равно считается
+# этим же токеном и внутри теста, и в `verify_telegram_auth`, поэтому
+# плейсхолдер работает без внешнего бота. `BOT_USERNAME` только для
+# рендера кнопки — пустой в dev просто не рисует виджет.
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+if not TELEGRAM_BOT_TOKEN:
+    if PRODUCTION:
+        raise ImproperlyConfigured(
+            'Не задан TELEGRAM_BOT_TOKEN. В проде им проверяется подпись '
+            'Telegram Login Widget — без него любой вход неотличим от '
+            'подделанного.'
+        )
+    TELEGRAM_BOT_TOKEN = 'dev-insecure-telegram-bot-token'
+
+TELEGRAM_BOT_USERNAME = os.environ.get('TELEGRAM_BOT_USERNAME', '')
+if PRODUCTION and not TELEGRAM_BOT_USERNAME:
+    raise ImproperlyConfigured(
+        'Не задан TELEGRAM_BOT_USERNAME. Без него виджету некуда слать '
+        'запрос авторизации.'
+    )
+
+
 # Application definition
 
 INSTALLED_APPS = [

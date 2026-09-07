@@ -9,10 +9,7 @@
 страница, на которой ничего нет, рендерится и будучи сломанной.
 """
 
-from unittest import mock
-
 from django.contrib import messages
-from django.contrib.auth import get_user
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.messages.middleware import MessageMiddleware
 from django.contrib.sessions.middleware import SessionMiddleware
@@ -24,7 +21,6 @@ from core import data
 from core.context_processors import auth_state, nav_state
 from core.models import User
 from core.tests.base import TestCase, login_as, login_as_newcomer, user
-from core.views import DEMO_USERNAME
 
 # (имя маршрута, kwargs, подпись для subTest)
 PUBLIC_URLS = [
@@ -131,68 +127,6 @@ class DesignPagesAreDebugOnly(TestCase):
         for name in DEBUG_ONLY_URLS:
             with self.subTest(url=name):
                 self.assertEqual(self.client.get(reverse(name)).status_code, 200)
-
-
-class SigningIn(TestCase):
-    """Провайдера личности пока нет — до Telegram (FR-AUTH-01, NFR-25)
-    кнопка подписывает в демо-аккаунт. Поэтому проверяется не «какой
-    пароль подошёл», а то, что переживёт смену механизма."""
-
-    def test_login_authenticates_and_rotates_the_session(self):
-        """Ключ, выданный гостю, не должен оставаться при нём после входа
-        (session fixation): подсунутый до входа ключ стал бы ключом
-        вошедшего. Session-флаг этого не делал."""
-        session = self.client.session
-        session['seen_before'] = True
-        session.save()
-        before = session.session_key
-
-        response = self.client.post(reverse('core:login'))
-        self.assertRedirects(response, reverse('core:home'))
-        self.assertEqual(get_user(self.client).username, DEMO_USERNAME)
-        self.assertNotEqual(self.client.session.session_key, before)
-
-    def test_next_is_honoured_but_never_leaves_the_site(self):
-        target = reverse('core:library')
-        self.assertRedirects(
-            self.client.post(f"{reverse('core:login')}?next={target}"), target)
-        for evil in ('http://evil.example.com/', 'https://evil.example.com/login',
-                     '//evil.example.com/'):
-            with self.subTest(evil=evil):
-                response = self.client.post(f"{reverse('core:login')}?next={evil}")
-                self.assertEqual(response.url, reverse('core:home'))
-
-    @mock.patch('core.views.auth.DEMO_USERNAME', 'no-such-account')
-    def test_an_empty_database_is_not_a_500(self):
-        """Причина («нет пользователя, выполни seed_demo») уходит в лог: она
-        адресована тому, кто разворачивал портал, а не тому, кто нажал
-        кнопку. `next` при этом не теряется — иначе повтор уводит не туда."""
-        target = reverse('core:library')
-        with self.assertLogs('core.views', level='WARNING'):
-            response = self.client.post(reverse('core:login'), {'next': target})
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Кіру уақытша мүмкін емес')
-        self.assertFalse(get_user(self.client).is_authenticated)
-        self.assertEqual(response.context['next'], target)
-
-    def test_logout_is_post_only_and_idempotent(self):
-        self.client.post(reverse('core:login'))
-        self.assertEqual(self.client.get(reverse('core:logout')).status_code, 405)
-        self.assertRedirects(self.client.post(reverse('core:logout')),
-                             reverse('core:home'))
-        self.assertFalse(get_user(self.client).is_authenticated)
-        self.assertEqual(self.client.post(reverse('core:logout')).status_code, 302)
-
-    def test_signup_signs_in_but_creates_no_account(self):
-        """Аккаунт заводит Telegram (FR-AUTH-03). Пока провайдера нет,
-        придуманный ник некуда деть — и вписывать его в чужой аккаунт
-        нельзя. Раньше он попадал в сессию и здоровался с человеком,
-        которого в базе не существовало."""
-        before = User.objects.count()
-        response = self.client.post(reverse('core:signup'), {'name': 'Айгерім'})
-        self.assertRedirects(response, reverse('core:signup_success'))
-        self.assertEqual(User.objects.count(), before)
-        self.assertEqual(get_user(self.client).username, DEMO_USERNAME)
 
 
 class TemplateContext(TestCase):
