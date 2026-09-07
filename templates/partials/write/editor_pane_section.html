@@ -9,8 +9,14 @@
     `id="editor-pane"` обязан остаться в ответе на htmx-запрос: swap
     заменяет весь элемент, и без совпадающего id следующее переключение
     главы было бы уже не на что нацелить.
+
+    Без своих внешних отступов (11.2, AUDIT-WRITE-FLOW): `lg:order-2`
+    ставит её узкой сеткой рядом со списком глав, а зазор и верхний
+    отступ держит обёртка в `workspace_body.html` — что для полного
+    показа, что для htmx-фрагмента, который эту секцию подменяет собой
+    же (`hx-swap="outerHTML"`) внутри той же сетки.
 {% endcomment %}
-<section id="editor-pane" class="mt-8">
+<section id="editor-pane" class="lg:order-2">
     <h2 class="mb-3 font-display text-lg font-bold text-slate-900">
         {% if story.is_single %}Мәтінді өңдеу{% elif is_new %}Жаңа бөлім{% else %}{{ current.number }}-бөлім · «{{ current.title|default:"" }}»{% endif %}
     </h2>

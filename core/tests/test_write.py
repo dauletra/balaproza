@@ -451,6 +451,40 @@ class TheWorkspaceMergesListAndEditor(TestCase):
         self.assertNotContains(fragment, 'Бөлімдер')
         self.assertNotContains(fragment, 'Қауіпті аймақ')
 
+    # Класс `<details>` чек-листа — свой, отдельный от двух других
+    # `<details>` на этом экране (опрос главы, «Дайын тармақтар» внутри
+    # самой панели): без этого якоря regex мог бы зацепить не тот узел.
+    PANEL_DETAILS = 'group mb-8 rounded-lg border border-slate-200 bg-white'
+
+    def test_the_checklist_panel_collapses_when_nothing_is_actionable(self):
+        """11.2: 'aidana-tan' — публичный сериал, чек-лист закрыт, слать
+        нечего (см. test_readiness_asks_the_text_and_not_the_status),
+        замечания модератора нет. Панели нечего показывать активного —
+        она свёрнута по умолчанию, а не занимает место рядом с
+        редактором ради одного списка закрытых пунктов."""
+        response = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.SLUG}))
+        body = response.content.decode()
+        self.assertIn('Дайын', body)
+        self.assertIn(self.PANEL_DETAILS, body)
+        self.assertNotRegex(body, rf'<details class="{re.escape(self.PANEL_DETAILS)}"\s*open>')
+
+    def test_the_checklist_panel_stays_open_with_missing_items(self):
+        """'aidana-kus' — черновик, не хватает текста и жас белгісі:
+        панели есть что показать, поэтому она раскрыта."""
+        response = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': 'aidana-kus'}))
+        self.assertContains(response, 'Жас белгісін қой')
+        self.assertRegex(response.content.decode(),
+                         rf'<details class="{re.escape(self.PANEL_DETAILS)}"\s*open>')
+
+    def test_the_chapter_row_no_longer_carries_its_own_edit_pencil(self):
+        """11.2: вся строка теперь ссылка с тем же hx-* переключением —
+        отдельная иконка «Өңдеу» стала лишней в узкой колонке."""
+        response = self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.SLUG}))
+        self.assertNotContains(response, 'aria-label="Өңдеу"')
+
     def test_hx_request_on_chapter_edit_also_returns_only_the_pane(self):
         chapter = self.story.chapter_set.first()
         fragment = self.client.get(

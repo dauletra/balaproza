@@ -18,21 +18,42 @@
     (`can_submit_for_review`, BR-79), — включая публичный сериал с
     дописанной главой. Прежнее «только черновик» и означало, что подать
     новую главу было нечем, и она публиковалась сама.
+
+    11.2 (AUDIT-WRITE-FLOW): панель — `<details>`, свёрнута по умолчанию,
+    только когда в ней нет вовсе ничего действенного — ни незакрытых
+    обязательных пунктов, ни замечания модератора, ни блока отправки
+    (условие открытия то же самое, что решает, рисовать ли блок отправки
+    ниже, — `can_submit`/`pending_since`/`NotPublished`, повторено явно,
+    а не в одну сторону: свернуть и спрятать саму кнопку «Модерацияға
+    жіберу» ровно тогда, когда работа полностью готова её показать, было
+    бы противоположностью цели панели).
 {% endcomment %}
-<section class="mb-8 rounded-lg border border-slate-200 bg-white p-5">
-    <div class="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-            <h2 class="font-display text-lg font-bold text-slate-900">Жариялауға дайындық</h2>
-            <p class="mt-1 font-sans text-xs leading-relaxed text-slate-500">
-                {% if story.status == "NotPublished" %}
-                    Модерацияға жіберер алдында осылар керек.
-                {% else %}
-                    Оқырманға түсінікті карточка және дайын мәтін.
-                {% endif %}
-            </p>
-        </div>
-        <span class="rounded-chip bg-slate-100 px-2.5 py-1 font-sans text-xs font-bold text-slate-600">{{ story|reading_meta }}</span>
-    </div>
+<details class="group mb-8 rounded-lg border border-slate-200 bg-white" {% if checklist_actionable %}open{% endif %}>
+    <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 p-5">
+        <span class="flex items-center gap-2.5">
+            <span class="shrink-0 text-slate-400 transition-transform group-open:rotate-180">
+                {% include "components/icon.html" with name="chevron-down" size=14 only %}
+            </span>
+            <span class="font-display text-lg font-bold text-slate-900">Жариялауға дайындық</span>
+        </span>
+        {% if checklist_actionable %}
+            <span class="shrink-0 rounded-chip bg-slate-100 px-2.5 py-1 font-sans text-xs font-bold text-slate-600">{{ story|reading_meta }}</span>
+        {% else %}
+            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-chip bg-status-published-bg px-2.5 py-1 font-sans text-xs font-bold text-status-published-fg">
+                {% include "components/icon.html" with name="check" size=12 only %}
+                Дайын
+            </span>
+        {% endif %}
+    </summary>
+
+    <div class="border-t border-slate-100 p-5 pt-4">
+    <p class="mb-4 font-sans text-xs leading-relaxed text-slate-500">
+        {% if story.status == "NotPublished" %}
+            Модерацияға жіберер алдында осылар керек.
+        {% else %}
+            Оқырманға түсінікті карточка және дайын мәтін.
+        {% endif %}
+    </p>
 
     {% comment %}
         Замечание модератора (BR-80) — первым, до всего остального: это
@@ -169,4 +190,5 @@
             {% endif %}
         </div>
     {% endif %}
-</section>
+    </div>
+</details>

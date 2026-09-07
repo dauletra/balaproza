@@ -110,14 +110,21 @@
     {% include "partials/write/publish_panel.html" %}
 
     {% comment %}
-        Редактор активной главы (11.1b, AUDIT-WRITE-FLOW): раньше отдельный
-        экран `/chapter/<id>/edit/`, теперь встроен прямо здесь — переход
-        со страницы на страницу не нужен, чтобы дописать текст.
+        Редактор активной главы (11.1b) слева от списка глав узкой
+        колонкой (11.2, AUDIT-WRITE-FLOW). Не три колонки, как в первом
+        наброске раздела 5.7: колонка контента `max-w-[860px]` без рейла
+        (docs/ui.md, DEC-48) — своей ширины сверху в шаблоне заводить
+        нельзя, а с чек-листом третьей колонкой редактору прозы досталось
+        бы от силы 250–300px. Чек-лист остаётся над этим блоком, во всю
+        ширину, но свёрнут по умолчанию, когда ему нечего показать
+        (`publish_panel.html`) — компактность оттуда, а не из третьей
+        колонки.
     {% endcomment %}
+    <div class="mt-8 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start lg:gap-6">
     {% include "partials/write/editor_pane_section.html" %}
 
     {# ── Список глав / цельный текст ── #}
-    <section class="mt-8 rounded-lg border border-slate-200 bg-white">
+    <section class="mt-8 rounded-lg border border-slate-200 bg-white lg:order-1 lg:mt-0">
         <div class="flex items-baseline justify-between border-b border-slate-100 px-5 py-4">
             <h2 class="font-display text-lg font-bold text-slate-900">{% if story.is_single %}Мәтін{% else %}Бөлімдер{% endif %}</h2>
             <span class="font-sans text-xs text-slate-500">{{ story|reading_meta }}</span>
@@ -126,12 +133,27 @@
         {% if chapters %}
             <ol class="flex flex-col">
                 {% for c in chapters %}
-                    <li class="flex items-center gap-4 border-b border-slate-100 px-5 py-3 last:border-b-0 hover:bg-slate-50">
-                        <span class="w-7 shrink-0 text-right font-display text-sm font-bold text-slate-400">{{ c.number }}</span>
-
-                        <div class="min-w-0 flex-1">
-                            <div class="truncate font-sans text-sm font-semibold text-slate-900">{% if story.is_single %}Толық мәтін{% else %}{{ c.title }}{% endif %}</div>
-                            <div class="flex flex-wrap items-center gap-x-2 font-sans text-xs text-slate-500">
+                    {% comment %}
+                        11.2 (AUDIT-WRITE-FLOW): строка компактнее — узкая
+                        колонка (240px) не оставляет места для пяти иконок
+                        в ряд, как раньше. Вся карточка теперь ссылка с
+                        тем же hx-* переключением, что раньше нёс только
+                        карандаш, — отдельная иконка «Өңдеу» стала лишней.
+                        «Сайтта қарау» из строки убрана: путь к читателю
+                        остаётся через «Сайтта қарау» в шапке. Реордер и
+                        удаление (BR-84) остаются — компактным рядом под
+                        текстом, а не вперемешку с остальным.
+                    {% endcomment %}
+                    <li class="border-b border-slate-100 px-4 py-3 last:border-b-0">
+                        <a href="{% url 'core:chapter_edit' slug=story.slug chapter=c.pk %}"
+                           hx-get="{% url 'core:chapter_edit' slug=story.slug chapter=c.pk %}"
+                           hx-target="#editor-pane" hx-swap="outerHTML" hx-push-url="true"
+                           class="block rounded-md hover:bg-slate-50">
+                            <div class="flex items-baseline gap-2">
+                                <span class="shrink-0 font-display text-sm font-bold text-slate-400">{{ c.number }}</span>
+                                <span class="min-w-0 flex-1 truncate font-sans text-sm font-semibold text-slate-900">{% if story.is_single %}Толық мәтін{% else %}{{ c.title }}{% endif %}</span>
+                            </div>
+                            <div class="mt-1 flex flex-wrap items-center gap-x-2 font-sans text-xs text-slate-500">
                                 <span>{{ c.char_count|spaced }} таңба</span>
 
                                 {% comment %}
@@ -151,73 +173,44 @@
                                 {% else %}
                                     <span class="text-status-published-fg">Жарияланған</span>
                                 {% endif %}
-                                {% comment %}
-                                    Карта качества по главам (DEC-32). Одна цифра
-                                    говорит «зацепило», ведущая реакция — «чем
-                                    зацепило»: ради этого реакции и вводились,
-                                    и автор должен видеть их первым.
-                                {% endcomment %}
-                                {% if c.top_reaction %}
-                                    <span aria-hidden="true">·</span>
-                                    <span class="inline-flex items-center gap-1 text-slate-600">
-                                        {% include "components/icon.html" with name=c.top_reaction.icon size=12 only %}
-                                        {{ c.top_reaction.label }} · {{ c.likes }}
-                                    </span>
-                                    <span class="text-slate-400">({{ c.top_reaction.hint }})</span>
-                                {% endif %}
                             </div>
-                        </div>
-
-                        {% if not story.is_single %}
-                        <div class="flex shrink-0 items-center gap-0.5">
-                            {% if not forloop.first %}
-                            <form method="post" action="{% url 'core:chapter_move' slug=story.slug chapter=c.pk %}">
-                                {% csrf_token %}
-                                <input type="hidden" name="direction" value="up">
-                                <button type="submit" aria-label="Жоғары жылжыту"
-                                        class="grid h-8 w-8 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-                                    {% include "components/icon.html" with name="chevron-down" size=14 cls="rotate-180" only %}
-                                </button>
-                            </form>
-                            {% endif %}
-                            {% if not forloop.last %}
-                            <form method="post" action="{% url 'core:chapter_move' slug=story.slug chapter=c.pk %}">
-                                {% csrf_token %}
-                                <input type="hidden" name="direction" value="down">
-                                <button type="submit" aria-label="Төмен жылжыту"
-                                        class="grid h-8 w-8 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-                                    {% include "components/icon.html" with name="chevron-down" size=14 only %}
-                                </button>
-                            </form>
-                            {% endif %}
-                        </div>
-                        {% endif %}
-
-                        <div class="flex shrink-0 items-center gap-1.5">
                             {% comment %}
-                                11.1c: обычная ссылка — рабочий адрес и
-                                фолбэк без JS (та же основа, что у
-                                reaction_bar.html — action/href настоящий,
-                                hx-* поверх). С htmx подменяет только
-                                #editor-pane, без перезагрузки списка глав
-                                и чек-листа рядом; hx-push-url держит адрес
-                                строки в синхроне с открытой главой.
+                                Карта качества по главам (DEC-32). Одна цифра
+                                говорит «зацепило», ведущая реакция — «чем
+                                зацепило»: ради этого реакции и вводились,
+                                и автор должен видеть их первым.
                             {% endcomment %}
-                            <a href="{% url 'core:chapter_edit' slug=story.slug chapter=c.pk %}"
-                               hx-get="{% url 'core:chapter_edit' slug=story.slug chapter=c.pk %}"
-                               hx-target="#editor-pane" hx-swap="outerHTML" hx-push-url="true"
-                               aria-label="Өңдеу"
-                               class="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700">
-                                {% include "components/icon.html" with name="pen" size=14 only %}
-                            </a>
-                            {% with chap=c.number|stringformat:"d" %}
-                            {% url 'core:story_detail' slug=story.slug as detail_base %}
-                            <a href="{{ detail_base }}?chapter={{ chap }}#chapter-{{ chap }}"
-                               aria-label="Сайтта қарау" target="_blank"
-                               class="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700">
-                                {% include "components/icon.html" with name="eye" size=14 only %}
-                            </a>
-                            {% endwith %}
+                            {% if c.top_reaction %}
+                                <div class="mt-1 flex items-center gap-1 font-sans text-xs text-slate-600">
+                                    {% include "components/icon.html" with name=c.top_reaction.icon size=12 only %}
+                                    {{ c.top_reaction.label }} · {{ c.likes }}
+                                </div>
+                            {% endif %}
+                        </a>
+
+                        <div class="mt-1.5 flex items-center justify-end gap-0.5">
+                            {% if not story.is_single %}
+                                {% if not forloop.first %}
+                                <form method="post" action="{% url 'core:chapter_move' slug=story.slug chapter=c.pk %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="direction" value="up">
+                                    <button type="submit" aria-label="Жоғары жылжыту"
+                                            class="grid h-7 w-7 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                                        {% include "components/icon.html" with name="chevron-down" size=13 cls="rotate-180" only %}
+                                    </button>
+                                </form>
+                                {% endif %}
+                                {% if not forloop.last %}
+                                <form method="post" action="{% url 'core:chapter_move' slug=story.slug chapter=c.pk %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="direction" value="down">
+                                    <button type="submit" aria-label="Төмен жылжыту"
+                                            class="grid h-7 w-7 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                                        {% include "components/icon.html" with name="chevron-down" size=13 only %}
+                                    </button>
+                                </form>
+                                {% endif %}
+                            {% endif %}
                             <button type="button" x-data
                                     @click="$dispatch('open-delete-confirm', {
                                         name: '{{ c.title|escapejs }}',
@@ -226,8 +219,8 @@
                                         body: '«{{ c.title|escapejs }}» бөлімі қайтарылмастай өшіріледі. Пікірлер мен реакциялар да жоғалады.'
                                     })"
                                     aria-label="Өшіру"
-                                    class="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-status-error-bg hover:text-status-error-fg">
-                                {% include "components/icon.html" with name="trash" size=14 only %}
+                                    class="grid h-7 w-7 place-items-center rounded-md text-slate-400 hover:bg-status-error-bg hover:text-status-error-fg">
+                                {% include "components/icon.html" with name="trash" size=13 only %}
                             </button>
                         </div>
                     </li>
@@ -246,6 +239,7 @@
             </div>
         {% endif %}
     </section>
+    </div>
 
     {# ── Опасная зона ── #}
     <section class="mt-8 rounded-lg border border-status-error-fg/30 bg-status-error-bg/30 p-5">

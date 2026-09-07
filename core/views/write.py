@@ -149,6 +149,24 @@ def _chapter_pane_context(story, slug, chapter, can_submit, missing, *,
     }
 
 
+def _checklist_actionable(story, missing, can_submit, pending_since, moderation_note) -> bool:
+    """Есть ли в `publish_panel.html` вообще что показывать активного —
+    незакрытый обязательный пункт, замечание модератора, или сам блок
+    отправки (11.2, AUDIT-WRITE-FLOW). Панель — `<details>`, свёрнутая по
+    умолчанию, когда ответ `False`: список закрытых пунктов внутри —
+    единственное, что остаётся, а он и так уже свёрнут своим `<details>`.
+
+    Условие блока отправки повторено явно (`can_submit`/`pending_since`/
+    `NotPublished`), а не выведено из одного лишь `missing`: свернуть и
+    спрятать саму кнопку «Модерацияға жіберу» ровно тогда, когда работа
+    полностью готова её показать, было бы противоположностью цели
+    панели. Django `{% with %}` не считает булевы выражения — отсюда
+    вычисление здесь, а не в шаблоне.
+    """
+    return bool(missing or moderation_note or can_submit or pending_since
+               or story.status == 'NotPublished')
+
+
 def _workspace_context(story, slug) -> dict:
     """Общее для `manage_story` и `chapter_editor` (11.1b): список глав
     и готовность к отправке — то, что видит `publish_panel.html`
@@ -266,6 +284,9 @@ def manage_story(request, slug):
         # (`partials/write/workspace_body.html`).
         context.update(_workspace_context(story, slug))
         can_submit = data.can_submit_for_review(story, context['missing'])
+        context['checklist_actionable'] = _checklist_actionable(
+            story, context['missing'], can_submit,
+            context['pending_since'], context['moderation_note'])
         context.update(_chapter_pane_context(
             story, slug, _active_chapter_id(request, story),
             can_submit, context['missing']))
@@ -402,6 +423,9 @@ def chapter_editor(request, slug, chapter=None):
         # 11.1b: то же тело, что у `manage_story` — см. её docstring.
         context.update(_workspace_context(story, slug))
         can_submit = data.can_submit_for_review(story, context['missing'])
+        context['checklist_actionable'] = _checklist_actionable(
+            story, context['missing'], can_submit,
+            context['pending_since'], context['moderation_note'])
         context.update(_chapter_pane_context(
             story, slug, chapter, can_submit, context['missing'],
             form=rejected_form, current=current))
