@@ -32,6 +32,13 @@ def public_stories():
     return catalog_base()
 
 
+def sitemap_stories():
+    """Слаг и дата правки — для `sitemap.xml`. Не `catalog_base()`: карточные
+    `for_card()`/`with_reading_effort()` тут не нужны и только лишний JOIN на
+    выдаче в тысячи строк, которую читает краулер, а не читатель."""
+    return Story.objects.public().only('slug', 'updated_at')
+
+
 def story_by_slug(slug: str, viewer=None):
     """Работа по слагу для читательской стороны — и только та, которую
     этому зрителю можно показать (BR-76).

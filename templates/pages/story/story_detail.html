@@ -3,6 +3,14 @@
 
 {% block title %}{{ story.title }} — {{ story.author.public_name }} — Balaproza{% endblock %}
 
+{% block meta_description %}{{ story.annotation|default:story.title|truncatechars:160 }}{% endblock %}
+{% block og_title %}{{ story.title }}{% endblock %}
+{% block og_description %}{{ story.annotation|default:story.title|truncatechars:160 }}{% endblock %}
+{# `{% if %}` — внутри блока, а не вокруг него: `{% block %}` в extends-шаблоне #}
+{# регистрируется как замена родителя статическим сканом, до рендера, и #}
+{# обёртка снаружи блока на это не влияет (замена сработала бы всегда). #}
+{% block og_image %}{% if story.cover %}{{ request.scheme }}://{{ request.get_host }}/media/{{ story.cover }}{% else %}{{ block.super }}{% endif %}{% endblock %}
+
 {% block content %}
 
 {# Ширину колонки держит <main> в base.html (860px) — своего max-w здесь не нужно. #}
@@ -88,9 +96,10 @@
         строку у primary-действия; при этом повод пожаловаться появляется
         после чтения, а не до него.
     {% endcomment %}
-    {% if signed_in %}
+    {% if signed_in and not is_author %}
         <div class="mt-2 border-t border-slate-200 pt-5">
-            <button type="button" @click="$dispatch('open-report', { target: 'story:{{ story.slug }}' })"
+            <button type="button"
+                    @click="$dispatch('open-report', { report_url: '{% url 'core:story_report' slug=story.slug %}' })"
                     class="inline-flex items-center gap-2 font-sans text-sm font-semibold text-slate-500 hover:text-slate-800"
                     aria-label="Шағым жіберу">
                 {% include "components/icon.html" with name="flag" size=16 only %}

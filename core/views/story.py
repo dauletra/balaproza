@@ -231,6 +231,41 @@ def comment_like(request, slug, comment_id):
     return _back_to_story(slug, _chapter_from_post(request))
 
 
+# ───────────────────── Жалоба (BR-33, FR-STORY-09) ────────────────────────
+
+@require_POST
+@login_required
+def story_report(request, slug):
+    """Шағым бүкіл жұмысқа. `create_report` өзін-өзі шағымдаудан және
+    бос себептен қорғайды (BR-33) — форма үнсіз ештеңе жасамай қайтады."""
+    story = data.story_by_slug(slug, request.user)
+    if story is not None:
+        report = data.create_report(
+            request.user, story=story,
+            reason=request.POST.get('reason', ''),
+            note=request.POST.get('comment', ''))
+        if report is not None:
+            messages.success(request, 'Шағымың жіберілді.')
+    return redirect('core:story_detail', slug=slug)
+
+
+@require_POST
+@login_required
+def comment_report(request, slug, comment_id):
+    """Шағым бір пікірге — `comment_like`/`comment_delete` секілді,
+    сол бетке, сол якорьмен қайтады."""
+    comment = data.comment_of(slug, comment_id)
+    if comment is not None:
+        report = data.create_report(
+            request.user, comment=comment,
+            reason=request.POST.get('reason', ''),
+            note=request.POST.get('comment', ''))
+        if report is not None:
+            messages.success(request, 'Шағымың жіберілді.')
+        return _back_to_story(slug, comment.chapter_number, anchor=f'comment-{comment.pk}')
+    return _back_to_story(slug, _chapter_from_post(request))
+
+
 # ───────────────────── Библиотека (BR-60/61, FR-LIB-02) ──────────────────
 
 @require_POST

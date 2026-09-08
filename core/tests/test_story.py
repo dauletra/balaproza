@@ -425,7 +425,8 @@ class TheMainButtonSaysWhatWillHappen(TestCase):
         login_as(self.client)
         html = self.client.get(reverse('core:story_detail',
                                        kwargs={'slug': STORY_SLUG})).content.decode()
-        self.assertLess(html.index('Басқа шығармалар'), html.index("target: 'story:"))
+        self.assertLess(html.index('Басқа шығармалар'),
+                        html.index(f"report_url: '/story/{STORY_SLUG}/report/"))
 
 
 class ReactionsReplaceTheSingleLike(TestCase):
@@ -755,14 +756,14 @@ class CommentMenu(TestCase):
         self.assertContains(response, 'Пікір мәзірі')
         self.assertContains(response, 'Сілтемені көшіру')
         self.assertNotContains(response, 'Шағым жіберу')
-        self.assertNotContains(response, "target: 'comment:")
+        self.assertNotContains(response, "report_url: '")
 
     def test_a_reader_reports_a_stranger_and_deletes_their_own(self):
         """На свой комментарий жаловаться некому — его удаляют."""
         login_as(self.client)
         response = self._get()
         self.assertContains(response, 'Шағым жіберу')
-        self.assertContains(response, "target: 'comment:")
+        self.assertContains(response, "report_url: '")
         html = response.content.decode()
         own = next(c for c in data.comments_of_chapter(STORY_SLUG, 3)
                    if c.belongs_to('aidana'))

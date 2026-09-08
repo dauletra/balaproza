@@ -26,6 +26,7 @@ from .domain.notifications import (
     NOTIF_KINDS,
 )
 from .domain.profile import GENDERS, GENDER_LABELS
+from .domain.reports import REPORT_REASON_LABELS, REPORT_REASONS
 from .domain.story import (
     REACTIONS,
     REACTIONS_BY_SLUG,
@@ -563,6 +564,34 @@ class Story(models.Model):
             note = Notification.objects.create(
                 user=self.author, kind='moderation', story=self,
                 outcome=outcome, text=reason,
+            )
+            self.refresh_status()
+            return note
+
+    def take_down(self, reason: str) -> 'Notification':
+        """Снять уже опубликованное с публикации по жалобе (BR-33).
+
+        Не `apply_moderation`: та решает поданную ревизию (BR-79) и без
+        `pending` падает — здесь наоборот, ревизии может не быть вовсе,
+        решается то, что уже стоит у читателя. Общее с ней — форма: акт,
+        уведомление и пересчёт статуса одной транзакцией. Текст остаётся
+        у автора, снимается только видимость (`published_revision`), тем
+        же способом, каким её даёт BR-79, — поэтому `refresh_status()`
+        сам приводит работу в `NeedsWork`, ничего изобретать не пришлось.
+
+        Кто снял — хранит сам `Report` (`resolved_by`/`resolved_at`), не
+        это уведомление: у `apply_moderation` тоже нет `actor` в акте
+        читателю, решение платформы не подписывается именем модератора.
+        """
+        reason = reason.strip()
+        if not reason:
+            raise ValueError('Себепсіз алып тастауға болмайды.')
+        with transaction.atomic():
+            self.chapter_set.filter(published_revision__isnull=False) \
+                .update(published_revision=None)
+            note = Notification.objects.create(
+                user=self.author, kind='moderation', story=self,
+                outcome='rejected', text=reason,
             )
             self.refresh_status()
             return note
@@ -1576,6 +1605,64 @@ class CommentLike(models.Model):
 
     def __str__(self):
         return f'{self.user.username} ♥ #{self.comment_id}'
+
+
+class Report(models.Model):
+    """Жалоба читателя на уже опубликованный контент (BR-33, FR-STORY-09).
+
+    Не про очередь `/moderation/` (та — про ревизии до публикации, BR-82):
+    цель здесь — история или комментарий, уже показанные читателю. Ровно
+    одно из `story`/`comment` заполнено — проверяется в
+    `queries.moderation.create_report`, а не ограничением базы: тот же
+    приём, что у `Notification.story`/`contest`.
+
+    Рассмотрение — акт с автором и датой, как `ModerationDecision`: без
+    этого «кто отклонил жалобу» осталось бы без ответа. Снятие контента
+    жалоба не делает сама — решает `queries.moderation.resolve_report`
+    (`Story.take_down` или удаление комментария).
+    """
+
+    REASON_CHOICES = [(r, REPORT_REASON_LABELS[r]) for r in REPORT_REASONS]
+    OUTCOME_CHOICES = [
+        ('dismissed', 'Бұзушылық жоқ'),
+        ('upheld',    'Расталды'),
+    ]
+
+    reporter = models.ForeignKey('core.User', verbose_name='кімнен',
+                                 on_delete=models.CASCADE,
+                                 related_name='reports_filed')
+    story = models.ForeignKey(Story, verbose_name='шығарма', null=True,
+                              blank=True, on_delete=models.CASCADE,
+                              related_name='reports')
+    # SET_NULL, не CASCADE: снятие комментария по этой же жалобе (`uphold`)
+    # не должно стирать акт рассмотрения, а открытая жалоба — пропадать
+    # молча, если автор удалит комментарий раньше решения.
+    comment = models.ForeignKey(StoryComment, verbose_name='пікір', null=True,
+                                blank=True, on_delete=models.SET_NULL,
+                                related_name='reports')
+    reason = models.CharField('себебі', max_length=16, choices=REASON_CHOICES)
+    note = models.CharField('түсініктеме', max_length=500, blank=True)
+    created_at = models.DateTimeField('жіберілген', default=timezone.now)
+    outcome = models.CharField('нәтижесі', max_length=16, blank=True,
+                               choices=OUTCOME_CHOICES)
+    resolved_at = models.DateTimeField('қаралған', null=True, blank=True)
+    # Модератор мог уйти с портала; шешім қалады — ол болып қойды.
+    resolved_by = models.ForeignKey('core.User', verbose_name='қараған',
+                                    null=True, blank=True,
+                                    on_delete=models.SET_NULL, related_name='+')
+
+    class Meta:
+        ordering = ('created_at',)
+        verbose_name = 'шағым'
+        verbose_name_plural = 'шағымдар'
+
+    def __str__(self):
+        target = f'шығарма #{self.story_id}' if self.story_id else f'пікір #{self.comment_id}'
+        return f'{self.reporter_id} → {target}'
+
+    @property
+    def is_open(self) -> bool:
+        return self.resolved_at is None
 
 
 class ChapterPoll(models.Model):

@@ -304,8 +304,11 @@ class TheModerationPagesStayWithinTheirQueryBudget(TestCase):
 
     def test_the_queue_does_not_grow_with_the_line(self):
         """Срок ожидания, число глав и метка приезжают выдачей: без этого
-        очередь из двадцати работ стоила бы шестьдесят запросов."""
-        with self.assertNumQueries(6):
+        очередь из двадцати работ стоила бы шестьдесят запросов.
+
+        Семь, не шесть: плюс один `COUNT` за бейдж открытых жалоб в шапке
+        (BR-33) — тот же счётчик у `/moderation/reports/`."""
+        with self.assertNumQueries(7):
             self.client.get(reverse('core:moderation_queue'))
 
     def test_the_card_does_not_grow_with_the_chapters(self):

@@ -114,6 +114,7 @@ INSTALLED_APPS = [
     # миграции 0009: поиск по каталогу — это `ILIKE '%…%'`, и без
     # триграммного индекса он читает таблицу целиком.
     'django.contrib.postgres',
+    'django.contrib.sitemaps',
     'core'
 ]
 

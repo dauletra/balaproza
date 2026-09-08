@@ -95,7 +95,7 @@
                         </button>
                     {% elif signed_in %}
                         <button type="button" role="menuitem"
-                                @click="open = false; $dispatch('open-report', { target: 'comment:{{ comment_id }}' })"
+                                @click="open = false; $dispatch('open-report', { report_url: '{% url 'core:comment_report' slug=story_slug comment_id=comment_id %}' })"
                                 class="flex min-h-11 w-full items-center gap-2.5 border-t border-slate-100 px-4 text-left font-sans text-sm text-slate-800 hover:bg-slate-50">
                             {% include "components/icon.html" with name="flag" size=15 cls="text-slate-400" only %}
                             Шағым жіберу

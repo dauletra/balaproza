@@ -35,6 +35,7 @@ from .models import (
     ModerationDecision,
     Notification,
     PollOption,
+    Report,
     SchoolLink,
     Story,
     StoryComment,
@@ -544,3 +545,23 @@ class ModerationClaimAdmin(admin.ModelAdmin):
 
     list_display = ('story', 'moderator', 'claimed_at')
     autocomplete_fields = ('story',)
+
+
+@admin.register(Report)
+class ReportAdmin(admin.ModelAdmin):
+    """Жалобы (BR-33) — запасной путь для чтения, как у `ModerationDecision`.
+    Решение принимается в `/moderation/reports/` (`resolve_report`), а не
+    здесь: правка задним числом рассказывала бы о решении, которого никто
+    не принимал."""
+
+    list_display = ('reporter', 'story', 'comment', 'reason', 'outcome',
+                    'created_at')
+    list_filter = ('reason', 'outcome')
+    search_fields = ('reporter__username', 'story__title', 'note')
+    date_hierarchy = 'created_at'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

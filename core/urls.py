@@ -36,6 +36,9 @@ urlpatterns = [
         views.comment_delete, name='comment_delete'),
     path('story/<slug:slug>/comment/<int:comment_id>/like/',
         views.comment_like, name='comment_like'),
+    path('story/<slug:slug>/report/', views.story_report, name='story_report'),
+    path('story/<slug:slug>/comment/<int:comment_id>/report/',
+        views.comment_report, name='comment_report'),
     path('story/<slug:slug>/chapter/<int:chapter>/react/',
         views.chapter_react, name='chapter_react'),
     path('story/<slug:slug>/chapter/<int:chapter>/poll/vote/',
@@ -64,6 +67,11 @@ urlpatterns = [
     # MOD — модерация как раздел (DEC-71). Открыт только `is_staff`;
     # остальным раздела не существует — 404, а не 403.
     path('moderation/', views.moderation_queue, name='moderation_queue'),
+    # ВАЖНО: reports/ ДОЛЖЕН идти до <slug:slug>/, иначе Django смэтчит
+    # 'reports' как слаг работы (тот же приём, что у contests/my-submissions).
+    path('moderation/reports/', views.reports_queue, name='moderation_reports'),
+    path('moderation/reports/<int:pk>/resolve/', views.report_resolve,
+        name='moderation_report_resolve'),
     path('moderation/<slug:slug>/', views.moderation_detail,
         name='moderation_detail'),
     path('moderation/<slug:slug>/claim/', views.moderation_claim,
@@ -105,6 +113,9 @@ urlpatterns = [
     path('about/',            views.legal_about,            name='legal_about'),
     path('terms/',            views.legal_terms,            name='legal_terms'),
     path('privacy/',          views.legal_privacy,          name='legal_privacy'),
+
+    # SEO — краулерам (DEC-?, чек-лист README п. 9)
+    path('robots.txt', views.robots_txt, name='robots_txt'),
 
     # DESIGN — внутренние страницы (только при DEBUG=True)
     path('_design/tokens/', views.design_tokens, name='design_tokens'),

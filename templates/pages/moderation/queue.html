@@ -19,6 +19,16 @@
             {% if total %}{{ total|spaced }} шығарма шешім күтеді{% else %}Кезек бос{% endif %}
         </p>
     </div>
+    <a href="{% url 'core:moderation_reports' %}"
+       class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+        {% include "components/icon.html" with name="flag" size=14 only %}
+        Шағымдар
+        {% if open_reports %}
+            <span class="rounded-chip bg-status-attention-bg px-2 py-0.5 font-sans text-xs font-bold text-status-attention-fg">
+                {{ open_reports|spaced }}
+            </span>
+        {% endif %}
+    </a>
 </header>
 
 {# ── Оси: не сортировка, а «что я сейчас беру» ── #}

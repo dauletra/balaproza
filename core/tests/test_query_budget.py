@@ -23,7 +23,7 @@
 
 from django.urls import reverse
 
-from core.models import Chapter
+from core.models import Chapter, User
 from core.tests.base import TestCase, login_as
 
 
@@ -225,6 +225,33 @@ class PagesStayWithinTheirQueryBudget(TestCase):
         with self.assertNumQueries(5):
             self.client.get(reverse('core:collection_detail',
                                     kwargs={'slug': 'kulki-kerek'}))
+
+    def test_sitemap(self):
+        """`sitemap.xml`: два запроса за `data.sitemap_stories()` — паджинатор
+        сначала считает, потом выбирает, — и один за ссылками школы
+        (глобальный контекст-процессор). `StaticViewSitemap` в базу не ходит."""
+        with self.assertNumQueries(3):
+            self.client.get('/sitemap.xml')
+
+
+class ModerationPagesStayWithinTheirQueryBudget(TestCase):
+    """`/moderation/` открыт только `is_staff` — у демо-корпуса такого
+    пользователя нет, флаг выставляется прямо в тесте и живёт только его
+    транзакцию (BR-33)."""
+
+    def _login_as_moderator(self):
+        user = User.objects.get(username='aidana')
+        user.is_staff = True
+        user.save(update_fields=['is_staff'])
+        login_as(self.client, user.username)
+
+    def test_reports_queue_empty(self):
+        """Пять: сессия и сам вошедший (цена настоящего входа, см.
+        `test_home_signed_in`), бейдж уведомлений и ссылки школы — то же,
+        что у любой личной страницы, — плюс один `SELECT` жалоб (пуст)."""
+        self._login_as_moderator()
+        with self.assertNumQueries(5):
+            self.client.get(reverse('core:moderation_reports'))
 
 
 class AuthPagesStayWithinTheirQueryBudget(TestCase):

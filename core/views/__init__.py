@@ -44,6 +44,8 @@ from .moderation import (
     moderation_decide,
     moderation_detail,
     moderation_queue,
+    report_resolve,
+    reports_queue,
 )
 from .legal import (
     legal_about,
@@ -58,6 +60,7 @@ from .notifications import (
     notifications,
     notifications_read_all,
 )
+from .seo import robots_txt
 from .profile import (
     follow_toggle,
     profile_me,
@@ -70,9 +73,11 @@ from .story import (
     comment_create,
     comment_delete,
     comment_like,
+    comment_report,
     library_toggle,
     poll_vote,
     story_detail,
+    story_report,
 )
 from .write import (
     chapter_autosave,

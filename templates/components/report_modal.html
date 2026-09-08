@@ -1,8 +1,14 @@
 {% comment %}
     ReportModal (docs/ui.md + FR-STORY-09). Жалоба на контент.
-    Триггер: $dispatch('open-report', { target: 'X' })
+    Триггер: $dispatch('open-report', { report_url: '/story/.../report/' })
+
+    Настоящий POST на `report_url` — по образцу DeleteConfirm
+    (delete_confirm_modal.html, Ф15 Этап 1): csrf-токен один на форму,
+    `:action` меняется под адрес конкретной цели из события. Пустой
+    `report_url` (витрина /_design/) не даёт отправить форму на текущую
+    страницу молча.
 {% endcomment %}
-<div x-data="modal('open-report', ['target', 'reason', 'comment'])"
+<div x-data="modal('open-report', ['report_url', 'reason', 'comment'])"
      @close-report.window="open = false"
      x-show="open" x-cloak
      class="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -34,8 +40,10 @@
             Себебін көрсет. Модератор қарайды.
         </p>
 
-        <form @submit.prevent="open = false; $dispatch('toast', { kind:'success', text:'Шағымың жіберілді' })"
+        <form method="post" :action="report_url"
+              @submit="if (!report_url) $event.preventDefault()"
               class="mt-5 flex flex-col gap-3">
+            {% csrf_token %}
             <fieldset class="flex flex-col gap-2.5">
                 <legend class="sr-only">Шағым себебі</legend>
                 <label class="inline-flex items-center gap-2.5 cursor-pointer">
@@ -61,7 +69,7 @@
             </fieldset>
 
             <label class="font-sans text-sm font-semibold text-slate-800">Қосымша түсініктеме</label>
-            <textarea x-model="comment" rows="3" maxlength="500"
+            <textarea name="comment" x-model="comment" rows="3" maxlength="500"
                       class="w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-2.5 font-sans text-sm text-slate-900 placeholder:text-slate-500 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30"
                       placeholder="Қажет болса, толығырақ жаз"></textarea>
 

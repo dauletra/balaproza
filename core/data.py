@@ -92,6 +92,7 @@ from .queries.catalog import (
     genre_by_slug,
     public_stories,
     related_stories,
+    sitemap_stories,
     story_by_slug,
 )
 
@@ -224,14 +225,19 @@ from .queries.contests import (
     withdraw_submission,
 )
 
-# ── Модерация как раздел (DEC-71) ───────────────────────────────────────
+# ── Модерация как раздел (DEC-71) — и жалобы на опубликованное (BR-33) ──
 from .queries.moderation import (
     claim_story,
+    create_report,
     decision_history,
     moderation_queue,
+    open_reports,
+    open_reports_count,
     pending_revision_count,
     queue_size,
     release_story,
+    report_by_id,
+    resolve_report,
     story_for_moderation,
     submitted_chapters,
 )

@@ -226,11 +226,11 @@ uv run python manage.py recount_engagement
 | 2 | `check --deploy` без предупреждений | ждёт окружения |
 | 3 | HTTPS, HSTS, secure-куки | ждёт окружения |
 | 4 | `/_design/*` недоступны | следует из `DEBUG=False`, закрыто тестом |
-| 5 | Placeholder-обложки в `media/` заменены на легальные | ⛔ |
-| 6 | Правовые стабы наполнены реальным текстом (иначе ломается FR-AUTH-05) | ⛔ |
-| 7 | Favicon-set вместо `logo.png`: 16/32/192/512 + maskable | ⛔ |
-| 8 | OG-метаданные и `meta description` | ⛔ |
-| 9 | `sitemap.xml` и `robots.txt` | ⛔ |
+| 5 | Демо-обложки не попадают на прод | закрыто: прод стартует пустым, `seed_demo` падает при `DJANGO_ENV=production`; реальные обложки загружают авторы через `/write/` ([core/uploads.py](core/uploads.py)) |
+| 6 | Правовые стабы наполнены реальным текстом (иначе ломается FR-AUTH-05) | черновик готов ([core/views/legal.py](core/views/legal.py)) — ⛔ до проверки пользователем/юристом и заполнения `[байланыс арнасы]` |
+| 7 | Favicon-set вместо `logo.png`: 16/32/192/512 + maskable | закрыто — сгенерирован из `logo.png`, подключён в [templates/base.html](templates/base.html) |
+| 8 | OG-метаданные и `meta description` | закрыто — сайтовый дефолт в `base.html`, переопределение на странице работы |
+| 9 | `sitemap.xml` и `robots.txt` | закрыто — [core/sitemaps.py](core/sitemaps.py), [core/views/seo.py](core/views/seo.py) |
 | 10 | Логирование ошибок настроено | `LOGGING` в `config/settings.py`, вывод в stdout |
 | 11 | Бэкап `media/` и базы | ⛔ |
 | 12 | Решён вопрос OKLCH-fallback (DEC-12) | закрыт без кода — DEC-80: NFR-40 уже требует браузеры с поддержкой OKLCH |

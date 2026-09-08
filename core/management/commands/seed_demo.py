@@ -16,7 +16,8 @@
 from datetime import timedelta
 from random import Random
 
-from django.core.management.base import BaseCommand
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
@@ -103,6 +104,15 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
+        # Демо-корпус — для dev/тестов. На проде обложки и тексты из
+        # `_corpus.py` не лицензированы под реальную аудиторию (чек-лист
+        # README, п. 5): случайный запуск на боевой базе не должен молча
+        # разложить их по каталогу.
+        if settings.PRODUCTION:
+            raise CommandError(
+                'seed_demo — для dev/тестов, на проде не запускается. '
+                'Реальные обложки загружают авторы через /write/.')
+
         # Отчёт по-английски, как у самих команд Django: это вывод
         # инструмента, а не строка интерфейса, и консоль Windows в cp1251
         # на «жаңартылды» падает — ң и ү в неё не отображаются.

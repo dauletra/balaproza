@@ -51,6 +51,7 @@ def moderation_queue(request):
         'filters':     data.QUEUE_FILTERS,
         'total':       data.queue_size(),
         'slow_days':   data.QUEUE_SLOW_DAYS,
+        'open_reports': data.open_reports_count(),
     })
 
 
@@ -128,3 +129,39 @@ def moderation_decide(request, slug):
         f'«{story.title}»: {data.MODERATION_OUTCOME_LABELS[outcome]}. '
         f'Авторға хабарлама жіберілді.')
     return redirect('core:moderation_queue')
+
+
+# ───────────────────── Жалобы (BR-33, FR-STORY-09) ────────────────────────
+
+@moderator_only
+def reports_queue(request):
+    """Ашық шағымдар, ең ұзақ тұрғаны бірінші — ревизия кезегіндегідей."""
+    return render(request, 'pages/moderation/reports.html', {
+        'reports': data.open_reports(),
+    })
+
+
+@require_POST
+@moderator_only
+def report_resolve(request, pk):
+    """Шешім: «бұзушылық жоқ» немесе контентті алып тастау (BR-33).
+
+    Алып тастауға себеп міндетті — `Story.take_down`/`resolve_report`
+    соны талап етеді; бос қалса, `ValueError` осында ұсталады, дәл
+    `moderation_decide`-дегідей.
+    """
+    report = data.report_by_id(pk)
+    if report is None:
+        raise Http404('Шағым табылмады')
+
+    try:
+        data.resolve_report(
+            report, _current_user(request),
+            action=request.POST.get('action', ''),
+            reason=(request.POST.get('reason') or '').strip())
+    except ValueError as error:
+        messages.error(request, str(error))
+        return redirect('core:moderation_reports')
+
+    messages.success(request, 'Шағым қаралды.')
+    return redirect('core:moderation_reports')
