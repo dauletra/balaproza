@@ -25,7 +25,8 @@ from core.tests.base import TestCase, login_as, login_as_newcomer, user
 # (имя маршрута, kwargs, подпись для subTest)
 PUBLIC_URLS = [
     ('core:home',              {},                                'home'),
-    ('core:login',             {},                                'auth/login'),
+    # `login` не здесь: вошедшему он отвечает 302 (test_auth.LoginPage),
+    # гостю — 200, проверено ниже отдельно, test_login_renders_for_a_guest.
     ('core:signup_success',    {},                                'auth/signup-success'),
     ('core:catalog',           {},                                'catalog'),
     # search_results нет в этом списке: с DEC-65 это редирект (302), а не
@@ -74,6 +75,9 @@ class EveryRouteRenders(TestCase):
 
     def test_as_a_guest(self):
         self._walk('guest')
+
+    def test_login_renders_for_a_guest(self):
+        self.assertEqual(self.client.get(reverse('core:login')).status_code, 200)
 
     def test_search_results_redirects_to_catalog(self):
         """DEC-65: /search/ — legacy-адрес, не страница. Старая ссылка с

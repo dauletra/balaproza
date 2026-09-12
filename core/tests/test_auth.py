@@ -165,6 +165,18 @@ class LoginPage(TestCase):
             response = self.client.get(reverse('core:login'))
         self.assertContains(response, 'data-telegram-login="balaproza_bot"')
 
+    def test_already_signed_in_is_sent_to_profile(self):
+        """Вошедшему тут делать нечего — виджет и так предложил бы войти
+        ещё раз тем же Telegram-аккаунтом."""
+        login_as(self.client)
+        response = self.client.get(reverse('core:login'))
+        self.assertRedirects(response, reverse('core:profile_me'))
+
+    def test_already_signed_in_honours_next(self):
+        login_as(self.client)
+        response = self.client.get(reverse('core:login') + '?next=/catalog/')
+        self.assertRedirects(response, '/catalog/')
+
 
 class Onboarding(TestCase):
 

@@ -50,6 +50,12 @@ def _telegram_login_context(request) -> dict:
 
 
 def login_view(request):
+    """Уже вошедшему тут делать нечего (тот же виджет предложил бы
+    войти ещё раз) — уводим на `next`, если он безопасный, иначе в
+    профиль. Тот же приём, что у `onboarding` для завершённого
+    автора."""
+    if request.user.is_authenticated:
+        return redirect(_safe_next(request, fallback_url=reverse('core:profile_me')))
     return render(request, 'pages/auth/login.html', _telegram_login_context(request))
 
 
