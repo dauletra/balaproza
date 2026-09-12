@@ -157,6 +157,7 @@ class Command(BaseCommand):
                     'pen_name':  author.pen_name,
                     'bio':       author.bio,
                     'date_joined': joined,
+                    'terms_accepted_at': joined,
                 },
             )
             if is_new:

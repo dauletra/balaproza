@@ -24,7 +24,7 @@
 from django.urls import reverse
 
 from core.models import Chapter, User
-from core.tests.base import TestCase, login_as
+from core.tests.base import TestCase, login_as, login_as_newcomer
 
 
 class PagesStayWithinTheirQueryBudget(TestCase):
@@ -263,8 +263,10 @@ class AuthPagesStayWithinTheirQueryBudget(TestCase):
 
     def test_onboarding_page(self):
         """Плюс сессия, сам вошедший и бейдж уведомлений — цена любой
-        личной страницы (см. `test_home_signed_in`)."""
-        login_as(self.client)
+        личной страницы (см. `test_home_signed_in`). Онбордившийся сюда не
+        дойдёт — его встретит редирект в профиль вдвое дешевле, но это уже
+        не бюджет самой формы."""
+        login_as_newcomer(self.client, onboarded=False)
         with self.assertNumQueries(4):
             self.client.get(reverse('core:onboarding'))
 

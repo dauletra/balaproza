@@ -9,6 +9,7 @@ import hashlib
 import hmac
 import time
 from unittest import mock
+from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib.auth import get_user
@@ -84,7 +85,8 @@ class TelegramCallback(TestCase):
         self.assertTrue(created.username.startswith('id'))
 
     def test_returning_user_logs_in_without_a_duplicate_and_honours_next(self):
-        existing = User.objects.create_user('existing_tg', telegram_id=800111222)
+        existing = User.objects.create_user('existing_tg', telegram_id=800111222,
+                                            terms_accepted_at=timezone.now())
         before = User.objects.count()
         target = reverse('core:library')
 
@@ -186,15 +188,13 @@ class Onboarding(TestCase):
         self.assertIn(reverse('core:login'), response.url)
 
     def test_already_onboarded_author_is_sent_to_profile(self):
-        author = login_as_newcomer(self.client, 'onboarded_already')
-        author.terms_accepted_at = timezone.now()
-        author.save(update_fields=['terms_accepted_at'])
+        login_as_newcomer(self.client, 'onboarded_already')
 
         response = self.client.get(reverse('core:onboarding'))
         self.assertRedirects(response, reverse('core:profile_me'))
 
     def test_rejected_form_returns_what_was_typed_and_saves_nothing(self):
-        login_as_newcomer(self.client, 'typed_but_invalid')
+        login_as_newcomer(self.client, 'typed_but_invalid', onboarded=False)
         response = self.client.post(reverse('core:onboarding'), {
             'pen_name': '',
             'bio': 'Кітап оқығанды жақсы көремін',
@@ -211,7 +211,7 @@ class Onboarding(TestCase):
         self.assertIsNone(u.terms_accepted_at)
 
     def test_missing_agreement_is_rejected(self):
-        login_as_newcomer(self.client, 'no_agreement')
+        login_as_newcomer(self.client, 'no_agreement', onboarded=False)
         response = self.client.post(reverse('core:onboarding'), {
             'pen_name': 'Мадина', 'agree_rules': '', 'agree_privacy': '',
         })
@@ -220,7 +220,7 @@ class Onboarding(TestCase):
         self.assertIsNone(User.objects.get(username='no_agreement').terms_accepted_at)
 
     def test_valid_submission_completes_registration(self):
-        login_as_newcomer(self.client, 'finishing_up')
+        login_as_newcomer(self.client, 'finishing_up', onboarded=False)
         response = self.client.post(reverse('core:onboarding'), {
             'pen_name': 'Дана Серікқызы', 'bio': '',
             'birth_date': '2010-05-01', 'gender': 'girl',
@@ -233,7 +233,7 @@ class Onboarding(TestCase):
         self.assertIsNotNone(u.terms_accepted_at)
 
     def test_missing_gender_or_birth_date_is_rejected(self):
-        login_as_newcomer(self.client, 'no_gender_no_birth')
+        login_as_newcomer(self.client, 'no_gender_no_birth', onboarded=False)
         response = self.client.post(reverse('core:onboarding'), {
             'pen_name': 'Айгүл', 'bio': '', 'birth_date': '', 'gender': '',
             'agree_rules': 'on', 'agree_privacy': 'on',
@@ -244,7 +244,7 @@ class Onboarding(TestCase):
         self.assertIsNone(User.objects.get(username='no_gender_no_birth').terms_accepted_at)
 
     def test_birth_date_is_immutable_after_onboarding(self):
-        author = login_as_newcomer(self.client, 'locked_birth_date')
+        author = login_as_newcomer(self.client, 'locked_birth_date', onboarded=False)
         self.client.post(reverse('core:onboarding'), {
             'pen_name': 'Ерлан', 'bio': '',
             'birth_date': '2005-01-01', 'gender': 'boy',
@@ -259,3 +259,36 @@ class Onboarding(TestCase):
         })
         author.refresh_from_db()
         self.assertEqual(str(author.birth_date), '2005-01-01')
+
+
+class OnboardingGuardMiddleware(TestCase):
+    """DEC-85, отменяет заявленное в BR-90 «онбординг не гейтит остальной
+    сайт»: без завершённого `terms_accepted_at` любой прямой переход
+    подальше от `/auth/onboarding/` возвращает туда же, а не открывает
+    страницу."""
+
+    def test_unonboarded_user_is_bounced_back_to_onboarding(self):
+        newcomer = login_as_newcomer(self.client, 'wanders_off', onboarded=False)
+        for name in ('home', 'catalog', 'my_stories', 'library', 'profile_me'):
+            with self.subTest(name=name):
+                target = reverse(f'core:{name}')
+                response = self.client.get(target)
+                self.assertRedirects(
+                    response,
+                    f"{reverse('core:onboarding')}?{urlencode({'next': target})}")
+        self.assertIsNone(newcomer.terms_accepted_at)
+
+    def test_unonboarded_user_still_reaches_consent_and_auth_pages(self):
+        login_as_newcomer(self.client, 'reads_before_agreeing', onboarded=False)
+        for name in ('legal_terms', 'legal_privacy', 'legal_publishing',
+                     'legal_moderation', 'legal_about', 'onboarding'):
+            with self.subTest(name=name):
+                response = self.client.get(reverse(f'core:{name}'))
+                self.assertEqual(response.status_code, 200)
+
+    def test_onboarded_user_is_not_gated(self):
+        login_as_newcomer(self.client, 'already_settled_in')
+        self.assertEqual(self.client.get(reverse('core:my_stories')).status_code, 200)
+
+    def test_guest_is_not_gated(self):
+        self.assertEqual(self.client.get(reverse('core:catalog')).status_code, 200)

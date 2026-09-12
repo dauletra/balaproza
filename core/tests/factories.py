@@ -51,11 +51,17 @@ def tiny_image(name: str = 'cover.png') -> SimpleUploadedFile:
 
 
 def user(**over) -> User:
-    """Автор портала. Пароль не выдаётся — вход в тестах через `login_as`."""
+    """Автор портала. Пароль не выдаётся — вход в тестах через `login_as`.
+
+    Онбординг завершён (`terms_accepted_at`, BR-90): фабрика заводит уже
+    зарегистрированного человека, а не того, кто застрял на анкете —
+    `OnboardingGuardMiddleware` иначе увёл бы любой тест на другую страницу.
+    """
     username = over.pop('username', None) or _uniq('reader')
     fields = {
         'pen_name': username,
         'bio': '',
+        'terms_accepted_at': timezone.now(),
     }
     fields.update(over)
     return User.objects.create(username=username, **fields)

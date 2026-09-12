@@ -13,6 +13,7 @@
 
 from django.core.cache import cache
 from django.test import TestCase as DjangoTestCase
+from django.utils import timezone
 
 from core.models import User
 
@@ -60,7 +61,7 @@ def login_as(client, username='aidana'):
     return user
 
 
-def login_as_newcomer(client, username='newcomer'):
+def login_as_newcomer(client, username='newcomer', *, onboarded=True):
     """Ввести клиента под человеком, у которого на портале ещё ничего нет.
 
     Пустые состояния — «Әлі өтінім жоқ», «Сақталғандар жоқ», профиль без
@@ -71,9 +72,16 @@ def login_as_newcomer(client, username='newcomer'):
     записи о нём.
 
     Пароль нерабочий, как и у сидовых: входа по паролю на портале нет.
+
+    `onboarded=True` по умолчанию: этот человек пуст содержимым, а не
+    регистрацией — `OnboardingGuardMiddleware` иначе увёл бы его на анкету
+    вместо страницы, которую проверяет тест. `onboarded=False` — для тестов
+    самого онбординга (`test_auth.py`), которым нужен ровно этот пробел.
     """
-    user, created = User.objects.get_or_create(
-        username=username, defaults={'pen_name': username})
+    defaults = {'pen_name': username}
+    if onboarded:
+        defaults['terms_accepted_at'] = timezone.now()
+    user, created = User.objects.get_or_create(username=username, defaults=defaults)
     if created:
         user.set_unusable_password()
         user.save(update_fields=['password'])

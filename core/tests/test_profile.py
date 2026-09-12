@@ -996,7 +996,8 @@ class ProfileEdit(TestCase):
         """`value=` показывал `public_name` (pen_name or '@username'), не
         сырое поле: пустой pen_name отрисовался бы как «@username», и
         несохранённая форма сохранила бы это буквально при первом POST."""
-        user = User.objects.create_user(username='blankpen', password='x')
+        user = User.objects.create_user(username='blankpen', password='x',
+                                        terms_accepted_at=timezone.now())
         self.assertEqual(user.pen_name, '')
         self.client.force_login(user)
         html = self.client.get(reverse('core:profile_me_edit')).content.decode()
