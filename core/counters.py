@@ -60,11 +60,24 @@ def bump_reaction_count(chapter_id: int, kind: str, delta: int) -> None:
     меняется на месте (`vote.save(update_fields=['kind'])`), и сигналу не
     за что зацепиться — тот случай остаётся явным вызовом на стороне
     домена.
+
+    `delta < 0` не заводит строку через `get_or_create`: при каскадном
+    удалении главы (`Story` → `Chapter` → `CASCADE`) её `ChapterReaction`
+    может исчезнуть раньше, чем Django дойдёт до `post_delete` голосов на
+    той же главе — `get_or_create` в этот момент воскресил бы агрегат под
+    уже потухающий `chapter_id`, и Postgres уронил бы отложенную проверку
+    внешнего ключа в момент коммита (BR-95, найдено удалением аккаунта с
+    чужой реакцией на главе). Голому `filter().update()` нечего резать,
+    если строки уже нет, — молчаливый no-op и есть правильный ответ.
     """
-    row, created = ChapterReaction.objects.get_or_create(
-        chapter_id=chapter_id, kind=kind, defaults={'count': max(delta, 0)})
-    if not created:
-        ChapterReaction.objects.filter(pk=row.pk).update(count=F('count') + delta)
+    if delta > 0:
+        row, created = ChapterReaction.objects.get_or_create(
+            chapter_id=chapter_id, kind=kind, defaults={'count': delta})
+        if not created:
+            ChapterReaction.objects.filter(pk=row.pk).update(count=F('count') + delta)
+    else:
+        ChapterReaction.objects.filter(chapter_id=chapter_id, kind=kind).update(
+            count=F('count') + delta)
 
 
 def _story_id_of_chapter(chapter_id: int):

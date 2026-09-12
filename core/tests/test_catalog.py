@@ -548,9 +548,18 @@ class TheNewAuthorAxisFindsWhoIsNotReadYet(TestCase):
 
     def test_the_home_row_asks_the_same_question(self):
         """Ряд «Жаңа авторлар» и ось каталога обязаны говорить об одном:
-        иначе главная зовёт читать одних, а каталог находит других."""
-        names = [u.username for u in data.new_authors(4)]
-        joined = [User.objects.get(username=n).date_joined for n in names]
+        иначе главная зовёт читать одних, а каталог находит других.
+
+        После DEC-89 они сошлись ещё ближе: ось каталога фильтрует работы,
+        то есть автора без единой публикации не показывает никогда, и ряд
+        на главной теперь тоже ставит таких в хвост. Порядок по дате
+        проверяется внутри группы «есть что читать» — сортировка у ряда
+        двухступенчатая, и сравнивать сквозь обе ступени значило бы
+        проверять не то правило.
+        """
+        shown = [u for u in data.new_authors(4) if u.works]
+        joined = [u.date_joined for u in shown]
+        self.assertGreater(len(shown), 0)
         self.assertEqual(joined, sorted(joined, reverse=True))
 
     def test_it_is_offered_both_as_a_preset_and_as_an_axis(self):

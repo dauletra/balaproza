@@ -82,6 +82,26 @@
             {% include "components/button.html" with kind="primary" size="md" label="Сақтау" type="submit" %}
         </div>
     </form>
+
+    {# ── Қауіпті аймақ (FR-PROF-11, BR-95): жою — қайтарылмайды, кезеңі жоқ ── #}
+    <div class="mt-8 flex flex-col items-start gap-3 rounded-hero border border-status-error-fg/30 bg-status-error-bg/40 p-6">
+        <h2 class="font-display text-lg font-bold text-status-error-fg">Қауіпті аймақ</h2>
+        <p class="font-sans text-sm text-slate-600">
+            Аккаунтты өшіру қайтарылмайды: барлық шығармаларың, пікірлерің,
+            жазылымдарың және кітапхана дереу жойылады.
+        </p>
+        <button type="button" x-data
+                @click="$dispatch('open-delete-confirm', {
+                    name: 'аккаунтыңды',
+                    title: 'Аккаунтты өшіру керек пе?',
+                    body: 'Бәрі — шығармалар, бөлімдер, пікірлер, жазылымдар, кітапхана — қайтарылмастай жойылады.',
+                    confirm_url: '{% url "core:delete_account" %}'
+                })"
+                class="inline-flex h-9 items-center gap-2 rounded-md bg-status-error-fg px-5 font-sans text-sm font-bold text-white hover:opacity-90">
+            {% include "components/icon.html" with name="trash" size=14 only %}
+            Аккаунтты өшіру
+        </button>
+    </div>
 </div>
 {% endif %}
 {% endblock %}

@@ -8,7 +8,7 @@ from django.views.decorators.http import require_POST
 
 from .. import data
 from ..forms import CommentForm
-from .common import _current_user, _found_or_404
+from .common import _current_user, _found_or_404, _safe_next
 
 # Что читатель уже открывал в этой сессии — против накрутки перезагрузкой.
 # Список, а не множество: сессия сериализуется в JSON, где множества нет.
@@ -273,12 +273,21 @@ def comment_report(request, slug, comment_id):
 def library_toggle(request, slug):
     """Кнопка «Сақтау»: положить работу в библиотеку или снять с полки.
     Гостю она не рендерится — сразу ведёт на вход. Чужой черновик на полку
-    не кладётся: его для этого человека нет (BR-76)."""
+    не кладётся: его для этого человека нет (BR-76).
+
+    Кнопка живёт и на карточке (BR-96), поэтому возврат идёт по `next`:
+    без него сохранение с главной уносило читателя на страницу работы —
+    то есть кнопка «сохранить на потом» открывала это самое «потом».
+    Адрес чистится `_safe_next` (только относительные пути), умолчание —
+    прежний возврат на страницу произведения.
+    """
     story = data.story_by_slug(slug, request.user)
     if story is not None:
         saved = data.toggle_library_entry(request.user, story)
         messages.success(request, 'Кітапханаға сақталды' if saved
                          else 'Кітапханадан алынды')
+    if request.POST.get('next'):
+        return redirect(_safe_next(request))
     return _back_to_story(slug, _chapter_from_post(request))
 
 

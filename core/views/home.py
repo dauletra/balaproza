@@ -37,7 +37,7 @@ def home(request):
 
     # Не литерал 'Published': после DEC-37 опубликованный сериал носит
     # OnProcess или Completed, и по литералу с главной пропали бы все десять.
-    published = list(data.public_stories())
+    published = list(data.public_stories(viewer=user))
     genres = list(data.all_genres())
 
     # Жанры на главной — полоса-вывеска, а не навигация (DEC-31): 12 цветных слов

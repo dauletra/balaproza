@@ -17,9 +17,16 @@ from ..models import Genre, Story, User
 from .site import REFERENCE_TTL
 
 
-def catalog_base():
-    """Базовая выдача каталога: публичное, со всем, что рисует карточка."""
-    return Story.objects.public().for_card().with_reading_effort()
+def catalog_base(viewer=None):
+    """Базовая выдача каталога: публичное, со всем, что рисует карточка.
+
+    `viewer` — кто смотрит, для меток на карточке (BR-96). `None` значит
+    «гость», и метки всё равно проставляются, значениями: карточка
+    спрашивает их всегда, а пропущенная аннотация молча читается как
+    «не сохранено» (`managers.viewer_mark`).
+    """
+    return (Story.objects.public().for_card().with_reading_effort()
+            .for_viewer(viewer))
 
 
 def all_stories():
@@ -28,8 +35,8 @@ def all_stories():
     return Story.objects.for_card().with_reading_effort()
 
 
-def public_stories():
-    return catalog_base()
+def public_stories(viewer=None):
+    return catalog_base(viewer)
 
 
 def sitemap_stories():
@@ -132,11 +139,12 @@ def apply_catalog_filters(stories, sort: str = CATALOG_DEFAULT_SORT,
 def filter_catalog(*, query: str = '', genre: str = '', tag: str = '',
                    status: str = '', sort: str = CATALOG_DEFAULT_SORT,
                    audience: str = '', length: str = '',
-                   badge: str = '', author_tier: str = '', kind: str = ''):
+                   badge: str = '', author_tier: str = '', kind: str = '',
+                   viewer=None):
     """Единый пайплайн каталога, поиска, жанра и тега (DEC-27). Оси
     комбинируются через AND; непубличное не попадает сюда никогда, какие бы
     оси ни выставили (DEC-23)."""
-    qs = catalog_base().matching(query).in_genre(genre).with_tag(tag)
+    qs = catalog_base(viewer).matching(query).in_genre(genre).with_tag(tag)
 
     return apply_catalog_filters(qs, sort=sort, status=status,
                                  audience=audience, length=length,

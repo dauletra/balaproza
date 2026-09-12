@@ -81,6 +81,7 @@ urlpatterns = [
     # PROF — профиль
     path('me/', views.profile_me, name='profile_me'),
     path('me/edit/', views.profile_me_edit, name='profile_me_edit'),
+    path('me/delete/', views.delete_account, name='delete_account'),
     path('u/<str:username>/', views.profile_other, name='profile_other'),
     # Люди автора (FR-PROF-10). Один маршрут на оба списка: страницы
     # различаются набором, а не устройством. Неизвестный `kind` — 404 во

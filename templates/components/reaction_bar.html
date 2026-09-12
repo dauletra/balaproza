@@ -51,7 +51,7 @@
                         class="flex h-14 w-14 flex-col items-center justify-center gap-0.5 rounded-lg transition-colors
                             {% if item.mine %}bg-brand/10{% else %}hover:bg-slate-100{% endif %}">
                     <span class="text-2xl leading-none" aria-hidden="true">{{ item.reaction.emoji }}</span>
-                    <span class="text-[10px] leading-none text-slate-400" aria-hidden="true">{{ item.count }}</span>
+                    <span class="text-[10px] leading-none text-slate-500" aria-hidden="true">{{ item.count }}</span>
                 </button>
             {% endfor %}
         </form>
@@ -62,7 +62,7 @@
                    aria-label="{{ item.reaction.label }}, {{ item.count }}"
                    class="flex h-14 w-14 flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-slate-100">
                     <span class="text-2xl leading-none" aria-hidden="true">{{ item.reaction.emoji }}</span>
-                    <span class="text-[10px] leading-none text-slate-400" aria-hidden="true">{{ item.count }}</span>
+                    <span class="text-[10px] leading-none text-slate-500" aria-hidden="true">{{ item.count }}</span>
                 </a>
             {% endfor %}
         </div>

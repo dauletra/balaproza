@@ -103,16 +103,23 @@
             {% endcomment %}
         </div>
 
-        <h3 class="mt-6 mb-2 font-display text-lg font-bold">Размерная шкала</h3>
+        {% comment %}
+            Две колонки, mobile и sm+ (DEC-87). Строки набраны своим же кеглем —
+            мобильным, потому что нижняя граница задаётся именно им.
+        {% endcomment %}
+        <h3 class="mt-6 mb-2 font-display text-lg font-bold">Размерная шкала · mobile / sm+</h3>
         <div class="space-y-1 rounded-md bg-white p-5 shadow-sm">
-            <p class="text-[10px] text-slate-600">10–11px · микротекст, даты, счётчики</p>
-            <p class="text-xs text-slate-600">12–13px · метаданные, подписи карточек</p>
-            <p class="text-sm">14px · базовый размер интерфейса</p>
-            <p class="text-base">16px · заголовок карточки (mobile)</p>
-            <p class="text-lg">18px · заголовок карточки (desktop)</p>
-            <p class="font-display text-2xl font-bold">24px · бренд / заголовки секций</p>
-            <p class="font-display text-4xl font-bold">36px · заголовок страницы (h1)</p>
+            <p class="text-[11px] text-slate-600">11 / 11 · микротекст: подписи меню, eyebrow, служебные пометки</p>
+            <p class="text-[12px] text-slate-600">12 / 13 · метаданные: автор, оқылым, длительность, дата</p>
+            <p class="text-[14px]">14 / 14 · базовый: описания, аннотации, цитата</p>
+            <p class="text-[15px] font-semibold">15 / 16 · заголовок карточки</p>
+            <p class="font-display text-[20px] font-semibold">20 / 22 · заголовок секции</p>
+            <p class="font-display text-[24px] font-bold">24 / 30 · заголовок страницы (h1)</p>
         </div>
+        <p class="mt-2 font-sans text-[12px] text-slate-500">
+            Мобильная колонка — нижняя граница. Выше неё поднимаются широкая карточка
+            списка (16/18) и промо-плакат (18–32); ниже — расхождение.
+        </p>
     </section>
 
     {# ─────────────────────── Радиусы ─────────────────────── #}

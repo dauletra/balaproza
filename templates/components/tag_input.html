@@ -70,7 +70,7 @@
                    @click.outside="closeSuggestions"
                    :disabled="selected.length >= maxTags"
                    :placeholder="selected.length === 0 ? 'мектеп, достық, саяхат...' : (selected.length >= maxTags ? 'лимит толды' : 'тағы тег...')"
-                   class="min-w-[100px] flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:cursor-not-allowed">
+                   class="min-w-[100px] flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none disabled:cursor-not-allowed">
         </div>
 
         {# Dropdown автокомплита #}
@@ -86,7 +86,7 @@
                         class="flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-sm text-slate-700 hover:bg-slate-100">
                     <span class="opacity-60">#</span>
                     <span x-text="s.name" class="font-semibold"></span>
-                    <span class="ml-auto font-sans text-[11px] text-slate-400" x-text="s.usage_count + ' рет'"></span>
+                    <span class="ml-auto font-sans text-[11px] text-slate-500" x-text="s.usage_count + ' рет'"></span>
                 </button>
             </template>
         </div>

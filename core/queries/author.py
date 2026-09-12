@@ -25,9 +25,10 @@ def my_stories_of(user):
     return all_stories().by_author(user).latest_edited()
 
 
-def public_stories_of(user):
-    """Работы, которые видит посторонний (BR-73)."""
-    return my_stories_of(user).public()
+def public_stories_of(user, viewer=None):
+    """Работы, которые видит посторонний (BR-73). `viewer` — кто смотрит,
+    для меток на карточке (BR-96); `None` значит «гость»."""
+    return my_stories_of(user).public().for_viewer(viewer)
 
 
 def top_stories_of(user, limit: int = 3) -> list:

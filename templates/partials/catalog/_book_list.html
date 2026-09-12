@@ -9,11 +9,15 @@
       empty_collections — жинақтар как выход из пустого экрана (опц., DEC-31).
                     Передаёт только каталог: внутри самой подборки предлагать
                     подборки незачем.
+      states       — показывать ли метки читателя на карточке (опц., BR-96).
+                    Передаёт только каталог: его выдача построена
+                    `filter_catalog(viewer=…)`, а состав жинақа приходит с
+                    самой подборки и зрителя не знает.
 {% endcomment %}
 {% if results %}
     <div class="flex flex-col gap-3">
         {% for s in results %}
-            {% include "components/book_card_wide.html" with story=s description=s.annotation|truncatechars:170 %}
+            {% include "components/book_card_wide.html" with story=s description=s.annotation|truncatechars:170 states=states %}
         {% endfor %}
     </div>
 {% else %}

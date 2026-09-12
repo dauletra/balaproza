@@ -1,7 +1,8 @@
 {% comment %}
     Guest hero (FR-HOME-01) — компактный вход на портал.
 
-    Мобильный бюджет: ~180px, чтобы первый ряд обложек целиком помещался
+    Мобильный бюджет: ~185px (было ~180 до DEC-87 — подзаголовок поднялся
+    с 13 на 14), чтобы первый ряд обложек целиком помещался
     в первый фолд (360×640 → ~480px под шапкой). Ради этого из hero убраны
     чипы жанров (живут в секции «Жанрлар бойынша») и кнопка «Автор болу»
     на мобильном (живёт в блоке become_author ниже по странице).
@@ -21,7 +22,7 @@
             <h1 class="font-sans text-[24px] font-bold leading-[1.16] text-slate-900 sm:text-[30px]">
                 Бүгін не оқимыз?
             </h1>
-            <p class="mt-1.5 max-w-[620px] font-sans text-[13px] leading-[1.45] text-slate-600 sm:mt-2 sm:text-sm sm:leading-[1.55]">
+            <p class="mt-1.5 max-w-[620px] font-sans text-[14px] leading-[1.45] text-slate-600 sm:mt-2 sm:leading-[1.55]">
                 Құрдастарың жазған қазақша әңгімелер мен повестер. Оқы, ұнатқаныңды сақта.
             </p>
             <p class="mt-1 font-sans text-[12px] leading-[1.4] text-slate-500">
@@ -37,14 +38,14 @@
                @click.prevent="$dispatch('open-search')"
                class="flex h-11 items-center gap-2 rounded-search border border-slate-200 bg-white px-3 shadow-sm sm:hidden">
                 {% include "components/icon.html" with name="search" size=18 cls="shrink-0 text-slate-500" only %}
-                <span class="min-w-0 truncate font-sans text-sm text-slate-400">Шығарма, автор, жанр немесе тег</span>
+                <span class="min-w-0 truncate font-sans text-sm text-slate-500">Шығарма, автор, жанр немесе тег</span>
             </a>
 
             {# sm+: настоящая форма поиска. #}
             <form action="{% url 'core:catalog' %}" method="get" class="hidden min-h-[48px] flex-1 items-center gap-2 rounded-search border border-slate-200 bg-white px-3 shadow-sm focus-within:border-brand sm:flex">
                 <label for="home-search" class="sr-only">Іздеу</label>
                 {% include "components/icon.html" with name="search" size=18 cls="shrink-0 text-slate-500" only %}
-                <input id="home-search" type="search" name="q" placeholder="Шығарма, автор, жанр немесе тег" class="min-w-0 flex-1 bg-transparent font-sans text-sm text-slate-900 outline-none placeholder:text-slate-400">
+                <input id="home-search" type="search" name="q" placeholder="Шығарма, автор, жанр немесе тег" class="min-w-0 flex-1 bg-transparent font-sans text-sm text-slate-900 outline-none placeholder:text-slate-500">
                 <button type="submit" class="inline-flex h-9 shrink-0 items-center justify-center rounded-md bg-brand px-4 font-sans text-sm font-semibold text-white transition-colors hover:bg-brand-dark">
                     Іздеу
                 </button>

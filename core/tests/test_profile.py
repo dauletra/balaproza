@@ -16,6 +16,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from unittest import mock
 
+from django.contrib.auth import get_user
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.template.loader import render_to_string
 from django.test import Client
@@ -24,7 +25,15 @@ from django.utils import timezone
 
 from core import data
 from core.domain.contests import timing_line
-from core.models import Follow, Notification, Story, User
+from core.models import (
+    ChapterReactionVote,
+    Follow,
+    LibraryEntry,
+    Notification,
+    Story,
+    StoryComment,
+    User,
+)
 from core.templatetags.balaproza import outcome_label
 from core.tests import factories
 from core.tests.base import TestCase, login_as, login_as_newcomer, user
@@ -1685,3 +1694,74 @@ class StoryMetricIsCalledAReaction(TestCase):
                 offenders.append(path.name)
         self.assertFalse(offenders,
                          f'сумма реакций под иконкой лайка: {offenders}')
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Удаление аккаунта (FR-PROF-11, BR-95, DEC-86) — немедленное и полное,
+# каскад собран в моделях (Story.author → CASCADE и далее)
+# ───────────────────────────────────────────────────────────────────────
+class DeletingYourAccount(TestCase):
+
+    def test_guest_is_sent_to_login(self):
+        response = self.client.post(reverse('core:delete_account'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('core:login'), response.url)
+
+    def test_get_is_not_allowed(self):
+        login_as(self.client)
+        self.assertEqual(self.client.get(reverse('core:delete_account')).status_code, 405)
+
+    def test_deleting_removes_the_row_and_logs_out(self):
+        me = login_as_newcomer(self.client, 'wants_to_leave')
+        response = self.client.post(reverse('core:delete_account'))
+        self.assertRedirects(response, reverse('core:home'))
+        self.assertFalse(get_user(self.client).is_authenticated)
+        self.assertFalse(User.objects.filter(pk=me.pk).exists())
+
+    def test_deleting_the_author_takes_the_story_and_others_engagement_with_it(self):
+        """Story.author → CASCADE: удаление автора уносит его работу целиком,
+        а с ней и чужие данные, оставленные на ней (BR-95) — не просто
+        отвязывает их от удалённого аккаунта."""
+        author = login_as_newcomer(self.client, 'author_who_leaves')
+        story = factories.story(author=author, chapters=1)
+        chapter = story.chapter_set.first()
+        reader = factories.user(username='stays_behind')
+        comment = factories.comment(story, author=reader)
+        data.toggle_chapter_reaction(chapter, reader, 'kuldim')
+        data.toggle_library_entry(reader, story)
+
+        self.client.post(reverse('core:delete_account'))
+
+        self.assertFalse(Story.objects.filter(pk=story.pk).exists())
+        self.assertFalse(StoryComment.objects.filter(pk=comment.pk).exists())
+        self.assertFalse(ChapterReactionVote.objects
+                         .filter(chapter_id=chapter.pk, user=reader).exists())
+        self.assertFalse(LibraryEntry.objects.filter(user=reader, story=story).exists())
+        # Сам читатель, оставшийся на портале, не пострадал.
+        self.assertTrue(User.objects.filter(pk=reader.pk).exists())
+
+    def test_deleting_your_own_engagement_keeps_others_counters_honest(self):
+        """post_delete в core/counters.py подписан на затронутые каскадом
+        модели и держит счётчики верными даже при удалении не напрямую."""
+        me = login_as_newcomer(self.client, 'engaged_elsewhere')
+        other_author = factories.user(username='keeps_the_story')
+        story = factories.story(author=other_author, chapters=1)
+        chapter = story.chapter_set.first()
+        data.add_comment(story, me, text='Тамаша!')
+        data.toggle_chapter_reaction(chapter, me, 'kuldim')
+        data.toggle_follow(me, other_author)
+
+        story.refresh_from_db()
+        other_author.refresh_from_db()
+        self.assertEqual(story.comments, 1)
+        self.assertEqual(story.likes, 1)
+        self.assertEqual(other_author.followers, 1)
+
+        self.client.post(reverse('core:delete_account'))
+
+        story.refresh_from_db()
+        other_author.refresh_from_db()
+        self.assertEqual(story.comments, 0)
+        self.assertEqual(story.likes, 0)
+        self.assertEqual(other_author.followers, 0)
+        self.assertTrue(Story.objects.filter(pk=story.pk).exists())

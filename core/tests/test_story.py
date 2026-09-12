@@ -391,6 +391,15 @@ class TheReadingSurfaceIsBuiltForAPhone(TestCase):
         self.assertContains(self.response, 'chaptersOpen')
         self.assertContains(self.response, 'reading-mode')
 
+    def test_both_pills_sit_at_the_same_height_above_the_home_gesture(self):
+        """Панель чтения встаёт на место меню, поэтому её нижний отступ
+        обязан совпадать с меню дословно — иначе подмена одной пилюли
+        другой читается прыжком. Обе несут `env(safe-area-inset-bottom)`:
+        на iPhone без кнопки внизу 34px отданы жесту «домой», и голый
+        `bottom-4` сажал пилюлю на индикатор (docs/ui.md)."""
+        offset = 'bottom-[calc(1rem+env(safe-area-inset-bottom))]'
+        self.assertEqual(self.html.count(offset), 2)
+
 
 class TheMainButtonSaysWhatWillHappen(TestCase):
 

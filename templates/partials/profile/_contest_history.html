@@ -22,7 +22,7 @@
         <ul class="flex flex-col gap-3">
             {% for item in contest_history %}
                 <li class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                    <span class="font-sans text-xs tabular-nums text-slate-400">{{ item.year }}</span>
+                    <span class="font-sans text-xs tabular-nums text-slate-500">{{ item.year }}</span>
                     <a href="{% url 'core:contest_detail' slug=item.contest.slug %}"
                        class="font-sans text-sm font-semibold text-slate-900 hover:text-brand">
                         {{ item.contest.name }}

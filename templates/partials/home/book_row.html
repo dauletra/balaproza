@@ -7,8 +7,9 @@
       books    — список Story (отрежется до :6)
       link     — текст ссылки «барлығы →» (default: "барлығы →")
       link_href — куда вести (default: '#')
+      meta     — подпись под карточкой: 'author' (умолчание) | 'update'
 {% endcomment %}
 <section>
     {% include "components/section_header.html" with title=title eyebrow=eyebrow link=link|default:"барлығы →" link_href=link_href|default:"#" %}
-    {% include "partials/home/_book_scroller.html" with books=books link_href=link_href|default:"#" %}
+    {% include "partials/home/_book_scroller.html" with books=books link_href=link_href|default:"#" meta=meta %}
 </section>

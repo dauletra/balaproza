@@ -3,8 +3,15 @@
 
     Раньше конкурс жил только в правом рейле (`hidden xl:block`), то есть приз
     и дедлайн — сильнейший мотиватор для подростка — на телефоне не показывались
-    вообще. Мобильный бюджет блока ~185px: метрики в одну строку, вся карточка
-    кликабельна (тап-зона больше любой кнопки), CTA — span внутри <a>.
+    вообще. Мобильный бюджет блока ~208px (было ~185: подзаголовок поднялся
+    с 12 на 14 по DEC-87, плюс вторая строка метрик — дата и число заявок).
+    Вся карточка кликабельна (тап-зона больше любой кнопки), CTA — span
+    внутри <a>.
+
+    Метрик две строки, а не одна: «N күн қалды» не говорит, до какого
+    числа (срок в днях в календарь не записать), а число заявок отвечает
+    на «там пусто или туда все идут». Счётчик появляется с первой заявкой —
+    «0 жұмыс» в промо-блоке сообщает обратное тому, зачем блок стоит.
 
     Placeholder с CTA на список, если активного конкурса нет.
 
@@ -18,13 +25,13 @@
 
             {# ── Левая колонка: eyebrow + название + subtitle ── #}
             <div class="flex min-w-0 flex-1 flex-col gap-1">
-                <span class="inline-flex w-fit items-center rounded-chip bg-promo-bg px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-[0.1em] text-[rgb(33,11,11)]">
+                <span class="inline-flex w-fit items-center rounded-chip bg-promo-bg px-2 py-0.5 font-display text-[11px] font-bold uppercase tracking-[0.1em] text-[rgb(33,11,11)]">
                     Белсенді байқау
                 </span>
                 <div class="line-clamp-2 font-sans text-[17px] font-bold leading-tight text-slate-900 group-hover:text-brand md:text-[19px]">
                     {{ hero_contest.name }}
                 </div>
-                <div class="line-clamp-1 font-sans text-xs text-slate-600 md:line-clamp-none md:text-sm">
+                <div class="line-clamp-1 font-sans text-sm text-slate-600 md:line-clamp-none">
                     {{ hero_contest.subtitle }}
                 </div>
             </div>
@@ -36,15 +43,37 @@
                     <span aria-hidden="true" class="text-slate-300">·</span>
                     <span class="font-display font-bold text-brand">{{ hero_contest.prize_kzt|spaced }} ₸</span> жүлде
                 </p>
+                {% comment %}
+                    Вторая строка отвечает на то, чего «N күн қалды» не
+                    говорит: до какого числа (срок в днях нельзя записать в
+                    календарь) и сколько уже прислали (пусто это или туда
+                    все идут). Счётчик появляется с первой заявкой — «0
+                    жұмыс» в промо-блоке сообщает ровно обратное тому,
+                    зачем блок стоит.
+                {% endcomment %}
+                <p class="mt-0.5 font-sans text-[12px] leading-[1.4] text-slate-500 md:hidden">
+                    {{ hero_contest.closes_on|short_date }} дейін
+                    {% if hero_contest.submission_count %}
+                        <span aria-hidden="true" class="text-slate-300">·</span>
+                        {{ hero_contest.submission_count }} жұмыс жіберілді
+                    {% endif %}
+                </p>
                 <dl class="hidden items-center gap-7 md:flex">
                     <div>
                         <dt class="font-sans text-[11px] uppercase tracking-wide text-slate-500">Қалды</dt>
                         <dd class="mt-0.5 font-display text-xl font-bold text-slate-900">{{ hero_contest.days_left }} күн</dd>
+                        <dd class="font-sans text-[13px] text-slate-500">{{ hero_contest.closes_on|short_date }} дейін</dd>
                     </div>
                     <div>
                         <dt class="font-sans text-[11px] uppercase tracking-wide text-slate-500">Жүлде</dt>
                         <dd class="mt-0.5 font-display text-xl font-bold text-brand">{{ hero_contest.prize_kzt|spaced }} ₸</dd>
                     </div>
+                    {% if hero_contest.submission_count %}
+                        <div>
+                            <dt class="font-sans text-[11px] uppercase tracking-wide text-slate-500">Жіберілді</dt>
+                            <dd class="mt-0.5 font-display text-xl font-bold text-slate-900">{{ hero_contest.submission_count }} жұмыс</dd>
+                        </div>
+                    {% endif %}
                 </dl>
             </div>
 
@@ -64,18 +93,18 @@
     <section class="relative overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-50">
         <div class="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:gap-4 md:px-7 md:py-5">
             <div class="flex min-w-0 flex-col gap-1">
-                <span class="inline-flex w-fit items-center rounded-chip bg-slate-200 px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-[0.1em] text-slate-600">
+                <span class="inline-flex w-fit items-center rounded-chip bg-slate-200 px-2 py-0.5 font-display text-[11px] font-bold uppercase tracking-[0.1em] text-slate-600">
                     Байқаулар
                 </span>
                 <div class="font-sans text-[15px] font-semibold text-slate-700 md:text-base">
                     Жақында жаңа байқау жарияланады
                 </div>
-                <div class="font-sans text-xs text-slate-500 md:text-sm">
+                <div class="font-sans text-sm text-slate-500">
                     Telegram-арнамызда хабарландыру жариялаймыз.
                 </div>
             </div>
             <a href="{% url 'core:contest_list' %}"
-               class="inline-flex h-11 w-fit shrink-0 items-center gap-1.5 rounded-pill border border-slate-300 bg-white px-4 font-sans text-xs font-semibold text-slate-700 hover:border-brand hover:text-brand md:h-auto md:py-2">
+               class="inline-flex h-11 w-fit shrink-0 items-center gap-1.5 rounded-pill border border-slate-300 bg-white px-4 font-sans text-[14px] font-semibold text-slate-700 hover:border-brand hover:text-brand md:h-auto md:py-2">
                 Барлық байқаулар
                 {% include "components/icon.html" with name="arrow-right" size=12 only %}
             </a>

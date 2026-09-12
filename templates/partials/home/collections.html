@@ -10,17 +10,23 @@
 
     Жинақтар создаёт только редакция — отсюда eyebrow с атрибуцией.
 
+    Высота карточки 224, а не 212: описание по шкале (DEC-87) набрано 14, и
+    прежние 212 были подогнаны под 13 до пикселя — 88 обложек + 32 поля +
+    97 текста дают 217, то есть вторая строка описания уходила под
+    `overflow-hidden`. Скелетон в `pages/home.html` обязан держать ту же
+    высоту, иначе подстановка контента дёргает страницу.
+
     Контекст: collections (list of Collection)
 {% endcomment %}
 <section x-data="{}">
     {% url 'core:collections' as collections_url %}
     {% include "components/section_header.html" with title="Қазір не оқығың келеді?" eyebrow="редакция жинақтары" link="барлығы →" link_href=collections_url %}
 
-    <div class="-mx-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
+    <div class="-mx-4 snap-x snap-mandatory scroll-px-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:scroll-px-0 sm:px-0">
         <div class="flex w-max gap-3.5">
             {% for c in collections|slice:":8" %}
                 <a href="{% url 'core:collection_detail' slug=c.slug %}"
-                   class="group relative flex h-[212px] w-[248px] shrink-0 flex-col justify-between overflow-hidden rounded-lg p-4 transition-transform hover:-translate-y-0.5 sm:w-[284px]"
+                   class="group relative flex h-[224px] w-[248px] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-lg p-4 transition-transform hover:-translate-y-0.5 sm:w-[284px]"
                    style="background: oklch(0.96 0.04 {{ c.tint_hue }}); box-shadow: inset 0 0 0 1px oklch(0.86 0.07 {{ c.tint_hue }});">
                     <span aria-hidden="true"
                           class="absolute inset-y-0 left-0 w-[4px]"
@@ -36,13 +42,13 @@
                     </div>
 
                     <div class="relative z-10">
-                        <div class="mb-2 inline-flex items-center rounded-chip bg-white/70 px-2 py-0.5 font-sans text-[11px] font-semibold text-slate-600">
+                        <div class="mb-2 inline-flex items-center rounded-chip bg-white/70 px-2 py-0.5 font-sans text-[12px] font-semibold text-slate-600 sm:text-[13px]">
                             {{ c.count }} шығарма
                         </div>
                         <h3 class="font-display text-[18px] font-semibold leading-tight text-slate-900 group-hover:text-brand-dark">
                             {{ c.name }}
                         </h3>
-                        <p class="mt-2 line-clamp-2 font-sans text-[13px] leading-snug text-slate-600">
+                        <p class="mt-2 line-clamp-2 font-sans text-[14px] leading-snug text-slate-600">
                             {{ c.description }}
                         </p>
                     </div>
@@ -50,7 +56,7 @@
             {% endfor %}
 
             <a href="{{ collections_url }}"
-               class="group relative flex h-[212px] w-[248px] shrink-0 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 text-center transition-colors hover:border-brand hover:bg-brand/5">
+               class="group relative flex h-[224px] w-[248px] shrink-0 snap-start flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 text-center transition-colors hover:border-brand hover:bg-brand/5">
                 <span class="flex h-10 w-10 items-center justify-center rounded-pill bg-slate-100 text-slate-600 group-hover:bg-brand/10 group-hover:text-brand-dark">
                     {% include "components/icon.html" with name="arrow-right" size=18 only %}
                 </span>

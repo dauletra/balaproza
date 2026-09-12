@@ -1,9 +1,16 @@
 {% comment %}
     SectionHeader (docs/ui.md) — заголовок секции с опц. eyebrow и ссылкой «барлығы →».
 
-    Мобильный вариант компактнее (18px вместо 22px, mb-3 вместо mb-4): на телефоне
-    каждый заголовок отъедал ~17px от бюджета фолда × 6 секций.
-    Ссылка «барлығы →» имеет тап-зону 44px за счёт -my-2 py-2 (WCAG 2.5.5).
+    Мобильный вариант компактнее (20px вместо 22px, mb-3 вместо mb-4): на телефоне
+    каждый заголовок отъедал ~17px от бюджета фолда × 6 секций. Прежние 18
+    стояли ниже шкалы (DEC-87), и разница с 22 читалась не «компактнее», а
+    «мельче»: 20 — нижняя граница заголовка секции, ниже неё не опускаемся.
+
+    Тап-зона ссылки «барлығы →» — 44px по WCAG 2.5.5, и её держит `min-h-11`,
+    а не одни отступы: `-my-2 py-2` при строке 13px давали 34px, то есть
+    комментарий обещал норму, которой не было. Отрицательное поле гасит
+    добавленную высоту, чтобы ряд заголовка не разъезжался, а `items-baseline`
+    у родителя оставляет подпись на одной линии с заголовком секции.
 
     Параметры:
       title    — заголовок (Montserrat 600 18/22)
@@ -21,7 +28,7 @@
                 {{ eyebrow }}
             </div>
         {% endif %}
-        <h2 class="font-display text-[18px] font-semibold leading-tight text-slate-900 sm:text-[22px]">
+        <h2 class="font-display text-[20px] font-semibold leading-tight text-slate-900 sm:text-[22px]">
             {{ title }}
             {% if hint %}
 {#                <span class="ml-2 font-sans text-[13px] font-normal text-slate-500">{{ hint }}</span>#}
@@ -30,7 +37,7 @@
     </div>
     {% if link %}
         <a href="{{ link_href|default:'#' }}"
-           class="-my-2 shrink-0 py-2 font-sans text-[13px] font-semibold text-brand hover:text-brand-dark {{ link_class }}">
+           class="-my-3 inline-flex min-h-11 shrink-0 items-center py-3 font-sans text-[13px] font-semibold text-brand hover:text-brand-dark {{ link_class }}">
             {{ link }}
         </a>
     {% endif %}

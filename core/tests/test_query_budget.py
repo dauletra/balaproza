@@ -84,6 +84,20 @@ class PagesStayWithinTheirQueryBudget(TestCase):
         with self.assertNumQueries(15):
             self.client.get(reverse('core:catalog'))
 
+    def test_catalog_signed_in(self):
+        """Метки читателя на карточках (BR-96) не стоят ни одного запроса
+        сверх гостевого бюджета: «на полке ли» и «докуда дочитал» едут
+        аннотациями той же выдачи (`for_viewer`), а не походом за полкой
+        на каждую карточку — двадцать работ дали бы сорок запросов.
+
+        Разница с `test_catalog` — ровно три запроса цены входа: сессия,
+        сам вошедший и счётчик непрочитанных. Выдача работ по-прежнему
+        одна.
+        """
+        login_as(self.client)
+        with self.assertNumQueries(18):
+            self.client.get(reverse('core:catalog'))
+
     def test_genre_page(self):
         with self.assertNumQueries(15):
             self.client.get(reverse('core:genre_detail', kwargs={'slug': 'fantezi'}))

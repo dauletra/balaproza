@@ -184,7 +184,8 @@
         грязно на короткой панели. С `sm` панель ниже и просвечивать
         уже почти нечему.
     {% endcomment %}
-    <div class="sticky bottom-24 z-20 -mx-6 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-2.5 sm:-mx-8 sm:gap-3 sm:bg-white/95 sm:px-8 sm:py-4 sm:backdrop-blur md:bottom-0">
+    {# bottom-24 разводит панель с плавающим меню; safe-area — та же добавка, что у самого меню. #}
+    <div class="sticky bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 -mx-6 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-2.5 sm:-mx-8 sm:gap-3 sm:bg-white/95 sm:px-8 sm:py-4 sm:backdrop-blur md:bottom-0">
         <div class="flex items-center gap-2 sm:gap-3">
             {% comment %}
                 11.1c: href настоящий (фолбэк без JS — уводит на

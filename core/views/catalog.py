@@ -19,7 +19,7 @@ from django.urls import reverse
 
 from .. import data
 from ..links import CATALOG_AXES, FILTER_GROUPS, CatalogState, catalog_links
-from .common import _found_or_404
+from .common import _current_user, _found_or_404
 
 # Что показывать вместо списка. Заголовок и текст зависят от режима: «ничего
 # не найдено» на пустом жанре звучит как поломка, хотя это просто новый жанр.
@@ -70,7 +70,7 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
 
     results = data.filter_catalog(query=state.query, genre=state.genre,
                                   tag=state.tag, sort=state.effective_sort,
-                                  **state.axes)
+                                  viewer=_current_user(request), **state.axes)
     # Пустой экран запроса — про сам запрос, а не про раздел: «в жанре пока
     # ничего» и «по твоим словам ничего» звучат по-разному, даже когда оба
     # случая пришли с одного и того же /catalog/.

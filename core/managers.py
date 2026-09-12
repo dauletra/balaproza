@@ -16,10 +16,13 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db.models import (
+    BooleanField,
     Count,
+    DateTimeField,
     Exists,
     F,
     IntegerField,
+    Max,
     OuterRef,
     Prefetch,
     Q,
@@ -58,17 +61,28 @@ def from_annotation(instance, annotation: str, compute):
     return compute()
 
 
-def viewer_choice(instance, mark: str) -> str:
-    """Что выбрал этот читатель: реакция на главе, голос в опросе. Метку
-    ставит `queries/story.py`, и промах здесь не удорожает страницу, а
-    **врёт** — пустая строка значит «не голосовал». Поэтому метка ставится
-    всегда, гостю тоже."""
+def viewer_mark(instance, mark: str, default):
+    """Метка «что сделал именно этот читатель» — или умолчание, но не тихо.
+
+    Отличие от `from_annotation` принципиальное: там промах стоит запроса,
+    здесь его **нельзя досчитать** — объект не знает, кто на него смотрит,
+    и любой ответ будет про кого-то другого. Поэтому метка ставится
+    всегда, гостю тоже (`for_viewer(None)` проставляет её значениями), а
+    промах пишется в лог как расхождение, а не как цена.
+    """
     if hasattr(instance, mark):
         return getattr(instance, mark)
     if settings.DEBUG:
-        logger.warning('Метка `%s` не проставлена на %s — голос читателя '
-                       'показан несделанным', mark, type(instance).__name__)
-    return ''
+        logger.warning('Метка `%s` не проставлена на %s — действие читателя '
+                       'показано несделанным', mark, type(instance).__name__)
+    return default
+
+
+def viewer_choice(instance, mark: str) -> str:
+    """Что выбрал этот читатель: реакция на главе, голос в опросе. Метку
+    ставит `queries/story.py`, и промах здесь не удорожает страницу, а
+    **врёт** — пустая строка значит «не голосовал»."""
+    return viewer_mark(instance, mark, '')
 
 
 def chapter_count_subquery(story_ref: str = 'pk', *, published_only: bool = False):
@@ -156,6 +170,57 @@ class StoryQuerySet(QuerySet):
             # работа уже не пустой черновик, и полоса внимания звала бы
             # автора писать то, что он начал.
             has_any_chapter=Exists(Chapter.objects.filter(story=OuterRef('pk'))),
+            # «Когда читателю показали последнюю часть» — не `updated_at`:
+            # тот двигает любое сохранение строки, включая пересчёт статуса
+            # и решение модератора о чём угодно, и «жаңарды» врало бы на
+            # работе, где ничего нового не вышло. Берём дату решения по
+            # опубликованной ревизии (BR-79) — ровно момент, когда часть
+            # стала видна. Подзапросом, как и всё здесь: `Max` по join
+            # размножился бы фильтром по тегам.
+            last_published=Subquery(
+                Chapter.objects.filter(story=OuterRef('pk'),
+                                       published_revision__isnull=False)
+                .values('story')
+                .annotate(last=Max('published_revision__decided_at'))
+                .values('last')[:1],
+                output_field=DateTimeField(),
+            ),
+        )
+
+    def for_viewer(self, viewer):
+        """Метки этого читателя на карточке: лежит ли работа у него на
+        полке и докуда он её прочёл (BR-96).
+
+        Обе — `for_viewer(None)` тоже, значениями: карточка спрашивает их
+        всегда, и незаданная метка не «неизвестно», а молчаливое «нет»
+        (см. `viewer_mark`). Гость получает `False`/`0` от базы, а не от
+        пропущенной аннотации, и промах остаётся видимым.
+
+        `Exists`, а не `Count`: вопрос булев, а `UniqueConstraint`
+        `one_library_entry_per_story` и так не даёт второй строки. Прогресс
+        по умолчанию 0, а не 1, как у полки: там «на полке, но не открыта»
+        честно первая глава, здесь ноль означает «не начинал», и полосы
+        прогресса не будет вовсе.
+        """
+        from .models import LibraryEntry, ReadingProgress
+
+        if viewer is None:
+            return self.annotate(
+                viewer_saved=Value(False, output_field=BooleanField()),
+                viewer_chapter=Value(0, output_field=IntegerField()))
+
+        return self.annotate(
+            viewer_saved=Exists(LibraryEntry.objects.filter(
+                user=viewer, story=OuterRef('pk'))),
+            viewer_chapter=Coalesce(
+                Subquery(
+                    ReadingProgress.objects.filter(
+                        user=viewer, story=OuterRef('pk'),
+                    ).values('current_chapter')[:1],
+                    output_field=IntegerField(),
+                ),
+                Value(0),
+            ),
         )
 
     def by_author(self, author):

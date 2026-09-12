@@ -130,7 +130,7 @@
                                 {% elif row.kind == 'removed' %}
                                     <p class="rounded-md border-l-4 border-status-error-fg bg-status-error-bg/30 px-3 py-2 font-sans text-sm leading-relaxed text-slate-500 line-through">{{ row.text }}</p>
                                 {% else %}
-                                    <p class="px-3 py-1 font-sans text-sm leading-relaxed text-slate-400">{{ row.text|truncatewords:14 }}</p>
+                                    <p class="px-3 py-1 font-sans text-sm leading-relaxed text-slate-500">{{ row.text|truncatewords:14 }}</p>
                                 {% endif %}
                             {% endfor %}
                         </div>

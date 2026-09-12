@@ -41,6 +41,7 @@ from .managers import (
     StoryQuerySet,
     from_annotation,
     viewer_choice,
+    viewer_mark,
 )
 from .uploads import _ext, validate_raster_image
 
@@ -442,6 +443,53 @@ class Story(models.Model):
             self, 'chapter_count',
             lambda: self.chapter_set.filter(
                 published_revision__isnull=False).count())
+
+    @property
+    def saved_by_viewer(self) -> bool:
+        """Лежит ли работа на полке того, кто смотрит (BR-96). Метку ставит
+        `for_viewer`; незаданная значит «нет», и это молчаливо неверный
+        ответ, поэтому промах пишется в лог (`viewer_mark`), а не
+        досчитывается: объект не знает, кто на него смотрит.
+        """
+        return viewer_mark(self, 'viewer_saved', False)
+
+    @property
+    def read_up_to(self) -> int:
+        """Докуда дочитал тот, кто смотрит; 0 — не начинал (BR-96)."""
+        return viewer_mark(self, 'viewer_chapter', 0)
+
+    @property
+    def viewer_progress_pct(self) -> int:
+        """Прогресс полосой на обложке — только у сериала.
+
+        У одночастной работы `chapters` равна единице, и любая начатая
+        превращалась бы в «100%»: запись о прогрессе там означает «открыл»,
+        а не «дочитал». Врать полосой хуже, чем не рисовать её.
+        """
+        if self.is_single or self.chapters < 2 or self.read_up_to < 1:
+            return 0
+        return min(100, round(100 * self.read_up_to / self.chapters))
+
+    @property
+    def last_published_at(self):
+        """Когда читателю показали последнюю часть — или `None`, если ни
+        одной ещё не показали.
+
+        Не `updated_at`: тот двигает любое сохранение строки, в том числе
+        пересчёт статуса и решение модератора о соседней главе, и подпись
+        «жаңарды» врала бы на работе, где ничего нового не вышло. Здесь —
+        дата решения по опубликованной ревизии (BR-79), ровно момент, с
+        которого часть стала видна.
+
+        Имя аннотации намеренно другое (`last_published`): свойство —
+        data-дескриптор и перекрывает одноимённый атрибут экземпляра, то
+        есть совпади имена — `from_annotation` читал бы сам себя. Тот же
+        разнос, что у `chapters`/`chapter_count`.
+        """
+        return from_annotation(
+            self, 'last_published',
+            lambda: self.chapter_set.filter(published_revision__isnull=False)
+            .aggregate(last=models.Max('published_revision__decided_at'))['last'])
 
     @property
     def chapters_written(self) -> int:

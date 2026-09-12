@@ -8,64 +8,132 @@
       2. Контент (Жанрлар, Жинақтар, Байқаулар)
       3. Сайт (Проект, Жариялау, Модерация)
       4. Құжаттар (Пайдалану, Құпиялылық) + Авторлар мектебі
+
+    На мобильном колонки складываются в аккордеон (DEC-90): четыре группы в
+    две колонки по 375px стояли столбиком узких ссылок, и карта сайта
+    читалась как мелкий шрифт договора. Раскрытые заголовки — одна колонка
+    крупных строк, содержимое открывается тапом.
+
+    **Свёрнуто скриптом, а не разметкой.** В HTML содержимое открыто, и
+    `hidden` вешает Alpine при инициализации: без JS футер остаётся
+    развёрнутым, то есть карта сайта не пропадает. Обратный порядок
+    (`hidden` в разметке, Alpine снимает) без JS прятал бы все ссылки
+    навсегда. Цена — мигание на одну отрисовку внизу страницы.
+
+    `sm:!block` с `!important` обязателен: он перебивает `hidden`, который
+    ставит Alpine, и с `sm` группы раскрыты всегда, кнопка не нажимается
+    (`sm:pointer-events-none`), шеврона нет.
+
+    Нижний отступ на мобильном — высота плавающего меню (64) плюс его
+    отступ (16) плюс системная зона. Отступ контента (`pb-24` в base.html)
+    footer не защищает: меню `fixed`, а footer идёт после контента, и в
+    самом низу страницы пилюля вставала ровно на строку копирайта.
 {% endcomment %}
-<footer class="mt-12 bg-slate-100">
+<footer class="mt-12 bg-slate-100 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
     <div class="mx-auto max-w-[1280px] px-6 pt-8 pb-4 lg:px-12">
 
-        <div class="grid grid-cols-2 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="divide-y divide-slate-200 sm:grid sm:grid-cols-2 sm:gap-8 sm:divide-y-0 lg:grid-cols-4">
 
             {# ── Колонка 1: контакты + соцсети ── #}
-            <section class="flex flex-col gap-3">
-                <h3 class="font-sans text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Байланыс</h3>
-                <a href="mailto:daulet.rakhmankul@gmail.com"
-                   class="font-sans text-xs text-slate-600 hover:text-brand">
-                    daulet.rakhmankul@gmail.com
-                </a>
-                <ul class="mt-1 flex items-center gap-3.5" aria-label="Әлеуметтік желілер">
-                    <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="YouTube">
-                        {% include "components/icon.html" with name="youtube" size=18 only %}
-                    </a></li>
-                    <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
-                        {% include "components/icon.html" with name="instagram" size=18 cls="text-slate-900" only %}
-                    </a></li>
-                    <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="TikTok">
-                        {% include "components/icon.html" with name="tiktok" size=18 cls="text-slate-900" only %}
-                    </a></li>
-                    <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="Telegram">
-                        {% include "components/icon.html" with name="telegram" size=18 only %}
-                    </a></li>
-                </ul>
+            <section x-data="{ open: false }" class="py-1 sm:py-0">
+                <h3>
+                    <button type="button" @click="open = !open" :aria-expanded="open"
+                            class="flex min-h-11 w-full items-center justify-between gap-2 font-sans text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:min-h-0 sm:pointer-events-none">
+                        Байланыс
+                        <span class="shrink-0 text-slate-500 transition-transform sm:hidden"
+                              :class="open && 'rotate-180'" aria-hidden="true">
+                            {% include "components/icon.html" with name="chevron-down" size=16 only %}
+                        </span>
+                    </button>
+                </h3>
+                <div class="flex flex-col gap-3 pb-3 sm:!block sm:pb-0" :class="{ 'hidden': !open }">
+                    <a href="mailto:daulet.rakhmankul@gmail.com"
+                       class="font-sans text-[14px] text-slate-600 hover:text-brand sm:mt-3 sm:block">
+                        daulet.rakhmankul@gmail.com
+                    </a>
+                    <ul class="mt-1 flex items-center gap-3.5 sm:mt-4" aria-label="Әлеуметтік желілер">
+                        <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="YouTube"
+                               class="grid h-11 w-11 place-items-center sm:h-auto sm:w-auto">
+                            {% include "components/icon.html" with name="youtube" size=18 only %}
+                        </a></li>
+                        <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="Instagram"
+                               class="grid h-11 w-11 place-items-center sm:h-auto sm:w-auto">
+                            {% include "components/icon.html" with name="instagram" size=18 cls="text-slate-900" only %}
+                        </a></li>
+                        <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="TikTok"
+                               class="grid h-11 w-11 place-items-center sm:h-auto sm:w-auto">
+                            {% include "components/icon.html" with name="tiktok" size=18 cls="text-slate-900" only %}
+                        </a></li>
+                        <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="Telegram"
+                               class="grid h-11 w-11 place-items-center sm:h-auto sm:w-auto">
+                            {% include "components/icon.html" with name="telegram" size=18 only %}
+                        </a></li>
+                    </ul>
+                </div>
             </section>
 
             {# ── Колонка 2: Контент ── #}
-            <nav aria-label="Контент бойынша" class="flex flex-col gap-3">
-                <h3 class="font-sans text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Контент</h3>
-                <a href="{% url 'core:genre_index' %}" class="font-sans text-[13px] text-slate-700 hover:text-brand">Жанрлар</a>
-                <a href="{% url 'core:collections' %}" class="font-sans text-[13px] text-slate-700 hover:text-brand">Жинақтар</a>
-                <a href="{% url 'core:contest_list' %}" class="font-sans text-[13px] text-slate-700 hover:text-brand">Байқаулар</a>
-            </nav>
+            <section x-data="{ open: false }" class="py-1 sm:py-0">
+                <h3>
+                    <button type="button" @click="open = !open" :aria-expanded="open"
+                            class="flex min-h-11 w-full items-center justify-between gap-2 font-sans text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:min-h-0 sm:pointer-events-none">
+                        Контент
+                        <span class="shrink-0 text-slate-500 transition-transform sm:hidden"
+                              :class="open && 'rotate-180'" aria-hidden="true">
+                            {% include "components/icon.html" with name="chevron-down" size=16 only %}
+                        </span>
+                    </button>
+                </h3>
+                <nav aria-label="Контент бойынша" class="flex flex-col pb-3 sm:!flex sm:mt-3 sm:gap-3 sm:pb-0" :class="{ 'hidden': !open }">
+                    <a href="{% url 'core:genre_index' %}" class="flex min-h-11 items-center font-sans text-[14px] text-slate-700 hover:text-brand sm:min-h-0">Жанрлар</a>
+                    <a href="{% url 'core:collections' %}" class="flex min-h-11 items-center font-sans text-[14px] text-slate-700 hover:text-brand sm:min-h-0">Жинақтар</a>
+                    <a href="{% url 'core:contest_list' %}" class="flex min-h-11 items-center font-sans text-[14px] text-slate-700 hover:text-brand sm:min-h-0">Байқаулар</a>
+                </nav>
+            </section>
 
             {# ── Колонка 3: Сайт ── #}
-            <nav aria-label="Сайт туралы" class="flex flex-col gap-3">
-                <h3 class="font-sans text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Сайт</h3>
-                <a href="{% url 'core:legal_about' %}" class="font-sans text-[13px] text-slate-700 hover:text-brand">Проект туралы</a>
-                <a href="{% url 'core:legal_publishing' %}" class="font-sans text-[13px] text-slate-700 hover:text-brand">Жариялау шарттары</a>
-                <a href="{% url 'core:legal_moderation' %}" class="font-sans text-[13px] text-slate-700 hover:text-brand">Модерация ережелері</a>
-            </nav>
+            <section x-data="{ open: false }" class="py-1 sm:py-0">
+                <h3>
+                    <button type="button" @click="open = !open" :aria-expanded="open"
+                            class="flex min-h-11 w-full items-center justify-between gap-2 font-sans text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:min-h-0 sm:pointer-events-none">
+                        Сайт
+                        <span class="shrink-0 text-slate-500 transition-transform sm:hidden"
+                              :class="open && 'rotate-180'" aria-hidden="true">
+                            {% include "components/icon.html" with name="chevron-down" size=16 only %}
+                        </span>
+                    </button>
+                </h3>
+                <nav aria-label="Сайт туралы" class="flex flex-col pb-3 sm:!flex sm:mt-3 sm:gap-3 sm:pb-0" :class="{ 'hidden': !open }">
+                    <a href="{% url 'core:legal_about' %}" class="flex min-h-11 items-center font-sans text-[14px] text-slate-700 hover:text-brand sm:min-h-0">Проект туралы</a>
+                    <a href="{% url 'core:legal_publishing' %}" class="flex min-h-11 items-center font-sans text-[14px] text-slate-700 hover:text-brand sm:min-h-0">Жариялау шарттары</a>
+                    <a href="{% url 'core:legal_moderation' %}" class="flex min-h-11 items-center font-sans text-[14px] text-slate-700 hover:text-brand sm:min-h-0">Модерация ережелері</a>
+                </nav>
+            </section>
 
             {# ── Колонка 4: Құжаттар + Авторлар мектебі ── #}
-            <div class="flex flex-col gap-5">
-                <nav aria-label="Құжаттар" class="flex flex-col gap-3">
-                    <h3 class="font-sans text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Құжаттар</h3>
-                    <a href="{% url 'core:legal_terms' %}" class="font-sans text-[13px] text-slate-700 hover:text-brand">Пайдалану ережелері</a>
-                    <a href="{% url 'core:legal_privacy' %}" class="font-sans text-[13px] text-slate-700 hover:text-brand">Құпиялылық саясаты</a>
-                </nav>
+            <section x-data="{ open: false }" class="py-1 sm:py-0">
+                <h3>
+                    <button type="button" @click="open = !open" :aria-expanded="open"
+                            class="flex min-h-11 w-full items-center justify-between gap-2 font-sans text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:min-h-0 sm:pointer-events-none">
+                        Құжаттар
+                        <span class="shrink-0 text-slate-500 transition-transform sm:hidden"
+                              :class="open && 'rotate-180'" aria-hidden="true">
+                            {% include "components/icon.html" with name="chevron-down" size=16 only %}
+                        </span>
+                    </button>
+                </h3>
+                <div class="pb-3 sm:!block sm:pb-0" :class="{ 'hidden': !open }">
+                    <nav aria-label="Құжаттар" class="flex flex-col sm:mt-3 sm:gap-3">
+                        <a href="{% url 'core:legal_terms' %}" class="flex min-h-11 items-center font-sans text-[14px] text-slate-700 hover:text-brand sm:min-h-0">Пайдалану ережелері</a>
+                        <a href="{% url 'core:legal_privacy' %}" class="flex min-h-11 items-center font-sans text-[14px] text-slate-700 hover:text-brand sm:min-h-0">Құпиялылық саясаты</a>
+                    </nav>
 
-                <div class="flex flex-col gap-2">
-                    <h3 class="font-sans text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Авторлар мектебі</h3>
-                    {% include "components/school_links.html" with links=school_links_global layout="inline" %}
+                    <div class="mt-4 flex flex-col gap-2 sm:mt-5">
+                        <h4 class="font-sans text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Авторлар мектебі</h4>
+                        {% include "components/school_links.html" with links=school_links_global layout="inline" %}
+                    </div>
                 </div>
-            </div>
+            </section>
         </div>
     </div>
 

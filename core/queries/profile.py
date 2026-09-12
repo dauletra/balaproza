@@ -13,13 +13,13 @@ from datetime import datetime, time, timedelta
 from typing import Callable
 
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 
 from ..domain.awards import READ_TIER_ART, READ_TIERS, next_tier_for, tier_for
 from ..domain.catalog import BADGE_LABELS, PUBLIC_STATUSES
 from ..domain.notifications import NOTIF_BUCKETS
-from ..models import AwardGrant, Follow, Notification, User
+from ..models import AwardGrant, Follow, Notification, Story, User
 
 
 # ── Подписки (FR-PROF-10, BR-75) ─────────────────────────────────────────
@@ -124,8 +124,22 @@ def new_authors(limit: int = 4):
     и у того, кто пишет второй год. Порядок, а не окно `NEW_AUTHOR_DAYS`,
     как у оси каталога: ряд на главной обязан быть непустым, и в тихий
     месяц «последние четверо» честнее, чем пустое место.
+
+    Но первым делом — у кого есть что читать (DEC-89). Аккаунт без единой
+    публичной работы показывал в карточке «0 шығарма · 0 жазылушы», то есть
+    социальное доказательство доказывало обратное. Это сортировка, а не
+    фильтр: непустой ряд из DEC-57 остаётся, просто пустые профили уходят
+    в хвост и видны, только когда заполненных не хватило на `limit`.
+
+    `Exists`, а не `works_count__gt=0` из `with_works`: фильтровать по
+    агрегату значит `HAVING` и второй проход, а порядок нужен один и тот же
+    запрос — слой данных отдаёт QuerySet, а не список.
     """
-    return with_works(User.objects.order_by('-date_joined', 'username'))[:limit]
+    has_public = Exists(Story.objects.filter(
+        author=OuterRef('pk'), status__in=PUBLIC_STATUSES))
+    return with_works(
+        User.objects.annotate(has_public=has_public)
+        .order_by('-has_public', '-date_joined', 'username'))[:limit]
 
 
 def portal_stats(*, stories, genres) -> dict:

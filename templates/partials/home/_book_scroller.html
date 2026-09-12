@@ -10,25 +10,33 @@
     Пять дают 174 и 161 — размер растёт вместе с экраном, как и должно быть
     у витрины книг.
 
+    Фиксация после свайпа: `snap-x snap-mandatory` на скроллере, `snap-start`
+    на карточке. `scroll-px-4` обязателен — без него карточка встаёт под
+    отрицательное поле `-mx-4`, то есть на пол-обложки за краем экрана;
+    с `sm` поля нет, и обнулять scroll-padding не нужно.
+
     Параметры:
       books      — список Story (отрежется до :5)
       link_href  — куда ведёт замыкающая карточка «Барлығы» (опц.)
       empty_text — текст пустого состояния (опц.)
+      meta       — что показывает нижняя строка карточки (опц., см.
+                   `book_card_small`). Передаётся насквозь — `only` здесь
+                   не ставим: карточке нужен `story` из цикла.
 {% endcomment %}
 {% if books %}
-    <div class="-mx-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 lg:overflow-visible">
+    <div class="-mx-4 snap-x snap-mandatory scroll-px-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:scroll-px-0 sm:px-0 lg:overflow-visible">
         <div class="flex w-max gap-3.5 lg:grid lg:w-full lg:grid-cols-5">
             {% for s in books|slice:":5" %}
-                <div class="w-[138px] shrink-0 sm:w-[154px] lg:w-auto">
-                    {% include "components/book_card_small.html" with story=s %}
+                <div class="w-[138px] shrink-0 snap-start sm:w-[154px] lg:w-auto">
+                    {% include "components/book_card_small.html" with story=s meta=meta states=True %}
                 </div>
             {% endfor %}
 
             {% if link_href %}
                 <a href="{{ link_href }}"
-                   class="group flex aspect-[2/3] w-[138px] shrink-0 self-start flex-col items-center justify-center gap-2 rounded-chip border border-dashed border-slate-300 text-center text-slate-500 transition-colors hover:border-brand hover:bg-brand/5 hover:text-brand-dark sm:w-[154px] lg:hidden">
+                   class="group flex aspect-[2/3] w-[138px] shrink-0 snap-start self-start flex-col items-center justify-center gap-2 rounded-chip border border-dashed border-slate-300 text-center text-slate-500 transition-colors hover:border-brand hover:bg-brand/5 hover:text-brand-dark sm:w-[154px] lg:hidden">
                     {% include "components/icon.html" with name="arrow-right" size=20 only %}
-                    <span class="font-sans text-[13px] font-semibold">Барлығы</span>
+                    <span class="font-sans text-[14px] font-semibold">Барлығы</span>
                 </a>
             {% endif %}
         </div>

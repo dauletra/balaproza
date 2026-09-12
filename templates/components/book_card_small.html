@@ -7,28 +7,97 @@
     срезалась вместе с ним через line-clamp-2 — то есть главный сигнал выбора
     пропадал именно там, где он нужнее всего.
 
+    Кегли — по таблице docs/ui.md (DEC-87): заголовок карточки 15/16,
+    метаданные 12/13. Прежние 13/11 стоили карточке ~6px высоты меньше, но
+    ровно те две строки, по которым выбирают работу, читались хуже всего.
+
+    Нижняя строка отвечает на вопрос ряда, а не на один и тот же всегда.
+    По умолчанию это «кто написал и сколько читали»; у ряда «Жалғасып
+    жатқан» оқылым отвечает не на тот вопрос — там выбирают по тому, жив
+    ли сериал и докуда дошёл, а «сколько читали» уже сказал соседний ряд
+    «Көп оқылған». Двух рядов подряд с одинаковой подписью быть не должно.
+
+    **Карточка — не один `<a>`** (DEC-91). Закладка это POST-форма, а форма
+    внутри ссылки невалидна, и браузеры разбирают такую разметку each по-своему.
+    Поэтому обёртка `relative`, ссылка одна — на заголовке, и она растянута
+    на всю карточку через `after:absolute after:inset-0`. Кнопка закладки
+    поднята над ней `relative z-10`: без этого её накрывает псевдоэлемент
+    ссылки, и тап уходит на чтение.
+
+    Закладка и полоса прогресса — метки зрителя (BR-96), их ставит
+    `for_viewer`. Гостю кнопка не рисуется вовсе: полки у него нет, и
+    кнопка, уводящая на вход, обещала бы не то, что делает.
+
+    **Метки по явной просьбе (`states=True`), а не по умолчанию.** Их несёт
+    не всякая выдача: профиль строит карточки из снимка автора
+    (`User.public_works`), состав конкурса — из заявок, и зрителя там нет.
+    Молчаливое умолчание нарисовало бы там пустую закладку на сохранённой
+    работе — ответ не «неизвестно», а неверный. Просьба обязывает
+    вызывающую сторону сначала прокинуть зрителя в выдачу.
+
     Параметры:
-      story — объект Story (slug, title, primary_genre.hue, author, views)
+      story  — объект Story (slug, title, primary_genre.hue, author, views)
+      meta   — 'author' (по умолчанию: автор · оқылым) | 'update'
+               (N-бөлім · когда вышла последняя часть)
+      states — True, если выдача построена `for_viewer` и метки читателя
+               можно показывать (опц.)
 {% endcomment %}
-<a href="{% url 'core:story_detail' slug=story.slug %}"
-   class="group flex flex-col gap-2 transition-transform hover:-translate-y-0.5">
+<div class="group relative flex flex-col gap-2 transition-transform hover:-translate-y-0.5">
     <div class="relative">
         {% include "components/cover_placeholder.html" with story=story cls="aspect-[2/3] w-full rounded-chip shadow-[0_1px_3px_rgba(0,0,0,0.08)] group-hover:shadow-card-hover" letter_cls="text-6xl" %}
-        <span class="absolute bottom-1.5 left-1.5 inline-flex h-[20px] items-center rounded-chip bg-slate-900/75 px-1.5 font-sans text-[11px] font-semibold leading-none text-white">
+        <span class="absolute bottom-1.5 left-1.5 inline-flex h-[22px] items-center rounded-chip bg-slate-900/75 px-1.5 font-sans text-[12px] font-semibold leading-none text-white sm:text-[13px]">
             {% if story.is_single %}{{ story.read_minutes }} мин{% else %}{{ story.chapters }} бөлім{% endif %}
         </span>
-    </div>
-    <div class="flex flex-col gap-1">
-        <div class="font-sans text-[13px] font-semibold leading-tight text-slate-900 line-clamp-2">
-            {{ story.title }}
-        </div>
-        <div class="flex items-center gap-1.5 font-sans text-[11px] leading-tight text-slate-500">
-            <span class="min-w-0 truncate">{{ story.author.public_name }}</span>
-            <span aria-hidden="true" class="shrink-0">·</span>
-            <span class="inline-flex shrink-0 items-center gap-1">
-                {% include "components/icon.html" with name="eye" size=12 only %}
-                {{ story.views|compact_count }}
+
+        {% if states and story.viewer_progress_pct %}
+            {% comment %}
+                Полоса по нижнему краю обложки — только у сериала: у
+                одночастной работы запись о прогрессе значит «открыл», и
+                полоса показывала бы «100%» тому, кто прочёл абзац.
+                Подпись `sr-only`, элемент под `aria-hidden`: у `<span>`
+                роль `generic`, `aria-label` на нём не озвучивается.
+            {% endcomment %}
+            <span aria-hidden="true" class="absolute inset-x-0 bottom-0 h-1 overflow-hidden rounded-b-chip bg-slate-900/25">
+                <span class="block h-full bg-brand" style="width: {{ story.viewer_progress_pct }}%"></span>
             </span>
+            <span class="sr-only">{{ story.read_up_to }} / {{ story.chapters }} бөлім оқылды</span>
+        {% endif %}
+
+        {% if states and signed_in %}
+            <form method="post" action="{% url 'core:library_toggle' slug=story.slug %}"
+                  class="absolute right-1 top-1 z-10">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" aria-pressed="{{ story.saved_by_viewer|yesno:'true,false' }}"
+                        class="grid h-11 w-11 place-items-center rounded-pill text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.6)] hover:text-brand">
+                    {% if story.saved_by_viewer %}
+                        {% include "components/icon.html" with name="bookmark-filled" size=18 only %}
+                        <span class="sr-only">Кітапханадан алу</span>
+                    {% else %}
+                        {% include "components/icon.html" with name="bookmark" size=18 only %}
+                        <span class="sr-only">Кітапханаға сақтау</span>
+                    {% endif %}
+                </button>
+            </form>
+        {% endif %}
+    </div>
+
+    <div class="flex flex-col gap-1">
+        <a href="{% url 'core:story_detail' slug=story.slug %}"
+           class="font-sans text-[15px] font-semibold leading-tight text-slate-900 line-clamp-2 after:absolute after:inset-0 sm:text-[16px]">
+            {{ story.title }}
+        </a>
+        <div class="flex items-center gap-1.5 font-sans text-[12px] leading-tight text-slate-500 sm:text-[13px]">
+            {% if meta == 'update' %}
+                <span class="min-w-0 truncate">{{ story|update_meta }}</span>
+            {% else %}
+                <span class="min-w-0 truncate">{{ story.author.public_name }}</span>
+                <span aria-hidden="true" class="shrink-0">·</span>
+                <span class="inline-flex shrink-0 items-center gap-1">
+                    {% include "components/icon.html" with name="eye" size=13 only %}
+                    {{ story.views|compact_count }}
+                </span>
+            {% endif %}
         </div>
     </div>
-</a>
+</div>

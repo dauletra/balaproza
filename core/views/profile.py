@@ -6,6 +6,7 @@
 """
 
 from django.contrib import messages
+from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
 from django.shortcuts import redirect, render
@@ -124,6 +125,21 @@ def profile_me_edit(request):
         'profile_user': author,
         'username':     username,
     })
+
+
+@require_POST
+@login_required
+def delete_account(request):
+    """Аккаунтты өшіру — қауіпті аймақ (FR-PROF-11). Каскад весь в моделях
+    (`Story.author` → `CASCADE` и далее, BR-95) — тот же приём, что у
+    `delete_story` (BR-84): вызов `.delete()` напрямую, без обёртки в
+    `queries/`. `user` захвачен до `logout()` — тот подменяет
+    `request.user` на `AnonymousUser`."""
+    user = request.user
+    auth_logout(request)
+    user.delete()
+    messages.success(request, 'Аккаунт өшірілді.')
+    return redirect('core:home')
 
 
 def profile_other(request, username):

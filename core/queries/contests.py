@@ -98,9 +98,11 @@ def hero_contest():
 
     Именно `is_accepting`, а не «не завершён»: баннер зовёт участвовать, и
     вести на конкурс с закрытым приёмом значит не выполнить обещание
-    страницы. Без `prefetch`: состав баннеру не нужен.
+    страницы. Без `prefetch`: состав баннеру не нужен — нужно только его
+    число (`with_counts`), и оно приходит той же выдачей.
     """
-    return Contest.objects.accepting().order_by('closes_on', 'pk').first()
+    return (Contest.objects.accepting().with_counts()
+            .order_by('closes_on', 'pk').first())
 
 
 def submissions_of(user):

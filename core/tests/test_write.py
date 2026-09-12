@@ -810,14 +810,16 @@ class TheChapterEditorReportsTheTruth(TestCase):
     def test_the_counter_counts_typing_and_the_actions_stay_in_view(self):
         """Статичное `{{ current.char_count }}` не двигалось при вводе,
         хотя соседняя аннотация считала живьём — две механики одного и
-        того же на одном экране. `bottom-24` разводит панель с плавающей
-        пилюлей `mobile_nav` (docs/ui.md)."""
+        того же на одном экране. Отступ снизу разводит панель с плавающей
+        пилюлей `mobile_nav` (docs/ui.md): 6rem — это прежние `bottom-24`,
+        а `env(safe-area-inset-bottom)` добавлен вместе с такой же добавкой
+        у самой пилюли — на iPhone внизу 34px отданы жесту «домой»."""
         body = self.client.get(reverse(
             'core:chapter_new', kwargs={'slug': self.SLUG})).content.decode()
         self.assertIn('x-text="count"', body)
         self.assertIn('charCounter(', body)
         self.assertIn('@input="recount"', body)
-        self.assertIn('sticky bottom-24', body)
+        self.assertIn('sticky bottom-[calc(6rem+env(safe-area-inset-bottom))]', body)
         self.assertIn('md:bottom-0', body)
 
     def test_the_mobile_panel_is_compact_and_the_box_is_tall(self):
