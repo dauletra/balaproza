@@ -100,6 +100,13 @@ if PRODUCTION and not TELEGRAM_BOT_USERNAME:
         'запрос авторизации.'
     )
 
+# Django 4+ по умолчанию ставит `Cross-Origin-Opener-Policy: same-origin` —
+# это рвёт `window.opener` у попапа, который открывает сам Telegram Login
+# Widget в redirect-режиме: подтвердив вход, попап не может перенаправить
+# окно-родитель на наш callback и просто закрывается. `-allow-popups`
+# сохраняет изоляцию от чужих окон, но не от тех, что открыла сама страница.
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
+
 
 # Application definition
 
