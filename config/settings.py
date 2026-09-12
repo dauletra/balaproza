@@ -64,6 +64,10 @@ if not SECRET_KEY:
     SECRET_KEY = 'django-insecure-wa*es)k#sjqb-j=bl70+0#p_1bm9t0x%sp2s6_hou2wr$!*^6y'
 
 ALLOWED_HOSTS = [h for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if h]
+# Не про прод: DJANGO_ALLOWED_HOSTS задан и локально, когда за адресом
+# стоит туннель (ngrok/cloudflared) — тогда прокси-доверие ниже нужно и
+# в dev, см. `_hosts_explicit`.
+_hosts_explicit = bool(ALLOWED_HOSTS)
 if PRODUCTION and not ALLOWED_HOSTS:
     raise ImproperlyConfigured(
         'Не задан DJANGO_ALLOWED_HOSTS. Пустой список в проде означает, что '
@@ -299,17 +303,25 @@ LOGGING = {
 }
 
 
-# ── Прод: то, чего не видно в разработке ─────────────────────────────────
+# ── Прод и прокси-туннель ─────────────────────────────────────────────────
 #
-# Всё под одним условием и ничего — под `DEBUG`. Разница принципиальная:
-# тестовый раннер выставляет `DEBUG = False` уже после импорта настроек, и
-# блок «если не DEBUG» включил бы в тестах редирект на https, то есть
-# уронил бы суиту целиком. `PRODUCTION` читается из окружения и под
-# тестами остаётся ложным.
-if PRODUCTION:
-    # За прокси Django узнаёт про https только из заголовка. Без этой
-    # пары `SECURE_SSL_REDIRECT` уводит в бесконечный редирект.
+# Ничего — под `DEBUG`. Разница принципиальная: тестовый раннер выставляет
+# `DEBUG = False` уже после импорта настроек, и блок «если не DEBUG»
+# включил бы в тестах редирект на https, то есть уронил бы суиту целиком.
+# `PRODUCTION` читается из окружения и под тестами остаётся ложным.
+# Прокси-доверие (`_hosts_explicit`) — не только прод: та же проблема у
+# локального туннеля (ngrok/cloudflared) с явным `DJANGO_ALLOWED_HOSTS`.
+if _hosts_explicit:
+    # За прокси (прод — за настоящим, dev — за ngrok/cloudflared-туннелем)
+    # Django узнаёт про https только из заголовка; без этой пары Origin у
+    # POST выглядит http-адресом и падает проверкой CSRF, а
+    # `SECURE_SSL_REDIRECT` в проде без неё уводит в бесконечный редирект.
+    # Домены — те же, что уже разрешены ALLOWED_HOSTS: новой поверхности
+    # доверие не открывает.
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    CSRF_TRUSTED_ORIGINS = [f'https://{h}' for h in ALLOWED_HOSTS]
+
+if PRODUCTION:
     SECURE_SSL_REDIRECT = True
     # Год и поддомены — рекомендация Django; включать HSTS постепенно
     # (60 → 3600 → год) имеет смысл на живом домене, до запуска незачем.
@@ -318,9 +330,6 @@ if PRODUCTION:
     SECURE_HSTS_PRELOAD = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    # Домены, с которых принимается POST. Без них форма за прокси падает
-    # на проверке CSRF — с сообщением, которое не называет причину.
-    CSRF_TRUSTED_ORIGINS = [f'https://{h}' for h in ALLOWED_HOSTS]
 
     # Статику отдаёт whitenoise, если он установлен (группа `prod`).
     # Хранилище **без манифеста**: манифестное требует, чтобы каждый файл,

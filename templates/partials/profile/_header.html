@@ -22,12 +22,12 @@
             плитка «Шығарма» стоит на десять пикселей ниже, и это ровно тот
             дубль, который уже вычищали из правого рейла
             (test_lint.ProfileStatsNotDuplicated). Остаётся то,
-            чего нет в плитках: с какого года автор здесь и сколько раз
+            чего нет в плитках: как давно автор здесь и сколько раз
             выходил на конкурс.
         {% endcomment %}
         <p class="font-sans text-sm text-slate-500">
             @{{ profile_user.username }}
-            {% if profile_user.joined_year %} · {{ profile_user.joined_year }} жылдан бері{% endif %}
+            {% if profile_user.joined_since %} · Сайтта {{ profile_user.joined_since }}{% endif %}
             {% if contests_n %} · {{ contests_n }} байқау{% endif %}
         </p>
         {% if profile_user.bio %}

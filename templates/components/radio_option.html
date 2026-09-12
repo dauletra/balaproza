@@ -8,12 +8,14 @@
       label     — подпись
       checked   — boolean
       disabled  — boolean
+      required  — boolean
+      x_model   — Alpine-выражение для x-model (опц.); требует x-data в предках
       id        — кастомный id (опц., иначе name-value)
 {% endcomment %}
 {% with rid=id|default:name|add:"-"|add:value %}
 <label for="{{ rid }}" class="inline-flex items-center gap-2.5 {% if disabled %}cursor-not-allowed opacity-50{% else %}cursor-pointer{% endif %}">
     <input id="{{ rid }}" type="radio" name="{{ name }}" value="{{ value }}"
-           {% if checked %}checked{% endif %}{% if disabled %} disabled{% endif %}
+           {% if checked %}checked{% endif %}{% if disabled %} disabled{% endif %}{% if required %} required{% endif %}{% if x_model %} x-model="{{ x_model }}"{% endif %}
            class="peer sr-only">
     <span aria-hidden="true"
           class="grid h-5 w-5 shrink-0 place-items-center rounded-pill border-2 border-slate-300 bg-white

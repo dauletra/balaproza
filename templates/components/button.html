@@ -12,12 +12,16 @@
       icon_right — имя иконки справа (опц.)
       size     — 'md' (default · h-9 px-5 text-sm) | 'lg' (h-11 px-6 text-base)
       full     — занять всю ширину (boolean)
-      disabled — boolean (состояние на момент рендера)
+      disabled — boolean (состояние на момент рендера). Без x_disabled —
+                 статично на весь рендер: приглушённые классы зашиты в разметку.
       x_disabled — Alpine-выражение: кнопка гаснет и блокируется реактивно.
                    Нужно там, где условие меняется в браузере — например,
                    выбор произведения в подаче на конкурс. Работает вместе
-                   с `disabled`: сервер задаёт начальное состояние, Alpine
-                   ведёт дальнейшие. Требует `x-data` в предках
+                   с `disabled` (сервер задаёт исходное значение, Alpine —
+                   дальнейшие): приглушённые классы при этом не зашиваются
+                   статично, ими целиком владеет `:class` — иначе Alpine
+                   не смог бы их снять, когда x_disabled станет false.
+                   Требует `x-data` в предках
       aria_label — для иконочной кнопки
 {% endcomment %}
 {% with k=kind|default:"primary" sz=size|default:"md" %}
@@ -27,10 +31,10 @@
           {% if full %}w-full{% endif %}
           {% if k == 'primary' %}
               bg-brand text-white hover:bg-brand-dark
-              {% if disabled %} opacity-50 cursor-not-allowed hover:bg-brand{% endif %}
+              {% if disabled and not x_disabled %} opacity-50 cursor-not-allowed hover:bg-brand{% endif %}
           {% elif k == 'secondary' %}
               border border-brand bg-white text-brand hover:bg-slate-50
-              {% if disabled %} opacity-50 cursor-not-allowed{% endif %}
+              {% if disabled and not x_disabled %} opacity-50 cursor-not-allowed{% endif %}
           {% elif k == 'promo' %}
               bg-promo-cta text-white hover:opacity-90
           {% endif %}">

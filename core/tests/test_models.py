@@ -10,12 +10,13 @@
 уже есть.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from django.utils import timezone
 
 from core import data
+from core.domain.formatting import kk_joined
 from core.models import BlockedTagPattern, Genre, StoryTag, Tag, User
 from core.templatetags.balaproza import (
     compact_count,
@@ -47,17 +48,19 @@ class UserSaysWhoTheAuthorIs(TestCase):
         self.assertNotIn('first_name', fields)
         self.assertNotIn('last_name', fields)
 
-    def test_joined_year_is_almaty_time_not_utc(self):
+    def test_joined_since_counts_almaty_days_not_utc(self):
         """Новогодняя ночь: 1 января, 02:00 по Алматы — это ещё 31 декабря
-        по UTC. Профиль обязан говорить «2025 жылдан бері», а не 2024."""
+        по UTC. Счёт дней с регистрации обязан идти по алматинскому
+        календарю, а не по серверному часовому поясу."""
         u = User.objects.create_user('demo-newyear')
-        self.assertEqual(u.joined_year, timezone.localtime(u.date_joined).year)
+        self.assertEqual(u.joined_since, kk_joined(0))
 
         User.objects.filter(pk=u.pk).update(
             date_joined=datetime(2025, 1, 1, 2, 0, tzinfo=ZoneInfo('Asia/Almaty')))
         u.refresh_from_db()
         self.assertEqual(u.date_joined.astimezone(UTC).year, 2024)
-        self.assertEqual(u.joined_year, 2025)
+        expected_days = (timezone.localdate() - date(2025, 1, 1)).days
+        self.assertEqual(u.joined_since, kk_joined(expected_days))
 
 
 class ReferenceDataArrivesWithTheSchema(TestCase):

@@ -15,6 +15,7 @@
       state       — default|success|error (default 'default')
       message     — текст под полем для error/success состояний (опц.)
       maxlength   — int (опц.)
+      x_model     — Alpine-выражение для x-model (опц.); требует x-data в предках
 {% endcomment %}
 {% with st=state|default:"default" id="f-"|add:name %}
 <div class="flex w-full flex-col gap-1.5">
@@ -37,6 +38,7 @@
                {% if disabled %}disabled{% endif %}
                {% if autofocus %}autofocus{% endif %}
                {% if maxlength %}maxlength="{{ maxlength }}"{% endif %}
+               {% if x_model %}x-model="{{ x_model }}"{% endif %}
                {% if message %}aria-describedby="{{ id }}-msg"{% endif %}
                {% if st == 'error' %}aria-invalid="true"{% endif %}
                class="h-9 w-full rounded-md bg-slate-50 font-sans text-sm text-slate-900 placeholder:text-slate-500

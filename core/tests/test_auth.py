@@ -210,7 +210,8 @@ class Onboarding(TestCase):
     def test_valid_submission_completes_registration(self):
         login_as_newcomer(self.client, 'finishing_up')
         response = self.client.post(reverse('core:onboarding'), {
-            'pen_name': 'Дана Серікқызы', 'bio': '', 'birth_date': '', 'gender': '',
+            'pen_name': 'Дана Серікқызы', 'bio': '',
+            'birth_date': '2010-05-01', 'gender': 'girl',
             'agree_rules': 'on', 'agree_privacy': 'on',
         })
         self.assertRedirects(response, reverse('core:signup_success'))
@@ -218,3 +219,31 @@ class Onboarding(TestCase):
         u = User.objects.get(username='finishing_up')
         self.assertEqual(u.pen_name, 'Дана Серікқызы')
         self.assertIsNotNone(u.terms_accepted_at)
+
+    def test_missing_gender_or_birth_date_is_rejected(self):
+        login_as_newcomer(self.client, 'no_gender_no_birth')
+        response = self.client.post(reverse('core:onboarding'), {
+            'pen_name': 'Айгүл', 'bio': '', 'birth_date': '', 'gender': '',
+            'agree_rules': 'on', 'agree_privacy': 'on',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Жынысыңды таңда.')
+        self.assertContains(response, 'Туған күніңді жаз.')
+        self.assertIsNone(User.objects.get(username='no_gender_no_birth').terms_accepted_at)
+
+    def test_birth_date_is_immutable_after_onboarding(self):
+        author = login_as_newcomer(self.client, 'locked_birth_date')
+        self.client.post(reverse('core:onboarding'), {
+            'pen_name': 'Ерлан', 'bio': '',
+            'birth_date': '2005-01-01', 'gender': 'boy',
+            'agree_rules': 'on', 'agree_privacy': 'on',
+        })
+        author.refresh_from_db()
+        self.assertEqual(str(author.birth_date), '2005-01-01')
+
+        self.client.post(reverse('core:profile_me_edit'), {
+            'username': author.username, 'pen_name': author.pen_name, 'bio': '',
+            'birth_date': '1999-09-09', 'gender': 'boy',
+        })
+        author.refresh_from_db()
+        self.assertEqual(str(author.birth_date), '2005-01-01')

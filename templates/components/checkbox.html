@@ -8,13 +8,15 @@
       checked   — boolean
       disabled  — boolean
       required  — boolean
+      x_model   — Alpine-выражение для x-model (опц.); требует x-data в предках
+                   постарше того, что заводит `checkedBox` для своей заливки
 {% endcomment %}
 {% with id="cb-"|add:name %}
 <label for="{{ id }}"
        x-data="checkedBox({{ checked|yesno:'true,false' }})"
        class="inline-flex items-start gap-2.5 {% if disabled %}cursor-not-allowed opacity-50{% else %}cursor-pointer{% endif %}">
     <input id="{{ id }}" type="checkbox" name="{{ name }}" value="{{ value|default:'on' }}"
-           {% if checked %}checked{% endif %}{% if disabled %} disabled{% endif %}{% if required %} required{% endif %}
+           {% if checked %}checked{% endif %}{% if disabled %} disabled{% endif %}{% if required %} required{% endif %}{% if x_model %} x-model="{{ x_model }}"{% endif %}
            @change="sync"
            class="peer sr-only">
     <span aria-hidden="true"

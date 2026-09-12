@@ -210,9 +210,9 @@ class OwnProfile(TestCase):
         self.assertNotContains(about, 'my_story_row')
         # Приватный блок — только владельцу
         self.assertContains(about, 'Тек саған көрінеді')
-        # Год выводится из даты прихода, а не сверяется с литералом: она
+        # Строка выводится из даты прихода, а не сверяется с литералом: она
         # относительная (DEC-57), и корпус двигает её вместе с сегодня.
-        self.assertContains(about, f'{user("aidana").joined_year} жылдан бері')
+        self.assertContains(about, user('aidana').joined_since)
         self.assertContains(about, len(data.my_stories_of(user('aidana'))))
         self.assertContains(about, 'жобалармен бірге')
 
@@ -277,7 +277,7 @@ class StrangerProfile(TestCase):
             reverse('core:profile_other', kwargs={'username': 'rudazov'})
             + '?tab=about')
         self.assertContains(response, 'Фэнтези, шытырман')
-        self.assertContains(response, 'жылдан бері')
+        self.assertContains(response, user('rudazov').joined_since)
         self.assertNotContains(response, 'Тек саған көрінеді')
         self.assertNotContains(response, 'жобалармен бірге')
 
@@ -533,10 +533,10 @@ class AchievementsRow(TestCase):
         self.assertNotIn('<ul', html)
         self.assertEqual(html.strip(), '')
 
-    def test_the_facts_line_names_the_year_and_the_contests(self):
+    def test_the_facts_line_names_how_long_and_the_contests(self):
         response = self.client.get(
             reverse('core:profile_other', kwargs={'username': 'aidana'}))
-        self.assertContains(response, f'{user("aidana").joined_year} жылдан бері')
+        self.assertContains(response, user('aidana').joined_since)
         # Участие без статуса: число совпадает с длиной списка заявок и не
         # выдаёт вычитанием, что одна из них отклонена.
         self.assertContains(response,
@@ -550,7 +550,7 @@ class AchievementsRow(TestCase):
             reverse('core:profile_other', kwargs={'username': 'aygerim_k'}))
         self.assertEqual(list(data.submissions_of(user('aygerim_k'))), [])
         self.assertEqual(response.context['contests_n'], 0)
-        self.assertContains(response, f'{user("aygerim_k").joined_year} жылдан бері')
+        self.assertContains(response, user('aygerim_k').joined_since)
         # Проверяем сегмент, а не слово: «Байқаулар» есть в шапке и подвале.
         self.assertNotContains(response, '0 байқау')
 
@@ -905,12 +905,25 @@ class ProfileEdit(TestCase):
             ['Жаңа лақап', 'Жаңа био.', 'girl', date(2010, 5, 1)])
 
     def test_the_optional_half_may_be_left_blank(self):
-        self._post(bio='Бар.', gender='girl', birth_date='2010-05-01')
+        self._post(bio='Бар.', gender='girl', birth_date='')
         self._post(bio='', gender='', birth_date='')
         user = self._aidana()
         self.assertIsNone(user.birth_date)
         self.assertEqual(user.gender, '')
         self.assertEqual(user.bio, '')
+
+    def test_birth_date_is_immutable_once_set(self):
+        """DEC-84: `birth_date` — самодекларация только один раз, дальше
+        `update_profile` игнорирует новое значение, пусть форма и пропустит
+        его как валидное."""
+        self._post(bio='Бар.', gender='girl', birth_date='2010-05-01')
+        self._post(bio='', gender='', birth_date='')
+        user = self._aidana()
+        self.assertEqual(user.birth_date, date(2010, 5, 1))
+
+        self._post(birth_date='1999-09-09')
+        user = self._aidana()
+        self.assertEqual(user.birth_date, date(2010, 5, 1))
 
     def test_a_bad_field_saves_nothing_and_returns_to_the_form(self):
         cases = {

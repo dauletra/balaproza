@@ -18,7 +18,7 @@ from django.utils import timezone
 
 from .domain.catalog import BADGE_LABELS, PUBLIC_STATUSES
 from .domain.contests import AI_DECLARATIONS, SUBMISSION_STATUSES
-from .domain.formatting import kk_period
+from .domain.formatting import kk_joined, kk_period
 from .domain.library import LIBRARY_KINDS
 from .domain.notifications import (
     MODERATION_OUTCOME_LABELS,
@@ -183,10 +183,14 @@ class User(AbstractUser):
         return sum(s.views for s in self.public_works)
 
     @property
-    def joined_year(self) -> int:
-        """«2024 жылдан бері» в шапке профиля. Год, а не дата: точный день —
-        лишние персональные данные на публичной странице."""
-        return timezone.localtime(self.date_joined).year
+    def joined_since(self) -> str:
+        """«2 айдан бері» / «3 жыл 2 айдан бері» в шапке профиля —
+        `kk_joined` по алматинскому календарному дню, а не UTC: полночь
+        31 декабря по UTC — это уже 1 января в Алматы, и счёт дней обязан
+        идти по нему же, не по серверному часовому поясу."""
+        joined_date = timezone.localtime(self.date_joined).date()
+        days = (timezone.localdate() - joined_date).days
+        return kk_joined(days)
 
 
 class Genre(models.Model):

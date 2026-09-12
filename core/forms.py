@@ -348,7 +348,12 @@ class OnboardingForm(forms.ModelForm):
     """Онбординг после первого Telegram-входа (FR-AUTH-04). `pen_name`
     обязателен здесь же (DEC-82): пока его нет, читателю показывают
     `@id<цифры>`, и разумно закрыть это в первом же контакте, а не
-    рассчитывать, что автор сам дойдёт до `/me/edit/`."""
+    рассчитывать, что автор сам дойдёт до `/me/edit/`.
+
+    `gender` и `birth_date` тоже обязательны здесь (DEC-84, отменяет
+    необязательность DEC-24 для первого контакта) — единственная точка,
+    где эти поля вообще спрашиваются; на `/me/edit/` `birth_date` после
+    сохранения больше не редактируется (`update_profile`)."""
 
     agree_rules = forms.BooleanField(required=True, error_messages={
         'required': 'Жариялау ережелерімен келісу қажет.'})
@@ -362,16 +367,18 @@ class OnboardingForm(forms.ModelForm):
             'pen_name':   {'required':   'Авторлық атыңды жаз.',
                            'max_length': 'Авторлық атың тым ұзын — 60 таңбадан аспасын.'},
             'bio':        {'max_length': 'Өзің туралы мәтін тым ұзын — 200 таңбадан аспасын.'},
-            'gender':     {'invalid_choice': 'Жынысын дұрыс таңда.'},
-            'birth_date': {'invalid': 'Туған күніңді дұрыс жаз.'},
+            'gender':     {'required': 'Жынысыңды таңда.',
+                           'invalid_choice': 'Жынысын дұрыс таңда.'},
+            'birth_date': {'required': 'Туған күніңді жаз.',
+                           'invalid': 'Туған күніңді дұрыс жаз.'},
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['pen_name'].required = True
         self.fields['bio'].required = False
-        self.fields['birth_date'].required = False
-        self.fields['gender'].required = False
+        self.fields['birth_date'].required = True
+        self.fields['gender'].required = True
 
     def clean_birth_date(self):
         return _validate_birth_date(self.cleaned_data.get('birth_date'))
