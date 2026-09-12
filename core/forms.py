@@ -10,6 +10,7 @@
 import re
 
 from django import forms
+from django.utils import timezone
 
 from .domain.catalog import AUDIENCE_ORDER
 from .domain.contests import AI_DECLARATIONS, eligibility_line
@@ -270,8 +271,23 @@ class ChapterAutosaveForm(forms.ModelForm):
 _USERNAME_RE = re.compile(r'^[a-z0-9_]{3,30}$')
 
 
+def _validate_birth_date(birth_date):
+    """Общая проверка для `OnboardingForm` и `ProfileForm`: не из будущего
+    и не старше разумного (DEC-82). Ценз конкурса эта дата не решает
+    (BR-48) — только подсказка форме подачи, откуда она уже приходит
+    отдельным чекбоксом."""
+    if birth_date is None:
+        return birth_date
+    today = timezone.localdate()
+    if birth_date > today:
+        raise forms.ValidationError('Туған күнің болашақта бола алмайды.')
+    if today.year - birth_date.year > 120:
+        raise forms.ValidationError('Туған күніңді дұрыс жаз.')
+    return birth_date
+
+
 class ProfileForm(forms.ModelForm):
-    """Редактирование своего профиля (FR-PROF-05). `age` и `gender` —
+    """Редактирование своего профиля (FR-PROF-05). `birth_date` и `gender` —
     самодекларация (DEC-24); пустой `avatar` значит «не меняем»."""
 
     # Явное снятие аватара (BR-86) — см. `remove_cover` у `StorySettingsForm`.
@@ -288,15 +304,13 @@ class ProfileForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ('pen_name', 'name', 'bio', 'age', 'gender', 'avatar')
+        fields = ('pen_name', 'bio', 'birth_date', 'gender', 'avatar')
         error_messages = {
-            'pen_name': {'required':   'Авторлық атыңды жаз.',
-                         'max_length': 'Авторлық атың тым ұзын — 60 таңбадан аспасын.'},
-            'name':     {'required':   'Ресми атыңды жаз.',
-                         'max_length': 'Ресми атың тым ұзын — 120 таңбадан аспасын.'},
-            'bio':      {'max_length': 'Өзің туралы мәтін тым ұзын — 200 таңбадан аспасын.'},
-            'gender':   {'invalid_choice': 'Жынысын дұрыс таңда.'},
-            'age':      {'invalid': 'Жасын дұрыс жаз.'},
+            'pen_name':   {'required':   'Авторлық атыңды жаз.',
+                           'max_length': 'Авторлық атың тым ұзын — 60 таңбадан аспасын.'},
+            'bio':        {'max_length': 'Өзің туралы мәтін тым ұзын — 200 таңбадан аспасын.'},
+            'gender':     {'invalid_choice': 'Жынысын дұрыс таңда.'},
+            'birth_date': {'invalid': 'Туған күніңді дұрыс жаз.'},
         }
 
     def __init__(self, *args, current_user=None, **kwargs):
@@ -310,17 +324,13 @@ class ProfileForm(forms.ModelForm):
         self._exclude_pk = current_user.pk if current_user else None
         super().__init__(*args, **kwargs)
         self.fields['pen_name'].required = True
-        self.fields['name'].required = True
         self.fields['avatar'].required = False
         self.fields['bio'].required = False
-        self.fields['age'].required = False
+        self.fields['birth_date'].required = False
         self.fields['gender'].required = False
 
-    def clean_age(self):
-        age = self.cleaned_data.get('age')
-        if age is not None and not (1 <= age <= 120):
-            raise forms.ValidationError('Жасын дұрыс жаз.')
-        return age
+    def clean_birth_date(self):
+        return _validate_birth_date(self.cleaned_data.get('birth_date'))
 
     def clean_username(self):
         value = self.cleaned_data['username'].strip().lower()
@@ -335,9 +345,10 @@ class ProfileForm(forms.ModelForm):
 
 
 class OnboardingForm(forms.ModelForm):
-    """Онбординг после первого Telegram-входа (FR-AUTH-04). Без `pen_name`:
-    регистрация требует только официальное имя (BR-15…19), авторлық аты
-    правится потом на `/me/edit/` — `ProfileForm` его уже покрывает."""
+    """Онбординг после первого Telegram-входа (FR-AUTH-04). `pen_name`
+    обязателен здесь же (DEC-82): пока его нет, читателю показывают
+    `@id<цифры>`, и разумно закрыть это в первом же контакте, а не
+    рассчитывать, что автор сам дойдёт до `/me/edit/`."""
 
     agree_rules = forms.BooleanField(required=True, error_messages={
         'required': 'Жариялау ережелерімен келісу қажет.'})
@@ -346,27 +357,24 @@ class OnboardingForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ('name', 'bio', 'age', 'gender')
+        fields = ('pen_name', 'bio', 'birth_date', 'gender')
         error_messages = {
-            'name':   {'required':   'Ресми атыңды жаз.',
-                       'max_length': 'Ресми атың тым ұзын — 120 таңбадан аспасын.'},
-            'bio':    {'max_length': 'Өзің туралы мәтін тым ұзын — 200 таңбадан аспасын.'},
-            'gender': {'invalid_choice': 'Жынысын дұрыс таңда.'},
-            'age':    {'invalid': 'Жасын дұрыс жаз.'},
+            'pen_name':   {'required':   'Авторлық атыңды жаз.',
+                           'max_length': 'Авторлық атың тым ұзын — 60 таңбадан аспасын.'},
+            'bio':        {'max_length': 'Өзің туралы мәтін тым ұзын — 200 таңбадан аспасын.'},
+            'gender':     {'invalid_choice': 'Жынысын дұрыс таңда.'},
+            'birth_date': {'invalid': 'Туған күніңді дұрыс жаз.'},
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['name'].required = True
+        self.fields['pen_name'].required = True
         self.fields['bio'].required = False
-        self.fields['age'].required = False
+        self.fields['birth_date'].required = False
         self.fields['gender'].required = False
 
-    def clean_age(self):
-        age = self.cleaned_data.get('age')
-        if age is not None and not (1 <= age <= 120):
-            raise forms.ValidationError('Жасын дұрыс жаз.')
-        return age
+    def clean_birth_date(self):
+        return _validate_birth_date(self.cleaned_data.get('birth_date'))
 
 
 class SubmissionForm(forms.Form):

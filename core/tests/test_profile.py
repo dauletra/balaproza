@@ -11,7 +11,7 @@
 """
 
 import re
-from datetime import timedelta
+from datetime import date, timedelta
 from html.parser import HTMLParser
 from pathlib import Path
 from unittest import mock
@@ -210,7 +210,6 @@ class OwnProfile(TestCase):
         self.assertNotContains(about, 'my_story_row')
         # Приватный блок — только владельцу
         self.assertContains(about, 'Тек саған көрінеді')
-        self.assertContains(about, 'Айдана Серікқызы')      # ресми аты-жөні
         # Год выводится из даты прихода, а не сверяется с литералом: она
         # относительная (DEC-57), и корпус двигает её вместе с сегодня.
         self.assertContains(about, f'{user("aidana").joined_year} жылдан бері')
@@ -272,20 +271,14 @@ class StrangerProfile(TestCase):
         self.assertNotContains(stranger, 'Жазылудан бас тарттың')
 
     def test_about_hides_the_private_fields(self):
-        """Настоящее имя автора — не публичный факт.
-
-        В своей копии вкладки лежал `profile_user.name` без всякой пометки,
-        а шапку между двумя шаблонами уже копировали: следующее
-        копирование унесло бы имя-фамилию в публичный профиль.
-        """
+        """Черновики автора — не публичный факт: чужой профиль не должен
+        выдавать «Тек саған көрінеді» и число работ вместе с черновиками."""
         response = self.client.get(
             reverse('core:profile_other', kwargs={'username': 'rudazov'})
             + '?tab=about')
         self.assertContains(response, 'Фэнтези, шытырман')
         self.assertContains(response, 'жылдан бері')
         self.assertNotContains(response, 'Тек саған көрінеді')
-        self.assertNotContains(response,
-                               User.objects.get(username='rudazov').name)
         self.assertNotContains(response, 'жобалармен бірге')
 
     def test_private_sections_have_no_entrance_and_a_ghost_is_404(self):
@@ -886,8 +879,8 @@ class FollowingAnAuthorIsWrittenDown(TestCase):
 class ProfileEdit(TestCase):
     """Ф15, Этап 6: `/me/edit/` — настоящий POST, ошибка поля = no-op."""
 
-    FIELDS = {'username': 'aidana', 'pen_name': 'Аты', 'name': 'Есім',
-              'bio': '', 'gender': '', 'age': ''}
+    FIELDS = {'username': 'aidana', 'pen_name': 'Аты',
+              'bio': '', 'gender': '', 'birth_date': ''}
 
     def setUp(self):
         super().setUp()
@@ -903,19 +896,19 @@ class ProfileEdit(TestCase):
         return User.objects.get(username='aidana')
 
     def test_it_saves_every_field_and_returns_to_the_profile(self):
-        response = self._post(pen_name='Жаңа лақап', name='Жаңа есім',
-                              bio='Жаңа био.', gender='girl', age='16')
+        response = self._post(pen_name='Жаңа лақап',
+                              bio='Жаңа био.', gender='girl', birth_date='2010-05-01')
         self.assertRedirects(response, reverse('core:profile_me'))
         user = self._aidana()
         self.assertEqual(
-            [user.pen_name, user.name, user.bio, user.gender, user.age],
-            ['Жаңа лақап', 'Жаңа есім', 'Жаңа био.', 'girl', 16])
+            [user.pen_name, user.bio, user.gender, user.birth_date],
+            ['Жаңа лақап', 'Жаңа био.', 'girl', date(2010, 5, 1)])
 
     def test_the_optional_half_may_be_left_blank(self):
-        self._post(bio='Бар.', gender='girl', age='16')
-        self._post(bio='', gender='', age='')
+        self._post(bio='Бар.', gender='girl', birth_date='2010-05-01')
+        self._post(bio='', gender='', birth_date='')
         user = self._aidana()
-        self.assertIsNone(user.age)
+        self.assertIsNone(user.birth_date)
         self.assertEqual(user.gender, '')
         self.assertEqual(user.bio, '')
 
@@ -923,10 +916,9 @@ class ProfileEdit(TestCase):
         cases = {
             'username': ('ab', 'a' * 31, 'has space', 'a-b', 'rudazov'),
             'pen_name': ('', 'ә' * 61),
-            'name': ('',),
             'bio': ('ә' * 201,),
             'gender': ('alien',),
-            'age': ('abc', '999'),
+            'birth_date': ('abc', '2099-01-01'),
         }
         for field, values in cases.items():
             for value in values:

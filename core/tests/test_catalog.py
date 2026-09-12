@@ -47,14 +47,12 @@ class SearchAnswersOrExplainsItself(TestCase):
     def test_it_looks_at_the_author_too_and_ignores_case(self):
         """Ради этого и выбран Postgres: у SQLite `LIKE` складывает регистр
         только для ASCII, и «РЫСҚАЛИ» не нашло бы «Рысқали»."""
-        author = make.user(name='Рысқали Тест', pen_name='Rudazov Test')
+        author = make.user(pen_name='Рысқали Тест')
         make.story(author=author, chapters=1)
         upper = data.filter_catalog(query='РЫСҚАЛИ ТЕСТ')
         lower = data.filter_catalog(query='рысқали тест')
         self.assertGreater(len(upper), 0)
         self.assertEqual([s.slug for s in upper], [s.slug for s in lower])
-        self.assertTrue(any(s.author.public_name == 'Rudazov Test'
-                            for s in data.filter_catalog(query='Rudazov Test')))
 
     def test_an_empty_query_is_not_an_axis_at_all(self):
         """Пустой запрос — не «ничего не найдено», а «ось не выставлена»:

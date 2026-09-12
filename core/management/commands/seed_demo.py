@@ -154,7 +154,6 @@ class Command(BaseCommand):
             user, is_new = User.objects.update_or_create(
                 username=author.username,
                 defaults={
-                    'name':      author.name,
                     'pen_name':  author.pen_name,
                     'bio':       author.bio,
                     'date_joined': joined,

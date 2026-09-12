@@ -60,7 +60,7 @@ def login_as(client, username='aidana'):
     return user
 
 
-def login_as_newcomer(client, username='newcomer', name=''):
+def login_as_newcomer(client, username='newcomer'):
     """Ввести клиента под человеком, у которого на портале ещё ничего нет.
 
     Пустые состояния — «Әлі өтінім жоқ», «Сақталғандар жоқ», профиль без
@@ -73,7 +73,7 @@ def login_as_newcomer(client, username='newcomer', name=''):
     Пароль нерабочий, как и у сидовых: входа по паролю на портале нет.
     """
     user, created = User.objects.get_or_create(
-        username=username, defaults={'pen_name': username, 'name': name})
+        username=username, defaults={'pen_name': username})
     if created:
         user.set_unusable_password()
         user.save(update_fields=['password'])

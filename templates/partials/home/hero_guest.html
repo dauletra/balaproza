@@ -52,10 +52,10 @@
 
             {% comment %}
                 Вход только через Telegram, профиль создаётся автоматически
-                (см. pages/auth/login.html), поэтому CTA ведёт на login, а не
-                на signup: signup — это форма заполнения профиля уже вошедшего.
-                next сохраняет намерение: после входа человек попадает туда,
-                что ему пообещала кнопка.
+                (см. pages/auth/login.html) — отдельного signup-адреса нет
+                вовсе (DEC-83), CTA всегда ведёт на login. next сохраняет
+                намерение: после входа человек попадает туда, что ему
+                пообещала кнопка.
             {% endcomment %}
             {% url 'core:new_story' as write_next %}
             <a href="{% url 'core:login' %}?next={{ write_next|urlencode }}" class="hidden h-12 shrink-0 items-center justify-center gap-2 rounded-md bg-slate-900 px-5 font-sans text-sm font-semibold text-white transition-colors hover:bg-slate-700 sm:inline-flex">

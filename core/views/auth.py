@@ -97,9 +97,9 @@ def onboarding(request):
         if form.is_valid():
             data.complete_onboarding(
                 request.user,
-                name=form.cleaned_data['name'],
+                pen_name=form.cleaned_data['pen_name'],
                 bio=form.cleaned_data['bio'],
-                age=form.cleaned_data['age'],
+                birth_date=form.cleaned_data['birth_date'],
                 gender=form.cleaned_data['gender'],
             )
             return redirect('core:signup_success')
@@ -107,12 +107,6 @@ def onboarding(request):
         form = OnboardingForm()
 
     return render(request, 'pages/auth/onboarding.html', {'form': form})
-
-
-def signup(request):
-    """Тіркелу — та же дверь, что и вход (FR-AUTH-03): аккаунт заводит
-    Telegram, отдельной ветки создания здесь нет."""
-    return render(request, 'pages/auth/signup.html', _telegram_login_context(request))
 
 
 def signup_success(request):

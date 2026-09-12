@@ -1,13 +1,9 @@
 {% comment %}
     Вкладка «Туралы» — общая для своего и чужого профиля.
 
-    Копии разошлись сильнее всего именно здесь: в своей было четыре поля,
-    в чужой — только био. Среди четырёх лежало `profile_user.name` —
-    настоящее имя-фамилия автора, ничем не помеченное как приватное.
-    Шапку профиля между этими файлами уже копировали; при следующем
-    копировании этого блока реальное имя ушло бы в публичный профиль.
-
-    Приватная часть отделена явно и рендерится только владельцу.
+    Настоящего имени сайт не хранит (DEC-82) — только `pen_name`, оно же
+    публичное. Приватная часть (счётчик черновиков) отделена явно и
+    рендерится только владельцу.
 
     Контекст:
       profile_user — Author
@@ -48,11 +44,7 @@
             <p class="mb-3 font-sans text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
                 Тек саған көрінеді
             </p>
-            <dl class="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                    <dt class="font-sans text-xs text-slate-500">Ресми аты-жөні</dt>
-                    <dd class="font-sans text-slate-900">{{ profile_user.name }}</dd>
-                </div>
+            <dl class="text-sm">
                 <div>
                     <dt class="font-sans text-xs text-slate-500">Барлық шығарма</dt>
                     <dd class="font-sans text-slate-900">{{ stats.works_total }} <span class="text-slate-500">(жобалармен бірге)</span></dd>

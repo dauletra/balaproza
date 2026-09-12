@@ -15,7 +15,7 @@
         </a>
         <h1 class="mt-3 font-display text-3xl font-bold text-slate-900">Профильді өңдеу</h1>
         <p class="mt-1.5 font-sans text-sm text-slate-600">
-            Авторлық атыңды, ресми атыңды және биоңды жаңарт.
+            Авторлық атыңды және биоңды жаңарт.
         </p>
     </header>
 
@@ -46,8 +46,6 @@
         {# ── Авторлық аты (FR-AUTH-04) ── #}
         {% include "components/input_field.html" with name="pen_name" label="Авторлық атың" value=profile_user.pen_name required=True maxlength=60 %}
 
-        {% include "components/input_field.html" with name="name" label="Ресми аты-жөні" value=profile_user.name required=True maxlength=120 %}
-
         {# ── Жынысы ── #}
         <fieldset class="flex flex-col gap-2">
             <legend class="mb-1 font-sans text-sm font-semibold text-slate-800">Жынысы</legend>
@@ -65,9 +63,9 @@
             </div>
         </fieldset>
 
-        {# ── Возраст (BR-48) ── #}
+        {# ── Туған күні (BR-48) ── #}
         {# Диапазон не называем — ценз ставит конкурс, не платформа (BR-48, DEC-47) #}
-        {% include "components/input_field.html" with name="age" type="number" label="Жасы" value=profile_user.age hint="Кейбір байқаулар қатысушының жасына шек қояды — сол үшін сұраймыз. Профильде көрінбейді." %}
+        {% include "components/input_field.html" with name="birth_date" type="date" label="Туған күнің" value=profile_user.birth_date|date:"Y-m-d" hint="Кейбір байқаулар қатысушының жасына шек қояды — сол үшін сұраймыз. Профильде көрінбейді." %}
 
         {# ── Био ── #}
         {% include "components/textarea.html" with name="bio" label="Автор туралы" value=profile_user.bio rows=4 maxlength=200 hint="Профильде көрсетіледі. Қажет емес болса бос қалдыр." %}

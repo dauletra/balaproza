@@ -128,7 +128,7 @@ class TheModeratorWorksThroughTheAdmin(TestCase):
 
     def setUp(self):
         self.moderator = User.objects.create_superuser(
-            'moderator', password='x', name='Модератор')
+            'moderator', password='x')
         self.client.force_login(self.moderator)
         self.author = User.objects.get(username='aidana')
         self.story = _story(self.author)

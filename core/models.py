@@ -67,23 +67,25 @@ def award_image_path(instance, filename):
 
 class User(AbstractUser):
     """Пользователь портала; роли «читатель» нет (DEC-01). `first_name` /
-    `last_name` убраны: казахское имя не делится на две западные графы, а
-    имён здесь и так два — настоящее и публичное."""
+    `last_name` убраны: казахское имя не делится на две западные графы.
+    Настоящего имени сайт не хранит вовсе (DEC-82) — только `pen_name`,
+    под которым автор выступает."""
 
     first_name = None
     last_name = None
 
     GENDER_CHOICES = [(g, GENDER_LABELS[g]) for g in GENDERS]
 
-    # Публично не показывается: это поле нужно модератору и жюри конкурса.
-    name = models.CharField('нақты аты', max_length=120, blank=True)
-    # Пустое — автор им не обзавёлся, и его называют по нику. Дефолта нет,
-    # чтобы «псевдоним» не оказался молча проставленным за человека.
+    # Единственное имя у аккаунта — публичное. Обязательно с онбординга
+    # (BR-90): пустое поле означало бы, что автора называют по нику
+    # (`@id<цифры>`) до первого сознательного выбора, а его теперь нет.
     pen_name = models.CharField('лақап аты', max_length=60, blank=True)
     bio = models.CharField('өзі туралы', max_length=200, blank=True)
     # Самодекларация (DEC-24), без верификации. Возрастную вилку конкурса
-    # решает отдельный чекбокс формы подачи (BR-48), а не это поле.
-    age = models.PositiveSmallIntegerField('жасы', null=True, blank=True)
+    # решает отдельный чекбокс формы подачи (BR-48), а не это поле. Дата,
+    # а не число лет (DEC-82): число протухает с каждым днём рождения без
+    # пересчёта — то самое производное, которое проект не хранит.
+    birth_date = models.DateField('туған күні', null=True, blank=True)
     gender = models.CharField('жынысы', max_length=4, choices=GENDER_CHOICES,
                               blank=True)
     avatar = models.FileField('аватар', upload_to=user_avatar_path, blank=True,
@@ -115,23 +117,16 @@ class User(AbstractUser):
                      opclasses=['gin_trgm_ops']),
             GinIndex(fields=['username'], name='user_username_trgm',
                      opclasses=['gin_trgm_ops']),
-            GinIndex(fields=['name'], name='user_name_trgm',
-                     opclasses=['gin_trgm_ops']),
         ]
 
     def __str__(self):
         return self.public_name
 
     def get_full_name(self):
-        return self.name or self.username
+        return self.public_name
 
     def get_short_name(self):
-        """Как обратиться к самому человеку: «Қайта қош келдің, Айдана».
-
-        Имя, а не `public_name`, и только первое слово: полное имя с
-        обращением на «сен» (docs/ui.md) звучит как вызов к доске.
-        """
-        return self.name.split()[0] if self.name.strip() else self.public_name
+        return self.public_name
 
     @property
     def public_name(self) -> str:

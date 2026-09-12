@@ -87,7 +87,7 @@ class TheCabinetAnswersWhatToDoNext(TestCase):
         self.assertContains(self.response, 'әлі бір бөлім жоқ')
 
     def test_a_newcomer_gets_an_empty_state_with_a_way_in(self):
-        login_as_newcomer(self.client, 'no-such-user', name='Тест')
+        login_as_newcomer(self.client, 'no-such-user')
         response = self.client.get(reverse('core:my_stories'))
         self.assertContains(response, 'Әлі шығарма жоқ')
         self.assertContains(response, 'Жаңа шығарма жазу')

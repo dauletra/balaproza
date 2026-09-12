@@ -53,19 +53,18 @@ class UserAdmin(DjangoUserAdmin):
     убраны, и унаследованные наборы ссылались бы на несуществующие
     колонки, роняя страницу."""
 
-    list_display = ('username', 'public_name', 'name', 'is_staff', 'date_joined')
+    list_display = ('username', 'public_name', 'is_staff', 'date_joined')
     list_filter = ('is_staff', 'is_superuser', 'is_active')
-    search_fields = ('username', 'name', 'pen_name', 'email')
+    search_fields = ('username', 'pen_name', 'email')
     ordering = ('username',)
 
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         ('Аты-жөні', {
-            'fields': ('name', 'pen_name', 'bio', 'avatar', 'age', 'gender', 'email'),
-            'description': '«Нақты аты» көпшілікке көрінбейді — оны '
-                           'модерация мен байқау қазылары ғана көреді. '
-                           '«Жасы»/«Жынысы» — өзі толтырған, құжатпен '
-                           'расталмаған (DEC-24).',
+            'fields': ('pen_name', 'bio', 'avatar', 'birth_date', 'gender', 'email'),
+            'description': '«Туған күні»/«Жынысы» — өзі толтырған, '
+                           'құжатпен расталмаған (DEC-24). Нақты аты-жөні '
+                           'сайтта мүлде сақталмайды (DEC-82).',
         }),
         ('Рұқсаттар', {'fields': ('is_active', 'is_staff', 'is_superuser',
                                   'groups', 'user_permissions')}),

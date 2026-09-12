@@ -26,7 +26,6 @@ from core.tests.base import TestCase, login_as, login_as_newcomer, user
 PUBLIC_URLS = [
     ('core:home',              {},                                'home'),
     ('core:login',             {},                                'auth/login'),
-    ('core:signup',            {},                                'auth/signup'),
     ('core:signup_success',    {},                                'auth/signup-success'),
     ('core:catalog',           {},                                'catalog'),
     # search_results нет в этом списке: с DEC-65 это редирект (302), а не
@@ -85,7 +84,7 @@ class EveryRouteRenders(TestCase):
     def test_as_a_newcomer_with_nothing_of_their_own(self):
         """Вошедший без единой строки контента: смоук отвечает на «страница
         рендерится», а не «у автора есть что показать»."""
-        login_as_newcomer(self.client, 'tester', name='Test User')
+        login_as_newcomer(self.client, 'tester')
         self._walk('authed')
 
     def test_as_an_author_with_a_full_shelf(self):
@@ -145,14 +144,13 @@ class TemplateContext(TestCase):
         self.assertEqual(ctx['unread_notifications'], 0)
 
     def test_the_greeting_uses_the_persons_own_name(self):
-        """«Қайта қош келдің, Айдана», а не «, aidana»: читателю автор
-        известен под лақап аты, но приветствие обращено к нему самому.
-        Фамилии тоже нет — с «сен» (docs/ui.md) она звучит вызовом к доске."""
+        """«Қайта қош келдің, aidana»: то же лақап аты, что видит читатель —
+        другого имени сайт не хранит (DEC-82)."""
         aidana = User.objects.get(username='aidana')
         ctx = auth_state(self._request_as(aidana))
         self.assertTrue(ctx['signed_in'])
         self.assertEqual(ctx['current_user_username'], 'aidana')
-        self.assertEqual(ctx['current_user_name'], 'Айдана')
+        self.assertEqual(ctx['current_user_name'], aidana.public_name)
         # Число не вписывается литералом: вторая копия разъезжалась бы с
         # первой при каждой правке демо-корпуса.
         self.assertEqual(ctx['unread_notifications'],

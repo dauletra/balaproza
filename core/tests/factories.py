@@ -54,7 +54,6 @@ def user(**over) -> User:
     """Автор портала. Пароль не выдаётся — вход в тестах через `login_as`."""
     username = over.pop('username', None) or _uniq('reader')
     fields = {
-        'name': 'Сынақ Авторы',
         'pen_name': username,
         'bio': '',
     }

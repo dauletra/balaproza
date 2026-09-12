@@ -91,19 +91,18 @@ def author_by_username(username: str):
     return with_works(User.objects.filter(username=username)).first()
 
 
-def update_profile(user, *, pen_name: str, name: str, bio: str,
-                   age, gender: str, avatar, remove_avatar: bool = False,
+def update_profile(user, *, pen_name: str, bio: str,
+                   birth_date, gender: str, avatar, remove_avatar: bool = False,
                    username: str) -> None:
-    """Сохранить свой профиль (FR-PROF-01). `age`/`gender` — самодекларация
-    (DEC-24); пустой `avatar` значит «не меняем»: автор не переизбирает файл
-    при каждом сохранении. `remove_avatar` — явное снятие (BR-86), третье
-    состояние рядом с «не меняем»; новый файл важнее снятия. `username`
-    (BR-91) обязателен — форма всегда шлёт текущее или новое значение,
-    третьего состояния «не меняем» у него нет."""
+    """Сохранить свой профиль (FR-PROF-01). `birth_date`/`gender` —
+    самодекларация (DEC-24); пустой `avatar` значит «не меняем»: автор не
+    переизбирает файл при каждом сохранении. `remove_avatar` — явное снятие
+    (BR-86), третье состояние рядом с «не меняем»; новый файл важнее снятия.
+    `username` (BR-91) обязателен — форма всегда шлёт текущее или новое
+    значение, третьего состояния «не меняем» у него нет."""
     user.pen_name = pen_name
-    user.name = name
     user.bio = bio
-    user.age = age
+    user.birth_date = birth_date
     user.gender = gender
     user.username = username
     if avatar:

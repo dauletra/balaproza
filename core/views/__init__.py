@@ -16,7 +16,6 @@ from .auth import (
     login_view,
     logout_view,
     onboarding,
-    signup,
     signup_success,
     telegram_callback,
 )

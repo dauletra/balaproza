@@ -184,9 +184,9 @@ class Onboarding(TestCase):
     def test_rejected_form_returns_what_was_typed_and_saves_nothing(self):
         login_as_newcomer(self.client, 'typed_but_invalid')
         response = self.client.post(reverse('core:onboarding'), {
-            'name': '',
+            'pen_name': '',
             'bio': 'Кітап оқығанды жақсы көремін',
-            'age': '15',
+            'birth_date': '2010-05-01',
             'gender': 'girl',
             'agree_rules': 'on',
             'agree_privacy': 'on',
@@ -201,7 +201,7 @@ class Onboarding(TestCase):
     def test_missing_agreement_is_rejected(self):
         login_as_newcomer(self.client, 'no_agreement')
         response = self.client.post(reverse('core:onboarding'), {
-            'name': 'Мадина', 'agree_rules': '', 'agree_privacy': '',
+            'pen_name': 'Мадина', 'agree_rules': '', 'agree_privacy': '',
         })
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'келісу қажет')
@@ -210,11 +210,11 @@ class Onboarding(TestCase):
     def test_valid_submission_completes_registration(self):
         login_as_newcomer(self.client, 'finishing_up')
         response = self.client.post(reverse('core:onboarding'), {
-            'name': 'Дана Серікқызы', 'bio': '', 'age': '', 'gender': '',
+            'pen_name': 'Дана Серікқызы', 'bio': '', 'birth_date': '', 'gender': '',
             'agree_rules': 'on', 'agree_privacy': 'on',
         })
         self.assertRedirects(response, reverse('core:signup_success'))
 
         u = User.objects.get(username='finishing_up')
-        self.assertEqual(u.name, 'Дана Серікқызы')
+        self.assertEqual(u.pen_name, 'Дана Серікқызы')
         self.assertIsNotNone(u.terms_accepted_at)

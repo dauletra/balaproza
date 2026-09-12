@@ -265,14 +265,14 @@ class GuestHeaderAndBottomNav(TestCase):
 
 class GuestCtaKeepsTheIntent(TestCase):
     """Гостевые CTA расходились: hero вёл на signup, become_author — на login.
-    Форма signup — профиль уже вошедшего; вход только через Telegram."""
+    Вход и регистрация — одна и та же дверь Telegram (DEC-83), отдельного
+    signup-адреса больше нет вовсе."""
 
     def test_both_lead_to_login_with_next_preserved(self):
         """Что вход, придя из `?next=`, действительно возвращает туда —
         проверяет `test_auth.TelegramCallback` (там есть настоящий
         провайдер, которого форма демо-входа не знала)."""
         response = self.client.get(reverse('core:home'))
-        self.assertNotContains(response, reverse('core:signup'))
         self.assertContains(response, reverse('core:login'))
 
         target = reverse('core:new_story')

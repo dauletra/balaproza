@@ -29,17 +29,15 @@ from core.tests.base import TestCase, user
 
 class UserSaysWhoTheAuthorIs(TestCase):
 
-    def test_public_name_hides_the_real_one(self):
-        """Читателю автор известен под лақап аты, настоящее имя видит он
-        сам (BR-73). Ник — запасной вариант, а не второе имя: пустого
-        места у карточки не бывает."""
-        named = User.objects.create_user('demo-pen', pen_name='sayyn',
-                                         name='Сайын Нұрбекұлы')
+    def test_public_name_falls_back_to_the_nickname(self):
+        """Читателю автор известен под лақап аты (DEC-82: другого имени
+        сайт не хранит). Ник — запасной вариант при пустом псевдониме, а
+        не второе имя: пустого места у карточки не бывает."""
+        named = User.objects.create_user('demo-pen', pen_name='sayyn')
         self.assertEqual(named.public_name, 'sayyn')
-        self.assertEqual(named.get_full_name(), 'Сайын Нұрбекұлы')
-        self.assertNotIn('Сайын', named.public_name)
+        self.assertEqual(named.get_full_name(), 'sayyn')
 
-        nameless = User.objects.create_user('demo-nick', name='Айдана Серікқызы')
+        nameless = User.objects.create_user('demo-nick')
         self.assertEqual(nameless.public_name, '@demo-nick')
 
     def test_there_is_no_third_place_for_a_name(self):

@@ -19,8 +19,8 @@
           class="flex flex-col gap-6 rounded-hero border border-slate-200 bg-white p-6 sm:p-8">
         {% csrf_token %}
 
-        {% with err=form.name.errors.0 %}
-        {% include "components/input_field.html" with name="name" label="Ресми аты-жөні" value=form.name.value placeholder="Мысалы: Айдана Мұратқызы" required=True autofocus=True maxlength=120 state=err|yesno:"error,default" message=err %}
+        {% with err=form.pen_name.errors.0 %}
+        {% include "components/input_field.html" with name="pen_name" label="Авторлық атың" value=form.pen_name.value placeholder="Мысалы: Айдана Мұратқызы" required=True autofocus=True maxlength=60 hint="Кейін де өзгерте аласың." state=err|yesno:"error,default" message=err %}
         {% endwith %}
 
         <fieldset class="flex flex-col gap-2">
@@ -45,8 +45,8 @@
         </fieldset>
 
         {% comment %}Диапазон не называем — ценз ставит конкурс, не платформа (BR-48, DEC-47).{% endcomment %}
-        {% with err=form.age.errors.0 %}
-        {% include "components/input_field.html" with name="age" type="number" label="Жасы" value=form.age.value hint="Кейбір байқаулар қатысушының жасына шек қояды — сол үшін сұраймыз. Профильде көрінбейді." state=err|yesno:"error,default" message=err %}
+        {% with err=form.birth_date.errors.0 %}
+        {% include "components/input_field.html" with name="birth_date" type="date" label="Туған күнің" value=form.birth_date.value hint="Кейбір байқаулар қатысушының жасына шек қояды — сол үшін сұраймыз. Профильде көрінбейді." state=err|yesno:"error,default" message=err %}
         {% endwith %}
 
         {% with err=form.bio.errors.0 %}

@@ -13,7 +13,6 @@ urlpatterns = [
     path('auth/logout/', views.logout_view, name='logout'),
     path('auth/telegram/callback/', views.telegram_callback, name='telegram_callback'),
     path('auth/onboarding/', views.onboarding, name='onboarding'),
-    path('auth/signup/', views.signup, name='signup'),
     path('auth/signup/success/', views.signup_success, name='signup_success'),
 
     # CAT — каталог и поиск (DEC-27: search/genre/tag — единый catalog-движок)

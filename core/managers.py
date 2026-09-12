@@ -245,8 +245,7 @@ class StoryQuerySet(QuerySet):
             return self
         return self.filter(Q(title__icontains=q)
                            | Q(author__pen_name__icontains=q)
-                           | Q(author__username__icontains=q)
-                           | Q(author__name__icontains=q))
+                           | Q(author__username__icontains=q))
 
     def in_genre(self, slug: str):
         if not slug:
