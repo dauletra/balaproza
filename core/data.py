@@ -94,8 +94,12 @@ from .queries.catalog import (
     all_genres,
     filter_catalog,
     genre_by_slug,
+    home_rows,
     public_stories,
     related_stories,
+    search_suggestions,
+    sitemap_authors,
+    sitemap_genres,
     sitemap_stories,
     story_by_slug,
 )
@@ -147,6 +151,7 @@ from .queries.story import (
     poll_of,
     reactions_of,
     record_story_view,
+    sitemap_collections,
     recount_recent_views,
     toggle_chapter_reaction,
     toggle_comment_like,
@@ -167,6 +172,7 @@ from .queries.tags import (
     preview_story_tags,
     reject_tags,
     resolve_story_tags,
+    sitemap_tags,
     tag_by_slug,
     tags_of,
     trending_tags,
@@ -246,6 +252,7 @@ from .queries.contests import (
     home_contests,
     open_contests,
     submission_candidates,
+    sitemap_contests,
     submission_checklist,
     submissions_of,
     withdraw_submission,
@@ -267,6 +274,9 @@ from .queries.moderation import (
     story_for_moderation,
     submitted_chapters,
 )
+
+# ── Ограничение частоты: сколько раз в минуту это можно ─────────────────
+from .queries.throttle import too_often
 
 # ── Ссылки «Авторлар мектебі» (DEC-22) ───────────────────────────────────
 from .queries.site import school_links

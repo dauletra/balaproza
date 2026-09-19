@@ -100,6 +100,12 @@ def reject_tags(tags, reason: str) -> tuple[int, int]:
     return changed, len(links)
 
 
+def sitemap_tags():
+    """Принятые теги для `sitemap.xml`. Без счётчиков: краулеру нужен
+    адрес, а не число использований."""
+    return Tag.objects.filter(status='accepted').only('slug').order_by('slug')
+
+
 def popular_tags(limit: int = 10):
     """Опоры портала — accepted по накопленному использованию."""
     return (with_counts(Tag.objects.filter(status='accepted'))

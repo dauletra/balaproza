@@ -11,7 +11,7 @@
 `from core.views.catalog import PAGE_SIZE`.
 """
 
-from .api import search_index_json
+from .api import search_suggest
 from .auth import (
     decline_onboarding,
     login_view,

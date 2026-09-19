@@ -38,10 +38,12 @@ def home(request):
     else:
         hero_focus = 'empty'
 
-    # Не литерал 'Published': после DEC-37 опубликованный сериал носит
-    # OnProcess или Completed, и по литералу с главной пропали бы все десять.
-    published = list(data.public_stories(viewer=user))
-    genres = list(data.all_genres())
+    # Три ряда — три ограниченные выборки, а не весь каталог в память
+    # (`home_rows`). Публичность и оси живут там же, где у каталога:
+    # литерала 'Published' здесь нет и быть не может — опубликованный
+    # сериал носит OnProcess или Completed, и по литералу с главной
+    # пропали бы все сериалы.
+    rows = data.home_rows(viewer=user)
 
     # Жанры на главной — полоса-вывеска, а не навигация (DEC-31): 12 цветных слов
     # объясняют, что это литературный портал, и ведут на /genres/<slug>/.
@@ -57,16 +59,15 @@ def home(request):
         'hero_contest':    data.hero_contest(),
         'home_contests':   data.home_contests(),
         'collections':     data.all_collections(),
-        'genres':          genres,
+        'genres':          data.all_genres(),
         'book_of_week':    data.book_of_week(),
         'new_authors':     data.new_authors(4),
-        'top_stories':     sorted(published, key=lambda s: s.views, reverse=True)[:5],
-        'short_stories':   [s for s in published if s.is_single and s.read_minutes <= 15][:5],
+        'top_stories':     rows['top'],
+        'short_stories':   rows['short'],
         # Ряд называется «Жалғасып жатқан шығармалар» — значит именно те,
         # что продолжаются, а не все сериалы подряд.
-        'serial_stories':  [s for s in published
-                            if s.is_serial and s.status == 'OnProcess'][:5],
-        'portal_stats':    data.portal_stats(stories=published, genres=genres),
+        'serial_stories':  rows['ongoing'],
+        'portal_stats':    data.portal_stats(),
         'popular_tags':    data.popular_tags(8),
         'trending_tags':   data.trending_tags(6),
     })

@@ -61,64 +61,91 @@ document.addEventListener('alpine:init', function () {
         };
     });
 
-    /* Быстрый поиск (Cmd+K / Ctrl+K). Индекс тянется один раз при первом
-     * открытии и живёт до перезагрузки: он маленький, а искать надо на
-     * каждое нажатие клавиши. Адрес приходит параметром — {% url %} в
-     * статический файл не подставить. */
-    Alpine.data('searchPopup', function (indexUrl) {
+    /* Быстрый поиск (Cmd+K / Ctrl+K).
+     *
+     * Ищет **сервер**, на каждый запрос. Раньше браузер скачивал индекс
+     * целиком — все работы, всех авторов, все теги — и фильтровал его у
+     * себя. На демо-корпусе это выглядело остроумно: одна загрузка,
+     * дальше поиск без сети. На настоящем каталоге тот же приём означает,
+     * что в телефон подростка при первом нажатии Cmd+K уезжает весь
+     * портал; и подсказки отставали ровно настолько, насколько жил кэш
+     * индекса.
+     *
+     * Задержка перед запросом обязательна: без неё «Айдана» это шесть
+     * запросов. 200 мс — меньше, чем пауза между нажатиями у того, кто
+     * печатает, и незаметно для того, кто уже допечатал.
+     *
+     * Ответы приходят не в том порядке, в каком ушли. Поэтому у каждого
+     * запроса свой номер, и рисуется только последний: иначе медленный
+     * ответ на «Айд» перезатирает быстрый на «Айдана».
+     */
+    var SEARCH_DEBOUNCE_MS = 200;
+    var SEARCH_MIN_LENGTH = 2;
+
+    Alpine.data('searchPopup', function (searchUrl) {
         return {
             open: false,
             q: '',
-            loaded: false,
             loading: false,
-            index: { stories: [], authors: [], tags: [] },
+            results: { stories: [], authors: [], tags: [] },
+            timer: null,
+            /* Номер последнего отправленного запроса и последнего
+             * нарисованного ответа. */
+            sent: 0,
+            shown: 0,
 
-            async ensureLoaded() {
-                if (this.loaded || this.loading) return;
-                this.loading = true;
-                try {
-                    const r = await fetch(indexUrl);
-                    if (r.ok) this.index = await r.json();
-                    this.loaded = true;
-                } catch (e) { /* offline */ }
-                this.loading = false;
-            },
-
-            async openPopup() {
+            openPopup: function () {
                 this.open = true;
-                await this.$nextTick();
-                if (this.$refs.input) this.$refs.input.focus();
-                this.ensureLoaded();
+                this.$nextTick(function () {
+                    if (this.$refs.input) this.$refs.input.focus();
+                }.bind(this));
             },
 
-            close() {
+            close: function () {
                 this.open = false;
                 this.q = '';
+                this.results = { stories: [], authors: [], tags: [] };
+                clearTimeout(this.timer);
             },
 
-            filteredStories() {
-                const q = this.q.trim().toLowerCase();
-                if (!q) return [];
-                return this.index.stories.filter(s =>
-                    s.title.toLowerCase().includes(q) || s.author.toLowerCase().includes(q)
-                ).slice(0, 5);
+            /* Зовётся на ввод. Пустой и слишком короткий запрос до сети
+             * не доходит вовсе: одна буква находит половину каталога и
+             * ничего не подсказывает. */
+            search: function () {
+                clearTimeout(this.timer);
+                if (this.q.trim().length < SEARCH_MIN_LENGTH) {
+                    this.results = { stories: [], authors: [], tags: [] };
+                    this.loading = false;
+                    return;
+                }
+                this.loading = true;
+                this.timer = setTimeout(this.fetchResults.bind(this),
+                                        SEARCH_DEBOUNCE_MS);
             },
 
-            filteredAuthors() {
-                const q = this.q.trim().toLowerCase();
-                if (!q) return [];
-                return this.index.authors.filter(a =>
-                    a.name.toLowerCase().includes(q) || a.username.toLowerCase().includes(q)
-                ).slice(0, 5);
+            fetchResults: function () {
+                var self = this;
+                var mine = ++this.sent;
+                fetch(searchUrl + '?q=' + encodeURIComponent(this.q.trim()))
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (found) {
+                        /* Опоздавший ответ не рисуем: он про прежний
+                         * запрос, и его результат уже неверен. */
+                        if (!found || mine < self.shown) { return; }
+                        self.shown = mine;
+                        self.results = found;
+                        self.loading = false;
+                    })
+                    .catch(function () {
+                        /* Сеть отпала. Пустой список честнее прежнего:
+                         * «ничего не найдено» здесь и значит «не знаем». */
+                        if (mine >= self.shown) { self.loading = false; }
+                    });
             },
 
-            filteredTags() {
-                const q = this.q.trim().toLowerCase();
-                if (!q) return [];
-                return (this.index.tags || []).filter(t =>
-                    t.name.toLowerCase().includes(q) || t.slug.toLowerCase().includes(q)
-                ).slice(0, 5);
-            }
+            filteredStories: function () { return this.results.stories || []; },
+            filteredAuthors: function () { return this.results.authors || []; },
+            filteredTags: function () { return this.results.tags || []; }
         };
     });
 

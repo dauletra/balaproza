@@ -109,7 +109,7 @@ urlpatterns = [
     path('contests/<slug:slug>/withdraw/', views.contest_withdraw, name='contest_withdraw'),
 
     # API — внутренние JSON-эндпоинты (search popup и др.)
-    path('api/search-index.json', views.search_index_json, name='api_search_index'),
+    path('api/search.json', views.search_suggest, name='api_search'),
 
     # LEGAL/INFO — статичные стабы для footer-ссылок (DEC-22, FR-AUTH-05)
     path('rules/moderation/', views.legal_moderation_rules, name='legal_moderation'),

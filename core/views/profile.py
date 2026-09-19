@@ -16,7 +16,7 @@ from django.views.decorators.http import require_POST
 
 from .. import data
 from ..forms import ProfileForm
-from .common import _current_user, _current_username, _safe_next
+from .common import _current_user, _current_username, _safe_next, _throttled
 
 
 def _report(request, form) -> None:
@@ -231,6 +231,8 @@ def follow_toggle(request, username):
     страницах. `_safe_next` не пускает наружу (open-redirect).
     """
     target = data.author_by_username(username)
+    if _throttled(request, 'follow'):
+        target = None
     if target is not None:
         now_following = data.toggle_follow(request.user, target)
         messages.success(request, 'Жазылдың' if now_following

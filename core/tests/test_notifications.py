@@ -108,7 +108,7 @@ class AReactionReachesTheAuthorOnceADay(TestCase):
         self.chapters = list(self.story.chapter_set.order_by('number'))
 
     def test_the_author_is_told(self):
-        data.toggle_chapter_reaction(self.chapters[0], self.reader, 'heart')
+        data.toggle_chapter_reaction(self.chapters[0], self.reader, 'juregim')
 
         note = _notes(self.author, 'like')[0]
         self.assertEqual(note.actor, self.reader)
@@ -117,7 +117,7 @@ class AReactionReachesTheAuthorOnceADay(TestCase):
         self.assertEqual(note.story, self.story)
 
     def test_reacting_to_your_own_chapter_tells_nobody(self):
-        data.toggle_chapter_reaction(self.chapters[0], self.author, 'heart')
+        data.toggle_chapter_reaction(self.chapters[0], self.author, 'juregim')
 
         self.assertEqual(_notes(self.author), [])
 
@@ -125,40 +125,40 @@ class AReactionReachesTheAuthorOnceADay(TestCase):
         """Сорок глав по пять кнопок — сорок событий, и лента автора
         перестала бы показывать что-либо, кроме них."""
         for chapter in self.chapters:
-            data.toggle_chapter_reaction(chapter, self.reader, 'heart')
+            data.toggle_chapter_reaction(chapter, self.reader, 'juregim')
 
         self.assertEqual(len(_notes(self.author, 'like')), 1)
 
     def test_changing_the_reaction_does_not_add_a_second_line(self):
-        data.toggle_chapter_reaction(self.chapters[0], self.reader, 'heart')
-        data.toggle_chapter_reaction(self.chapters[0], self.reader, 'cry')
+        data.toggle_chapter_reaction(self.chapters[0], self.reader, 'juregim')
+        data.toggle_chapter_reaction(self.chapters[0], self.reader, 'jyladym')
 
         self.assertEqual(len(_notes(self.author, 'like')), 1)
 
     def test_removing_a_reaction_is_not_an_event(self):
         """«Тебя больше не отмечают» событием не является."""
-        data.toggle_chapter_reaction(self.chapters[0], self.reader, 'heart')
+        data.toggle_chapter_reaction(self.chapters[0], self.reader, 'juregim')
         Notification.objects.all().delete()
-        data.toggle_chapter_reaction(self.chapters[0], self.reader, 'heart')
+        data.toggle_chapter_reaction(self.chapters[0], self.reader, 'juregim')
 
         self.assertEqual(_notes(self.author), [])
 
     def test_the_next_day_is_a_new_event(self):
         """Окно молчания — сутки, а не «однажды и навсегда»: читатель,
         вернувшийся через неделю, — снова новость."""
-        data.toggle_chapter_reaction(self.chapters[0], self.reader, 'heart')
+        data.toggle_chapter_reaction(self.chapters[0], self.reader, 'juregim')
         Notification.objects.filter(user=self.author).update(
             created_at=timezone.now() - timedelta(days=2))
 
-        data.toggle_chapter_reaction(self.chapters[1], self.reader, 'heart')
+        data.toggle_chapter_reaction(self.chapters[1], self.reader, 'juregim')
 
         self.assertEqual(len(_notes(self.author, 'like')), 2)
 
     def test_another_reader_is_not_silenced_by_the_first(self):
         """Окно считается по паре «читатель и работа», а не по работе."""
         other = f.user()
-        data.toggle_chapter_reaction(self.chapters[0], self.reader, 'heart')
-        data.toggle_chapter_reaction(self.chapters[0], other, 'heart')
+        data.toggle_chapter_reaction(self.chapters[0], self.reader, 'juregim')
+        data.toggle_chapter_reaction(self.chapters[0], other, 'juregim')
 
         self.assertEqual(len(_notes(self.author, 'like')), 2)
 

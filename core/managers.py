@@ -123,11 +123,20 @@ class StoryQuerySet(QuerySet):
         молча выкидывает из выдачи все сериалы, отдавая 200."""
         return self.filter(status__in=PUBLIC_STATUSES)
 
+    def for_row(self):
+        """Карточка **без тегов**: автор и жанры.
+
+        Узкая карточка ряда (`book_card_small.html`) тегов не показывает
+        вовсе, а `prefetch_related` стоит отдельного запроса на каждую
+        выдачу — три ряда главной платили три запроса за то, чего на
+        экране нет.
+        """
+        return self.select_related('author', 'primary_genre', 'secondary_genre')
+
     def for_card(self):
-        """Всё, что спрашивает карточка: автор, жанры, теги. Без этого
-        страница из двадцати карточек делает под сотню запросов."""
-        return (self.select_related('author', 'primary_genre', 'secondary_genre')
-                .prefetch_related('tags'))
+        """Всё, что спрашивает карточка каталога: автор, жанры, теги. Без
+        этого страница из двадцати карточек делает под сотню запросов."""
+        return self.for_row().prefetch_related('tags')
 
     def with_reading_effort(self):
         """«Сколько это читать» и три знака карточки — одной выдачей. Объём

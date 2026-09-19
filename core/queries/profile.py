@@ -14,13 +14,15 @@
 from dataclasses import dataclass
 from typing import Callable
 
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Q
 
 from ..domain.awards import READ_TIER_ART, READ_TIERS, next_tier_for, tier_for
 from ..domain.catalog import BADGE_LABELS, PUBLIC_STATUSES
-from ..models import AwardGrant, Follow, Story, User
+from ..models import AwardGrant, Follow, Genre, Story, User
 from .notifications import notify_follow
+from .site import REFERENCE_TTL
 
 
 # ── Подписки (FR-PROF-10, BR-75) ─────────────────────────────────────────
@@ -169,19 +171,29 @@ def new_authors(limit: int = 4):
         .order_by('-has_public', '-date_joined', 'username'))[:limit]
 
 
-def portal_stats(*, stories, genres) -> dict:
-    """Счётчики масштаба в хиро гостя (FR-HOME-01), по самим данным.
+_STATS_KEY = 'site:portal_stats'
 
-    Два числа из трёх приходят от страницы: она держит и список публичных
-    работ, и полосу жанров целиком, и `COUNT` по тем же строкам был бы
-    вторым обращением за тем, что уже в памяти. Считать здесь остаётся
-    только авторов — их страница не перечисляет.
+
+def portal_stats() -> dict:
+    """Счётчики масштаба в хиро гостя (FR-HOME-01).
+
+    Тремя `COUNT`, закэшированными на те же пять минут, что остальные
+    справочники. Раньше два числа из трёх приходили от страницы —
+    `len()` по спискам, которые она уже держала, — и это было дешевле
+    ровно до тех пор, пока страница держала весь каталог. Держать его
+    ради трёх цифр в приветствии гостя нельзя (`home_rows`), а считать
+    их заново на каждый показ незачем: «сколько у нас работ» не обязано
+    быть свежим до секунды.
     """
-    return {
-        'stories': len(stories),
-        'authors': User.objects.count(),
-        'genres':  len(genres),
-    }
+    stats = cache.get(_STATS_KEY)
+    if stats is None:
+        stats = {
+            'stories': Story.objects.filter(status__in=PUBLIC_STATUSES).count(),
+            'authors': User.objects.count(),
+            'genres':  Genre.objects.count(),
+        }
+        cache.set(_STATS_KEY, stats, REFERENCE_TTL)
+    return stats
 
 
 # ── Прочтения и ступени ──────────────────────────────────────────────────

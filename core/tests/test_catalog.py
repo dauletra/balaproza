@@ -122,6 +122,11 @@ class TagPagesShowMovement(TestCase):
     """Тег — единственная ось, обновляющаяся без участия редакции (DEC-31).
     Её ценность в том, что там видно движение, поэтому «жаңа» вперёд."""
 
+    def _suggest(self, query: str) -> dict:
+        """Подсказки быстрого поиска по запросу."""
+        return self.client.get(
+            reverse('core:api_search') + f'?q={query}').json()
+
     def test_the_page_lists_its_stories_with_the_panel_and_a_way_out(self):
         tag = make.tag()
         story = make.story(chapters=1)
@@ -146,10 +151,12 @@ class TagPagesShowMovement(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(list(data.filter_catalog(tag=pending.slug)), [])
 
-        payload = self.client.get(reverse('core:api_search_index')).json()
-        slugs = [t['slug'] for t in payload['tags']]
-        self.assertNotIn(pending.slug, slugs)
-        self.assertIn('mektep', slugs)
+        # Быстрый поиск спрашивает сервер по запросу, а не выгружает
+        # индекс: непринятый тег не находится даже по точному имени.
+        found = self._suggest(pending.name)
+        self.assertNotIn(pending.slug, [t['slug'] for t in found['tags']])
+        self.assertIn('mektep',
+                      [t['slug'] for t in self._suggest('mektep')['tags']])
 
     def test_a_tag_opens_on_recent_while_the_rest_open_on_trending(self):
         """DEC-36 сделал дефолтом окно в 14 дней. Тег при этом остаётся на
@@ -440,12 +447,15 @@ class NothingUnmoderatedLeaksOut(TestCase):
         hidden = [make.story(chapters=1, status='NotPublished', title='Жасырын жоба'),
                   make.story(chapters=1, status='OnModeration', title='Тексерудегі')]
         catalog = self.client.get(reverse('core:catalog')).context['results']
-        index = self.client.get(reverse('core:api_search_index')).json()
 
         for story in hidden:
             with self.subTest(story=story.slug):
                 self.assertNotIn(story.slug, [s.slug for s in catalog])
-                self.assertNotIn(story.slug, {s['slug'] for s in index['stories']})
+                # И в подсказках быстрого поиска — по точному названию.
+                suggested = self.client.get(
+                    reverse('core:api_search') + f'?q={story.title}').json()
+                self.assertNotIn(story.slug,
+                                 {s['slug'] for s in suggested['stories']})
                 found = self.client.get(
                     reverse('core:catalog') + f'?q={story.title}')
                 self.assertNotIn(story.slug,
@@ -662,18 +672,21 @@ class SerialsDoNotVanishFromAnySurface(TestCase):
     сравнивающее с одним литералом, теряет их все разом, ничего не ломая.
     Страница отдаёт 200, просто без половины работ."""
 
-    def test_home_rows_and_the_search_index_still_carry_them(self):
+    def test_home_rows_and_quick_search_still_carry_them(self):
         home = self.client.get(reverse('core:home'))
         self.assertTrue(any(s.is_serial for s in home.context['top_stories']))
         self.assertTrue(home.context['serial_stories'])
         for story in home.context['serial_stories']:
             self.assertEqual(story.status, 'OnProcess')   # ряд «Жалғасып жатқан»
 
-        indexed = {s['slug'] for s in
-                   self.client.get(reverse('core:api_search_index')).json()['stories']}
-        serials = {s.slug for s in Story.objects.all()
-                   if s.is_serial and s.status in data.PUBLIC_STATUSES}
-        self.assertTrue(serials <= indexed)
+        # Публичный сериал находится быстрым поиском по названию. Полного
+        # перечисления тут больше нет: подсказки спрашивают сервер по
+        # запросу, и «все сериалы разом» он не отдаёт никому.
+        serial = next(s for s in Story.objects.all()
+                      if s.is_serial and s.status in data.PUBLIC_STATUSES)
+        found = self.client.get(
+            reverse('core:api_search') + f'?q={serial.title}').json()
+        self.assertIn(serial.slug, {s['slug'] for s in found['stories']})
 
 
 class TheCatalogIsPaginated(TestCase):
@@ -717,3 +730,63 @@ class TheCatalogIsPaginated(TestCase):
         short = self.client.get(reverse('core:collection_detail',
                                         kwargs={'slug': data.all_collections()[0].slug}))
         self.assertNotContains(short, 'aria-label="Беттер"')
+
+
+class QuickSearchAsksTheServer(TestCase):
+    """Подсказки Cmd+K: сервер ищет, браузер показывает.
+
+    Раньше сервер отдавал **весь** индекс — все работы, всех авторов, все
+    принятые теги, — а фильтровал его клиент. Проверять там было нечего,
+    кроме состава выгрузки; теперь проверяется сам поиск, и заодно то,
+    ради чего всё затевалось: выдача ограничена и не растёт с каталогом.
+    """
+
+    def _get(self, query: str) -> dict:
+        return self.client.get(
+            reverse('core:api_search') + f'?q={query}').json()
+
+    def test_it_finds_by_title_and_by_author(self):
+        author = make.user(pen_name='Айгерім Қасым')
+        story = make.story(author=author, chapters=1, title='Жаңбырлы қала')
+
+        by_title = self._get('Жаңбырлы')
+        self.assertIn(story.slug, {s['slug'] for s in by_title['stories']})
+
+        # Та же выдача, что у каталога: работа находится и по имени автора.
+        by_author = self._get('Айгерім')
+        self.assertIn(story.slug, {s['slug'] for s in by_author['stories']})
+        self.assertIn(author.username,
+                      {a['username'] for a in by_author['authors']})
+
+    def test_a_short_query_does_not_reach_the_database(self):
+        """Одна буква находит половину каталога и ничего не подсказывает."""
+        for query in ('', 'а'):
+            with self.subTest(query=query):
+                with self.assertNumQueries(0):
+                    found = self._get(query)
+                self.assertEqual(found,
+                                 {'stories': [], 'authors': [], 'tags': []})
+
+    def test_the_answer_is_bounded_whatever_the_catalogue_size(self):
+        """То, ради чего эндпоинт и переписан: цена ответа не зависит от
+        числа работ на портале."""
+        for number in range(8):
+            make.story(chapters=1, title=f'Бірдей атау {number}')
+
+        found = self._get('Бірдей атау')
+
+        self.assertEqual(len(found['stories']), 5)
+
+    def test_it_never_suggests_what_the_reader_cannot_open(self):
+        hidden = make.story(chapters=1, status='NotPublished',
+                            title='Жасырын жоба')
+        pending = make.tag(status='pending', slug='kupiya', name='Құпия')
+
+        self.assertEqual(self._get(hidden.title)['stories'], [])
+        self.assertEqual(self._get('kupiya')['tags'], [])
+        self.assertEqual(self._get(pending.name)['tags'], [])
+
+    def test_a_tag_is_found_by_its_latin_slug(self):
+        found = self._get('mektep')
+
+        self.assertIn('mektep', {t['slug'] for t in found['tags']})

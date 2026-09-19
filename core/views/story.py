@@ -8,7 +8,7 @@ from django.views.decorators.http import require_POST
 
 from .. import data
 from ..forms import CommentForm
-from .common import _current_user, _found_or_404, _safe_next
+from .common import _current_user, _found_or_404, _safe_next, _throttled
 
 # Что читатель уже открывал в этой сессии — против накрутки перезагрузкой.
 # Список, а не множество: сессия сериализуется в JSON, где множества нет.
@@ -182,6 +182,10 @@ def comment_create(request, slug):
     chapter_number = _chapter_from_post(request)
     if story is None:
         return _back_to_story(slug, chapter_number)
+    # Предел частоты (C4): поле без него означало сто комментариев за
+    # минуту и страницу произведения, которую больше некому читать.
+    if _throttled(request, 'comment'):
+        return _back_to_story(slug, chapter_number)
 
     form = CommentForm(request.POST)
     if not form.is_valid():
@@ -238,6 +242,8 @@ def comment_like(request, slug, comment_id):
 def story_report(request, slug):
     """Шағым бүкіл жұмысқа. `create_report` өзін-өзі шағымдаудан және
     бос себептен қорғайды (BR-33) — форма үнсіз ештеңе жасамай қайтады."""
+    if _throttled(request, 'report'):
+        return redirect('core:story_detail', slug=slug)
     story = data.story_by_slug(slug, request.user)
     if story is not None:
         report = data.create_report(
@@ -254,6 +260,8 @@ def story_report(request, slug):
 def comment_report(request, slug, comment_id):
     """Шағым бір пікірге — `comment_like`/`comment_delete` секілді,
     сол бетке, сол якорьмен қайтады."""
+    if _throttled(request, 'report'):
+        return _back_to_story(slug, _chapter_from_post(request))
     comment = data.comment_of(slug, comment_id)
     if comment is not None:
         report = data.create_report(
@@ -310,6 +318,11 @@ def chapter_react(request, slug, chapter):
     visible = data.story_by_slug(slug, request.user) is not None
     ch = data.chapter_of(slug, chapter) if visible else None
     kind = request.POST.get('kind', '')
+    # Предел частоты (C4) — молча: у реакции нет своей страницы, и тост
+    # поверх htmx-перерисовки читался бы как поломка. Кнопка просто
+    # возвращается в прежнее состояние.
+    if data.too_often('reaction', request.user):
+        ch = None
     if ch is not None and kind in data.REACTIONS_BY_SLUG:
         data.toggle_chapter_reaction(ch, request.user, kind)
     if request.headers.get('HX-Request') == 'true':

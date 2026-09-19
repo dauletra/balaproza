@@ -20,11 +20,24 @@ from django.contrib import admin
 from django.contrib.sitemaps.views import sitemap
 from django.urls import include, path
 
-from core.sitemaps import StaticViewSitemap, StoryListSitemap
+from core.sitemaps import (
+    AuthorSitemap,
+    CollectionSitemap,
+    ContestSitemap,
+    GenreSitemap,
+    StaticViewSitemap,
+    StoryListSitemap,
+    TagSitemap,
+)
 
 _sitemaps = {
-    'stories': StoryListSitemap,
-    'pages':   StaticViewSitemap,
+    'stories':     StoryListSitemap,
+    'authors':     AuthorSitemap,
+    'genres':      GenreSitemap,
+    'tags':        TagSitemap,
+    'collections': CollectionSitemap,
+    'contests':    ContestSitemap,
+    'pages':       StaticViewSitemap,
 }
 
 urlpatterns = [

@@ -7,16 +7,18 @@
       - Событие window 'open-search'
     Закрытие: Esc, клик по бекдропу, закрытие после перехода.
 
-    Источник данных: индекс из `core:api_search_index`, JSON'ом и один раз
-    за загрузку страницы — искать надо на каждое нажатие клавиши.
+    Ищет сервер — `core:api_search`, по запросу, с задержкой 200 мс и
+    от двух знаков. Раньше браузер скачивал индекс целиком и фильтровал
+    его у себя: на настоящем каталоге это значит «весь портал в телефон
+    при первом Cmd+K», и подсказки отставали на время жизни кэша.
 
-    Поиск: case-insensitive substring по названию/автору произведения и
-    name/username автора. Лимит 5+5.
+    Поиск: подстрока по названию и автору произведения, по нику и
+    авторскому имени, по имени принятого тега. До пяти в каждой группе.
 
     Enter → переход на /catalog/?q= (полная страница, DEC-65: поиск больше
     не отдельная entry-страница, а обычный `?q=` каталога).
 {% endcomment %}
-<div x-data="searchPopup('{% url 'core:api_search_index' %}')"
+<div x-data="searchPopup('{% url 'core:api_search' %}')"
      x-show="open"
      x-cloak
      @keydown.window.escape="close()"
@@ -37,6 +39,7 @@
             {% include "components/icon.html" with name="search" size=20 cls="text-slate-500" only %}
             <input x-ref="input"
                    x-model="q"
+                   @input="search()"
                    type="search" name="q"
                    placeholder="Шығарма немесе автор іздеу..."
                    class="min-w-0 flex-1 bg-transparent font-sans text-[15px] text-slate-900 placeholder:text-slate-500 focus:outline-none"

@@ -1,8 +1,11 @@
 """Мелочи, общие всем разделам: кто смотрит и в каком состоянии."""
 
 from django.conf import settings
+from django.contrib import messages
 from django.http import Http404
 from django.urls import reverse
+
+from .. import data
 
 # ───────────────────────── DEC-17: демо-состояния ────────────────────────
 # `?state=loading|error` превращает страницу в скелетон или ошибку. Только
@@ -46,6 +49,25 @@ def _current_username(request) -> str:
     """Ник вошедшего или '' у гостя — там, где нужна именно строка
     (сравнение с `username` из адреса, `viewer` в шаблоне)."""
     return request.user.username if request.user.is_authenticated else ''
+
+
+# Что человек видит, упёршись в предел. Без укоров и без чисел: «не
+# больше десяти в минуту» — правило системы, а не его забота.
+_TOO_OFTEN = 'Тым жиі. Сәл кідіріп, қайта көр.'
+
+
+def _throttled(request, action: str) -> bool:
+    """Исчерпан ли предел частоты; заодно говорит об этом человеку.
+
+    Проверка стоит во вью, а не в слое записей, потому что отказ у
+    каждого действия свой: комментарий возвращается на страницу тостом,
+    реакция молча перерисовывает себя прежней. Само правило одно и живёт
+    в `queries/throttle`.
+    """
+    if not data.too_often(action, _current_user(request)):
+        return False
+    messages.error(request, _TOO_OFTEN)
+    return True
 
 
 def _safe_next(request, fallback_url: str = ''):

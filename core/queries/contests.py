@@ -28,6 +28,13 @@ from .catalog import all_stories
 _OPEN_ORDER = ('accepting', 'upcoming', 'judging')
 
 
+def sitemap_contests():
+    """Конкурсы для карты сайта — без состава и счётчиков заявок.
+    Завершённые тоже: страница прошлогоднего выпуска остаётся живой
+    ссылкой, на ней победители и другие выпуски."""
+    return Contest.objects.only('slug').order_by('-results_on')
+
+
 def all_contests():
     return Contest.objects.for_card()
 

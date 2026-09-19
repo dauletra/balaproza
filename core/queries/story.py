@@ -360,6 +360,12 @@ def collections_of(story):
     return Collection.objects.filter(item_set__story=story).distinct()
 
 
+def sitemap_collections():
+    """Жинақтар для карты сайта — без состава: краулеру нужен адрес, а
+    `all_collections()` тянет обложки трёх работ на каждую подборку."""
+    return Collection.objects.only('slug').order_by('position', 'pk')
+
+
 def all_collections():
     """Все жинақтар с составом — ровно под то, что рисует карточка.
 

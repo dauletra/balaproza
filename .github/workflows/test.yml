@@ -1,0 +1,78 @@
+# Прогон суиты и проверки прода на каждый push и pull request.
+#
+# 885 тестов существовали и до этого, и ничто не мешало запушить красное.
+# Здесь проверяется ровно то же, что разработчик проверяет руками, —
+# разница в том, что теперь это нельзя забыть.
+#
+# Три шага, и каждый ловил настоящую поломку:
+#   - `makemigrations --check` — состояние миграций разошлось с моделями
+#     молча (подписи `gender` менялись без миграции целую серию);
+#   - `test core` — сама суита;
+#   - `check --deploy` в прод-режиме — та самая проверка, которую README
+#     требует перед каждым деплоем.
+
+name: tests
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: qnovel_user
+          POSTGRES_PASSWORD: qnovel_pass
+          POSTGRES_DB: qnovel_db
+        ports: ['5432:5432']
+        # Без проверки готовности шаги стартуют раньше, чем Postgres
+        # примет соединение, и падает первый же `migrate`.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Роли нужен CREATEDB: Django поднимает отдельную `test_<имя>` и
+      # клонирует её по числу процессов (см. `core/tests/runner.py`).
+      DATABASE_URL: postgres://qnovel_user:qnovel_pass@localhost:5432/qnovel_db
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Права роли на создание тестовых баз
+        run: |
+          PGPASSWORD=qnovel_pass psql -h localhost -U qnovel_user -d qnovel_db \
+            -c "ALTER ROLE qnovel_user CREATEDB;"
+
+      - name: Зависимости
+        run: uv sync --group dev
+
+      - name: Миграции не разошлись с моделями
+        run: uv run python manage.py makemigrations --check --dry-run
+
+      - name: Тесты
+        run: uv run python manage.py test core --noinput
+
+      # Прод-режим проверяется отдельным шагом и на подставных секретах:
+      # значения здесь ничего не открывают, важно лишь, что все
+      # обязательные переменные заданы — иначе настройки честно падают
+      # раньше самой проверки.
+      - name: Проверки прода
+        env:
+          DJANGO_ENV: production
+          SECRET_KEY: ci-only-not-a-secret-ci-only-not-a-secret-ci-only-12345
+          DJANGO_ALLOWED_HOSTS: example.com
+          TELEGRAM_BOT_TOKEN: '000:ci'
+          TELEGRAM_BOT_USERNAME: ci_bot
+        run: uv run python manage.py check --deploy --fail-level WARNING
