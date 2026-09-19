@@ -82,6 +82,9 @@ urlpatterns = [
     # PROF — профиль
     path('me/', views.profile_me, name='profile_me'),
     path('me/edit/', views.profile_me_edit, name='profile_me_edit'),
+    # Забрать свои тексты. Без ника в адресе намеренно: портфель собирается
+    # по вошедшему, и чужого отдать тут нечем.
+    path('me/export/', views.export_texts, name='export_texts'),
     path('me/delete/', views.delete_account, name='delete_account'),
     path('u/<str:username>/', views.profile_other, name='profile_other'),
     # Люди автора (FR-PROF-10). Один маршрут на оба списка: страницы

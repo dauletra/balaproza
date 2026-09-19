@@ -141,6 +141,29 @@
         </p>
     </div>
 
+    {% comment %}
+        Забрать свои тексты. Стоит **до** «Қауіпті аймақ» намеренно: тот,
+        кто пришёл удалять аккаунт, обязан сперва увидеть, что забрать
+        написанное можно, и что это разные действия.
+
+        Обычная ссылка, не форма: это чтение своего же, и лишний экран
+        подтверждения человеку в такой день не нужен. `download` не
+        ставим — имя файла приходит заголовком ответа (там есть дата, а
+        разметка её не знает).
+    {% endcomment %}
+    <div class="mt-8 flex flex-col items-start gap-3 rounded-hero border border-slate-200 bg-white p-6">
+        <h2 class="font-display text-lg font-bold text-slate-800">Мәтіндерімді жүктеп алу</h2>
+        <p class="font-sans text-sm text-slate-600">
+            Барлық жазғаның бір файлда: жарияланғаны да, әлі көрсетілмегені де.
+            Кез келген мәтін редакторы ашады.
+        </p>
+        <a href="{% url 'core:export_texts' %}"
+           class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-5 font-sans text-sm font-bold text-slate-800 hover:border-brand hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
+            {% include "components/icon.html" with name="download" size=14 only %}
+            Жүктеп алу
+        </a>
+    </div>
+
     {# ── Қауіпті аймақ (FR-PROF-11, BR-95): жою — қайтарылмайды, кезеңі жоқ ── #}
     <div class="mt-8 flex flex-col items-start gap-3 rounded-hero border border-status-error-fg/30 bg-status-error-bg/40 p-6">
         <h2 class="font-display text-lg font-bold text-status-error-fg">Қауіпті аймақ</h2>

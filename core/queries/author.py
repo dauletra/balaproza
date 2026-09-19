@@ -11,10 +11,12 @@
 платит один. Гость — `None`, и ответ ему пустой, а не падение.
 """
 
+from django.db.models import Prefetch
+
 from ..domain.library import LIBRARY_KINDS
 from ..domain.story import PUBLISH_CHECKLIST, checklist_label
 from ..managers import chapter_count_subquery
-from ..models import LibraryEntry, Notification, Story
+from ..models import Chapter, LibraryEntry, Notification, Story
 from .catalog import all_stories
 
 
@@ -278,6 +280,47 @@ def in_library(user, story_slug: str) -> bool:
     """Лежит ли работа в библиотеке — для кнопки «Сақтау»."""
     return user is not None and LibraryEntry.objects.filter(
         user=user, story__slug=story_slug).exists()
+
+
+def export_portfolio(user) -> list:
+    """Всё написанное автором — формой, из которой собирается выгрузка.
+
+    Плоскими словарями, а не моделями: документ строит `domain/export`, а
+    домен моделей не знает. Заодно это делает саму сборку проверяемой без
+    базы.
+
+    Берутся **рабочие копии** глав (`title`/`body`), а не опубликованные
+    ревизии (BR-79): автор забирает то, что написал, включая
+    неодобренное. Видимость при этом называется — `published_revision_id`
+    отвечает на «видит ли это читатель», и в файле это пометка у главы.
+
+    Порядок: работы — как в кабинете, главы — как у автора на экране.
+    Один запрос на работы и один на все их главы: без `prefetch_related`
+    портфель из пятнадцати работ стоил бы шестнадцати.
+    """
+    if user is None:
+        return []
+    works = (Story.objects.filter(author=user)
+             .prefetch_related(Prefetch(
+                 'chapter_set',
+                 queryset=Chapter.objects.order_by('position', 'number')))
+             .latest_edited())
+    return [
+        {
+            'title': story.title,
+            'annotation': story.annotation,
+            'chapters': [
+                {
+                    'number': chapter.number,
+                    'title': chapter.title,
+                    'body': chapter.body,
+                    'published': chapter.published_revision_id is not None,
+                }
+                for chapter in story.chapter_set.all()
+            ],
+        }
+        for story in works
+    ]
 
 
 def story_by_slug_for_author(slug: str, user):

@@ -63,6 +63,7 @@ from .notifications import (
 from .seo import robots_txt
 from .profile import (
     delete_account,
+    export_texts,
     follow_toggle,
     profile_me,
     profile_me_edit,

@@ -8,9 +8,10 @@
 from django.contrib import messages
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.decorators import login_required
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .. import data
@@ -129,6 +130,33 @@ def profile_me_edit(request):
         # перечислять не должен.
         'push_settings': data.push_settings_of(author),
     })
+
+
+@login_required
+def export_texts(request):
+    """Забрать свои тексты одним файлом (FR-PROF-12).
+
+    GET, а не POST: это чтение своего же, и обычная ссылка здесь честнее
+    формы — человек приходит сюда в худший день, когда что-то уже пошло
+    не так, и лишний экран подтверждения ему не нужен. Чужого в ответе
+    быть не может: портфель собирается по `request.user`, ника в адресе
+    нет вовсе.
+
+    Файл строится в запросе и целиком в памяти. Фона и очереди не надо:
+    черновиков у автора не больше пятнадцати (BR-85), и даже портфель из
+    романов — это мегабайты текста, а не гигабайты.
+    """
+    today = timezone.localdate()
+    body = data.portfolio_markdown(
+        author=request.user.public_name,
+        username=request.user.username,
+        exported_on=today,
+        works=data.export_portfolio(request.user),
+    )
+    response = HttpResponse(body, content_type='text/markdown; charset=utf-8')
+    filename = data.portfolio_filename(request.user.username, today)
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 @require_POST

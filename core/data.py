@@ -51,6 +51,7 @@ from .domain.formatting import (
     kk_updated,
     spaced_number,
 )
+from .domain.export import portfolio_filename, portfolio_markdown
 from .domain.library import LIBRARY_KINDS
 from .domain.notifications import (
     MODERATION_OUTCOME_LABELS,
@@ -103,6 +104,7 @@ from .queries.catalog import (
 from .queries.author import (
     can_submit_for_review,
     chapter_needs_submission,
+    export_portfolio,
     moderation_note,
     pending_review_since,
     in_library,
