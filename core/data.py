@@ -158,12 +158,14 @@ from .counters import recount_engagement
 
 # ── Теги (docs/ui.md) ───────────────────────────────────────────────────────
 from .queries.tags import (
+    accept_tags,
     accepted_tags_json,
     all_tags,
     blocked_tag_patterns_list,
     is_blocked,
     popular_tags,
     preview_story_tags,
+    reject_tags,
     resolve_story_tags,
     tag_by_slug,
     tags_of,
@@ -221,6 +223,7 @@ from .queries.notifications import (
     notify_new_chapter,
     notify_reaction,
     notify_submission_decided,
+    notify_tag_rejected,
     pending_pushes,
     push_settings_of,
     unread_count_for_user,

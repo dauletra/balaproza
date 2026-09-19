@@ -8,7 +8,14 @@
 from dataclasses import dataclass
 
 # Типы событий (FR-NOTIF-03).
-NOTIF_KINDS = ("comment", "like", "new_chapter", "follower", "moderation", "contest")
+#
+# `tag` — решение модератора о теге, и вид у него отдельный не из
+# любви к дроблению. Записать его как `moderation` нельзя: статус работы
+# выводится из **последнего** такого события (`Story.refresh_status`), и
+# снятый тег увёл бы опубликованную работу в «Толықтыру қажет» — то есть
+# из каталога. Событие про тег не решает судьбу текста, и вид у него свой.
+NOTIF_KINDS = ("comment", "like", "new_chapter", "follower", "moderation",
+               "contest", "tag")
 
 # Исход модерации (BR-11). Хранится, а не выводится из `Story.status`: акт
 # человека не восстанавливается из состояния объекта — статус живёт дальше
@@ -61,8 +68,8 @@ class PushCategory:
 PUSH_CATEGORIES = (
     PushCategory(
         'push_moderation', 'Модерация мен байқау',
-        'Шығармаң жарияланды ма, әлде түзету керек пе; байқау шешімі.',
-        ('moderation', 'contest')),
+        'Шығармаң жарияланды ма, әлде түзету керек пе; тег, байқау шешімі.',
+        ('moderation', 'contest', 'tag')),
     PushCategory(
         'push_response', 'Оқырман жауабы',
         'Пікір, реакция, жаңа жазылушы.',
@@ -127,6 +134,19 @@ SUBMISSION_EVENTS = {
 }
 
 
+def tag_rejected_event(tag_name: str, reason: str) -> str:
+    """Тег снят с работы, и вот почему.
+
+    Имя тега — внутри события, а не приходит из объекта: связки с работой
+    уже нет (в том и решение), а `Notification` тега не хранит вовсе.
+    Соврать оно не может — отклонённый тег не переименовывают.
+
+    Причина — слова модератора, то же исключение из правила «в тексте
+    только событие», что и у отказа в публикации (BR-11).
+    """
+    return f'#{tag_name} тегі алынып тасталды: {reason}'
+
+
 def award_event(award_title: str) -> str:
     """Победа в номинации (DEC-46). Название номинации — часть события, а
     не предмета: предмет здесь конкурс, а номинаций у него много."""
@@ -164,6 +184,8 @@ def push_line(kind: str, *, actor: str = '', story: str = '', contest: str = '',
         return f'{line} — {event}' if event else line
     if kind == 'contest':
         return f'Байқау: {contest} — {event}'
+    if kind == 'tag':
+        return f'«{story}» — {event}'
     return event
 
 

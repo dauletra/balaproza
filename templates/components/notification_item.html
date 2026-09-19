@@ -62,6 +62,13 @@
             {% elif n.outcome == 'needs_work' %}bg-status-warning-bg text-status-warning-fg
             {% else %}bg-status-attention-bg text-status-attention-fg{% endif %}
         {% elif n.kind == 'contest' %}bg-status-warning-bg text-status-warning-fg
+        {% comment %}
+            Тег: тот же `warning`, что у «Толықтыру қажет», и по той же
+            причине — работу просят поправить, а не наказывают. Красный
+            здесь читался бы как снятие с публикации, которого не было:
+            текст остался на месте, ушёл только тег.
+        {% endcomment %}
+        {% elif n.kind == 'tag' %}bg-status-warning-bg text-status-warning-fg
         {% else %}bg-slate-100 text-slate-500{% endif %}">
         {% if n.kind == 'comment' %}
             {% include "components/icon.html" with name="message-caption" size=16 only %}
@@ -75,6 +82,9 @@
             {% include "components/icon.html" with name="shield" size=16 only %}
         {% elif n.kind == 'contest' %}
             {% include "components/icon.html" with name="trophy" size=16 only %}
+        {% elif n.kind == 'tag' %}
+            {# Модерация — `shield` по реестру docs/ui.md; решение о теге это она же #}
+            {% include "components/icon.html" with name="shield" size=16 only %}
         {% endif %}
     </span>
 
@@ -126,6 +136,14 @@
                 {% else %}
                     <span class="text-slate-700">{{ n.text }}</span>
                 {% endif %}
+            {% comment %}
+                Тег. Имя работы ссылкой, имя тега и причина — внутри
+                текста: связки с работой уже нет (в том и решение), и
+                объекта, из которого взять имя, не существует.
+            {% endcomment %}
+            {% elif n.kind == 'tag' and n.story %}
+                <a href="{% url 'core:notification_open' pk=n.pk %}" class="font-semibold hover:text-brand">«{{ n.story.title }}»</a>
+                <span class="text-slate-700">— {{ n.text }}</span>
             {% elif n.kind == 'contest' %}
                 <span class="font-bold">Байқау:</span>
                 {% if n.contest %}

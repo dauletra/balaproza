@@ -14,6 +14,7 @@ from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.db.models import Count
 from django.shortcuts import render
 
+from . import data
 from .domain.contests import CONTEST_PHASE_LABELS
 from .domain.notifications import MODERATION_OUTCOME_LABELS
 from .queries.notifications import notify_award_granted, notify_submission_decided
@@ -101,22 +102,62 @@ class GenreAdmin(admin.ModelAdmin):
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
     """Путь тега: pending → accepted | rejected (BR-TAG-03). Действия
-    групповые: модерация тегов — просмотр списка новых имён разом."""
+    групповые: модерация тегов — просмотр списка новых имён разом.
 
-    list_display = ('name', 'slug', 'status', 'created_at')
+    Отказ спрашивает причину и уходит через `reject_tags`, а не через
+    `queryset.update()`: решение о теге это ещё и снятие его с работ, и
+    весть автору — порознь они оставляли обещание BR-TAG-03
+    выполненным наполовину. Промежуточная страница — та же механика, что
+    у решения по работе: форма списка текста не передаёт.
+    """
+
+    list_display = ('name', 'slug', 'status', 'usage', 'created_at')
     list_filter = ('status',)
     search_fields = ('name', 'slug')
     actions = ('accept', 'reject')
 
+    @admin.display(description='жұмыстарда')
+    def usage(self, obj):
+        """Скольких работ коснётся решение. Число тут не украшение: отказ
+        снимает тег со всех разом, и знать об этом надо до нажатия."""
+        return obj.stories.count()
+
     @admin.action(description='Қабылдау (accepted)')
     def accept(self, request, queryset):
-        updated = queryset.update(status='accepted')
+        updated = data.accept_tags(queryset)
         self.message_user(request, f'{updated} тег қабылданды.')
 
     @admin.action(description='Қабылдамау (rejected)')
     def reject(self, request, queryset):
-        updated = queryset.update(status='rejected')
-        self.message_user(request, f'{updated} тег қабылданбады.')
+        """Причина обязательна (BR-11, BR-TAG-03): «нельзя» без «почему»
+        автор исправить не может."""
+        error = ''
+        if 'apply' in request.POST:
+            reason = (request.POST.get('reason') or '').strip()
+            if not reason:
+                error = 'Себепті жазу керек: онсыз автор неге екенін білмейді.'
+            else:
+                changed, told = data.reject_tags(queryset, reason)
+                self.message_user(
+                    request,
+                    f'{changed} тег қабылданбады, {told} жұмыстан алынып '
+                    f'тасталды, авторларға хабарланды.',
+                    messages.SUCCESS)
+                return None
+
+        return render(request, 'admin/core/tag/reject.html', {
+            **self.admin_site.each_context(request),
+            'title': 'Тегті қабылдамау',
+            'opts': self.model._meta,
+            'tags': queryset,
+            # Сколько работ задето — то же число, что в колонке списка, но
+            # здесь оно про весь выбор разом.
+            'affected': StoryTag.objects.filter(tag__in=queryset).count(),
+            'error': error,
+            'reason': request.POST.get('reason', ''),
+            'action': 'reject',
+            'selected': queryset.values_list('pk', flat=True),
+        })
 
 
 @admin.register(BlockedTagPattern)

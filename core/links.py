@@ -334,6 +334,11 @@ def notification_href(n) -> str:
     if n.kind == 'moderation':
         return (reverse('core:manage_story', kwargs={'slug': n.story.slug})
                 if n.story_id else '')
+    if n.kind == 'tag':
+        # В баптаулар, а не в кабинет вообще: снятый тег меняют там же,
+        # где ставят, и «поставь другой» без адреса поля — половина ответа.
+        return (reverse('core:story_settings', kwargs={'slug': n.story.slug})
+                if n.story_id else '')
     if n.kind == 'contest':
         return (reverse('core:contest_detail', kwargs={'slug': n.contest.slug})
                 if n.contest_id else '')

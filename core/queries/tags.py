@@ -10,13 +10,15 @@
 
 from datetime import timedelta
 
+from django.db import transaction
 from django.db.models import Count, Q
 from django.db.models.functions import Lower
 from django.utils import timezone
 
 from ..domain.catalog import PUBLIC_STATUSES
 from ..domain.slugs import slugify_kz
-from ..models import BlockedTagPattern, Tag
+from ..models import BlockedTagPattern, StoryTag, Tag
+from .notifications import notify_tag_rejected
 
 # Ширина недельного среза («Осы аптада», DEC-31). Живёт здесь, рядом с
 # единственным запросом, который его применяет.
@@ -57,6 +59,45 @@ def tags_of(story):
     стороне показа (`tag_list.html` по `viewer_is_author`): автор обязан
     видеть собственный тег, пока тот ждёт модератора."""
     return story.tags.all() if story else Tag.objects.none()
+
+
+def accept_tags(tags) -> int:
+    """Провести теги в `accepted` (BR-TAG-03). Уведомления нет: тег
+    заработал молча, и сказать тут нечего — автор увидит, что пометка
+    «тексеруде» с чипа исчезла."""
+    return Tag.objects.filter(pk__in=[t.pk for t in tags]).update(
+        status='accepted')
+
+
+def reject_tags(tags, reason: str) -> tuple[int, int]:
+    """Отклонить теги: снять с работ и сказать авторам, почему.
+
+    Отдаёт «сколько тегов, сколько уведомлений». До этого отклонение было
+    одним `update(status='rejected')`, и обещание BR-TAG-03 держалось
+    наполовину: публике тег переставал показываться (выдача режет по
+    `accepted`), а у автора он оставался висеть на работе, без слова о
+    том, что случилось и почему.
+
+    Причина обязательна — как у отказа в публикации (BR-11): «нельзя» без
+    «почему» автор не может исправить.
+
+    Одной транзакцией: снятие связок, уведомления и смена статуса — три
+    стороны одного решения, и разойтись они не должны. Связки читаются
+    **до** удаления, иначе уведомлять уже не о чем.
+    """
+    reason = reason.strip()
+    if not reason:
+        raise ValueError('Себепсіз қабылдамауға болмайды.')
+
+    pks = [t.pk for t in tags]
+    with transaction.atomic():
+        links = list(StoryTag.objects.filter(tag_id__in=pks)
+                     .select_related('tag', 'story', 'story__author'))
+        changed = Tag.objects.filter(pk__in=pks).update(status='rejected')
+        for link in links:
+            notify_tag_rejected(link.story, link.tag.name, reason)
+        StoryTag.objects.filter(tag_id__in=pks).delete()
+    return changed, len(links)
 
 
 def popular_tags(limit: int = 10):

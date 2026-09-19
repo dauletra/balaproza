@@ -1,0 +1,61 @@
+{% extends "admin/base_site.html" %}
+
+{% comment %}
+    Промежуточная страница отказа по тегу (BR-TAG-03).
+
+    Та же механика, что у решения по работе
+    (`admin/core/story/moderation.html`): причина обязательна, а форма
+    списка текст передать не умеет. Разметка админская, без Tailwind:
+    `output.css` в админку не подключён.
+
+    Отличие от страницы решения по работе — предупреждение о том, скольких
+    работ коснётся отказ: тег снимается со всех разом, и это надо видеть
+    до нажатия, а не узнать из тоста после.
+
+    Контекст: tags, affected, reason, error, action, selected.
+{% endcomment %}
+
+{% block content %}
+<h1>Тегті қабылдамау</h1>
+
+{% if error %}
+    <p class="errornote">{{ error }}</p>
+{% endif %}
+
+<p>Мына тегтер қабылданбайды:</p>
+<ul>
+    {% for tag in tags %}
+        <li><strong>#{{ tag.name }}</strong> — {{ tag.status }}</li>
+    {% endfor %}
+</ul>
+
+{% if affected %}
+    <p class="help">
+        Тег {{ affected }} жұмыстан алынып тасталады, авторларына себебімен
+        хабарланады. Мәтіндерге тиіспейді — тек тег алынады.
+    </p>
+{% else %}
+    <p class="help">Бұл тегтер ешбір жұмыста тұрған жоқ — тек мәртебесі өзгереді.</p>
+{% endif %}
+
+<form method="post">
+    {% csrf_token %}
+    {% for pk in selected %}<input type="hidden" name="_selected_action" value="{{ pk }}">{% endfor %}
+    <input type="hidden" name="action" value="{{ action }}">
+
+    <fieldset class="module aligned">
+        <div class="form-row">
+            <label for="id_reason">Себебі:</label>
+            <textarea id="id_reason" name="reason" rows="4" cols="60" maxlength="200" required>{{ reason }}</textarea>
+            <p class="help">
+                Автор осы мәтінді хабарламадан оқиды — неге бұл тег жарамағанын жаз.
+            </p>
+        </div>
+    </fieldset>
+
+    <div class="submit-row">
+        <input type="submit" name="apply" value="Қабылдамау" class="default">
+        <a href="{% url 'admin:core_tag_changelist' %}" class="button cancel-link">Болдырмау</a>
+    </div>
+</form>
+{% endblock %}

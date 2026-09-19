@@ -35,6 +35,7 @@ from ..domain.notifications import (
     award_event,
     comment_quote,
     new_chapter_event,
+    tag_rejected_event,
 )
 from ..models import Follow, Notification, Story, User
 
@@ -230,6 +231,17 @@ def notify_submission_decided(submission):
         return None
     return _notify(submission.author, 'contest', contest=submission.contest,
                    text=text)
+
+
+def notify_tag_rejected(story, tag_name: str, reason: str):
+    """Тег снят с работы модератором (BR-TAG-03).
+
+    Без актора, как и решение по публикации: платформа не подписывает
+    свои решения именем модератора. Ведёт в баптаулар — туда, где автор
+    может поставить другой тег, а не в кабинет вообще.
+    """
+    return _notify(story.author, 'tag', story=story,
+                   text=tag_rejected_event(tag_name, reason))
 
 
 def notify_award_granted(grant):
