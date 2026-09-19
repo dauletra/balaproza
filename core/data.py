@@ -178,7 +178,7 @@ from .queries.write import (
     update_story_settings,
 )
 
-# ── Награды, подписки, уведомления, витрины портала ──────────────────────
+# ── Награды, подписки, витрины портала ───────────────────────────────────
 from .queries.profile import (
     AWARDS,
     achievements_of,
@@ -190,17 +190,21 @@ from .queries.profile import (
     following_count_of,
     following_of,
     is_following,
-    mark_all_notifications_read,
-    mark_notification_read,
     new_authors,
-    notifications_for_user,
     portal_stats,
     read_ladder,
     read_tier,
     reads_total,
     toggle_follow,
-    unread_count_for_user,
     update_profile,
+)
+
+# ── Уведомления: лента автора (FR-NOTIF-*) ───────────────────────────────
+from .queries.notifications import (
+    mark_all_notifications_read,
+    mark_notification_read,
+    notifications_for_user,
+    unread_count_for_user,
 )
 
 # ── Конкурсы (DEC-45, DEC-46) ────────────────────────────────────────────
