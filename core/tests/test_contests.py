@@ -432,22 +432,13 @@ class ContestAwardImages(TestCase):
                     self.assertTrue(award.image.name.endswith(('.png', '.webp')),
                                     award.image.name)
 
-    def test_the_declared_files_exist_in_media(self):
-        """`media/` целиком в `.gitignore`, поэтому на чистом клоне файлов
-        нет, и жёсткая проверка падала бы не на ошибке, а на отсутствии
-        необязательных ассетов. Контракт пути проверяется отдельно."""
-        from django.conf import settings
-        root = Path(settings.MEDIA_ROOT) / 'awards'
-        if not root.is_dir():
-            self.skipTest('media/awards/ нет локально — ассеты не в репозитории')
-        for contest in data.all_contests():
-            for award in contest.awards:
-                if not award.image:
-                    continue
-                with self.subTest(contest=contest.slug, award=award.slug):
-                    self.assertTrue(
-                        (Path(settings.MEDIA_ROOT) / award.image.name).is_file(),
-                        f'нет файла: {award.image.name}')
+    # Теста «файл лежит в media/» здесь больше нет. Он проверял не код, а
+    # содержимое гитигнорной папки на машине разработчика: на чистом клоне
+    # молча пропускался, на рабочей — падал или нет в зависимости от
+    # порядка тестов, потому что сид в ту же папку и писал (см.
+    # `tests/runner.py`). Теперь `MEDIA_ROOT` под тестами временный, и
+    # проверять там нечего. Правило, которое действительно код, —
+    # контракт пути выше.
 
     def test_an_award_without_an_image_still_renders(self):
         """Админ не загрузил файл — типографическая заглушка, не дыра."""

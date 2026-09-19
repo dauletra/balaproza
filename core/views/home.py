@@ -1,5 +1,6 @@
 """Главная — редакционная витрина (FR-HOME-*)."""
 
+from django.conf import settings
 from django.shortcuts import render
 
 from .. import data
@@ -15,8 +16,10 @@ def home(request):
                        my_stories[0] if my_stories else None)
     progress = data.reading_progress_of(user)
 
-    # Design-system demo override for the four authenticated hero states.
-    hero_state_demo = request.GET.get('hero_state')
+    # Переключатель четырёх состояний хиро — для дизайн-обзора, и только
+    # при `DEBUG`: на живом сайте `?hero_state=empty` показывал бы
+    # вошедшему автору пустой экран «начни писать» поверх его работ.
+    hero_state_demo = request.GET.get('hero_state') if settings.DEBUG else None
     if is_signed_in and hero_state_demo in {'empty', 'reading', 'writing', 'full'}:
         if hero_state_demo == 'empty':
             progress = None

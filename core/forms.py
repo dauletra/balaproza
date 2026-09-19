@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from .domain.catalog import AUDIENCE_ORDER
 from .domain.contests import AI_DECLARATIONS, eligibility_line
-from .domain.story import MAX_DRAFT_STORIES
+from .domain.story import CHAPTER_BODY_MAX, COMMENT_MAX, MAX_DRAFT_STORIES
 from .models import Chapter, Genre, Story, User
 
 # Лимит аннотации (BR-16). У поля модели его нет — это `TextField`, — и
@@ -27,6 +27,20 @@ ANNOTATION_MAX = 500
 POLL_OPTIONS_MIN = 2
 POLL_OPTIONS_MAX = 4
 POLL_OPTION_MAX_LEN = 80
+
+
+def _within_chapter_limit(body: str) -> str:
+    """Потолок объёма главы одной проверкой на две формы.
+
+    До него предел был один — настройка Django на размер тела запроса, и
+    текст, в него не влезший, отвергался ошибкой уровня фреймворка:
+    автор видел не «слишком длинно», а сломанную отправку.
+    """
+    if len(body) > CHAPTER_BODY_MAX:
+        raise forms.ValidationError(
+            f'Бөлім тым ұзын — {CHAPTER_BODY_MAX // 1000} мың таңбадан '
+            f'аспасын. Оны бірнеше бөлімге бөл.')
+    return body
 
 
 class PollOptionsWidget(forms.TextInput):
@@ -222,7 +236,7 @@ class ChapterForm(forms.ModelForm):
         body = self.cleaned_data.get('body', '')
         if not body.strip():
             raise forms.ValidationError('Бөлім мәтінін жаз.')
-        return body
+        return _within_chapter_limit(body)
 
     def clean(self):
         """Вопрос и варианты существуют только вместе (BR-POLL-02).
@@ -254,8 +268,9 @@ class ChapterAutosaveForm(forms.ModelForm):
 
     Посреди набора пустой заголовок и пустой текст нормальны: автор ещё
     пишет, и требовать от него законченности каждые три секунды нельзя.
-    Проверяется единственное, что есть и в базе, — длина заголовка;
-    остальное решается при осознанном сохранении, `ChapterForm`.
+    Проверяются только пределы, которые есть и в базе, — длина заголовка
+    и потолок объёма; остальное решается при осознанном сохранении,
+    `ChapterForm`.
     """
 
     class Meta:
@@ -266,6 +281,13 @@ class ChapterAutosaveForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for name in ('title', 'body'):
             self.fields[name].required = False
+
+    def clean_body(self):
+        # Потолок тот же, что у осознанного сохранения: иначе
+        # автосохранение молча отдавало бы 400 на тексте, который форма
+        # рядом принимает, и редактор показывал бы «сақталмады» без
+        # объяснения.
+        return _within_chapter_limit(self.cleaned_data.get('body', ''))
 
 
 _USERNAME_RE = re.compile(r'^[a-z0-9_]{3,30}$')
@@ -448,7 +470,11 @@ class CommentForm(forms.Form):
     вложенности держит не форма, а резолв родителя: ответ на ответ не
     находится вовсе."""
 
-    text = forms.CharField(error_messages={'required': 'Пікір мәтінін жаз.'},
-                           strip=True)
+    text = forms.CharField(
+        strip=True, max_length=COMMENT_MAX,
+        error_messages={
+            'required': 'Пікір мәтінін жаз.',
+            'max_length': f'Пікір тым ұзын — {COMMENT_MAX} таңбадан аспасын.',
+        })
     parent = forms.CharField(required=False)
     chapter = forms.IntegerField(required=False)

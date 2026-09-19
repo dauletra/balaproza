@@ -39,10 +39,12 @@
 """
 
 import os
+import shutil
+import tempfile
 
 from django.core.management import call_command
 from django.test.runner import DiscoverRunner
-from django.test.utils import setup_databases
+from django.test.utils import override_settings, setup_databases
 
 DEFAULT_PARALLEL = 4
 
@@ -53,6 +55,37 @@ class SeededTestRunner(DiscoverRunner):
         if not parallel:
             parallel = min(DEFAULT_PARALLEL, os.cpu_count() or 1)
         super().__init__(*args, parallel=parallel, **kwargs)
+
+    # ── `media/` на время прогона — временная папка ──────────────────────
+    #
+    # Сид ниже пишет в `MEDIA_ROOT`, и без подмены это **настоящая**
+    # `media/` разработчика. Цена обнаружилась числом: 2453 файла-сироты
+    # в `media/awards/` — по одному на каждый прошлый прогон. Механика
+    # такая: `seed_demo` сохраняет `ContestAward`, сигнал замены растра
+    # (`media_cleanup`) считает файл изменившимся, пишет новый рядом (у
+    # Django имя занято — добавляется суффикс) и удаляет прежний. Строка
+    # в базе после этого указывает на новое имя, а руками скопированный
+    # файл, про который написано в README, исчезает.
+    #
+    # Отсюда же бралась плавающая суита: тест, проверяющий существование
+    # эмблемы, падал или нет в зависимости от того, прошёл ли сид до него
+    # — то есть от порядка тестов. Прогон, который зависит от порядка,
+    # непрерывной интеграции не годится.
+    #
+    # Подмена ставится здесь, а не в отдельных тестах: сид идёт в
+    # головном процессе (см. `setup_databases`), и покрыть надо именно
+    # его. Тем двум классам, что грузят файлы сами, свои временные папки
+    # оставлены — они от этого не зависят.
+    def setup_test_environment(self, **kwargs):
+        super().setup_test_environment(**kwargs)
+        self._media_root = tempfile.mkdtemp(prefix='qnovel-test-media-')
+        self._media = override_settings(MEDIA_ROOT=self._media_root)
+        self._media.enable()
+
+    def teardown_test_environment(self, **kwargs):
+        self._media.disable()
+        shutil.rmtree(self._media_root, ignore_errors=True)
+        super().teardown_test_environment(**kwargs)
 
     def setup_databases(self, **kwargs):
         config = setup_databases(

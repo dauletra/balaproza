@@ -12,6 +12,7 @@
 import re
 from datetime import timedelta
 
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -552,9 +553,15 @@ class ReturningHomeAsksWhatYouWereDoing(TestCase):
         self.assertIn('xl:hidden', html)
         self.assertEqual(html.count('Оқу үстінде'), 2)   # поток + рейл
 
+    @override_settings(DEBUG=True)
     def test_the_three_demo_states_each_offer_their_own_next_step(self):
         """`?hero_state=` — витрина для дизайн-обзора: у настоящего
-        читателя эти состояния достигаются данными, а не параметром."""
+        читателя эти состояния достигаются данными, а не параметром.
+
+        `DEBUG=True` здесь обязателен: параметр закрыт им (A5), иначе на
+        живом сайте `?hero_state=empty` показывал бы вошедшему автору
+        пустой экран «начни писать» поверх его же работ.
+        """
         cases = {
             'empty':   ('Бүгін неден бастаймыз?', 'Жаңа шығарма'),
             'reading': ('Оқуды жалғастыру', 'Жазып көру'),
@@ -569,3 +576,9 @@ class ReturningHomeAsksWhatYouWereDoing(TestCase):
         self.assertIsNone(
             self.client.get(f"{reverse('core:home')}?hero_state=reading")
             .context['active_work'])
+
+    def test_the_demo_states_do_not_work_on_the_live_site(self):
+        """Иначе посторонний параметр перерисовывает автору его главную."""
+        response = self.client.get(f"{reverse('core:home')}?hero_state=empty")
+
+        self.assertEqual(response.context['hero_focus'], 'writing')

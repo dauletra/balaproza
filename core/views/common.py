@@ -1,11 +1,17 @@
 """Мелочи, общие всем разделам: кто смотрит и в каком состоянии."""
 
+from django.conf import settings
 from django.http import Http404
 from django.urls import reverse
 
 # ───────────────────────── DEC-17: демо-состояния ────────────────────────
 # `?state=loading|error` превращает страницу в скелетон или ошибку. Только
 # для дизайн-обзора: на проде это async-загрузки через htmx.
+#
+# И только при `DEBUG`. Страницы `/_design/` закрыты этой же проверкой с
+# первого дня, а переключатель, который их показывает на живом сайте,
+# закрыт не был: любой посетитель мог открыть главную с `?state=error` и
+# увидеть «жүктеу мүмкін болмады» там, где всё работает.
 _PAGE_STATES = ('content', 'loading', 'error')
 
 
@@ -19,6 +25,8 @@ def _found_or_404(obj, what: str):
 
 
 def _page_state(request) -> str:
+    if not settings.DEBUG:
+        return 'content'
     st = request.GET.get('state', 'content')
     return st if st in _PAGE_STATES else 'content'
 

@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import logging
 import os
 from pathlib import Path
 
@@ -90,6 +91,20 @@ SITE_URL = os.environ.get('DJANGO_SITE_URL', '').rstrip('/')
 if not SITE_URL:
     SITE_URL = (f'https://{ALLOWED_HOSTS[0]}' if _hosts_explicit
                 else 'http://localhost:8000')
+
+# Где стоит админка. Весь сайт переведён на Telegram ровно ради того,
+# чтобы паролей не было, — и рядом остался единственный путь с полными
+# правами, где пароль есть: `/admin/` по стандартному адресу, без
+# второго фактора и без ограничения попыток.
+#
+# Смена адреса сама по себе не защита, но она убирает сайт из потока
+# ботов, которые долбят `/admin/` у каждого Django-проекта. Настоящая
+# защита — ограничение по сети на уровне прокси, и это делается там же,
+# при деплое (README).
+#
+# Умолчание прежнее: локально и в тестах ничего не меняется, в проде
+# адрес задаётся переменной.
+ADMIN_PATH = os.environ.get('DJANGO_ADMIN_PATH', 'admin').strip('/')
 
 
 # ── Telegram Login Widget (NFR-25) ────────────────────────────────────────
@@ -266,7 +281,14 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # заданы вовсе. Число — то же, что `core.uploads.RASTER_MAX_BYTES`;
 # не импортируется оттуда, чтобы настройки не тянули код приложения.
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
-DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
+# А этот порог — про **текст**, а не про картинки: файловые части
+# multipart-запроса Django в него не считает. Пять мегабайт заведены были
+# под загрузку и молча стали потолком главы: казахский текст это два
+# байта на знак, то есть предел приходился примерно на 2,5 млн знаков — и
+# упёршийся в него автор получал ошибку уровня фреймворка вместо слов.
+# Теперь о длине говорит форма (`CHAPTER_BODY_MAX`, миллион знаков), а
+# этот порог поднят так, чтобы он никогда не срабатывал первым.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 8 * 1024 * 1024
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -335,6 +357,43 @@ if _hosts_explicit:
     CSRF_TRUSTED_ORIGINS = [f'https://{h}' for h in ALLOWED_HOSTS]
 
 if PRODUCTION:
+    # ── Отслеживание ошибок ──────────────────────────────────────────────
+    #
+    # Без него пятисотка уходит в stdout, а stdout никто не читает в три
+    # часа ночи: о первой же ошибке на живом сайте узнавали бы от
+    # пользователя — если он напишет, а писать ему некуда.
+    #
+    # Сервер свой (GlitchTip): протокол тот же, что у Sentry, и клиент тот
+    # же, но трейсбеки с детской площадки не уходят третьей стороне. Это
+    # и причина `send_default_pii=False` рядом: в трейсбеке не должно
+    # оказаться ни текста главы, ни идентификатора Telegram.
+    #
+    # Не падаем без DSN, в отличие от ключа и хостов выше: там забытая
+    # переменная означает дыру, здесь — слепоту. Слепой прод хуже
+    # зрячего, но лучше неподнявшегося; поэтому предупреждение в лог.
+    SENTRY_DSN = os.environ.get('SENTRY_DSN', '')
+    if SENTRY_DSN:
+        try:
+            import sentry_sdk
+        except ImportError:
+            logging.getLogger('django').warning(
+                'SENTRY_DSN задан, но sentry-sdk не установлен: '
+                'uv sync --no-dev --group prod')
+        else:
+            sentry_sdk.init(
+                dsn=SENTRY_DSN,
+                environment='production',
+                send_default_pii=False,
+                # Профиль запросов — отдельным решением: GlitchTip умеет
+                # его частично, и включать его «на всякий случай» значит
+                # слать объём, который никто не смотрит.
+                traces_sample_rate=float(
+                    os.environ.get('SENTRY_TRACES_SAMPLE_RATE', '0')),
+            )
+    else:
+        logging.getLogger('django').warning(
+            'SENTRY_DSN не задан — ошибки видны только в stdout')
+
     SECURE_SSL_REDIRECT = True
     # Год и поддомены — рекомендация Django; включать HSTS постепенно
     # (60 → 3600 → год) имеет смысл на живом домене, до запуска незачем.

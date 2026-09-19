@@ -28,7 +28,10 @@ _sitemaps = {
 }
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # Адрес админки — из настроек (`ADMIN_PATH`), умолчание прежнее.
+    # Имена маршрутов от этого не зависят: `reverse('admin:…')` работает
+    # при любом префиксе, и тесты его не знают.
+    path(f'{settings.ADMIN_PATH}/', admin.site.urls),
     path('sitemap.xml', sitemap, {'sitemaps': _sitemaps}, name='sitemap'),
     path('', include('core.urls', namespace='core')),
 ]

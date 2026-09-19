@@ -1734,6 +1734,27 @@ class Report(models.Model):
         ordering = ('created_at',)
         verbose_name = 'шағым'
         verbose_name_plural = 'шағымдар'
+        constraints = [
+            # Одна **открытая** жалоба на цель от одного человека. Без
+            # этого очередь модератора заваливалась одним кликом,
+            # повторённым сто раз.
+            #
+            # Именно открытая, а не любая: работа живёт дальше и
+            # дописывается, и жалоба на то, что появилось после
+            # рассмотрения прошлой, — законная. Закрыть дорогу навсегда
+            # значило бы наказать читателя за то, что он однажды
+            # пожаловался не по делу.
+            models.UniqueConstraint(
+                fields=('reporter', 'story'),
+                condition=models.Q(story__isnull=False,
+                                   resolved_at__isnull=True),
+                name='one_open_report_per_story_per_reporter'),
+            models.UniqueConstraint(
+                fields=('reporter', 'comment'),
+                condition=models.Q(comment__isnull=False,
+                                   resolved_at__isnull=True),
+                name='one_open_report_per_comment_per_reporter'),
+        ]
 
     def __str__(self):
         target = f'шығарма #{self.story_id}' if self.story_id else f'пікір #{self.comment_id}'

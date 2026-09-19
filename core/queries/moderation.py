@@ -162,6 +162,13 @@ def create_report(reporter, *, story=None, comment=None, reason: str,
     owner_id = story.author_id if story else comment.author_id
     if owner_id == reporter.pk:
         return None
+    # Вторая жалоба на то же, пока первая не рассмотрена, — no-op, а не
+    # ошибка: человек нажал дважды или вернулся и не помнит. Ограничение
+    # держит и база (`one_open_report_per_*`), здесь — чтобы вместо
+    # пятисотки был тихий отказ, как у остальных проверок рядом.
+    if Report.objects.filter(reporter=reporter, story=story, comment=comment,
+                             resolved_at__isnull=True).exists():
+        return None
     return Report.objects.create(
         reporter=reporter, story=story, comment=comment,
         reason=reason, note=note.strip()[:500])

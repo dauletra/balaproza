@@ -2,6 +2,7 @@
 `Sitemap:` требует абсолютный адрес, а домен известен только запросу.
 """
 
+from django.conf import settings
 from django.http import HttpResponse
 from django.urls import reverse
 
@@ -20,6 +21,10 @@ _DISALLOWED = (
 
 def robots_txt(request):
     lines = ['User-agent: *']
+    # Админка тоже. Её адрес настраиваемый (`ADMIN_PATH`), и вписать его
+    # сюда литералом значило бы закрыть от краулера не тот путь, а
+    # настоящий назвать в открытую нигде и не закрыть.
+    lines.append(f'Disallow: /{settings.ADMIN_PATH}/')
     lines += [f'Disallow: {path}' for path in _DISALLOWED]
     lines.append('Allow: /')
     lines.append('')

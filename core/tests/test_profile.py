@@ -19,7 +19,7 @@ from unittest import mock
 from django.contrib.auth import get_user
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.template.loader import render_to_string
-from django.test import Client
+from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -1168,10 +1168,15 @@ class NotificationFeed(TestCase):
         self.assertContains(empty, 'Әзірге хабарлама жоқ')
         self.assertNotContains(empty, 'Барлығын оқылды')
 
+    @override_settings(DEBUG=True)
     def test_the_header_says_nothing_about_data_that_is_not_on_screen(self):
         """DEC-17: шапка стояла выше ветвления по `page_state`, и в
         `?state=error` страница сообщала «жүктеу мүмкін болмады» и
-        «4 оқылмаған» — с рабочей кнопкой «оқылды деп белгілеу»."""
+        «4 оқылмаған» — с рабочей кнопкой «оқылды деп белгілеу».
+
+        `DEBUG=True` обязателен: сами леса закрыты им (A5), и на живом
+        сайте `?state=` ничего не меняет.
+        """
         html = self.response.content.decode()
         self.assertIn('оқылмаған', html)
         self.assertIn('Барлығын оқылды деп белгілеу', html)

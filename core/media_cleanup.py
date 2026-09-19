@@ -39,21 +39,39 @@ def _process_and_replace_raster_field(sender, instance, **kwargs):
     отличимо «поле не трогали» от «поле заменили на то же значение» —
     второго не бывает у файлов (новая загрузка всегда новое имя), а
     первое не должно ни пережимать повторно, ни трогать файл.
+
+    Обрабатывается только **загруженный** файл. Разница не теоретическая:
+    имя можно присвоить строкой, не загружая ничего, — так делает
+    `seed_demo` с эмблемами наград, так же правится строка в базе. Раньше
+    это считалось новым файлом, и сид на каждом прогоне открывал
+    существующий, пережимал и клал рядом копию (имя занято — Django
+    добавляет суффикс), а прежнюю удалял. Счёт нашёлся числом: 2453
+    файла-сироты в `media/awards/`. Если же файла по присвоенному имени
+    нет вовсе, пережатие просто падало.
+
+    Отличает их `_committed` — то же, чем пользуется сам
+    `FileField.pre_save`: у присвоенного имени он `True`, у только что
+    загруженного файла `False`.
     """
     field_name = RASTER_FIELDS[sender]
     new_file = getattr(instance, field_name)
+    uploading = bool(new_file) and not new_file._committed
 
     old_name = ''
     if instance.pk:
         old_name = (sender.objects.filter(pk=instance.pk)
                    .values_list(field_name, flat=True).first()) or ''
     new_name = new_file.name if new_file else ''
-    if old_name == new_name:
+    if old_name == new_name and not uploading:
         return
 
-    if old_name:
+    # Старый файл убирается, когда его действительно нечем больше
+    # держать: пришла загрузка или поле очистили. Смена одного имени на
+    # другое без загрузки файла не трогает: что лежит по новому имени —
+    # неизвестно, и удалять старое на этом основании опасно.
+    if old_name and (uploading or not new_name):
         new_file.storage.delete(old_name)
-    if new_file:
+    if uploading:
         setattr(instance, field_name, resize_raster_image(new_file, _ext(new_name)))
 
 

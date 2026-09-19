@@ -228,10 +228,17 @@ class GatedPagesExplainThemselves(TestCase):
                     self.client.get(reverse(name, kwargs=kwargs)), reason)
 
 
+@override_settings(DEBUG=True)
 class DesignStatesAreOptIn(TestCase):
     """`?state=loading|error` — леса DEC-17: пока данные приходят синхронно,
     показать скелетон и ошибку больше нечем. Проверяется, что опт-ин
-    работает и что мусорное значение не ломает страницу."""
+    работает и что мусорное значение не ломает страницу.
+
+    Весь класс под `DEBUG=True`: параметр закрыт им (A5). Живой сайт
+    отвечает на него содержимым, и это проверяет отдельный класс ниже —
+    посетитель не должен уметь показать себе «жүктеу мүмкін болмады» там,
+    где всё работает.
+    """
 
     # (маршрут, маркер контента, текст ошибки). Маркер обязан рендериться
     # ТОЛЬКО в content-режиме — иначе тест не заметит, что состояние не
@@ -263,6 +270,25 @@ class DesignStatesAreOptIn(TestCase):
         response = self.client.get(f"{reverse('core:home')}?state=garbage")
         self.assertContains(response, 'Көп оқылған шығармалар')
         self.assertNotContains(response, 'animate-pulse')
+
+
+class DesignStatesDoNotExistOnTheLiveSite(TestCase):
+    """Леса дизайн-обзора — только при `DEBUG` (A5).
+
+    Без этой проверки любой посетитель открывал бы главную с
+    `?state=error` и видел «Бір нәрсе сәтсіз болды» на работающем сайте:
+    жалоба в поддержку на поломку, которой нет, и скриншот, который потом
+    ходит по чатам.
+    """
+
+    def test_the_live_site_answers_with_its_content(self):
+        for state in ('loading', 'error'):
+            with self.subTest(state=state):
+                response = self.client.get(f"{reverse('core:home')}?state={state}")
+
+                self.assertContains(response, 'Көп оқылған шығармалар')
+                self.assertNotContains(response, 'animate-pulse')
+                self.assertNotContains(response, 'Бір нәрсе сәтсіз болды')
 
 
 class MessagesReachTheToastHost(TestCase):

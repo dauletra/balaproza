@@ -754,3 +754,54 @@ class HomeRowSize(TestCase):
         home = (TEMPLATES_DIR / "pages/home.html").read_text(encoding="utf-8")
         for match in re.findall(r'lg:grid-cols-(\d)', home):
             self.assertEqual(match, '5')
+
+
+class LegalPagesSpeakToPeople(TestCase):
+    """Страница правил — текст для подростка, а не выписка из требований.
+
+    В ней было семь внутренних кодов (`FR-AUTH-01`, `BR-22`, `BR-76`,
+    `NFR-20…26`) и отсылка в `docs/spec.md` — то есть читателя правил
+    отправляли в исходники. Плюс три незакрытых плейсхолдера, один из них
+    ровно там, где человеку объясняют, как забрать свои данные.
+
+    Глазами это не ловится: страницы длинные, по-казахски, и открывают их
+    редко. Поэтому числом.
+    """
+
+    # Коды требований и ссылки в репозиторий. `DEC-` тоже: решение —
+    # внутренняя бухгалтерия проекта.
+    _INTERNAL = re.compile(r'\b(?:FR|BR|NFR|DEC)-[A-Z0-9]|docs/|\.md\b')
+    # Незакрытая заготовка. Квадратная скобка в живом тексте не нужна
+    # вовсе, а как признак «здесь ещё не дописано» — надёжна.
+    _PLACEHOLDER = re.compile(r'\[[^\]]*\]')
+
+    _PAGES = ('legal_moderation', 'legal_publishing', 'legal_about',
+              'legal_terms', 'legal_privacy')
+
+    def test_no_internal_codes_and_no_placeholders_reach_the_reader(self):
+        for name in self._PAGES:
+            with self.subTest(page=name):
+                body = self.client.get(
+                    reverse(f'core:{name}')).content.decode()
+                # Сперва выбрасываем `<style>`/`<script>` целиком, вместе
+                # с содержимым: в инлайн-стиле `base.html` живёт селектор
+                # `[x-cloak]`, и он ловится как незакрытая заготовка.
+                # Потом уже теги — иначе классы вроде `xl:hidden` тоже
+                # считались бы текстом страницы.
+                text = re.sub(r'<(script|style)\b.*?</\1>', ' ', body,
+                              flags=re.S)
+                text = re.sub(r'<[^>]+>', ' ', text)
+
+                self.assertIsNone(self._INTERNAL.search(text),
+                                  'внутренний код в тексте для читателя')
+                self.assertIsNone(self._PLACEHOLDER.search(text),
+                                  'незакрытая заготовка в тексте')
+
+    def test_the_reader_is_told_where_to_write(self):
+        """Правила, не называющие канал связи, отвечают на «что делать,
+        если» словами «никуда»."""
+        for name in ('legal_moderation', 'legal_about', 'legal_privacy'):
+            with self.subTest(page=name):
+                body = self.client.get(reverse(f'core:{name}')).content.decode()
+                self.assertTrue('@qazaqnovel' in body or '@' in body,
+                                'на странице нет ни одного канала связи')
