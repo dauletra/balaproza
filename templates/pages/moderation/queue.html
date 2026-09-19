@@ -6,7 +6,7 @@
 {% block content %}
 {% comment %}
     Очередь модератора (FR-MOD-01). Контекст: stories, kind, filters,
-    total, slow_days.
+    total, slow_days, overdue, promise_hours.
 
     Порядок один и не настраивается — дольше всех ждущий первым. Это не
     предпочтение, а обещание автору, что до него дойдут: сортировка «по
@@ -18,7 +18,34 @@
         <p class="mt-2 font-sans text-sm text-slate-600">
             {% if total %}{{ total|spaced }} шығарма шешім күтеді{% else %}Кезек бос{% endif %}
         </p>
+        {% comment %}
+            Просрочка названа числом (D1). Автору обещано «әдетте тәулік
+            ішінде», и это обещание должно быть видно с той стороны, где
+            его выполняют: иначе о нарушенном сроке узнают из жалобы, то
+            есть позже самого автора.
+        {% endcomment %}
+        {% if overdue %}
+            <p class="mt-1 font-sans text-sm font-semibold text-status-attention-fg">
+                {{ overdue|spaced }} шығарма уәде еткен мерзімнен асып кетті
+                ({{ promise_hours }} сағат)
+            </p>
+        {% endif %}
     </div>
+    <a href="{% url 'core:moderation_summary' %}"
+       class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+        {% include "components/icon.html" with name="adjustments" size=14 only %}
+        Сандар
+    </a>
+    <a href="{% url 'core:moderation_comments' %}"
+       class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
+        {% include "components/icon.html" with name="message-caption" size=14 only %}
+        Пікірлер
+        {% if held_comments %}
+            <span class="rounded-chip bg-status-attention-bg px-2 py-0.5 font-sans text-xs font-bold text-status-attention-fg">
+                {{ held_comments|spaced }}
+            </span>
+        {% endif %}
+    </a>
     <a href="{% url 'core:moderation_reports' %}"
        class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
         {% include "components/icon.html" with name="flag" size=14 only %}

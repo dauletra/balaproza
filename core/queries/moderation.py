@@ -20,15 +20,25 @@ from django.db import transaction
 from django.db.models import Count, Min
 from django.utils import timezone
 
-from ..domain.moderation import QUEUE_SLOW_DAYS, paragraph_diff
+from ..domain.moderation import (
+    QUEUE_SLOW_DAYS,
+    REVIEW_PROMISE_HOURS,
+    paragraph_diff,
+)
 from ..domain.reports import REPORT_REASONS
+from ..domain.catalog import PUBLIC_STATUSES
 from ..models import (
+    BlockedTagPattern,
     Chapter,
     ChapterRevision,
     ModerationClaim,
+    ModerationDecision,
     Report,
     Story,
+    StoryComment,
+    User,
 )
+from .notifications import notify_comment
 
 
 def _queue_base():
@@ -74,6 +84,77 @@ def moderation_queue(*, kind: str = '', moderator=None) -> list:
 def queue_size() -> int:
     """Сколько всего ждёт — число для шапки; ось на него не влияет."""
     return _queue_base().count()
+
+
+def overdue_count() -> int:
+    """Сколько заявок пережило обещанный срок (D1).
+
+    Платформа говорит автору «әдетте тәулік ішінде», и это обещание
+    должно быть видно с той стороны, где его выполняют. Иначе о
+    просрочке узнают из жалобы, то есть позже автора.
+    """
+    edge = timezone.now() - timedelta(hours=REVIEW_PROMISE_HOURS)
+    return _queue_base().filter(
+        chapter__revisions__state='pending',
+        chapter__revisions__submitted_at__lt=edge).distinct().count()
+
+
+# ── Задержанные комментарии (D2) ─────────────────────────────────────────
+#
+# Сплошной премодерации комментариев нет: их на порядок больше, чем глав,
+# и ответ через сутки перестаёт быть разговором. Задерживается то, что
+# попало в блок-лист, — остальное публикуется сразу и живёт по жалобам.
+# Правила говорят об этом ровно так же, без обещания «проверяем всё».
+
+def comment_is_blocked(text: str) -> bool:
+    """Есть ли в тексте образец из блок-листа.
+
+    Подстрокой и в нижнем регистре: «спам» обязан ловить и «спамить», и
+    «СПАМ». Точное совпадение здесь бесполезно — комментарий это не одно
+    слово.
+
+    Фильтрация в Python, а не запросом на каждый образец: список
+    небольшой (десятки строк), а `WHERE %s LIKE '%%' || pattern || '%%'`
+    по нему всё равно был бы полным проходом.
+    """
+    lowered = (text or '').lower()
+    if not lowered:
+        return False
+    patterns = BlockedTagPattern.objects.filter(
+        scope__in=('comment', 'both')).values_list('pattern', flat=True)
+    return any(p in lowered for p in patterns)
+
+
+def held_comments() -> list:
+    """Задержанные комментарии, дольше ждущий первым — тот же принцип
+    очереди, что у ревизий и жалоб."""
+    return list(StoryComment.objects.filter(held=True)
+                .select_related('author', 'story')
+                .order_by('created_at'))
+
+
+def held_comments_count() -> int:
+    """Число для бейджа в шапке очереди. `COUNT`, а не `len()` по списку:
+    бейджу нужна цифра, а список притащил бы тексты всех задержанных
+    комментариев на страницу, где их не показывают."""
+    return StoryComment.objects.filter(held=True).count()
+
+
+def held_comment_by_id(pk):
+    return StoryComment.objects.filter(pk=pk, held=True).select_related(
+        'story').first()
+
+
+def publish_held_comment(comment) -> None:
+    """Пропустить задержанный комментарий к читателю.
+
+    Уведомление автору работы уходит **здесь**, а не при создании: до
+    решения комментария для читателя не существует, и сообщать было не о
+    чем.
+    """
+    StoryComment.objects.filter(pk=comment.pk).update(held=False)
+    comment.held = False
+    notify_comment(comment)
 
 
 def story_for_moderation(slug: str):
@@ -219,3 +300,63 @@ def resolve_report(report, moderator, *, action: str, reason: str = '') -> None:
         report.resolved_at = timezone.now()
         report.resolved_by = moderator
         report.save(update_fields=['outcome', 'resolved_at', 'resolved_by'])
+
+
+# ── Сводка портала (D6) ──────────────────────────────────────────────────
+#
+# Без неё первые месяцы — угадывание: нельзя ответить, доходит ли человек
+# до конца анкеты, доходит ли черновик до публикации, возвращается ли
+# читатель. Считается **своей базой**, без стороннего счётчика: на детской
+# площадке чужой скрипт это абзац в политике конфиденциальности и данные,
+# ушедшие наружу, а все нужные числа и так лежат в своих таблицах.
+#
+# Здесь же, в разделе модерации, а не отдельной админкой: смотрит их тот
+# же человек, что и очередь, и сводка без очереди рядом отвечает на
+# «сколько», не отвечая на «что с этим делать».
+
+def portal_summary() -> dict:
+    """Пять вопросов, на которые до этого ответа не было.
+
+    Все пять — про **воронку**, а не про трафик: сколько людей дошло,
+    сколько текстов дошло, сколько ждёт и как долго. Трафик считает
+    веб-сервер, и он же единственный, кто его видит честно.
+    """
+    now = timezone.now()
+    week = now - timedelta(days=7)
+
+    signed_up = User.objects.count()
+    onboarded = User.objects.filter(terms_accepted_at__isnull=False).count()
+    wrote = User.objects.filter(stories__isnull=False).distinct().count()
+    published = (User.objects
+                 .filter(stories__status__in=PUBLIC_STATUSES)
+                 .distinct().count())
+
+    drafts = Story.objects.filter(status='NotPublished').count()
+    public = Story.objects.filter(status__in=PUBLIC_STATUSES).count()
+
+    decided_week = ModerationDecision.objects.filter(decided_at__gte=week)
+    returned = decided_week.exclude(outcome='approved').count()
+
+    oldest = (ChapterRevision.objects.filter(state='pending')
+              .order_by('submitted_at').values_list('submitted_at', flat=True)
+              .first())
+
+    return {
+        # Воронка автора: пришёл → дозаполнил → начал писать → опубликовал.
+        # Разрыв между первыми двумя — цена анкеты; между вторым и
+        # третьим — цена пустого экрана «начни писать».
+        'signed_up': signed_up,
+        'onboarded': onboarded,
+        'wrote': wrote,
+        'published': published,
+        # Воронка текста.
+        'drafts': drafts,
+        'public': public,
+        # Работа модерации за неделю и её качество: доля возвратов
+        # говорит не о строгости, а о том, понятны ли авторам правила.
+        'decided_week': decided_week.count(),
+        'returned_week': returned,
+        # Самое старое ожидание — то, по чему видно нарушенное обещание.
+        'oldest_wait': oldest,
+        'overdue': overdue_count(),
+    }

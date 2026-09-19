@@ -70,6 +70,13 @@ urlpatterns = [
     # ВАЖНО: reports/ ДОЛЖЕН идти до <slug:slug>/, иначе Django смэтчит
     # 'reports' как слаг работы (тот же приём, что у contests/my-submissions).
     path('moderation/reports/', views.reports_queue, name='moderation_reports'),
+    # Сводка портала (D6) — до <slug:slug>/, как и всё остальное здесь.
+    path('moderation/summary/', views.portal_summary, name='moderation_summary'),
+    # Задержанные блок-листом пікірлер (D2). Тоже до <slug:slug>/.
+    path('moderation/comments/', views.held_comments_queue,
+        name='moderation_comments'),
+    path('moderation/comments/<int:pk>/decide/', views.held_comment_decide,
+        name='moderation_comment_decide'),
     path('moderation/reports/<int:pk>/resolve/', views.report_resolve,
         name='moderation_report_resolve'),
     path('moderation/<slug:slug>/', views.moderation_detail,

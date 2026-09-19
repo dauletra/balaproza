@@ -122,9 +122,15 @@ def trending_tags(limit: int = 6):
 
 def is_blocked(name: str) -> bool:
     """Проверка имени тега против блок-листа (BR-TAG-05). Сравнение в нижнем
-    регистре: «Спам» обязан ловиться так же, как «спам»."""
+    регистре: «Спам» обязан ловиться так же, как «спам».
+
+    Совпадение **точное** — тег это одно имя целиком. У комментария
+    правило другое (подстрока), и живёт оно в `queries/moderation`;
+    отсюда `scope` в самом списке.
+    """
     return BlockedTagPattern.objects.filter(
-        pattern=(name or '').strip().lower()).exists()
+        pattern=(name or '').strip().lower(),
+        scope__in=('tag', 'both')).exists()
 
 
 def accepted_tags_json() -> list:

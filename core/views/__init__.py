@@ -40,10 +40,13 @@ from .contests import (
 from .design import design_components, design_states, design_tokens
 from .home import home
 from .moderation import (
+    held_comment_decide,
+    held_comments_queue,
     moderation_claim,
     moderation_decide,
     moderation_detail,
     moderation_queue,
+    portal_summary,
     report_resolve,
     reports_queue,
 )

@@ -27,6 +27,11 @@ def moderator_only(view):
 
     404, а не 403: «нельзя» подтверждало бы, что раздел есть. Гость сюда
     тоже не редиректится на вход — ему нечего здесь ждать.
+
+    Стоит **снаружи** `require_POST`, а не под ним: обратный порядок
+    отвечал на GET посторонним 405 «метод не разрешён», то есть
+    подтверждал существование адреса — ровно то, чего это правило и не
+    должно допускать.
     """
     @wraps(view)
     def guarded(request, *args, **kwargs):
@@ -50,7 +55,12 @@ def moderation_queue(request):
         'kind':        kind,
         'filters':     data.QUEUE_FILTERS,
         'total':       data.queue_size(),
+        'held_comments': data.held_comments_count(),
         'slow_days':   data.QUEUE_SLOW_DAYS,
+        # Обещание «тәулік ішінде» стоит у автора на экране отправки, и
+        # видно оно должно быть с той стороны, где его выполняют (D1).
+        'overdue':     data.overdue_count(),
+        'promise_hours': data.REVIEW_PROMISE_HOURS,
         'open_reports': data.open_reports_count(),
     })
 
@@ -83,8 +93,8 @@ def moderation_detail(request, slug):
     })
 
 
-@require_POST
 @moderator_only
+@require_POST
 def moderation_claim(request, slug):
     """Взять работу в работу или отпустить (BR-82)."""
     story = data.story_for_moderation(slug)
@@ -103,8 +113,8 @@ def moderation_claim(request, slug):
     return redirect('core:moderation_detail', slug=slug)
 
 
-@require_POST
 @moderator_only
+@require_POST
 def moderation_decide(request, slug):
     """Решение по поданному тексту (BR-11, BR-79, BR-82).
 
@@ -131,6 +141,55 @@ def moderation_decide(request, slug):
     return redirect('core:moderation_queue')
 
 
+# ───────────────────── Сводка портала (D6) ───────────────────────────────
+
+@moderator_only
+def portal_summary(request):
+    """Пять вопросов о том, что происходит, — своей базой, без счётчика.
+
+    В разделе модерации, а не отдельной админкой: смотрит их тот же
+    человек, что и очередь, и сводка без очереди рядом отвечает на
+    «сколько», не отвечая на «что с этим делать».
+    """
+    return render(request, 'pages/moderation/summary.html', {
+        'summary': data.portal_summary(),
+        'promise_hours': data.REVIEW_PROMISE_HOURS,
+    })
+
+
+# ───────────────────── Задержанные пікірлер (D2) ──────────────────────────
+
+@moderator_only
+def held_comments_queue(request):
+    """Пікірлер, блок-тізімге іліккен: жарияланбай, шешім күтіп тұр.
+
+    Отдельной страницей, а не вкладкой очереди работ: решается здесь
+    другое — не текст автора, а одна реплика, и решений два вместо трёх.
+    """
+    return render(request, 'pages/moderation/comments.html', {
+        'comments': data.held_comments(),
+    })
+
+
+@moderator_only
+@require_POST
+def held_comment_decide(request, pk):
+    """Пропустить к читателю или удалить. Третьего нет: задержанный
+    комментарий нельзя «вернуть на доработку» — правки у комментариев не
+    бывает."""
+    comment = data.held_comment_by_id(pk)
+    if comment is None:
+        raise Http404('Пікір табылмады')
+
+    if request.POST.get('action') == 'publish':
+        data.publish_held_comment(comment)
+        messages.success(request, 'Пікір жарияланды.')
+    else:
+        data.delete_comment(comment)
+        messages.success(request, 'Пікір өшірілді.')
+    return redirect('core:moderation_comments')
+
+
 # ───────────────────── Жалобы (BR-33, FR-STORY-09) ────────────────────────
 
 @moderator_only
@@ -141,8 +200,8 @@ def reports_queue(request):
     })
 
 
-@require_POST
 @moderator_only
+@require_POST
 def report_resolve(request, pk):
     """Шешім: «бұзушылық жоқ» немесе контентті алып тастау (BR-33).
 

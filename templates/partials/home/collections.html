@@ -18,6 +18,12 @@
 
     Контекст: collections (list of Collection)
 {% endcomment %}
+{% comment %}
+    Без содержимого секции нет (D3): на новом портале редакционных блоков
+    не существует, пока их кто-то не соберёт, и заголовок над пустотой
+    обещает то, чего нет.
+{% endcomment %}
+{% if collections %}
 <section x-data="{}">
     {% url 'core:collections' as collections_url %}
     {% include "components/section_header.html" with title="Қазір не оқығың келеді?" eyebrow="редакция жинақтары" link="барлығы →" link_href=collections_url %}
@@ -65,3 +71,4 @@
         </div>
     </div>
 </section>
+{% endif %}

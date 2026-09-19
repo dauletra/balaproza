@@ -11,6 +11,12 @@
 
     Контекст: book_of_week (BookOfWeek из stub_data)
 {% endcomment %}
+{% comment %}
+    Без содержимого секции нет (D3): на новом портале редакционных блоков
+    не существует, пока их кто-то не соберёт, и заголовок над пустотой
+    обещает то, чего нет.
+{% endcomment %}
+{% if book_of_week %}
 {% with bw=book_of_week story=book_of_week.story %}
 {% with hue=story.primary_genre.hue|default:195 %}
 {% url 'core:story_detail' slug=story.slug as read_href %}
@@ -103,3 +109,4 @@
 </section>
 {% endwith %}
 {% endwith %}
+{% endif %}

@@ -205,6 +205,11 @@ def comment_create(request, slug):
     comment = data.add_comment(story, request.user,
                                text=form.cleaned_data['text'],
                                chapter_number=chapter_number, parent=parent)
+    if comment.held:
+        # Задержанный комментарий не виден никому (D2), и молчать об этом
+        # нельзя: человек решит, что форма сломалась, и напишет ещё раз.
+        messages.info(request, 'Пікірің тексеруге жіберілді — модератор қарайды.')
+        return _back_to_story(slug, chapter_number)
     messages.success(request, 'Пікірің қосылды.')
     return _back_to_story(slug, chapter_number, anchor=f'comment-{comment.pk}')
 

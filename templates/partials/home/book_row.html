@@ -9,7 +9,16 @@
       link_href — куда вести (default: '#')
       meta     — подпись под карточкой: 'author' (умолчание) | 'update'
 {% endcomment %}
+{% comment %}
+    Пустой ряд не рендерится вовсе (D3). Пока каталог наполняется — а на
+    новом портале он пуст в первый день, — заголовок секции над пустотой
+    хуже отсутствия секции: он обещает содержимое и сообщает, что его
+    нет. Главная честно сжимается под то, что есть, и растёт вместе с
+    каталогом.
+{% endcomment %}
+{% if books %}
 <section>
     {% include "components/section_header.html" with title=title eyebrow=eyebrow link=link|default:"барлығы →" link_href=link_href|default:"#" %}
     {% include "partials/home/_book_scroller.html" with books=books link_href=link_href|default:"#" meta=meta %}
 </section>
+{% endif %}

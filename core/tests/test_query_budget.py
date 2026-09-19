@@ -179,8 +179,14 @@ class PagesStayWithinTheirQueryBudget(TestCase):
         списка, а опрос — `select_related`'ом вместе с ней.
 
         **Один.** `closed` спрашивал `chapter.story`, чтобы взять у
-        работы её же главы: запрос за объектом ради одного ключа."""
-        with self.assertNumQueries(25):
+        работы её же главы: запрос за объектом ради одного ключа.
+
+        **Ещё один.** Ответы к комментариям теперь приходят явным
+        `Prefetch` с фильтром «не задержанные» (D2), и тот же запрос
+        сразу тянет их авторов — раньше это были два обращения.
+        Экономия попутная: фильтр заводился ради задержанных, а не ради
+        бюджета."""
+        with self.assertNumQueries(24):
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'dalney-berega'}) + '?chapter=3')
 

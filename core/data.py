@@ -68,8 +68,10 @@ from .domain.moderation import (
     QUEUE_FILTER_KEYS,
     QUEUE_SLOW_DAYS,
     REASON_TEMPLATES,
+    REVIEW_PROMISE_HOURS,
     diff_summary,
     paragraph_diff,
+    review_is_overdue,
 )
 from .domain.story import (
     PUBLISH_CHECKLIST,
@@ -260,12 +262,19 @@ from .queries.contests import (
 # ── Модерация как раздел (DEC-71) — и жалобы на опубликованное (BR-33) ──
 from .queries.moderation import (
     claim_story,
+    comment_is_blocked,
     create_report,
     decision_history,
+    held_comment_by_id,
+    held_comments,
+    held_comments_count,
     moderation_queue,
     open_reports,
     open_reports_count,
+    overdue_count,
     pending_revision_count,
+    portal_summary,
+    publish_held_comment,
     queue_size,
     release_story,
     report_by_id,

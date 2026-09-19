@@ -208,10 +208,15 @@ def cast_poll_vote(poll, user, option_slug: str) -> bool:
 
 
 def _comments(story_slug: str):
+    # Задержанного не видит никто, включая автора работы (D2): показать
+    # его одному значит объяснять, почему второй его не видит.
     return (StoryComment.objects
-            .filter(story__slug=story_slug, parent__isnull=True)
+            .filter(story__slug=story_slug, parent__isnull=True, held=False)
             .select_related('author', 'story', 'story__author')
-            .prefetch_related('reply_set__author'))
+            .prefetch_related(Prefetch(
+                'reply_set',
+                queryset=StoryComment.objects.filter(held=False)
+                .select_related('author'))))
 
 
 def _attach_liked(comments: list, viewer) -> list:
@@ -321,12 +326,20 @@ def add_comment(story, author, *, text: str, chapter_number=None, parent=None) -
     Уведомление — не сигналом (`notify_comment` объясняет, почему):
     адресатов у одного комментария бывает двое, и кто они, знает не
     строка, а само действие.
+
+    Попавший в блок-лист **задерживается** (D2): читателю его нет,
+    решение принимает модератор, и уведомление автору работы уходит
+    тогда же — до решения сообщать не о чем.
     """
+    from .moderation import comment_is_blocked
+
+    held = comment_is_blocked(text)
     with transaction.atomic():
         comment = StoryComment.objects.create(
             story=story, author=author, chapter_number=chapter_number,
-            parent=parent, text=text)
-        notify_comment(comment)
+            parent=parent, text=text, held=held)
+        if not held:
+            notify_comment(comment)
         return comment
 
 

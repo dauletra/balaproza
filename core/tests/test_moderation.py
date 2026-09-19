@@ -307,11 +307,69 @@ class TheModerationPagesStayWithinTheirQueryBudget(TestCase):
         очередь из двадцати работ стоила бы шестьдесят запросов.
 
         Семь, не шесть: плюс один `COUNT` за бейдж открытых жалоб в шапке
-        (BR-33) — тот же счётчик у `/moderation/reports/`."""
-        with self.assertNumQueries(7):
+        (BR-33) — тот же счётчик у `/moderation/reports/`.
+
+        Восемь: плюс `COUNT` просроченных заявок (D1). Обещание «әдетте
+        тәулік ішінде» стоит у автора на экране отправки, и видно оно
+        должно быть там, где его выполняют, — иначе о нарушенном сроке
+        узнают из жалобы, то есть позже самого автора. Число не растёт с
+        длиной очереди, как и остальные семь.
+
+        Девять: плюс `COUNT` задержанных комментариев (D2) — тот же
+        бейдж в шапке, что у жалоб. Именно `COUNT`, а не список: тексты
+        задержанного на этой странице не показывают."""
+        with self.assertNumQueries(9):
             self.client.get(reverse('core:moderation_queue'))
 
     def test_the_card_does_not_grow_with_the_chapters(self):
         with self.assertNumQueries(8):
             self.client.get(reverse('core:moderation_detail',
                                     kwargs={'slug': 'mod-budget-0'}))
+
+
+class ThePortalCountsItself(TestCase):
+    """Сводка (D6): пять вопросов, на которые до неё ответа не было.
+
+    Всё считается своей базой. Стороннего счётчика на портале нет
+    намеренно: на детской площадке чужой скрипт — это абзац в политике
+    конфиденциальности и данные, ушедшие наружу.
+    """
+
+    def setUp(self):
+        super().setUp()
+        _moderator(self.client, 'summary_mod')
+        self.url = reverse('core:moderation_summary')
+
+    def test_the_author_funnel_counts_each_step(self):
+        """Смысл в разрывах: между «вошёл» и «дозаполнил» видна цена
+        анкеты, между «дозаполнил» и «начал писать» — цена пустого
+        экрана."""
+        before = data.portal_summary()
+
+        newcomer = make.user()
+        writer = make.user()
+        make.story(author=writer, chapters=1, published=False,
+                   status='NotPublished')
+        publisher = make.user()
+        make.story(author=publisher, chapters=1)
+
+        after = data.portal_summary()
+
+        self.assertEqual(after['signed_up'] - before['signed_up'], 3)
+        self.assertEqual(after['wrote'] - before['wrote'], 2)
+        self.assertEqual(after['published'] - before['published'], 1)
+        self.assertNotIn(newcomer, [])   # заведён, но ничего не написал
+
+    def test_it_names_the_broken_promise(self):
+        """Просрочка — единственное число здесь, по которому надо
+        действовать сегодня."""
+        page = self.client.get(self.url)
+
+        self.assertContains(page, 'Мерзімнен асқан')
+        self.assertContains(page, str(data.REVIEW_PROMISE_HOURS))
+
+    def test_the_page_is_closed_to_everyone_else(self):
+        reader = Client()
+        login_as_newcomer(reader, 'summary_reader')
+
+        self.assertEqual(reader.get(self.url).status_code, 404)
