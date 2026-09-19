@@ -199,11 +199,20 @@ from .queries.profile import (
     update_profile,
 )
 
-# ── Уведомления: лента автора (FR-NOTIF-*) ───────────────────────────────
+# ── Уведомления: лента и события, которые её наполняют (FR-NOTIF-*) ──────
+# Пишущая сторона названа поимённо, как и всё здесь, хотя views её не
+# зовут: события заводят слой записей и админка. Список в фасаде — карта
+# того, откуда в ленте берётся каждая строка.
 from .queries.notifications import (
     mark_all_notifications_read,
     mark_notification_read,
     notifications_for_user,
+    notify_award_granted,
+    notify_comment,
+    notify_follow,
+    notify_new_chapter,
+    notify_reaction,
+    notify_submission_decided,
     unread_count_for_user,
 )
 

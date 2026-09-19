@@ -7,8 +7,8 @@
 Рейтинга здесь нет и не будет (DEC-41): знак говорит «ты сделал»,
 рейтинг — «ты хуже вон того», и аудитории 14-18 второе не нужно.
 
-Уведомления жили здесь, пока их только читали, — теперь они в
-`queries/notifications.py`.
+Уведомления жили здесь, пока их только читали; теперь их ещё и пишут из
+четырёх разделов, и живут они в `queries/notifications.py`.
 """
 
 from dataclasses import dataclass
@@ -20,6 +20,7 @@ from django.db.models import Count, Exists, OuterRef, Q
 from ..domain.awards import READ_TIER_ART, READ_TIERS, next_tier_for, tier_for
 from ..domain.catalog import BADGE_LABELS, PUBLIC_STATUSES
 from ..models import AwardGrant, Follow, Story, User
+from .notifications import notify_follow
 
 
 # ── Подписки (FR-PROF-10, BR-75) ─────────────────────────────────────────
@@ -36,6 +37,10 @@ def toggle_follow(follower, following) -> bool:
     удалении строки `Follow` — в том числе когда строка уходит не отсюда, а
     каскадом от удаления аккаунта. На себя не подписываются — это держит
     `CheckConstraint` в базе.
+
+    Уведомление, в отличие от счётчика, пишется здесь, а не сигналом: у
+    отписки строка тоже меняется, а события нет — автору не сообщают, что
+    от него ушли.
     """
     if follower.pk == following.pk:
         return False
@@ -43,6 +48,7 @@ def toggle_follow(follower, following) -> bool:
         link = Follow.objects.filter(follower=follower, following=following).first()
         if link is None:
             Follow.objects.create(follower=follower, following=following)
+            notify_follow(follower, following)
             now_following = True
         else:
             link.delete()

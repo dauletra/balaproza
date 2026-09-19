@@ -585,7 +585,14 @@ class Story(models.Model):
         if outcome != 'approved' and not reason:
             raise ValueError('Себепсіз қайтаруға болмайды (BR-11).')
 
+        from .queries.notifications import notify_new_chapter
+
         now = timezone.now()
+        # Сколько глав **впервые** стало видно читателю. Не то же, что
+        # число одобренных ревизий: одобренная правка уже стоящего текста
+        # — не новая часть, и звать за ней подписчиков второй раз значит
+        # обещать им то, чего нет.
+        opened = 0
         with transaction.atomic():
             for revision in pending:
                 revision.state = 'approved' if outcome == 'approved' else 'rejected'
@@ -593,6 +600,8 @@ class Story(models.Model):
                 revision.save(update_fields=['state', 'decided_at'])
                 if outcome == 'approved':
                     chapter = revision.chapter
+                    if chapter.published_revision_id is None:
+                        opened += 1
                     chapter.published_revision = revision
                     chapter.save(update_fields=['published_revision'])
             # Акт решения — с тем, кто его принял (BR-82). Пишется рядом с
@@ -613,6 +622,12 @@ class Story(models.Model):
                 outcome=outcome, text=reason,
             )
             self.refresh_status()
+            # После пересчёта: подписчиков зовут на то, что уже стоит у
+            # читателя. Тип у этих строк другой (`new_chapter`), и
+            # `refresh_status`, читающий последнее решение по `moderation`,
+            # их не видит, — порядок выбран смыслом, а не необходимостью.
+            if opened:
+                notify_new_chapter(self, opened)
             return note
 
     def take_down(self, reason: str) -> 'Notification':

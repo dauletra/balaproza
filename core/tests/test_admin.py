@@ -164,8 +164,13 @@ class TheModeratorWorksThroughTheAdmin(TestCase):
         self._act('approve', apply='1', reason='')
         self.story.refresh_from_db()
         self.assertEqual(self.story.status, 'Published')
-        self.assertEqual(Notification.objects.get(story=self.story).outcome,
-                         'approved')
+        # По `kind`, а не по одной работе: у одобрения два следствия —
+        # решение автору и зов подписчикам (`new_chapter`), — и «единственное
+        # уведомление этой работы» перестало быть правдой ровно тогда, когда
+        # подписка начала к чему-то приводить. Вопрос теста прежний: акт
+        # решения записан и назван верно.
+        note = Notification.objects.get(story=self.story, kind='moderation')
+        self.assertEqual(note.outcome, 'approved')
 
     def test_a_work_outside_the_queue_is_named_not_skipped_silently(self):
         """Иначе модератор считает решёнными все, что выбрал.

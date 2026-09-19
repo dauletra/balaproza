@@ -29,6 +29,7 @@ from ..models import (
     StoryView,
 )
 from .catalog import all_stories
+from .notifications import notify_comment, notify_reaction
 
 
 def chapters_of(story_slug: str, *, as_author: bool = False) -> list:
@@ -136,12 +137,18 @@ def toggle_chapter_reaction(chapter, user, kind: str) -> str:
     удаляется. `Story.likes` — агрегат по числу голосов, а не реакций
     (BR-14a), поэтому смена вида его не трогает. Возвращает новый slug
     реакции, '' — если снята.
+
+    Уведомление автору уходит на **поставленную** реакцию, не на снятую:
+    «тебя больше не отмечают» событием не является. Смена вида — тоже
+    отклик, и она его шлёт; повторной строки в ленте от этого не будет,
+    её держит окно молчания в `notify_reaction`.
     """
     with transaction.atomic():
         vote = (ChapterReactionVote.objects.select_for_update()
                 .filter(chapter=chapter, user=user).first())
         if vote is None:
             ChapterReactionVote.objects.create(chapter=chapter, user=user, kind=kind)
+            notify_reaction(chapter, user)
             return kind
         if vote.kind == kind:
             vote.delete()
@@ -151,6 +158,7 @@ def toggle_chapter_reaction(chapter, user, kind: str) -> str:
         vote.save(update_fields=['kind'])
         bump_reaction_count(chapter.pk, old_kind, -1)
         bump_reaction_count(chapter.pk, kind, 1)
+        notify_reaction(chapter, user)
         return kind
 
 
@@ -308,10 +316,18 @@ def add_comment(story, author, *, text: str, chapter_number=None, parent=None) -
     """Новый комментарий или ответ (BR-30/BR-33). Валидность `parent`
     (свой ли уровень, та ли работа) проверяет вызывающая сторона —
     `top_level_comment_of` уже это гарантирует к моменту вызова.
-    `Story.comments` двигает сигнал на создании строки."""
-    return StoryComment.objects.create(
-        story=story, author=author, chapter_number=chapter_number,
-        parent=parent, text=text)
+    `Story.comments` двигает сигнал на создании строки.
+
+    Уведомление — не сигналом (`notify_comment` объясняет, почему):
+    адресатов у одного комментария бывает двое, и кто они, знает не
+    строка, а само действие.
+    """
+    with transaction.atomic():
+        comment = StoryComment.objects.create(
+            story=story, author=author, chapter_number=chapter_number,
+            parent=parent, text=text)
+        notify_comment(comment)
+        return comment
 
 
 def delete_comment(comment) -> None:

@@ -16,6 +16,7 @@ from django.shortcuts import render
 
 from .domain.contests import CONTEST_PHASE_LABELS
 from .domain.notifications import MODERATION_OUTCOME_LABELS
+from .queries.notifications import notify_award_granted, notify_submission_decided
 from .models import (
     AwardGrant,
     BlockedTagPattern,
@@ -395,6 +396,14 @@ class AwardGrantAdmin(admin.ModelAdmin):
     def author(self, obj):
         return obj.author
 
+    def save_model(self, request, obj, form, change):
+        """Присуждение — единственное место, где рождается победа (DEC-46):
+        отдельного статуса заявки под неё нет. Уведомление уходит только
+        на само присуждение, не на правку комментария к нему."""
+        super().save_model(request, obj, form, change)
+        if not change:
+            notify_award_granted(obj)
+
 
 @admin.register(Submission)
 class SubmissionAdmin(admin.ModelAdmin):
@@ -406,6 +415,20 @@ class SubmissionAdmin(admin.ModelAdmin):
     # Ответы формы подачи (DEC-21/DEC-24) — жюри и модератору видны,
     # автор их повторно не редактирует.
     readonly_fields = ('ai_declaration', 'age_confirmed', 'rules_confirmed')
+
+    def save_model(self, request, obj, form, change):
+        """Решение по заявке автор узнаёт от платформы, а не проверками
+        страницы конкурса (BR-41).
+
+        Уведомление — на **смену** статуса, а не на каждое сохранение:
+        поправленный комментарий жюри не повод сообщать «өтінімің
+        қабылданды» второй раз. Тот же приём, что у `StoryAdmin`, где
+        ручная правка статуса работы разбирается по `form.changed_data`.
+        """
+        decided = change and 'status' in form.changed_data
+        super().save_model(request, obj, form, change)
+        if decided:
+            notify_submission_decided(obj)
 
 
 class CollectionItemInline(admin.TabularInline):
