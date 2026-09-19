@@ -46,31 +46,6 @@
         {# ── Авторлық аты (FR-AUTH-04) ── #}
         {% include "components/input_field.html" with name="pen_name" label="Авторлық атың" value=profile_user.pen_name required=True maxlength=60 %}
 
-        {# ── Жынысы ── #}
-        <fieldset class="flex flex-col gap-2">
-            <legend class="mb-1 font-sans text-sm font-semibold text-slate-800">Жынысы</legend>
-            <div class="flex flex-wrap gap-6">
-                {% if profile_user.gender == 'boy' %}
-                    {% include "components/radio_option.html" with name="gender" value="boy" label="Ұл/Ер" checked=True %}
-                    {% include "components/radio_option.html" with name="gender" value="girl" label="Қыз/Әйел" %}
-                {% elif profile_user.gender == 'girl' %}
-                    {% include "components/radio_option.html" with name="gender" value="boy" label="Ұл/Ер" %}
-                    {% include "components/radio_option.html" with name="gender" value="girl" label="Қыз/Әйел" checked=True %}
-                {% else %}
-                    {% include "components/radio_option.html" with name="gender" value="boy" label="Ұл/Ер" %}
-                    {% include "components/radio_option.html" with name="gender" value="girl" label="Қыз/Әйел" %}
-                {% endif %}
-            </div>
-        </fieldset>
-
-        {# ── Туған күні (BR-48). Иммутабельность после сохранения — DEC-84, обеспечивает `update_profile`, тут только вид. #}
-        {# Диапазон не называем — ценз ставит конкурс, не платформа (BR-48, DEC-47) #}
-        {% if profile_user.birth_date %}
-            {% include "components/input_field.html" with name="birth_date" type="date" label="Туған күнің" value=profile_user.birth_date|date:"Y-m-d" disabled=True hint="Бір рет сақталған соң өзгермейді." %}
-        {% else %}
-            {% include "components/input_field.html" with name="birth_date" type="date" label="Туған күнің" value=profile_user.birth_date|date:"Y-m-d" hint="Профильде көрінбейді. Сақтағаннан кейін өзгертуге болмайды." %}
-        {% endif %}
-
         {# ── Био ── #}
         {% include "components/textarea.html" with name="bio" label="Автор туралы" value=profile_user.bio rows=4 maxlength=200 hint="Профильде көрсетіледі. Қажет емес болса бос қалдыр." %}
 

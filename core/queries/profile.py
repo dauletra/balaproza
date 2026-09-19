@@ -100,15 +100,11 @@ def author_by_username(username: str):
 
 
 def update_profile(user, *, pen_name: str, bio: str,
-                   birth_date, gender: str, avatar, remove_avatar: bool = False,
+                   avatar, remove_avatar: bool = False,
                    username: str,
                    push_moderation=None, push_response=None,
                    push_new_chapter=None) -> None:
-    """Сохранить свой профиль (FR-PROF-01). `gender` — самодекларация
-    (DEC-24), меняется свободно. `birth_date` тоже самодекларация, но
-    только на онбординге (DEC-84): раз заданная, дальше не трогается —
-    здесь, а не в форме или шаблоне, чтобы инвариант держался независимо
-    от того, откуда пришёл вызов. Пустой `avatar` значит «не меняем»:
+    """Сохранить свой профиль (FR-PROF-01). Пустой `avatar` значит «не меняем»:
     автор не переизбирает файл при каждом сохранении. `remove_avatar` —
     явное снятие (BR-86), третье состояние рядом с «не меняем»; новый файл
     важнее снятия. `username` (BR-91) обязателен — форма всегда шлёт
@@ -120,9 +116,6 @@ def update_profile(user, *, pen_name: str, bio: str,
     """
     user.pen_name = pen_name
     user.bio = bio
-    if not user.birth_date:
-        user.birth_date = birth_date
-    user.gender = gender
     user.username = username
     if avatar:
         user.avatar = avatar

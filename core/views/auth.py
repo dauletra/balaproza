@@ -129,8 +129,6 @@ def onboarding(request):
                 user,
                 pen_name=form.cleaned_data['pen_name'],
                 bio=form.cleaned_data['bio'],
-                birth_date=form.cleaned_data['birth_date'],
-                gender=form.cleaned_data['gender'],
             )
             return redirect('core:signup_success')
     else:

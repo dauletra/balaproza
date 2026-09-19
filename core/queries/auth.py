@@ -32,14 +32,16 @@ def get_or_create_telegram_user(telegram_id: int) -> tuple[User, bool]:
         telegram_id=telegram_id, defaults={'username': _unique_username()})
 
 
-def complete_onboarding(user: User, *, pen_name: str, bio: str, birth_date, gender: str) -> User:
+def complete_onboarding(user: User, *, pen_name: str, bio: str) -> User:
     """Онбординг после первого входа (FR-AUTH-04). `terms_accepted_at` —
     акт согласия (FR-AUTH-05); его дата и делает регистрацию завершённой
-    (BR-90), отдельного флага нет."""
+    (BR-90), отдельного флага нет.
+
+    Полей два. Возраст и пол не спрашиваются вовсе (D4/D5): ни то, ни
+    другое нигде не использовалось, а на детской площадке каждое поле —
+    обязательство."""
     user.pen_name = pen_name
     user.bio = bio
-    user.birth_date = birth_date
-    user.gender = gender
     user.terms_accepted_at = timezone.now()
-    user.save(update_fields=['pen_name', 'bio', 'birth_date', 'gender', 'terms_accepted_at'])
+    user.save(update_fields=['pen_name', 'bio', 'terms_accepted_at'])
     return user

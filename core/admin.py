@@ -63,10 +63,10 @@ class UserAdmin(DjangoUserAdmin):
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         ('Аты-жөні', {
-            'fields': ('pen_name', 'bio', 'avatar', 'birth_date', 'gender', 'email'),
-            'description': '«Туған күні»/«Жынысы» — өзі толтырған, '
-                           'құжатпен расталмаған (DEC-24). Нақты аты-жөні '
-                           'сайтта мүлде сақталмайды (DEC-82).',
+            'fields': ('pen_name', 'bio', 'avatar', 'email'),
+            'description': 'Нақты аты-жөні, жасы және жынысы сайтта мүлде '
+                           'сақталмайды: балалар алаңында әр артық өріс — '
+                           'қорғауға тиіс міндеттеме.',
         }),
         ('Хабарламалар', {
             'fields': ('telegram_push', 'push_moderation', 'push_response',

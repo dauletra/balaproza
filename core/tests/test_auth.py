@@ -217,8 +217,6 @@ class Onboarding(TestCase):
         response = self.client.post(reverse('core:onboarding'), {
             'pen_name': '',
             'bio': 'Кітап оқығанды жақсы көремін',
-            'birth_date': '2010-05-01',
-            'gender': 'girl',
             'agree_rules': 'on',
             'agree_privacy': 'on',
         })
@@ -242,7 +240,6 @@ class Onboarding(TestCase):
         login_as_newcomer(self.client, 'finishing_up', onboarded=False)
         response = self.client.post(reverse('core:onboarding'), {
             'pen_name': 'Дана Серікқызы', 'bio': '',
-            'birth_date': '2010-05-01', 'gender': 'girl',
             'agree_rules': 'on', 'agree_privacy': 'on',
         })
         self.assertRedirects(response, reverse('core:signup_success'))
@@ -251,33 +248,41 @@ class Onboarding(TestCase):
         self.assertEqual(u.pen_name, 'Дана Серікқызы')
         self.assertIsNotNone(u.terms_accepted_at)
 
-    def test_missing_gender_or_birth_date_is_rejected(self):
-        login_as_newcomer(self.client, 'no_gender_no_birth', onboarded=False)
-        response = self.client.post(reverse('core:onboarding'), {
-            'pen_name': 'Айгүл', 'bio': '', 'birth_date': '', 'gender': '',
+    def test_the_form_asks_for_two_things_and_no_more(self):
+        """Анкета из пяти полей стала анкетой из трёх (D4/D5): имя и два
+        согласия. Пола и даты рождения не спрашивают вовсе — ни то, ни
+        другое нигде не использовалось, а площадка детская.
+
+        Проверяется с обеих сторон: без имени не пройти, а без снятых
+        полей — пройти.
+        """
+        login_as_newcomer(self.client, 'short_form', onboarded=False)
+
+        refused = self.client.post(reverse('core:onboarding'), {
+            'pen_name': '', 'bio': '',
             'agree_rules': 'on', 'agree_privacy': 'on',
         })
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Жынысыңды таңда.')
-        self.assertContains(response, 'Туған күніңді жаз.')
-        self.assertIsNone(User.objects.get(username='no_gender_no_birth').terms_accepted_at)
+        self.assertEqual(refused.status_code, 200)
+        self.assertContains(refused, 'Авторлық атыңды жаз.')
+        self.assertIsNone(
+            User.objects.get(username='short_form').terms_accepted_at)
 
-    def test_birth_date_is_immutable_after_onboarding(self):
-        author = login_as_newcomer(self.client, 'locked_birth_date', onboarded=False)
         self.client.post(reverse('core:onboarding'), {
-            'pen_name': 'Ерлан', 'bio': '',
-            'birth_date': '2005-01-01', 'gender': 'boy',
+            'pen_name': 'Айгүл', 'bio': '',
             'agree_rules': 'on', 'agree_privacy': 'on',
         })
-        author.refresh_from_db()
-        self.assertEqual(str(author.birth_date), '2005-01-01')
+        self.assertIsNotNone(
+            User.objects.get(username='short_form').terms_accepted_at)
 
-        self.client.post(reverse('core:profile_me_edit'), {
-            'username': author.username, 'pen_name': author.pen_name, 'bio': '',
-            'birth_date': '1999-09-09', 'gender': 'boy',
-        })
-        author.refresh_from_db()
-        self.assertEqual(str(author.birth_date), '2005-01-01')
+    def test_the_page_does_not_ask_for_age_or_gender(self):
+        """Поля нет ни в модели, ни на экране: иначе снятое поле вернулось
+        бы разметкой и молча ничего не сохраняло."""
+        login_as_newcomer(self.client, 'no_extra_fields', onboarded=False)
+
+        page = self.client.get(reverse('core:onboarding'))
+
+        self.assertNotContains(page, 'name="gender"')
+        self.assertNotContains(page, 'name="birth_date"')
 
     # ── Анонимный визит с pending_telegram_id вместо аккаунта ──────────────
     # Ветка `login_as_newcomer(onboarded=False)` выше проверяет уже
@@ -298,7 +303,7 @@ class Onboarding(TestCase):
     def test_invalid_submission_from_a_pending_telegram_visitor_creates_nothing(self):
         telegram_id = self._seed_pending_session()
         response = self.client.post(reverse('core:onboarding'), {
-            'pen_name': '', 'bio': '', 'birth_date': '', 'gender': '',
+            'pen_name': '', 'bio': '',
             'agree_rules': 'on', 'agree_privacy': 'on',
         })
         self.assertEqual(response.status_code, 200)
@@ -310,7 +315,6 @@ class Onboarding(TestCase):
         telegram_id = self._seed_pending_session()
         response = self.client.post(reverse('core:onboarding'), {
             'pen_name': 'Жаңа автор', 'bio': '',
-            'birth_date': '2010-05-01', 'gender': 'girl',
             'agree_rules': 'on', 'agree_privacy': 'on',
         })
         self.assertRedirects(response, reverse('core:signup_success'))
@@ -330,7 +334,6 @@ class Onboarding(TestCase):
 
         self.client.post(reverse('core:onboarding'), {
             'pen_name': 'Тағы бір автор', 'bio': '',
-            'birth_date': '2010-05-01', 'gender': 'boy',
             'agree_rules': 'on', 'agree_privacy': 'on',
         })
         self.assertNotEqual(self.client.session.session_key, before)

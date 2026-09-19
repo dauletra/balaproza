@@ -71,7 +71,6 @@ from .domain.moderation import (
     diff_summary,
     paragraph_diff,
 )
-from .domain.profile import GENDERS, GENDER_LABELS
 from .domain.story import (
     PUBLISH_CHECKLIST,
     REACTIONS,

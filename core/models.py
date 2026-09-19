@@ -25,7 +25,6 @@ from .domain.notifications import (
     MODERATION_OUTCOMES,
     NOTIF_KINDS,
 )
-from .domain.profile import GENDERS, GENDER_LABELS
 from .domain.reports import REPORT_REASON_LABELS, REPORT_REASONS
 from .domain.story import (
     REACTIONS,
@@ -75,20 +74,23 @@ class User(AbstractUser):
     first_name = None
     last_name = None
 
-    GENDER_CHOICES = [(g, GENDER_LABELS[g]) for g in GENDERS]
-
     # Единственное имя у аккаунта — публичное. Обязательно с онбординга
     # (BR-90): пустое поле означало бы, что автора называют по нику
     # (`@id<цифры>`) до первого сознательного выбора, а его теперь нет.
     pen_name = models.CharField('лақап аты', max_length=60, blank=True)
     bio = models.CharField('өзі туралы', max_length=200, blank=True)
-    # Самодекларация (DEC-24), без верификации. Возрастную вилку конкурса
-    # решает отдельный чекбокс формы подачи (BR-48), а не это поле. Дата,
-    # а не число лет (DEC-82): число протухает с каждым днём рождения без
-    # пересчёта — то самое производное, которое проект не хранит.
-    birth_date = models.DateField('туған күні', null=True, blank=True)
-    gender = models.CharField('жынысы', max_length=4, choices=GENDER_CHOICES,
-                              blank=True)
+    # Возраста и пола здесь нет, и это решение, а не пробел (D4/D5).
+    #
+    # Пол не использовался нигде: обязательное поле на входе, два
+    # значения, не показывается ни на одной странице. Дата рождения имела
+    # ровно один сценарий — возрастная вилка конкурса, — но её и там
+    # решает отдельный чекбокс формы подачи (`Submission.age_confirmed`),
+    # потому что самодекларацию всё равно никто не проверяет.
+    #
+    # Площадка собирает данные несовершеннолетних, и каждое лишнее поле
+    # здесь — обязательство, которое кто-то должен защищать. Два поля,
+    # не дававших ничего, стоили конверсии на входе и абзаца в политике
+    # конфиденциальности.
     avatar = models.FileField('аватар', upload_to=user_avatar_path, blank=True,
                               max_length=200, validators=[validate_raster_image])
     # Колонка, а не `follower_set.count()`: её читают `ORDER BY` ленты

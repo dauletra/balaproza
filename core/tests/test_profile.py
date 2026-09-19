@@ -888,8 +888,7 @@ class FollowingAnAuthorIsWrittenDown(TestCase):
 class ProfileEdit(TestCase):
     """Ф15, Этап 6: `/me/edit/` — настоящий POST, ошибка поля = no-op."""
 
-    FIELDS = {'username': 'aidana', 'pen_name': 'Аты',
-              'bio': '', 'gender': '', 'birth_date': ''}
+    FIELDS = {'username': 'aidana', 'pen_name': 'Аты', 'bio': ''}
 
     def setUp(self):
         super().setUp()
@@ -905,42 +904,31 @@ class ProfileEdit(TestCase):
         return User.objects.get(username='aidana')
 
     def test_it_saves_every_field_and_returns_to_the_profile(self):
-        response = self._post(pen_name='Жаңа лақап',
-                              bio='Жаңа био.', gender='girl', birth_date='2010-05-01')
+        response = self._post(pen_name='Жаңа лақап', bio='Жаңа био.')
         self.assertRedirects(response, reverse('core:profile_me'))
         user = self._aidana()
-        self.assertEqual(
-            [user.pen_name, user.bio, user.gender, user.birth_date],
-            ['Жаңа лақап', 'Жаңа био.', 'girl', date(2010, 5, 1)])
+        self.assertEqual([user.pen_name, user.bio],
+                         ['Жаңа лақап', 'Жаңа био.'])
 
     def test_the_optional_half_may_be_left_blank(self):
-        self._post(bio='Бар.', gender='girl', birth_date='')
-        self._post(bio='', gender='', birth_date='')
-        user = self._aidana()
-        self.assertIsNone(user.birth_date)
-        self.assertEqual(user.gender, '')
-        self.assertEqual(user.bio, '')
+        self._post(bio='Бар.')
+        self._post(bio='')
+        self.assertEqual(self._aidana().bio, '')
 
-    def test_birth_date_is_immutable_once_set(self):
-        """DEC-84: `birth_date` — самодекларация только один раз, дальше
-        `update_profile` игнорирует новое значение, пусть форма и пропустит
-        его как валидное."""
-        self._post(bio='Бар.', gender='girl', birth_date='2010-05-01')
-        self._post(bio='', gender='', birth_date='')
-        user = self._aidana()
-        self.assertEqual(user.birth_date, date(2010, 5, 1))
+    def test_the_page_does_not_ask_for_age_or_gender(self):
+        """Оба поля сняты (D4/D5): пол не показывался нигде, а возрастную
+        вилку конкурса решает чекбокс формы подачи. Проверяется разметка —
+        иначе снятое поле вернулось бы в неё и молча ничего не сохраняло."""
+        page = self.client.get(reverse('core:profile_me_edit'))
 
-        self._post(birth_date='1999-09-09')
-        user = self._aidana()
-        self.assertEqual(user.birth_date, date(2010, 5, 1))
+        self.assertNotContains(page, 'name="gender"')
+        self.assertNotContains(page, 'name="birth_date"')
 
     def test_a_bad_field_saves_nothing_and_returns_to_the_form(self):
         cases = {
             'username': ('ab', 'a' * 31, 'has space', 'a-b', 'rudazov'),
             'pen_name': ('', 'ә' * 61),
             'bio': ('ә' * 201,),
-            'gender': ('alien',),
-            'birth_date': ('abc', '2099-01-01'),
         }
         for field, values in cases.items():
             for value in values:
