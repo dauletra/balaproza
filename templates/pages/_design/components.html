@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Дизайн · Компоненты — Balaproza{% endblock %}
+{% block title %}Дизайн · Компоненты — Qazaqnovel{% endblock %}
 
 {% block content %}
     <header class="mb-10">
@@ -63,7 +63,7 @@
         <div class="grid gap-4 sm:grid-cols-2">
             {% include "components/input_field.html" with name="email1" label="Default" placeholder="email@example.com" %}
             {% include "components/input_field.html" with name="email2" label="With icon" icon="search" placeholder="Шығарма іздеу..." %}
-            {% include "components/input_field.html" with name="email3" label="Success" value="daulet@balaproza.kz" state="success" message="Дұрыс пішім" %}
+            {% include "components/input_field.html" with name="email3" label="Success" value="daulet@qazaqnovel.kz" state="success" message="Дұрыс пішім" %}
             {% include "components/input_field.html" with name="email4" label="Error" value="ne-email" state="error" message="Email пішімі дұрыс емес" %}
             {% include "components/input_field.html" with name="email5" label="Disabled" value="readonly@x.kz" disabled=True %}
             {% include "components/input_field.html" with name="email6" label="With hint" placeholder="Пароль" type="password" hint="Кем дегенде 8 таңба" %}

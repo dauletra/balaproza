@@ -163,9 +163,9 @@ class LoginPage(TestCase):
         self.assertContains(response, 'TELEGRAM_BOT_USERNAME')
 
     def test_shows_the_widget_when_bot_is_configured(self):
-        with override_settings(TELEGRAM_BOT_USERNAME='balaproza_bot'):
+        with override_settings(TELEGRAM_BOT_USERNAME='qazaqnovel_bot'):
             response = self.client.get(reverse('core:login'))
-        self.assertContains(response, 'data-telegram-login="balaproza_bot"')
+        self.assertContains(response, 'data-telegram-login="qazaqnovel_bot"')
 
     def test_already_signed_in_is_sent_to_profile(self):
         """Вошедшему тут делать нечего — виджет и так предложил бы войти

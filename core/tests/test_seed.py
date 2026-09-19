@@ -37,7 +37,7 @@ from django.utils import timezone
 
 from core import data
 from core.management.commands import _corpus
-from core.templatetags.balaproza import ago, outcome_label, since
+from core.templatetags.qazaqnovel import ago, outcome_label, since
 from core.models import (
     AwardGrant,
     Chapter,

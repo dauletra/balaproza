@@ -18,7 +18,7 @@ from django.utils import timezone
 from core import data
 from core.domain.formatting import kk_joined
 from core.models import BlockedTagPattern, Genre, StoryTag, Tag, User
-from core.templatetags.balaproza import (
+from core.templatetags.qazaqnovel import (
     compact_count,
     page_range,
     reading_meta,

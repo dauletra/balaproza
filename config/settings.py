@@ -274,7 +274,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'balaproza',
+        'LOCATION': 'qazaqnovel',
         'TIMEOUT': 300,
     },
 }

@@ -34,7 +34,7 @@ from core.models import (
     StoryComment,
     User,
 )
-from core.templatetags.balaproza import outcome_label
+from core.templatetags.qazaqnovel import outcome_label
 from core.tests import factories
 from core.tests.base import TestCase, login_as, login_as_newcomer, user
 

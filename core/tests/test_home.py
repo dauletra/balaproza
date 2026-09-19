@@ -16,7 +16,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core import data
-from core.templatetags.balaproza import (
+from core.templatetags.qazaqnovel import (
     reading_meta,
     short_date,
     spaced,

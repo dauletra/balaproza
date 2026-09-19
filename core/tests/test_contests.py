@@ -23,7 +23,7 @@ from django.urls import reverse
 
 from core import data, views
 from core.domain.contests import eligibility_line, timing_line
-from core.templatetags.balaproza import ago, period, short_date
+from core.templatetags.qazaqnovel import ago, period, short_date
 from core.models import (
     AwardGrant,
     Contest,

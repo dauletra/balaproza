@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}{{ story.title }} — {{ story.author.public_name }} — Balaproza{% endblock %}
+{% block title %}{{ story.title }} — {{ story.author.public_name }} — Qazaqnovel{% endblock %}
 
 {% block meta_description %}{{ story.annotation|default:story.title|truncatechars:160 }}{% endblock %}
 {% block og_title %}{{ story.title }}{% endblock %}

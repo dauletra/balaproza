@@ -14,7 +14,7 @@ from core.domain.story import MAX_DRAFT_STORIES
 from core.models import Chapter, ChapterPoll, Story, Tag
 from core.tests import factories
 from core.tests.base import login_as, login_as_newcomer, user
-from core.templatetags.balaproza import reading_meta, since, spaced
+from core.templatetags.qazaqnovel import reading_meta, since, spaced
 
 
 # ───────────────────────── Кабинет: my_stories_of / writer_stats ─────────

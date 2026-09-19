@@ -4,7 +4,7 @@
 значение нельзя вывести (акт человека) или агрегат по логу слишком дорог, —
 и тогда рядом стоит её пересчёт.
 
-Подписи собирает `templatetags/balaproza`, выдачу — `managers.py`.
+Подписи собирает `templatetags/qazaqnovel`, выдачу — `managers.py`.
 """
 
 from datetime import timedelta

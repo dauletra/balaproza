@@ -1,4 +1,4 @@
-# Balaproza
+# Qazaqnovel
 
 Казахоязычный детский литературный портал. Django 6 + PostgreSQL + Tailwind CSS v4
 + Alpine.js + htmx.
@@ -22,7 +22,7 @@
 Нужны [uv](https://docs.astral.sh/uv/), Node.js 20+ и PostgreSQL 14+.
 
 ```bash
-git clone https://github.com/dauletra/balaproza.git
+git clone https://github.com/dauletra/qazaqnovel.git
 ```
 
 ```bash
