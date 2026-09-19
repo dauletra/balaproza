@@ -68,9 +68,11 @@ class UserAdmin(DjangoUserAdmin):
                            'сайтта мүлде сақталмайды (DEC-82).',
         }),
         ('Хабарламалар', {
-            'fields': ('telegram_push',),
-            'description': 'Өшірілген болса — бот бұғатталған немесе автор '
-                           'өзі бас тартқан. Сайттағы хабарламалар қалады.',
+            'fields': ('telegram_push', 'push_moderation', 'push_response',
+                       'push_new_chapter'),
+            'description': '«Telegram-хабарлама» — арнаның өзі: өшірілген '
+                           'болса, бот бұғатталған. Қалған үшеуі — автордың '
+                           'таңдауы. Сайттағы хабарламалар бәрібір қалады.',
         }),
         ('Рұқсаттар', {'fields': ('is_active', 'is_staff', 'is_superuser',
                                   'groups', 'user_permissions')}),

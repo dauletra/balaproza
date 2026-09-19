@@ -302,6 +302,15 @@ class ProfileForm(forms.ModelForm):
     username = forms.CharField(required=True, max_length=30, error_messages={
         'required': 'Никті жаз.'})
 
+    # Семьи Telegram-уведомлений. Полями формы, а не через `Meta.fields`:
+    # у модели они `blank=False` с дефолтом `True`, и `ModelForm` сделал бы
+    # их обязательными — снятая галка не отправляется браузером вовсе, то
+    # есть «выключить» означало бы «форма невалидна». `required=False` —
+    # ровно это и лечит: пусто значит «не хочу».
+    push_moderation = forms.BooleanField(required=False)
+    push_response = forms.BooleanField(required=False)
+    push_new_chapter = forms.BooleanField(required=False)
+
     class Meta:
         model = User
         fields = ('pen_name', 'bio', 'birth_date', 'gender', 'avatar')

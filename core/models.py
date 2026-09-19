@@ -116,6 +116,13 @@ class User(AbstractUser):
     # (`push_notifications`). Второе важнее первого: без него очередь
     # каждый раз ломилась бы в закрытую дверь.
     telegram_push = models.BooleanField('Telegram-хабарлама', default=True)
+    # Что именно слать — три семьи событий (`domain.PUSH_CATEGORIES`).
+    # Отдельно от `telegram_push` намеренно: тот про **канал** и снимается
+    # платформой, эти три — выбор человека. Одним общим выключателем автор,
+    # уставший от откликов, терял бы и решения модератора.
+    push_moderation = models.BooleanField('модерация мен байқау', default=True)
+    push_response = models.BooleanField('оқырман жауабы', default=True)
+    push_new_chapter = models.BooleanField('жаңа бөлімдер', default=True)
 
     class Meta:
         verbose_name = 'пайдаланушы'

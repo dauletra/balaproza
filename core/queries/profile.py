@@ -99,7 +99,9 @@ def author_by_username(username: str):
 
 def update_profile(user, *, pen_name: str, bio: str,
                    birth_date, gender: str, avatar, remove_avatar: bool = False,
-                   username: str) -> None:
+                   username: str,
+                   push_moderation=None, push_response=None,
+                   push_new_chapter=None) -> None:
     """Сохранить свой профиль (FR-PROF-01). `gender` — самодекларация
     (DEC-24), меняется свободно. `birth_date` тоже самодекларация, но
     только на онбординге (DEC-84): раз заданная, дальше не трогается —
@@ -108,7 +110,12 @@ def update_profile(user, *, pen_name: str, bio: str,
     автор не переизбирает файл при каждом сохранении. `remove_avatar` —
     явное снятие (BR-86), третье состояние рядом с «не меняем»; новый файл
     важнее снятия. `username` (BR-91) обязателен — форма всегда шлёт
-    текущее или новое значение, третьего состояния «не меняем» у него нет."""
+    текущее или новое значение, третьего состояния «не меняем» у него нет.
+
+    Три `push_*` — семьи Telegram-уведомлений; `None` значит «не трогаем»,
+    как пустой `avatar`. Форма всегда шлёт все три (снятая галка это
+    `False`), а вызовы, которым до них дела нет, их и не передают.
+    """
     user.pen_name = pen_name
     user.bio = bio
     if not user.birth_date:
@@ -119,6 +126,20 @@ def update_profile(user, *, pen_name: str, bio: str,
         user.avatar = avatar
     elif remove_avatar:
         user.avatar = ''
+
+    chosen = {'push_moderation': push_moderation,
+              'push_response': push_response,
+              'push_new_chapter': push_new_chapter}
+    for field, wanted in chosen.items():
+        if wanted is not None:
+            setattr(user, field, wanted)
+    # Сохранённые настройки заново открывают канал, если его закрыла
+    # платформа (бот был заблокирован). Человек только что сказал, что
+    # хочет получать хотя бы что-то, — держать дверь закрытой после этого
+    # значит молча игнорировать просьбу. Если бота так и не разблокировали,
+    # первая же отправка закроет её снова.
+    if not user.telegram_push and any(bool(v) for v in chosen.values()):
+        user.telegram_push = True
     user.save()
 
 

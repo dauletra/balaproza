@@ -58,6 +58,8 @@ from .domain.notifications import (
     NOTIF_BUCKET_LABELS,
     NOTIF_BUCKETS,
     NOTIF_KINDS,
+    PUSH_CATEGORIES,
+    PUSH_KIND_FIELD,
     push_line,
 )
 from .domain.moderation import (
@@ -218,6 +220,7 @@ from .queries.notifications import (
     notify_reaction,
     notify_submission_decided,
     pending_pushes,
+    push_settings_of,
     unread_count_for_user,
 )
 

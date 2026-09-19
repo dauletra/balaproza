@@ -18,6 +18,7 @@ from unittest.mock import patch
 
 from django.core.management import call_command
 from django.test import override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from core import data
@@ -28,9 +29,9 @@ from core.domain.telegram import (
     send_telegram_message,
 )
 from core.links import push_message
-from core.models import Notification
+from core.models import Notification, User
 from core.tests import factories as f
-from core.tests.base import TestCase
+from core.tests.base import TestCase, login_as
 
 # Токен обязателен, иначе команда честно отказывается работать. Значение
 # любое: сама отправка подменена.
@@ -262,6 +263,137 @@ class TheMessageCarriesTheSubjectAndTheLink(TestCase):
         note = Notification.objects.get(user=author, kind='comment')
 
         self.assertIn('Сен & мен <бірге>', push_message(note))
+
+
+@TOKEN
+@NO_PAUSE
+class TheAuthorChoosesWhatArrives(TestCase):
+    """Три семьи, а не один выключатель.
+
+    Ради этого этап и заведён: у автора с живым сериалом отклики идут
+    потоком, а решение модератора приходит редко и важнее всего
+    остального. Общий «выключить» отнимал бы второе вместе с первым — то
+    же самое, что блокировка бота, только изнутри продукта.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.author = _reader()
+        self.story = f.story(author=self.author, chapters=1)
+
+    def _queued(self, kind: str) -> Notification:
+        return Notification.objects.create(
+            user=self.author, kind=kind, story=self.story, text='оқиға')
+
+    def test_a_switched_off_family_stays_out_of_the_queue(self):
+        for category in data.PUSH_CATEGORIES:
+            with self.subTest(category.field):
+                Notification.objects.all().delete()
+                for kind in category.kinds:
+                    self._queued(kind)
+                setattr(self.author, category.field, False)
+                self.author.save(update_fields=[category.field])
+
+                self.assertEqual(data.pending_pushes(), [])
+
+                setattr(self.author, category.field, True)
+                self.author.save(update_fields=[category.field])
+
+    def test_the_families_are_independent(self):
+        """Выключенные отклики не уносят с собой решение модератора — весь
+        смысл разделения в этом."""
+        self._queued('comment')
+        self._queued('moderation')
+        self.author.push_response = False
+        self.author.save(update_fields=['push_response'])
+
+        kinds = [n.kind for n in data.pending_pushes()]
+
+        self.assertEqual(kinds, ['moderation'])
+
+    def test_the_site_feed_is_untouched(self):
+        """Выключается канал, а не события: колокольчик считает своё."""
+        self._queued('comment')
+        self.author.push_response = False
+        self.author.save(update_fields=['push_response'])
+
+        self.assertEqual(data.pending_pushes(), [])
+        self.assertEqual(data.unread_count_for_user(self.author), 1)
+
+
+class TheSwitchesLiveInTheProfileForm(TestCase):
+    """`/me/edit/` — единственное место, где человек их трогает."""
+
+    FIELDS = {'username': 'aidana', 'pen_name': 'Аты',
+              'bio': '', 'gender': '', 'birth_date': ''}
+
+    def setUp(self):
+        super().setUp()
+        self.user = login_as(self.client)
+
+    def _post(self, **overrides):
+        payload = dict(self.FIELDS)
+        payload.update(overrides)
+        return self.client.post(reverse('core:profile_me_edit'), payload)
+
+    def _fresh(self):
+        return User.objects.get(pk=self.user.pk)
+
+    def test_the_page_offers_every_family(self):
+        page = self.client.get(reverse('core:profile_me_edit'))
+
+        for category in data.PUSH_CATEGORIES:
+            self.assertContains(page, category.label)
+            self.assertContains(page, f'name="{category.field}"')
+
+    def test_an_unchecked_box_switches_the_family_off(self):
+        """Снятая галка браузером не отправляется вовсе — «нет» это
+        отсутствие поля, и форма обязана читать его именно так."""
+        self._post(push_moderation='on', push_new_chapter='on')
+
+        user = self._fresh()
+        self.assertTrue(user.push_moderation)
+        self.assertFalse(user.push_response)
+        self.assertTrue(user.push_new_chapter)
+
+    def test_saving_reopens_a_channel_the_platform_closed(self):
+        """Бот был заблокирован, человек вернулся и подтвердил, что хочет
+        получать хотя бы что-то. Держать дверь закрытой после этого значит
+        молча игнорировать просьбу; если бота не разблокировали, первая же
+        отправка закроет её снова."""
+        data.disable_push(self.user)
+
+        self._post(push_moderation='on')
+
+        self.assertTrue(self._fresh().telegram_push)
+
+    def test_saving_everything_off_does_not_reopen_it(self):
+        data.disable_push(self.user)
+
+        self._post()
+
+        self.assertFalse(self._fresh().telegram_push)
+
+    def test_a_rejected_form_changes_nothing(self):
+        """Ошибка в соседнем поле не должна тихо переписать настройки —
+        то же правило, что у остального профиля."""
+        self._post(username='!!', push_moderation='on')
+
+        user = self._fresh()
+        self.assertEqual(user.username, 'aidana')
+        self.assertTrue(user.push_response)
+
+
+class EveryKindBelongsToExactlyOneFamily(TestCase):
+    """Вид события, не попавший ни в одну семью, не дошёл бы никогда —
+    и молча: условие выборки собирается по семьям."""
+
+    def test_the_families_cover_all_six_kinds(self):
+        self.assertEqual(set(data.PUSH_KIND_FIELD), set(data.NOTIF_KINDS))
+
+    def test_no_kind_is_claimed_twice(self):
+        claimed = [kind for c in data.PUSH_CATEGORIES for kind in c.kinds]
+        self.assertEqual(len(claimed), len(set(claimed)))
 
 
 class TheSenderUnderstandsWhatTelegramAnswered(TestCase):

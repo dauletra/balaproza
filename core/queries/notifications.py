@@ -25,10 +25,12 @@
 
 from datetime import datetime, time, timedelta
 
+from django.db.models import Q
 from django.utils import timezone
 
 from ..domain.notifications import (
     NOTIF_BUCKETS,
+    PUSH_CATEGORIES,
     SUBMISSION_EVENTS,
     award_event,
     comment_quote,
@@ -262,6 +264,20 @@ PUSH_MAX_AGE_HOURS = 1
 PUSH_BATCH = 200
 
 
+def _chosen_kinds() -> Q:
+    """«Этот вид этому человеку ещё нужен» — условием для базы.
+
+    Собирается из `PUSH_CATEGORIES`, а не переписывается здесь списком:
+    вторая копия разошлась бы с первой молча, и это худший из возможных
+    отказов — человек снял галку, а сообщения идут.
+    """
+    chosen = Q()
+    for category in PUSH_CATEGORIES:
+        chosen |= Q(kind__in=category.kinds,
+                    **{f'user__{category.field}': True})
+    return chosen
+
+
 def pending_pushes(limit: int = PUSH_BATCH) -> list:
     """Что осталось доставить, старое первым.
 
@@ -269,17 +285,33 @@ def pending_pushes(limit: int = PUSH_BATCH) -> list:
     в каком случились, — иначе решение модератора обгоняет комментарий,
     на который оно отвечает.
 
-    Адресат обязан быть с `telegram_id` и не отключивший доставку.
-    Проверка в запросе, а не в команде: иначе пачка из двухсот строк
-    целиком состояла бы из тех, кому слать некуда.
+    Три условия на адресата: есть куда слать (`telegram_id`), канал жив
+    (`telegram_push`) и этот вид событий он не выключал. Все три в
+    запросе, а не в команде: иначе пачка из двухсот строк целиком
+    состояла бы из тех, кому слать не надо.
     """
     edge = timezone.now() - timedelta(hours=PUSH_MAX_AGE_HOURS)
     return list(Notification.objects
                 .filter(pushed_at__isnull=True, created_at__gte=edge,
                         user__telegram_id__isnull=False,
                         user__telegram_push=True)
+                .filter(_chosen_kinds())
                 .select_related('user', 'actor', 'story', 'contest')
                 .order_by('created_at', 'pk')[:limit])
+
+
+def push_settings_of(user) -> list:
+    """Три переключателя с текущим состоянием — для формы профиля.
+
+    Данными, а не разметкой: подписи и состав семей живут в домене, и
+    шаблон их перечислять не должен — иначе новая семья событий
+    появляется в очереди и не появляется в настройках.
+    """
+    if user is None:
+        return []
+    return [{'name': c.field, 'label': c.label, 'hint': c.hint,
+             'checked': getattr(user, c.field)}
+            for c in PUSH_CATEGORIES]
 
 
 def mark_pushed(notifications) -> int:

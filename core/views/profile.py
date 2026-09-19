@@ -124,6 +124,10 @@ def profile_me_edit(request):
     return render(request, 'pages/profile/profile_me_edit.html', {
         'profile_user': author,
         'username':     username,
+        # Три семьи Telegram-уведомлений с текущим состоянием. Данными, а
+        # не разметкой: подписи и состав живут в домене, и шаблон их
+        # перечислять не должен.
+        'push_settings': data.push_settings_of(author),
     })
 
 

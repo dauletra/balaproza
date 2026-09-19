@@ -74,6 +74,46 @@
         {# ── Био ── #}
         {% include "components/textarea.html" with name="bio" label="Автор туралы" value=profile_user.bio rows=4 maxlength=200 hint="Профильде көрсетіледі. Қажет емес болса бос қалдыр." %}
 
+        {% comment %}
+            Telegram-хабарламалар. Три семьи, а не один выключатель: у
+            автора с живым сериалом отклики идут потоком, а решение
+            модератора приходит редко и важнее всего остального — общим
+            «выключить» он терял бы второе вместе с первым.
+
+            Список приходит данными (`push_settings`), подписи живут в
+            домене: семья, заведённая там и не перечисленная здесь,
+            попадала бы в рассылку, не попадая в настройки.
+
+            Сайтовая лента этими галками не управляется вовсе —
+            выключается канал, а не события. Сказано вслух подписью
+            секции: иначе «выключил уведомления» читается как «колокольчик
+            больше не звенит».
+        {% endcomment %}
+        <fieldset class="flex flex-col gap-3 border-t border-slate-100 pt-5">
+            <legend class="mb-1 font-sans text-sm font-semibold text-slate-800">
+                Telegram-хабарламалар
+            </legend>
+            <p class="font-sans text-xs text-slate-600">
+                Сайттағы хабарламалар қалай болса, солай қалады — мұнда тек
+                Telegram-ға не жіберілетіні шешіледі.
+            </p>
+
+            {% if not profile_user.telegram_push %}
+                <p class="rounded-md bg-status-warning-bg px-3 py-2.5 font-sans text-xs text-status-warning-fg">
+                    Бот бұғатталған сияқты: соңғы хабарлама жеткізілмеді, сондықтан
+                    жіберу тоқтатылды. Telegram-да ботты қайта қосып, осы бетті
+                    сақтасаң, жіберу жалғасады.
+                </p>
+            {% endif %}
+
+            {% for item in push_settings %}
+                <div class="flex flex-col gap-1">
+                    {% include "components/checkbox.html" with name=item.name label=item.label checked=item.checked %}
+                    <p class="pl-7 font-sans text-xs text-slate-500">{{ item.hint }}</p>
+                </div>
+            {% endfor %}
+        </fieldset>
+
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
             <a href="{% url 'core:profile_me' %}"
                class="font-sans text-sm font-semibold text-slate-600 hover:text-brand">
