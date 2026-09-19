@@ -94,7 +94,8 @@ core/
 ├── counters.py    │ сигналы post_save/post_delete — то, что доменные
 ├── media_cleanup.py │ функции не видят (массовое удаление, каскад):
 │                  счётчики и уборка файла обложки/аватара/афиши/эмблемы
-├── management/commands/  seed_demo + _corpus.py (демо-содержимое литералами)
+├── management/commands/  seed_demo + _corpus.py (демо-содержимое литералами),
+│                  два суточных пересчёта и push_notifications (раз в минуту)
 └── tests/         base.py (login_as), factories.py, runner.py
 templates/         base.html, components/, partials/, pages/ — всё в корневой
 static/js/         components.js (Alpine-компоненты портала), reader.js (читалка),

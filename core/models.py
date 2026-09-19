@@ -106,6 +106,16 @@ class User(AbstractUser):
     # не `None` (BR-90); отдельного флага «завершил онбординг» не заводим.
     terms_accepted_at = models.DateTimeField('ережелерге келісті',
                                              null=True, blank=True)
+    # Слать ли уведомления в Telegram. По умолчанию да: право писать
+    # получено на входе (виджет просит `request-access=write`), и человек,
+    # вошедший через Telegram, ждёт ответа именно там.
+    #
+    # Снимается двумя способами. Сам человек — на `/me/edit/`. Сама
+    # платформа — когда бот получил отказ, после которого повторять
+    # бессмысленно: адресат закрыл бота или не дал права писать
+    # (`push_notifications`). Второе важнее первого: без него очередь
+    # каждый раз ломилась бы в закрытую дверь.
+    telegram_push = models.BooleanField('Telegram-хабарлама', default=True)
 
     class Meta:
         verbose_name = 'пайдаланушы'
@@ -1881,6 +1891,15 @@ class Notification(models.Model):
                                choices=OUTCOME_CHOICES)
     text = models.CharField('оқиға', max_length=300, blank=True)
     read = models.BooleanField('оқылды', default=False)
+    # Когда событие ушло в Telegram; пусто — ещё не уходило. Колонка, а не
+    # отдельная таблица очереди: очередь тут и есть «уведомления без этой
+    # отметки», и вторая таблица дублировала бы первую целиком.
+    #
+    # `read` отвечает на другой вопрос и заменить её не может: «прочитано»
+    # — про человека и ленту на сайте, «отправлено» — про бота. Событие
+    # бывает отправленным и непрочитанным, и это норма.
+    pushed_at = models.DateTimeField('Telegram-ға жіберілді',
+                                     null=True, blank=True)
 
     class Meta:
         ordering = ('-created_at',)
@@ -1891,6 +1910,13 @@ class Notification(models.Model):
             # последнюю неделю». Бейдж — на каждой странице у каждого
             # вошедшего, так что этот индекс трогают чаще прочих.
             models.Index(fields=['user', '-created_at']),
+            # Очередь отправки. Частичный: неотправленных в любой момент
+            # единицы — всё, что успело накопиться между запусками команды,
+            # — а полный индекс по `pushed_at` рос бы вместе со всей
+            # историей уведомлений ради выборки из десяти строк.
+            models.Index(fields=['created_at'],
+                         condition=models.Q(pushed_at__isnull=True),
+                         name='notif_unpushed'),
         ]
 
     def __str__(self):

@@ -41,6 +41,16 @@ def _uniq(prefix: str) -> str:
     return f'{prefix}-{next(_seq)}'
 
 
+def next_telegram_id() -> int:
+    """Уникальный `telegram_id` — колонка уникальна, и второй тестовый
+    автор с тем же числом ронял бы не тот тест, который его завёл.
+
+    Из того же счётчика, что и ники: воспроизводимость важнее похожести
+    на настоящие номера Telegram.
+    """
+    return 900_000_000 + next(_seq)
+
+
 def tiny_image(name: str = 'cover.png') -> SimpleUploadedFile:
     """Настоящий растр в один пиксель — для тестов загрузки обложки,
     аватара и эмблемы. `validate_raster_image` (BR-86) декодирует файл

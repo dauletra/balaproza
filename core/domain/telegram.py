@@ -13,7 +13,10 @@ Redirect-режим: виджет не шлёт JS-колбэк, а редире
 
 import hashlib
 import hmac
+import json
 import time
+import urllib.error
+import urllib.request
 
 # Старше — подпись верна, но ссылку не принимаем: Telegram не даёт nonce,
 # только `auth_date`, и это единственная защита от повторного использования
@@ -51,3 +54,77 @@ def verify_telegram_auth(params: dict, bot_token: str, *,
         return 'stale'
 
     return None
+
+
+# ── Отправка сообщения ───────────────────────────────────────────────────
+#
+# Тот же бот, которым человек вошёл, и то же разрешение: виджет входа
+# просит `data-request-access="write"`, то есть право писать получено ещё
+# на входе — отдельного «нажми Start у бота» не требуется. Разрешение
+# можно и не дать, и отозвать потом; оба случая приходят сюда отказом.
+#
+# Здесь, рядом с проверкой подписи, по той же причине: Telegram — внешний
+# протокол, а не часть предметной области портала. Ни моделей, ни
+# настроек Django — токен приходит параметром.
+#
+# `urllib`, а не `requests`: один POST с JSON не стоит шестой зависимости
+# в проекте, где их пять.
+
+_SEND_URL = 'https://api.telegram.org/bot{token}/sendMessage'
+
+# Что вернула отправка. Пусто — доставлено; остальное объясняет, что
+# делать дальше, и это два **разных** ответа: «повторять бессмысленно» и
+# «сейчас не вышло».
+PUSH_OK = ''
+PUSH_BLOCKED = 'blocked'
+PUSH_FAILED = 'failed'
+
+# Ответы, после которых повторять нечего: адресат закрыл бота, удалил
+# аккаунт, не дал права писать. Telegram отвечает на них 4xx с текстом —
+# по коду их не отличить от «неверный токен», поэтому смотрим описание.
+_PERMANENT = (
+    'bot was blocked',
+    'user is deactivated',
+    'chat not found',
+    "bot can't initiate conversation",
+)
+
+
+def _description(error) -> str:
+    """Человеческая часть отказа Telegram. Тело читается один раз и может
+    оказаться не-JSON (прокси, страница ошибки) — тогда пусто, и отказ
+    считается временным: лучше повторить лишний раз, чем замолчать
+    навсегда из-за чужой HTML-страницы."""
+    try:
+        return json.loads(error.read().decode()).get('description', '').lower()
+    except (ValueError, OSError, AttributeError):
+        return ''
+
+
+def send_telegram_message(bot_token: str, chat_id: int, text: str, *,
+                          timeout: int = 10) -> str:
+    """Отправить сообщение. `PUSH_OK` — доставлено, иначе код причины.
+
+    Исключений не бросает вовсе: зовут её из команды по расписанию, где
+    одно упавшее сообщение не должно уносить всю очередь.
+    """
+    payload = json.dumps({
+        'chat_id': chat_id,
+        'text': text,
+        # Своя же ссылка под каждым уведомлением развернулась бы карточкой
+        # с обложкой — в ленте бота это шум, а не помощь.
+        'link_preview_options': {'is_disabled': True},
+    }).encode()
+    request = urllib.request.Request(
+        _SEND_URL.format(token=bot_token), data=payload,
+        headers={'Content-Type': 'application/json'})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return PUSH_OK if response.status == 200 else PUSH_FAILED
+    except urllib.error.HTTPError as error:
+        description = _description(error)
+        return (PUSH_BLOCKED if any(m in description for m in _PERMANENT)
+                else PUSH_FAILED)
+    except (urllib.error.URLError, OSError, ValueError):
+        # Сеть, таймаут, DNS. Временное по определению.
+        return PUSH_FAILED

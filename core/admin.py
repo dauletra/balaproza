@@ -67,6 +67,11 @@ class UserAdmin(DjangoUserAdmin):
                            'құжатпен расталмаған (DEC-24). Нақты аты-жөні '
                            'сайтта мүлде сақталмайды (DEC-82).',
         }),
+        ('Хабарламалар', {
+            'fields': ('telegram_push',),
+            'description': 'Өшірілген болса — бот бұғатталған немесе автор '
+                           'өзі бас тартқан. Сайттағы хабарламалар қалады.',
+        }),
         ('Рұқсаттар', {'fields': ('is_active', 'is_staff', 'is_superuser',
                                   'groups', 'user_permissions')}),
         ('Маңызды күндер', {'fields': ('last_login', 'date_joined')}),
@@ -515,8 +520,13 @@ class NotificationAdmin(admin.ModelAdmin):
     исправленное руками оно рассказывало бы автору о решении, которого
     никто не принимал. Модератору здесь нужно видеть, что автор получил."""
 
+    # `pushed_at` рядом с `read` отвечает на вопрос «дошло ли вообще»:
+    # это два разных канала, и событие бывает отправленным в Telegram и
+    # непрочитанным на сайте. Пустая колонка у свежих строк — норма,
+    # рассылка идёт раз в минуту; пустая у старых — повод смотреть, жива
+    # ли `push_notifications`.
     list_display = ('user', 'kind', 'outcome_label', 'short_text',
-                    'created_at', 'read')
+                    'created_at', 'read', 'pushed_at')
     list_filter = ('kind', 'outcome', 'read')
     search_fields = ('user__username', 'text')
     date_hierarchy = 'created_at'

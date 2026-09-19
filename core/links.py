@@ -9,6 +9,7 @@
 from dataclasses import dataclass, fields, replace
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.urls import reverse
 
 from . import data
@@ -344,3 +345,31 @@ def notification_href(n) -> str:
     if n.actor_id:
         return reverse('core:profile_other', kwargs={'username': n.actor.username})
     return ''
+
+
+def push_message(n) -> str:
+    """Уведомление как сообщение в Telegram: фраза плюс адрес предмета.
+
+    Здесь, потому что это ровно предмет модуля — данные плюс URL. Фразу
+    собирает домен (`push_line`), адрес — `notification_href` строкой
+    выше; складывать их в команде отправки значило бы завести третье
+    место, где известно и то и другое.
+
+    Адрес **абсолютный**: сообщение открывается из мессенджера, и
+    относительный путь там не ссылка. Домен берётся из `SITE_URL` —
+    единственного места, где он вообще известен без запроса.
+
+    Ссылка отдельной строкой и без разметки. Никакого `parse_mode`: в
+    названии работы бывают `<` и `&`, и экранировать их ради жирного
+    шрифта значит завести ошибку там, где её сейчас нет.
+    """
+    line = data.push_line(
+        n.kind,
+        actor=n.actor.public_name if n.actor_id else '',
+        story=n.story.title if n.story_id else '',
+        contest=n.contest.name if n.contest_id else '',
+        outcome=data.MODERATION_OUTCOME_LABELS.get(n.outcome, ''),
+        event=n.text,
+    )
+    href = notification_href(n)
+    return f'{line}\n\n{settings.SITE_URL}{href}' if href else line

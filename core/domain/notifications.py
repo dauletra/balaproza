@@ -80,6 +80,40 @@ def award_event(award_title: str) -> str:
     return f'{award_title} номинациясында жеңдің. Құттықтаймыз!'
 
 
+def push_line(kind: str, *, actor: str = '', story: str = '', contest: str = '',
+              outcome: str = '', event: str = '') -> str:
+    """Уведомление одной строкой — для сообщения в Telegram.
+
+    На сайте предложение собирает `notification_item.html` из объектов:
+    имя автора ссылкой, название работы ссылкой, цитата отдельным блоком.
+    В мессенджере верстки нет, поэтому фраза собирается здесь — и здесь,
+    а не в команде отправки: правило записи живёт в домене, как подписи
+    статусов.
+
+    Принимает строки, не объекты: домен моделей не знает, а достать из
+    уведомления имя и название — работа `links.push_message`.
+
+    Порядок слов у `new_chapter` отличается от страницы сознательно: там
+    автор стоит после названия, потому что рядом есть иконка, отступ и
+    группа «новая глава»; в одну строку без них это читается как хвост.
+    """
+    if kind == 'comment':
+        line = f'{actor} «{story}» туындысына пікір қалдырды.'
+        return f'{line}\n«{event}»' if event else line
+    if kind == 'like':
+        return f'{actor} «{story}» туындысына реакция қалдырды.'
+    if kind == 'new_chapter':
+        return f'{actor}: «{story}» — {event}'
+    if kind == 'follower':
+        return f'{actor} саған жазылды.'
+    if kind == 'moderation':
+        line = f'{outcome}: «{story}»' if story else outcome
+        return f'{line} — {event}' if event else line
+    if kind == 'contest':
+        return f'Байқау: {contest} — {event}'
+    return event
+
+
 def comment_quote(text: str) -> str:
     """Цитата читателя — одно из двух исключений из правила «в тексте
     только событие» (второе — причина модератора, BR-11).
