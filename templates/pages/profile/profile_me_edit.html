@@ -83,6 +83,24 @@
         </div>
     </form>
 
+    {% comment %}
+        Telegram қосылымы: сайттан шығу тек осы құрылғыдағы сессияны аяқтайды,
+        Telegram жағын сайт өшіре алмайды (олай ету — қауіпсіздік тұрғысынан
+        басқа сайтқа Telegram аккаунтыңды басқаруға рұқсат беру дегенді
+        білдірер еді)
+    {% endcomment %}
+    <div class="mt-8 flex flex-col items-start gap-3 rounded-hero border border-status-info-fg/30 bg-status-info-bg/40 p-6">
+        <div class="flex items-center gap-2">
+            {% include "components/icon.html" with name="telegram" size=18 cls="text-status-info-fg" only %}
+            <h2 class="font-display text-lg font-bold text-status-info-fg">Telegram қосылымы</h2>
+        </div>
+        <p class="font-sans text-sm text-slate-600">
+            Сайттан шыққанда тек осы құрылғыдағы сессия аяқталады. Telegram-мен
+            байланысты толық үзу үшін Telegram қолданбасының Параметрлер →
+            Құпиялылық бөлімінен осы сайтқа берілген рұқсатты қайтарып ал.
+        </p>
+    </div>
+
     {# ── Қауіпті аймақ (FR-PROF-11, BR-95): жою — қайтарылмайды, кезеңі жоқ ── #}
     <div class="mt-8 flex flex-col items-start gap-3 rounded-hero border border-status-error-fg/30 bg-status-error-bg/40 p-6">
         <h2 class="font-display text-lg font-bold text-status-error-fg">Қауіпті аймақ</h2>

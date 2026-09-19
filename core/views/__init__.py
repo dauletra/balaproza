@@ -13,6 +13,7 @@
 
 from .api import search_index_json
 from .auth import (
+    decline_onboarding,
     login_view,
     logout_view,
     onboarding,

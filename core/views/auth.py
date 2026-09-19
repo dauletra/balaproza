@@ -11,6 +11,7 @@ import logging
 from urllib.parse import urlencode
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -61,8 +62,11 @@ def login_view(request):
 
 def telegram_callback(request):
     """Куда Telegram редиректит после согласия пользователя. `id` — telegram_id
-    (FR-AUTH-01); первый вход заводит аккаунт (FR-AUTH-03) и ведёт на
-    онбординг, повторный — сразу на `next`."""
+    (FR-AUTH-01). Уже заведённый аккаунт логинится сразу и уходит на `next`;
+    первый визит аккаунт ещё не заводит — подтверждённый `telegram_id` ждёт
+    анкету в сессии (`pending_telegram_id`), а не в базе, чтобы отказ от
+    регистрации не оставлял недозаполненную запись (см. `onboarding`,
+    `decline_onboarding`)."""
     params = {k: v for k, v in request.GET.items() if k in _TELEGRAM_FIELDS}
     reason = verify_telegram_auth(params, settings.TELEGRAM_BOT_TOKEN)
     if reason:
@@ -72,12 +76,15 @@ def telegram_callback(request):
             'error': _SIGN_IN_FAILED,
         })
 
-    user, created = data.get_or_create_telegram_user(int(params['id']))
-    auth_login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-
+    telegram_id = int(params['id'])
     next_url = _safe_next(request)
-    if created:
+
+    user = data.find_telegram_user(telegram_id)
+    if user is None:
+        request.session['pending_telegram_id'] = telegram_id
         return redirect(f"{reverse('core:onboarding')}?{urlencode({'next': next_url})}")
+
+    auth_login(request, user, backend='django.contrib.auth.backends.ModelBackend')
     return redirect(next_url)
 
 
@@ -92,17 +99,34 @@ def logout_view(request):
 def onboarding(request):
     """Онбординг после первого входа (FR-AUTH-03/04/05/06). Завершённость —
     `terms_accepted_at` (BR-90): повторный заход сюда уже онбордившегося
-    автора не должен спрашивать те же поля снова."""
-    if not request.user.is_authenticated:
-        return redirect(f"{reverse('core:login')}?{urlencode({'next': _safe_next(request)})}")
-    if request.user.terms_accepted_at:
-        return redirect('core:profile_me')
+    автора не должен спрашивать те же поля снова.
+
+    Две разные заготовки аккаунта могут оказаться тут, и обе — законные:
+    уже вошедший без анкеты (`login_as_newcomer(onboarded=False)` в тестах,
+    возможен и в проде — например, недоведённая до конца прошлая попытка)
+    заполняет `request.user`; первый визит по Telegram — анонимный,
+    `pending_telegram_id` ждёт в сессии (см. `telegram_callback`), и
+    аккаунт заводится только на валидном сабмите, не раньше."""
+    pending_id = None
+    if request.user.is_authenticated:
+        if request.user.terms_accepted_at:
+            return redirect('core:profile_me')
+        user = request.user
+    else:
+        pending_id = request.session.get('pending_telegram_id')
+        if not pending_id:
+            return redirect(f"{reverse('core:login')}?{urlencode({'next': _safe_next(request)})}")
+        user = None
 
     if request.method == 'POST':
         form = OnboardingForm(request.POST)
         if form.is_valid():
+            if user is None:
+                user, _ = data.get_or_create_telegram_user(pending_id)
+                auth_login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+                del request.session['pending_telegram_id']
             data.complete_onboarding(
-                request.user,
+                user,
                 pen_name=form.cleaned_data['pen_name'],
                 bio=form.cleaned_data['bio'],
                 birth_date=form.cleaned_data['birth_date'],
@@ -113,6 +137,24 @@ def onboarding(request):
         form = OnboardingForm()
 
     return render(request, 'pages/auth/onboarding.html', {'form': form})
+
+
+@require_POST
+def decline_onboarding(request):
+    """«Тіркеуден бас тарту» — единственный выход с гейтованной анкеты.
+    Закрывает обе заготовки из `onboarding` по-разному: у анонимной
+    (`pending_telegram_id`) в базе ничего нет, стереть нечего, кроме ключа
+    сессии; у уже вошедшей без анкеты аккаунт уже существует — тот же приём,
+    что у `delete_account` (`user` захвачен до `logout()`, который подменяет
+    `request.user` на `AnonymousUser`)."""
+    if request.user.is_authenticated:
+        user = request.user
+        auth_logout(request)
+        user.delete()
+    else:
+        request.session.pop('pending_telegram_id', None)
+    messages.info(request, 'Тіркеу тоқтатылды.')
+    return redirect('core:home')
 
 
 def signup_success(request):

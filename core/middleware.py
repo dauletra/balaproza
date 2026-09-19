@@ -19,6 +19,7 @@ _EXEMPT_URL_NAMES = frozenset({
     'logout',
     'telegram_callback',
     'onboarding',
+    'decline_onboarding',
     'signup_success',
     'legal_moderation',
     'legal_publishing',

@@ -79,9 +79,28 @@
         </a>
     </section>
 
-    <p class="mt-8 text-center font-sans text-xs text-slate-500">
-        Сұрағың бар ма? <a href="#" class="font-semibold text-brand hover:underline">Қолдау қызметіне</a> жаз.
-    </p>
+    {# ── Соцсети: тот же тізім, сол сілтемелер, footer.html-мен бірдей (BR-90-дан кейінгі жалғыз хабарласу арнасы) ── #}
+    <div class="mt-8 flex flex-col items-center gap-3">
+        <p class="text-center font-sans text-xs text-slate-500">Сұрағың бар ма? Жаз:</p>
+        <ul class="flex items-center gap-3.5" aria-label="Әлеуметтік желілер">
+            <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="YouTube"
+                   class="grid h-11 w-11 place-items-center rounded-pill hover:bg-slate-100">
+                {% include "components/icon.html" with name="youtube" size=18 only %}
+            </a></li>
+            <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="Instagram"
+                   class="grid h-11 w-11 place-items-center rounded-pill hover:bg-slate-100">
+                {% include "components/icon.html" with name="instagram" size=18 cls="text-slate-900" only %}
+            </a></li>
+            <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="TikTok"
+                   class="grid h-11 w-11 place-items-center rounded-pill hover:bg-slate-100">
+                {% include "components/icon.html" with name="tiktok" size=18 cls="text-slate-900" only %}
+            </a></li>
+            <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="Telegram"
+                   class="grid h-11 w-11 place-items-center rounded-pill hover:bg-slate-100">
+                {% include "components/icon.html" with name="telegram" size=18 only %}
+            </a></li>
+        </ul>
+    </div>
 </div>
 {% endblock %}
 

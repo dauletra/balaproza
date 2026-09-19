@@ -17,10 +17,17 @@ def _unique_username() -> str:
             return candidate
 
 
+def find_telegram_user(telegram_id: int) -> User | None:
+    """Найти по `telegram_id`, не заводя нового — для callback: пока анкета
+    не отправлена, аккаунт заводить рано (отказ от регистрации иначе
+    оставлял бы недозаполненную запись)."""
+    return User.objects.filter(telegram_id=telegram_id).first()
+
+
 def get_or_create_telegram_user(telegram_id: int) -> tuple[User, bool]:
     """Найти по `telegram_id` или завести нового (FR-AUTH-03: аккаунт
-    заводит первая авторизация). Второй элемент — правда ли создан
-    только что, им решается, вести ли на онбординг."""
+    заводит первая авторизация — точнее, её завершение анкетой, см.
+    `onboarding`). Второй элемент — правда ли создан только что."""
     return User.objects.get_or_create(
         telegram_id=telegram_id, defaults={'username': _unique_username()})
 

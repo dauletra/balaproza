@@ -73,16 +73,19 @@ class VerifyingTheSignature(SimpleTestCase):
 
 class TelegramCallback(TestCase):
 
-    def test_first_login_creates_account_and_leads_to_onboarding(self):
+    def test_first_login_does_not_create_an_account_yet(self):
+        """Подпись верна, но анкета не заполнена — аккаунт рано заводить:
+        отказ от регистрации не должен оставлять недозаполненную запись
+        (см. Onboarding.test_valid_submission_from_a_fresh_telegram_visitor
+        и Decline)."""
         payload = _telegram_payload(telegram_id=700111222, first_name='Данияр')
         response = self.client.get(reverse('core:telegram_callback'), payload)
 
-        created = User.objects.get(telegram_id=700111222)
         self.assertRedirects(
             response, f"{reverse('core:onboarding')}?next=%2F")
-        self.assertEqual(get_user(self.client).pk, created.pk)
-        self.assertIsNone(created.terms_accepted_at)
-        self.assertTrue(created.username.startswith('id'))
+        self.assertFalse(User.objects.filter(telegram_id=700111222).exists())
+        self.assertFalse(get_user(self.client).is_authenticated)
+        self.assertEqual(self.client.session['pending_telegram_id'], 700111222)
 
     def test_returning_user_logs_in_without_a_duplicate_and_honours_next(self):
         existing = User.objects.create_user('existing_tg', telegram_id=800111222,
@@ -98,9 +101,11 @@ class TelegramCallback(TestCase):
         self.assertEqual(User.objects.count(), before)
         self.assertEqual(get_user(self.client).pk, existing.pk)
 
-    def test_login_rotates_the_session(self):
+    def test_returning_user_login_rotates_the_session(self):
         """Session fixation: ключ, выданный гостю, не должен оставаться при
         нём после входа — подсунутый заранее ключ стал бы ключом вошедшего."""
+        User.objects.create_user('rotates_tg', telegram_id=600111222,
+                                 terms_accepted_at=timezone.now())
         session = self.client.session
         session['seen_before'] = True
         session.save()
@@ -110,6 +115,20 @@ class TelegramCallback(TestCase):
         self.client.get(reverse('core:telegram_callback'), payload)
 
         self.assertNotEqual(self.client.session.session_key, before)
+
+    def test_first_login_does_not_rotate_the_session_yet(self):
+        """Пока аккаунта нет, ротировать нечего — вход (и ротация) случится
+        только на сабмите анкеты, см.
+        Onboarding.test_valid_submission_from_a_fresh_telegram_visitor_rotates_the_session."""
+        session = self.client.session
+        session['seen_before'] = True
+        session.save()
+        before = session.session_key
+
+        payload = _telegram_payload(telegram_id=690111222)
+        self.client.get(reverse('core:telegram_callback'), payload)
+
+        self.assertEqual(self.client.session.session_key, before)
 
     def test_next_never_leaves_the_site(self):
         User.objects.create_user('safe_tg', telegram_id=650111222)
@@ -259,6 +278,94 @@ class Onboarding(TestCase):
         })
         author.refresh_from_db()
         self.assertEqual(str(author.birth_date), '2005-01-01')
+
+    # ── Анонимный визит с pending_telegram_id вместо аккаунта ──────────────
+    # Ветка `login_as_newcomer(onboarded=False)` выше проверяет уже
+    # существующий (но недозаполненный) аккаунт; здесь — первый визит по
+    # Telegram, когда аккаунта ещё нет вообще (см. `telegram_callback`).
+
+    def _seed_pending_session(self, telegram_id=750111222):
+        session = self.client.session
+        session['pending_telegram_id'] = telegram_id
+        session.save()
+        return telegram_id
+
+    def test_pending_telegram_visitor_reaches_the_form(self):
+        self._seed_pending_session()
+        response = self.client.get(reverse('core:onboarding'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_invalid_submission_from_a_pending_telegram_visitor_creates_nothing(self):
+        telegram_id = self._seed_pending_session()
+        response = self.client.post(reverse('core:onboarding'), {
+            'pen_name': '', 'bio': '', 'birth_date': '', 'gender': '',
+            'agree_rules': 'on', 'agree_privacy': 'on',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(User.objects.filter(telegram_id=telegram_id).exists())
+        self.assertFalse(get_user(self.client).is_authenticated)
+        self.assertEqual(self.client.session['pending_telegram_id'], telegram_id)
+
+    def test_valid_submission_from_a_pending_telegram_visitor_creates_and_logs_in(self):
+        telegram_id = self._seed_pending_session()
+        response = self.client.post(reverse('core:onboarding'), {
+            'pen_name': 'Жаңа автор', 'bio': '',
+            'birth_date': '2010-05-01', 'gender': 'girl',
+            'agree_rules': 'on', 'agree_privacy': 'on',
+        })
+        self.assertRedirects(response, reverse('core:signup_success'))
+
+        u = User.objects.get(telegram_id=telegram_id)
+        self.assertEqual(u.pen_name, 'Жаңа автор')
+        self.assertIsNotNone(u.terms_accepted_at)
+        self.assertEqual(get_user(self.client).pk, u.pk)
+        self.assertNotIn('pending_telegram_id', self.client.session)
+
+    def test_valid_submission_from_a_pending_telegram_visitor_rotates_the_session(self):
+        self._seed_pending_session()
+        session = self.client.session
+        session['seen_before'] = True
+        session.save()
+        before = session.session_key
+
+        self.client.post(reverse('core:onboarding'), {
+            'pen_name': 'Тағы бір автор', 'bio': '',
+            'birth_date': '2010-05-01', 'gender': 'boy',
+            'agree_rules': 'on', 'agree_privacy': 'on',
+        })
+        self.assertNotEqual(self.client.session.session_key, before)
+
+
+class DecliningOnboarding(TestCase):
+    """«Тіркеуден бас тарту» — единственный выход с гейтованной анкеты,
+    закрывает обе заготовки из `Onboarding` по-разному."""
+
+    def test_is_post_only(self):
+        self.assertEqual(self.client.get(reverse('core:decline_onboarding')).status_code, 405)
+
+    def test_pending_telegram_visitor_leaves_no_account_behind(self):
+        session = self.client.session
+        session['pending_telegram_id'] = 770111222
+        session.save()
+
+        response = self.client.post(reverse('core:decline_onboarding'))
+
+        self.assertRedirects(response, reverse('core:home'))
+        self.assertFalse(User.objects.filter(telegram_id=770111222).exists())
+        self.assertNotIn('pending_telegram_id', self.client.session)
+        self.assertFalse(get_user(self.client).is_authenticated)
+
+    def test_unonboarded_account_is_deleted(self):
+        """Редирект именно на `home`, а не на `onboarding`, заодно доказывает,
+        что `OnboardingGuardMiddleware` пропускает этот POST — иначе гейт
+        завернул бы его назад на анкету раньше, чем отработал бы view."""
+        newcomer = login_as_newcomer(self.client, 'declines_after_all', onboarded=False)
+
+        response = self.client.post(reverse('core:decline_onboarding'))
+
+        self.assertRedirects(response, reverse('core:home'))
+        self.assertFalse(User.objects.filter(pk=newcomer.pk).exists())
+        self.assertFalse(get_user(self.client).is_authenticated)
 
 
 class OnboardingGuardMiddleware(TestCase):

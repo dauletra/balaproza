@@ -7,7 +7,7 @@
     <header class="mb-6 text-center">
         <h1 class="font-display text-3xl font-bold text-slate-900">Қош келдің!</h1>
         <p class="mt-1.5 font-sans text-sm text-slate-600">
-            Аккаунт құрылды. Тіркеуді аяқтау үшін бірер сұраққа жауап бер.
+            Тіркеуді аяқтау үшін бірер сұраққа жауап бер.
         </p>
     </header>
 
@@ -97,6 +97,17 @@
             </div>
         </div>
     </form>
+
+    {# ── Бас тарту: жалғыз шығу жолы, гейт өзгені жібермейді ── #}
+    <div class="mt-5 text-center">
+        <form method="post" action="{% url 'core:decline_onboarding' %}" role="none">
+            {% csrf_token %}
+            <button type="submit"
+                    class="font-sans text-sm font-semibold text-slate-500 hover:text-status-error-fg">
+                Тіркеуден бас тарту
+            </button>
+        </form>
+    </div>
 </div>
 {% endblock %}
 
