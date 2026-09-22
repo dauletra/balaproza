@@ -16,9 +16,25 @@
 #   MEDIA_DIR     каталог media/ (по умолчанию ../media от этого скрипта)
 #   BACKUP_DIR    куда складывать (обязательна)
 #
+# Необязательные — всё три про то, чтобы копия пережила саму машину:
+#   TELEGRAM_BOT_TOKEN, BACKUP_CHAT_ID   куда отчитываться каждый проход
+#   BACKUP_GPG_RECIPIENT                 кому шифровать дамп
+#   BACKUP_REMOTE                        куда отправить копию (rsync-адрес)
+#
 # BACKUP_DIR обязан жить **не на том диске**, где база. Бэкап рядом с
 # оригиналом спасает от кривой миграции и не спасает от умершего диска,
 # а умирают чаще диски.
+#
+# **Молча сломавшийся бэкап — самый частый способ остаться без бэкапа.**
+# Скрипт писал в stderr, stderr читает cron, cron пишет письмо, письма
+# никто не настраивал. Поэтому отчёт уходит в Telegram — и на удачный
+# проход тоже: молчание становится сигналом только тогда, когда
+# сообщение приходит каждый день.
+#
+# Порядок важностей именно такой: незашифрованная копия, которая есть,
+# лучше зашифрованной, которой нет. Поэтому сторож обязателен по смыслу,
+# а шифрование и отправка наружу включаются переменными — когда есть
+# куда.
 
 set -euo pipefail
 
@@ -27,6 +43,26 @@ set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MEDIA_DIR="${MEDIA_DIR:-$here/../media}"
+
+# ── Сторож ───────────────────────────────────────────────────────────────
+#
+# Без `curl` или без токена отчёт просто не уходит: сторож не должен
+# ронять сам бэкап. Строки без эмодзи — те же правила, что у остального
+# текста проекта.
+notify () {
+    [ -n "${TELEGRAM_BOT_TOKEN:-}" ] || return 0
+    [ -n "${BACKUP_CHAT_ID:-}" ] || return 0
+    command -v curl >/dev/null 2>&1 || return 0
+    curl --silent --show-error --max-time 15 \
+         --data-urlencode "chat_id=${BACKUP_CHAT_ID}" \
+         --data-urlencode "text=$1" \
+         "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+         >/dev/null 2>&1 || true
+}
+
+# Падение на любом шаге — сообщение с номером строки. `set -e` уводит нас
+# сюда раньше, чем до отчёта об успехе дойдёт очередь.
+trap 'notify "Бэкап $(hostname) упал на строке ${LINENO}. Проверь cron и место на диске."' ERR
 
 today="$(date +%F)"
 dest="$BACKUP_DIR/daily/$today"
@@ -48,14 +84,35 @@ else
     echo "media/ не найдена ($MEDIA_DIR) — сохранена только база" >&2
 fi
 
+# ── Шифрование ───────────────────────────────────────────────────────────
+# В копии лежат тексты несовершеннолетних и их Telegram-идентификаторы.
+# Включается указанием получателя: без ключа шифровать нечем, а
+# останавливать бэкап из-за этого нельзя — копия без шифра лучше, чем её
+# отсутствие. Оригинал удаляется только после успешного шифрования.
+if [ -n "${BACKUP_GPG_RECIPIENT:-}" ] && command -v gpg >/dev/null 2>&1; then
+    for plain in "$dest/db.dump" "$dest/media.tar.gz"; do
+        [ -f "$plain" ] || continue
+        gpg --batch --yes --trust-model always \
+            --recipient "$BACKUP_GPG_RECIPIENT" \
+            --output "$plain.gpg" --encrypt "$plain"
+        rm -f "$plain"
+    done
+fi
+
 # Что внутри и когда снято — рядом со снимком, а не в имени файла:
 # имя копируют, а файл едет вместе с ним.
+#
+# Имена читаются со снимка, а не подставляются литералом: после
+# шифрования файлы называются иначе, и манифест, перечисляющий
+# несуществующее, хуже отсутствующего.
 {
     echo "снято:   $(date --iso-8601=seconds)"
-    echo "база:    $(basename "$dest/db.dump") ($(du -h "$dest/db.dump" | cut -f1))"
-    [ -f "$dest/media.tar.gz" ] &&
-        echo "media:   media.tar.gz ($(du -h "$dest/media.tar.gz" | cut -f1))"
     echo "хост:    $(hostname)"
+    for file in "$dest"/*; do
+        [ -f "$file" ] || continue
+        case "$file" in */manifest.txt) continue ;; esac
+        echo "файл:    $(basename "$file") ($(du -h "$file" | cut -f1))"
+    done
 } > "$dest/manifest.txt"
 
 # ── Ротация ──────────────────────────────────────────────────────────────
@@ -76,4 +133,14 @@ link_into daily 7
 [ "$(date +%u)" = "7" ] && link_into weekly 4
 [ "$(date +%d)" = "01" ] && link_into monthly 6
 
-echo "готово: $dest"
+# ── Копия наружу ─────────────────────────────────────────────────────────
+# «Другой носитель» на одной машине не спасает от потерянной машины.
+# `rsync` — потому что адрес может быть и локальным путём (второй диск), и
+# `user@host:/path`, и это решается настройкой, а не кодом.
+if [ -n "${BACKUP_REMOTE:-}" ]; then
+    rsync --archive --delete "$BACKUP_DIR/daily/" "$BACKUP_REMOTE"
+fi
+
+size="$(du -sh "$dest" | cut -f1)"
+echo "готово: $dest ($size)"
+notify "Бэкап $(hostname) готов: $today, $size. Хранится в $BACKUP_DIR."

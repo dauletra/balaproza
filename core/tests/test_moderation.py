@@ -326,8 +326,12 @@ class TheModerationPagesStayWithinTheirQueryBudget(TestCase):
 
         Девять: плюс `COUNT` задержанных комментариев (D2) — тот же
         бейдж в шапке, что у жалоб. Именно `COUNT`, а не список: тексты
-        задержанного на этой странице не показывают."""
-        with self.assertNumQueries(9):
+        задержанного на этой странице не показывают.
+
+        Десять: очередь отдаётся страницей, и пагинатору нужно, сколько
+        всего строк в **этой оси**. Это и есть цена окна — постоянный
+        `COUNT` вместо списка, растущего вместе с очередью."""
+        with self.assertNumQueries(10):
             self.client.get(reverse('core:moderation_queue'))
 
     def test_the_card_does_not_grow_with_the_chapters(self):

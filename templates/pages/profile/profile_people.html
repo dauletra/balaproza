@@ -32,6 +32,16 @@
                 {% include "components/author_row.html" with author=a size=44 cls="py-3.5" only %}
             {% endfor %}
         </ul>
+        {% comment %}
+            Список растит не тот, кто на него смотрит: у автора, которого
+            читают, подписчиков однажды станет тысяча. Компонент тот же,
+            что у каталога и разговора под главой.
+        {% endcomment %}
+        {% if page.paginator.num_pages > 1 %}
+            <div class="mt-6">
+                {% include "components/pagination.html" with current=page.number total=page.paginator.num_pages base=page_base %}
+            </div>
+        {% endif %}
     {% elif kind == "followers" %}
         {% include "components/empty_state.html" with icon="user-circle" title="Әлі жазылушы жоқ" text="Жарияланған шығарма оқырманды өзі әкеледі." %}
     {% else %}

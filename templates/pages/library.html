@@ -30,6 +30,12 @@
                 {% include "components/library_row.html" with entry=e %}
             {% endfor %}
         </div>
+        {# Полка копится годами; число над вкладкой при этом про всю. #}
+        {% if lib_pages > 1 %}
+            <div class="mt-6">
+                {% include "components/pagination.html" with current=lib_page total=lib_pages base=page_base qs=page_qs %}
+            </div>
+        {% endif %}
     {% endif %}
 
     {% if page_state == 'content' and not entries %}

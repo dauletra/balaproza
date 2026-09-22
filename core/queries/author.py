@@ -11,7 +11,7 @@
 платит один. Гость — `None`, и ответ ему пустой, а не падение.
 """
 
-from django.db.models import Prefetch
+from django.db.models import Count, Prefetch
 
 from ..domain.library import LIBRARY_KINDS
 from ..domain.story import PUBLISH_CHECKLIST, checklist_label
@@ -243,14 +243,31 @@ def reader_stats(user) -> dict:
     stats = dict(public_stats(user))
     stats.update({
         'works_total': len(user.authored) if user is not None else 0,
-        # Из общей выборки библиотеки, а не отдельным COUNT: полки на этой
-        # же странице уже прочитаны целиком.
-        'finished':    len(user.shelf('done')) if user is not None else 0,
+        # Отдельным счётом: полки страница больше не читает целиком, и
+        # `len()` по ним означал бы тянуть всю библиотеку ради одного
+        # числа — ровно то, от чего окно и заводилось.
+        'finished':    library_counts(user)['done'],
     })
     return stats
 
 
-def library_of(user, kind: str = '') -> list:
+def library_counts(user) -> dict:
+    """Сколько записей на каждой полке — одним запросом.
+
+    `GROUP BY`, а не три `COUNT` и не длина загруженного списка: числа
+    стоят над вкладками и нужны все три сразу, а страница показывает одну
+    полку и только её страницу. До появления окна их брали `len()` по
+    выборке, прочитанной целиком, — это и было тем, что росло.
+    """
+    if user is None:
+        return {kind: 0 for kind in LIBRARY_KINDS}
+    rows = (LibraryEntry.objects.filter(user=user)
+            .values('kind').annotate(n=Count('pk')))
+    counted = {row['kind']: row['n'] for row in rows}
+    return {kind: counted.get(kind, 0) for kind in LIBRARY_KINDS}
+
+
+def library_of(user, kind: str = '', *, offset: int = 0, limit=None) -> list:
     """Полки читателя. Пустой `kind` — вся библиотека.
 
     Число частей приезжает той же строкой (`story_chapters`) и садится на
@@ -270,6 +287,11 @@ def library_of(user, kind: str = '') -> list:
                          progress_chapter=progress_chapter_subquery()))
     if kind in LIBRARY_KINDS:
         entries = entries.filter(kind=kind)
+    # Срез до материализации: `chapter_count` садится на объект циклом
+    # ниже, и без окна этот цикл прошёл бы по всей библиотеке ради
+    # двадцати строк на экране.
+    if limit is not None:
+        entries = entries[offset:offset + limit]
     rows = list(entries)
     for entry in rows:
         entry.story.chapter_count = entry.story_chapters

@@ -89,15 +89,29 @@ def _story_id_of_chapter(chapter_id: int):
 
 
 # ── StoryComment → Story.comments ───────────────────────────────────────
+#
+# Считается **видимое читателю**. Задержанный блок-листом комментарий
+# (D2) не видит никто, включая автора работы, — а счётчик его прибавлял,
+# потому что сигнал смотрел на создание строки и не смотрел на `held`.
+# Карточка каталога обещала «5 пікір», на странице их было четыре.
+#
+# Отсюда три двери вместо одной: строка создана, строка удалена и —
+# отдельно — задержанное пропущено модератором. Последнее сигналом не
+# ловится: `publish_held_comment` снимает флаг через `update()`, а он
+# `post_save` не шлёт. Это и к лучшему: снятие флага бывает ровно одно и
+# живёт в одной функции.
 @receiver(post_save, sender=StoryComment)
 def _comment_created(sender, instance, created, **kwargs):
-    if created:
+    if created and not instance.held:
         bump(Story, instance.story_id, comments=1)
 
 
 @receiver(post_delete, sender=StoryComment)
 def _comment_deleted(sender, instance, **kwargs):
-    bump(Story, instance.story_id, comments=-1)
+    # Удалённый задержанный в счётчике и не был: вычесть его значило бы
+    # увести число ниже правды.
+    if not instance.held:
+        bump(Story, instance.story_id, comments=-1)
 
 
 # ── ChapterReactionVote → Story.likes и ChapterReaction.count ───────────
@@ -169,13 +183,31 @@ def _poll_vote_deleted(sender, instance, **kwargs):
     bump(PollOption, instance.option_id, votes=-1)
 
 
-def _recount(target_model, field: str, source_model, group_by: str, count_field='pk'):
+def comment_published(comment) -> None:
+    """Задержанный комментарий пропущен к читателю — теперь он считается.
+
+    Зовётся из `publish_held_comment`, а не сигналом: флаг снимается
+    `update()`, который `post_save` не шлёт. Держать это здесь, рядом с
+    остальными счётчиками, а не там — чтобы правило «что считается»
+    жило в одном файле.
+    """
+    bump(Story, comment.story_id, comments=1)
+
+
+def _recount(target_model, field: str, source_model, group_by: str,
+             count_field='pk', **only):
     """Один счётчик, пересчитанный от реальных строк одним `UPDATE`.
     Отдаёт число задетых строк — как `Story.objects.update(...)` в
     `recount_recent_views`, то есть «сколько строк пересчитано», а не
     «сколько из них реально изменилось»: второе стоило бы отдельного
-    запроса до и после ради одной цифры в логе."""
-    real = (source_model.objects.filter(**{group_by: OuterRef('pk')})
+    запроса до и после ради одной цифры в логе.
+
+    `only` сужает то, что считается. Нужен он ровно одному счётчику —
+    комментариям, — и появился потому, что сверка обязана считать по
+    тому же правилу, что и сигнал: иначе она не чинит расхождение, а
+    подтверждает его.
+    """
+    real = (source_model.objects.filter(**{group_by: OuterRef('pk')}, **only)
             .values(group_by).annotate(n=Count(count_field)).values('n')[:1])
     return target_model.objects.update(
         **{field: Coalesce(Subquery(real, output_field=IntegerField()), 0)})
@@ -200,7 +232,11 @@ def recount_engagement() -> dict[str, int]:
         .values('chapter__story').annotate(n=Sum('count')).values('n')[:1]
     )
     return {
-        'story.comments': _recount(Story, 'comments', StoryComment, 'story'),
+        # Только видимые читателю — то же правило, что у сигнала выше.
+        # Сверка по всем строкам подтверждала бы завышенное число, а не
+        # чинила его: задержанного не видит никто.
+        'story.comments': _recount(Story, 'comments', StoryComment, 'story',
+                                   held=False),
         'story.likes': Story.objects.update(
             likes=Coalesce(Subquery(likes_from_reactions,
                                      output_field=IntegerField()), 0)),

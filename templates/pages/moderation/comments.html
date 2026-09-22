@@ -64,6 +64,16 @@
             </li>
         {% endfor %}
     </ul>
+    {% comment %}
+        Очередь тяжелеет ровно в тот день, когда с ней не справляются.
+        Компонент тот же, что у каталога: своей копии пагинации на
+        портале быть не должно.
+    {% endcomment %}
+    {% if page.paginator.num_pages > 1 %}
+        <div class="mt-6">
+            {% include "components/pagination.html" with current=page.number total=page.paginator.num_pages base=page_base %}
+        </div>
+    {% endif %}
 {% else %}
     {% include "components/empty_state.html" with title="Тексерудегі пікір жоқ" text="Блок-тізімге ілінген пікір болса, осында түседі." %}
 {% endif %}

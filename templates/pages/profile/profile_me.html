@@ -28,6 +28,11 @@
                     {% include "components/book_card_small.html" with story=s %}
                 {% endfor %}
             </div>
+            {% if works_page.paginator.num_pages > 1 %}
+                <div class="mt-6">
+                    {% include "components/pagination.html" with current=works_page.number total=works_page.paginator.num_pages base=works_base qs=works_qs %}
+                </div>
+            {% endif %}
         {% elif hidden_n %}
             {% include "components/empty_state.html" with icon="pen" title="Әлі жарияланған шығарма жоқ" text="Жазғаның бар, бірақ оқырманға әзірге көрінбейді. Жариялауды кабинетте бастайсың." cta_label="Менің шығармаларым" cta_href=my_stories_href %}
         {% else %}

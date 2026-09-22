@@ -20,12 +20,36 @@ set -euo pipefail
 
 snapshot="${1:-}"
 [ -n "$snapshot" ] || { echo "укажи каталог снимка: ops/restore.sh <путь>" >&2; exit 1; }
-[ -f "$snapshot/db.dump" ] || { echo "нет $snapshot/db.dump" >&2; exit 1; }
 
 : "${DATABASE_URL:?нужна переменная DATABASE_URL}"
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MEDIA_DIR="${MEDIA_DIR:-$here/../media}"
+
+# ── Расшифровка, если снимок зашифрован ──────────────────────────────────
+#
+# `backup.sh` шифрует дамп, когда задан получатель. Восстановление обязано
+# понимать оба вида снимка: бэкап, который нельзя восстановить, бэкапом не
+# является, а шифрование — ровно тот шаг, на котором это ломается молча.
+#
+# Расшифрованное кладётся во временный каталог и удаляется при выходе:
+# оставить открытый дамп рядом с зашифрованным значило бы отменить
+# шифрование задним числом.
+work="$snapshot"
+if [ ! -f "$snapshot/db.dump" ] && [ -f "$snapshot/db.dump.gpg" ]; then
+    command -v gpg >/dev/null 2>&1 || {
+        echo "снимок зашифрован, а gpg не установлен" >&2; exit 1; }
+    work="$(mktemp -d)"
+    trap 'rm -rf "$work"' EXIT
+    echo "снимок зашифрован — расшифровываю во временный каталог"
+    for cipher in "$snapshot"/*.gpg; do
+        [ -f "$cipher" ] || continue
+        plain="$work/$(basename "${cipher%.gpg}")"
+        gpg --batch --yes --output "$plain" --decrypt "$cipher"
+    done
+fi
+
+[ -f "$work/db.dump" ] || { echo "нет $snapshot/db.dump" >&2; exit 1; }
 
 cat "$snapshot/manifest.txt" 2>/dev/null || true
 echo
@@ -38,14 +62,14 @@ read -r -p "Продолжить? напиши yes: " answer
 # `--clean` восстановление в непустую базу падает на первом же конфликте
 # ключей и оставляет её наполовину чужой.
 pg_restore --clean --if-exists --no-owner --no-privileges \
-           --dbname="$DATABASE_URL" "$snapshot/db.dump"
+           --dbname="$DATABASE_URL" "$work/db.dump"
 
-if [ -f "$snapshot/media.tar.gz" ]; then
+if [ -f "$work/media.tar.gz" ]; then
     mkdir -p "$MEDIA_DIR"
     # Старое убирается целиком: файл, которого нет в снимке, — это файл,
     # про который база ничего не знает.
     rm -rf "${MEDIA_DIR:?}/"*
-    tar --extract --gzip --file="$snapshot/media.tar.gz" -C "$MEDIA_DIR"
+    tar --extract --gzip --file="$work/media.tar.gz" -C "$MEDIA_DIR"
 fi
 
 echo "восстановлено из $snapshot"

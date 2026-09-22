@@ -13,6 +13,7 @@ from django.test import Client
 from django.urls import reverse
 
 from core import data
+from core.counters import recount_engagement
 from core.models import BlockedTagPattern, StoryComment
 from core.tests import factories as f
 from core.tests.base import TestCase
@@ -189,3 +190,85 @@ class TheModeratorDecidesInTwoWays(TestCase):
                             kwargs={'pk': self.comment.pk})):
             with self.subTest(url=url):
                 self.assertEqual(reader.get(url).status_code, 404)
+
+
+class TheCounterCountsWhatTheReaderSees(TestCase):
+    """Задержанный блок-листом комментарий не видит никто, включая автора
+    работы, — а счётчик его прибавлял: сигнал смотрел на создание строки
+    и не смотрел на `held`. Карточка каталога обещала «5 пікір», на
+    странице их было четыре.
+
+    Само себя это не чинило: суточная сверка считала по всем строкам и
+    потому подтверждала завышенное число.
+    """
+
+    def setUp(self):
+        super().setUp()
+        BlockedTagPattern.objects.get_or_create(
+            pattern='счётчик-стоп', defaults={'scope': 'comment'})
+        self.story = f.story(author=f.user(), chapters=1)
+        self.reader = f.user()
+
+    def _comments(self):
+        self.story.refresh_from_db()
+        return self.story.comments
+
+    def test_a_held_comment_does_not_touch_the_counter(self):
+        before = self._comments()
+
+        held = data.add_comment(self.story, self.reader,
+                                text='счётчик-стоп деген сөз', chapter_number=1)
+
+        self.assertTrue(held.held)
+        self.assertEqual(self._comments(), before)
+
+    def test_letting_it_through_adds_it(self):
+        before = self._comments()
+        held = data.add_comment(self.story, self.reader,
+                                text='счётчик-стоп деген сөз', chapter_number=1)
+
+        data.publish_held_comment(held)
+
+        self.assertEqual(self._comments(), before + 1)
+
+    def test_deleting_a_held_one_does_not_go_below_the_truth(self):
+        before = self._comments()
+        held = data.add_comment(self.story, self.reader,
+                                text='счётчик-стоп деген сөз', chapter_number=1)
+
+        data.delete_comment(held)
+
+        self.assertEqual(self._comments(), before)
+
+    def test_an_ordinary_comment_still_counts(self):
+        before = self._comments()
+
+        data.add_comment(self.story, self.reader, text='Жай пікір',
+                         chapter_number=1)
+
+        self.assertEqual(self._comments(), before + 1)
+
+    def test_the_daily_reconciliation_agrees_with_the_signal(self):
+        """Сверка обязана считать по тому же правилу: иначе она не чинит
+        расхождение, а закрепляет его."""
+        data.add_comment(self.story, self.reader, text='Жай пікір',
+                         chapter_number=1)
+        data.add_comment(self.story, self.reader,
+                         text='счётчик-стоп деген сөз', chapter_number=1)
+        expected = self._comments()
+
+        recount_engagement()
+
+        self.assertEqual(self._comments(), expected)
+
+    def test_the_number_on_the_page_matches_the_number_on_the_card(self):
+        data.add_comment(self.story, self.reader, text='Көрінетін пікір',
+                         chapter_number=1)
+        data.add_comment(self.story, self.reader,
+                         text='счётчик-стоп деген сөз', chapter_number=1)
+
+        page = self.client.get(
+            reverse('core:story_detail', kwargs={'slug': self.story.slug})
+            + '?chapter=1')
+
+        self.assertEqual(page.context['comments_total'], self._comments())

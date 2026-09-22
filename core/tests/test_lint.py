@@ -23,6 +23,7 @@ from core.tests.base import TestCase, login_as
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "templates"
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
+STATIC_SRC_DIR = Path(__file__).resolve().parent.parent.parent / "static_src"
 
 
 def _templates():
@@ -878,3 +879,31 @@ class TheKeyboardMaySkipTheHeader(unittest.TestCase):
         markup = (TEMPLATES_DIR / 'base.html').read_text(encoding='utf-8')
 
         self.assertIn('id="main" tabindex="-1"', markup)
+
+
+class MovementIsOptional(unittest.TestCase):
+    """Скелетоны пульсируют, карточки на ховере приподнимаются, модалки и
+    тосты въезжают переходами. Для человека с вестибулярными нарушениями
+    это причина закрыть вкладку, и выключить это было нечем: в стилях не
+    было ни одного упоминания системной настройки.
+
+    Проверяется источник, а не собранный `output.css`: тот пересобирается
+    командой, которую запускает человек, и в репозитории его нет.
+    """
+
+    def setUp(self):
+        self.css = (STATIC_SRC_DIR / 'input.css').read_text(encoding='utf-8')
+
+    def test_the_system_setting_is_honoured(self):
+        self.assertIn('@media (prefers-reduced-motion: reduce)', self.css)
+
+    def test_it_shortens_motion_instead_of_forbidding_it(self):
+        """`animation: none` оставил бы `x-transition` без события
+        `transitionend`, на котором Alpine снимает `display`, — и модалка
+        осталась бы полупрозрачной навсегда. Поэтому длительность
+        сводится к мгновенной, а не к нулю."""
+        block = self.css[self.css.index('@media (prefers-reduced-motion'):]
+
+        self.assertIn('animation-duration: 0.01ms', block)
+        self.assertIn('transition-duration: 0.01ms', block)
+        self.assertNotIn('animation: none', block)

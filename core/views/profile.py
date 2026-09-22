@@ -16,7 +16,13 @@ from django.views.decorators.http import require_POST
 
 from .. import data
 from ..forms import ProfileForm
-from .common import _current_user, _current_username, _safe_next, _throttled
+from .common import (
+    _current_user,
+    _current_username,
+    _paged,
+    _safe_next,
+    _throttled,
+)
 
 
 def _report(request, form) -> None:
@@ -67,6 +73,11 @@ def profile_me(request):
     following = data.following_of(author)
     catalog = data.award_catalog(author)
     ladder = data.read_ladder(author)
+    # Страницей — ради веса страницы, а не ради запросов: снимок работ
+    # автора нужен здесь ещё шести местам (сводки, знаки, ступени,
+    # конкурсная биография), и убрать его не выйдет. А вот выводить
+    # двести карточек в разметку незачем: читает их всё равно человек.
+    works_page = _paged(request, author.public_works if author else [])
     return render(request, 'pages/profile/profile_me.html', {
         'has_right_rail':  bool(author and following),
         'profile_user':    author,
@@ -78,7 +89,10 @@ def profile_me(request):
         # Здесь то же, что видит читатель; черновики и модерация живут
         # только в кабинете, а их число — во вкладке «Статистика» под
         # пометкой «Тек саған көрінеді» (FR-PROF-08).
-        'works':           author.public_works if author else [],
+        'works':           works_page.object_list if author else [],
+        'works_page':      works_page,
+        'works_base':      reverse('core:profile_me'),
+        'works_qs':        'tab=works',
         'hidden_n':        (len(author.authored)
                             - len(author.public_works)) if author else 0,
         'my_stories_href': reverse('core:my_stories'),
@@ -198,6 +212,7 @@ def profile_other(request, username):
     # Тот же снимок, что и в своём профиле: работы автора спрашивают
     # сегменты, тело вкладки, рейл, сводка и три награды.
     works = author.public_works
+    works_page = _paged(request, works)
     # Рейл чужого профиля — «Ең көп оқылғаны», а не «на кого он подписан»
     # (FR-PROF-09): список чужих подписок читателю ничего не сообщает.
     # Порог в четыре работы — против дубля: на вкладке «Шығармалар» тело
@@ -213,7 +228,11 @@ def profile_other(request, username):
         'is_self':       False,
         'tab':           tab,
         'prof_items':    _prof_items(author, _PROF_TABS_OTHER, False),
-        'works':         works,
+        'works':         works_page.object_list,
+        'works_page':    works_page,
+        'works_base':    reverse('core:profile_other',
+                                 kwargs={'username': username}),
+        'works_qs':      'tab=works',
         'rail_top':      rail_top,
         'stats':         data.public_stats(author),
         # Знаки одинаковы для владельца и для постороннего: достижение
@@ -267,22 +286,32 @@ def profile_people(request, username, kind):
 
     title, fetch, _ = _PEOPLE_KINDS[kind]
     me = _current_username(request)
-    people = list(fetch(author))
+    # Страницей, а не списком: у автора, которого читают, подписчиков
+    # однажды станет тысяча, и растит он их не сам. До этого страница
+    # отдавала их все разом.
+    page = _paged(request, fetch(author))
     return render(request, 'pages/profile/profile_people.html', {
         'profile_user': author,
         'username':     username,
         'kind':         kind,
         'title':        title,
-        'people':       people,
+        'people':       page.object_list,
+        'page':         page,
+        'page_base':    reverse('core:profile_people',
+                                kwargs={'username': username, 'kind': kind}),
         'is_self':      me == username,
         # Сегменты ведут между двумя списками одного автора, и каждый несёт
-        # готовый `href`: список это путь, а не состояние страницы. Длина
-        # открытого берётся отсюда — выборка уже на руках.
+        # готовый `href`: список это путь, а не состояние страницы. Число
+        # у открытого — про весь список, а не про эту страницу.
         'people_items': [
             {
                 'slug':  k,
                 'label': lbl,
-                'count': len(people) if k == kind else count_of(author),
+                # У открытого списка число уже посчитал пагинатор —
+                # спрашивать его второй раз значит платить лишний `COUNT`
+                # на каждый показ.
+                'count': (page.paginator.count if k == kind
+                          else count_of(author)),
                 'href':  reverse('core:profile_people',
                                  kwargs={'username': username, 'kind': k}),
             }

@@ -346,16 +346,20 @@ class PersonalPagesStayWithinTheirQueryBudget(TestCase):
         сводки, ряд знаков, каталог знаков, ступени оқылым, библиотека и
         конкурсная биография. Было 59, затем 14 — четырнадцатым был второй
         `SELECT` того же пользователя: снимок искал его по нику, хотя
-        страница уже держала объект на руках."""
+        страница уже держала объект на руках.
+
+        Четырнадцатый — счёт полок библиотеки: вкладка «Кітапхана»
+        показывает число, а сами полки страница больше не читает
+        целиком."""
         login_as(self.client)
-        with self.assertNumQueries(13):
+        with self.assertNumQueries(14):
             self.client.get(reverse('core:profile_me'))
 
     def test_profile_me_stats_tab(self):
         """Вкладка «Статистика» не добавляет запросов: своя статистика
         считается из тех же работ, что и публичная."""
         login_as(self.client)
-        with self.assertNumQueries(13):
+        with self.assertNumQueries(14):
             self.client.get(reverse('core:profile_me') + '?tab=stats')
 
     def test_profile_other(self):
@@ -395,8 +399,12 @@ class PersonalPagesStayWithinTheirQueryBudget(TestCase):
         Было пять: цикл сегментов звал обе выборки заново, то есть
         страница делала ту, что показывает, дважды — и вторую целиком, со
         счётчиком работ у каждого имени, ради одного числа.
+
+        Стало пять снова, но по другой причине: список отдаётся страницей,
+        и пагинатору нужно, сколько всего строк. Число у открытого
+        сегмента берётся у него же — спрашивать второй раз незачем.
         """
-        with self.assertNumQueries(4):
+        with self.assertNumQueries(5):
             self.client.get(reverse('core:profile_people',
                                     kwargs={'username': 'rudazov',
                                             'kind': 'followers'}))
@@ -408,10 +416,16 @@ class PersonalPagesStayWithinTheirQueryBudget(TestCase):
             self.client.get(reverse('core:my_stories'))
 
     def test_library(self):
-        """Три вкладки — одна выборка: полки режутся из неё, а не
-        спрашиваются по одной на вкладку ради счётчика в сегменте."""
+        """Числа над тремя вкладками — одним `GROUP BY`, сама полка —
+        страницей.
+
+        Было восемь: полки резались из одной выборки, прочитанной
+        целиком. Это дешевле ровно до тех пор, пока библиотека невелика,
+        а копится она годами — и росла страница вместе с ней. Девятый
+        запрос это `GROUP BY` по трём полкам; выборка при этом отдаёт
+        двадцать строк вместо всех."""
         login_as(self.client)
-        with self.assertNumQueries(8):
+        with self.assertNumQueries(9):
             self.client.get(reverse('core:library'))
 
     def test_my_submissions(self):

@@ -17,7 +17,7 @@
 from datetime import datetime, time, timedelta
 
 from django.db import transaction
-from django.db.models import Count, Min
+from django.db.models import BooleanField, Count, ExpressionWrapper, Min, Q
 from django.utils import timezone
 
 from ..domain.moderation import (
@@ -40,6 +40,7 @@ from ..models import (
     StoryView,
     User,
 )
+from ..counters import comment_published
 from .notifications import notify_comment
 
 
@@ -75,17 +76,23 @@ def moderation_queue(*, kind: str = '', moderator=None) -> list:
 
     # «Долго ждёт» — правило (`QUEUE_SLOW_DAYS`), а не вёрстка: шаблон,
     # считающий дни сам, стал бы вторым местом, где живёт норма срока.
-    stories = list(rows)
+    #
+    # Аннотацией, а не проходом по списку: очередь отдаётся **выдачей**, и
+    # страницу из неё нарезает пагинатор. Цикл в Python требовал бы
+    # материализовать всю очередь — то есть ровно то, от чего пагинация и
+    # спасает, и тяжелела бы она в тот день, когда с ней не справляются.
     threshold = timezone.now() - timedelta(days=QUEUE_SLOW_DAYS)
-    for story in stories:
-        story.waiting_slow = (story.waiting_since is not None
-                              and story.waiting_since <= threshold)
-    return stories
+    return rows.annotate(waiting_slow=ExpressionWrapper(
+        Q(waiting_since__lte=threshold), output_field=BooleanField()))
 
 
-def queue_size() -> int:
-    """Сколько всего ждёт — число для шапки; ось на него не влияет."""
-    return _queue_base().count()
+def queue_size(*, kind: str = '', moderator=None) -> int:
+    """Сколько ждёт. Без оси — всего, с осью — в ней.
+
+    Оба вопроса настоящие: «всего» показывает шапка раздела, «в этой оси»
+    нужно пагинации, иначе вторая страница ведёт в пустоту.
+    """
+    return moderation_queue(kind=kind, moderator=moderator).count()
 
 
 def overdue_count() -> int:
@@ -127,12 +134,13 @@ def comment_is_blocked(text: str) -> bool:
     return any(p in lowered for p in patterns)
 
 
-def held_comments() -> list:
+def held_comments():
     """Задержанные комментарии, дольше ждущий первым — тот же принцип
-    очереди, что у ревизий и жалоб."""
-    return list(StoryComment.objects.filter(held=True)
-                .select_related('author', 'story')
-                .order_by('created_at'))
+    очереди, что у ревизий и жалоб. Выдачей, а не списком: страницу
+    нарезает пагинатор."""
+    return (StoryComment.objects.filter(held=True)
+            .select_related('author', 'story')
+            .order_by('created_at'))
 
 
 def held_comments_count() -> int:
@@ -152,10 +160,14 @@ def publish_held_comment(comment) -> None:
 
     Уведомление автору работы уходит **здесь**, а не при создании: до
     решения комментария для читателя не существует, и сообщать было не о
-    чем.
+    чем. По той же причине здесь же прибавляется `Story.comments`:
+    счётчик считает видимое, и до этой минуты комментария в нём не было.
+    Сигналом это не ловится — флаг снимается `update()`, а он `post_save`
+    не шлёт.
     """
     StoryComment.objects.filter(pk=comment.pk).update(held=False)
     comment.held = False
+    comment_published(comment)
     notify_comment(comment)
 
 
@@ -257,14 +269,18 @@ def create_report(reporter, *, story=None, comment=None, reason: str,
         reason=reason, note=note.strip()[:500])
 
 
-def open_reports() -> list:
+def open_reports():
     """Открытые жалобы, дольше висящая первой — тот же принцип очереди,
-    что у ревизий: обещание, что до неё дойдут."""
-    return list(Report.objects
-                .filter(resolved_at__isnull=True)
-                .select_related('reporter', 'story__author',
-                                'comment__story', 'comment__author')
-                .order_by('created_at'))
+    что у ревизий: обещание, что до неё дойдут.
+
+    Выдачей, а не списком: страницу нарезает пагинатор, и до базы
+    доезжает ровно она.
+    """
+    return (Report.objects
+            .filter(resolved_at__isnull=True)
+            .select_related('reporter', 'story__author',
+                            'comment__story', 'comment__author')
+            .order_by('created_at'))
 
 
 def open_reports_count() -> int:

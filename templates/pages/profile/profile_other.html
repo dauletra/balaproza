@@ -20,6 +20,11 @@
                     {% include "components/book_card_small.html" with story=s %}
                 {% endfor %}
             </div>
+            {% if works_page.paginator.num_pages > 1 %}
+                <div class="mt-6">
+                    {% include "components/pagination.html" with current=works_page.number total=works_page.paginator.num_pages base=works_base qs=works_qs %}
+                </div>
+            {% endif %}
         {% else %}
             {% include "components/empty_state.html" with icon="book" title="Шығармалар жоқ" text="Бұл автор әлі ешнәрсе жарияламаған." %}
         {% endif %}

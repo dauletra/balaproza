@@ -15,11 +15,12 @@ from functools import wraps
 from django.contrib import messages
 from django.http import Http404
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from .. import data
 from ..domain.moderation import QUEUE_FILTER_KEYS
-from .common import _current_user
+from .common import _current_user, _paged
 
 
 def moderator_only(view):
@@ -50,8 +51,16 @@ def moderation_queue(request):
     if kind not in QUEUE_FILTER_KEYS:
         kind = ''
 
+    # Страницей: очередь тяжелеет ровно в тот день, когда с ней не
+    # справляются, — то есть страница становится медленной тогда, когда
+    # она нужнее всего. Порядок «дольше ждущий первым» при этом и есть
+    # то, с чего начинают, так что первая страница — правильная.
+    page = _paged(request, data.moderation_queue(kind=kind, moderator=user))
     return render(request, 'pages/moderation/queue.html', {
-        'stories':     data.moderation_queue(kind=kind, moderator=user),
+        'stories':     page.object_list,
+        'page':        page,
+        'page_base':   reverse('core:moderation_queue'),
+        'page_qs':     f'kind={kind}' if kind else '',
         'kind':        kind,
         'filters':     data.QUEUE_FILTERS,
         'total':       data.queue_size(),
@@ -180,8 +189,11 @@ def held_comments_queue(request):
     Отдельной страницей, а не вкладкой очереди работ: решается здесь
     другое — не текст автора, а одна реплика, и решений два вместо трёх.
     """
+    page = _paged(request, data.held_comments())
     return render(request, 'pages/moderation/comments.html', {
-        'comments': data.held_comments(),
+        'comments':  page.object_list,
+        'page':      page,
+        'page_base': reverse('core:moderation_comments'),
     })
 
 
@@ -209,8 +221,11 @@ def held_comment_decide(request, pk):
 @moderator_only
 def reports_queue(request):
     """Ашық шағымдар, ең ұзақ тұрғаны бірінші — ревизия кезегіндегідей."""
+    page = _paged(request, data.open_reports())
     return render(request, 'pages/moderation/reports.html', {
-        'reports': data.open_reports(),
+        'reports':   page.object_list,
+        'page':      page,
+        'page_base': reverse('core:moderation_reports'),
     })
 
 

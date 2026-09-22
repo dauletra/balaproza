@@ -118,6 +118,16 @@
             </article>
         {% endfor %}
     </div>
+    {% comment %}
+        Очередь тяжелеет ровно в тот день, когда с ней не справляются.
+        Компонент тот же, что у каталога: своей копии пагинации на
+        портале быть не должно.
+    {% endcomment %}
+    {% if page.paginator.num_pages > 1 %}
+        <div class="mt-6">
+            {% include "components/pagination.html" with current=page.number total=page.paginator.num_pages base=page_base qs=page_qs %}
+        </div>
+    {% endif %}
 {% else %}
     {% include "components/empty_state.html" with icon="check" title="Кезек бос" text="Шешім күтіп тұрған мәтін жоқ." %}
 {% endif %}

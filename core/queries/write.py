@@ -7,8 +7,18 @@
 `core/queries` в целом, только для записи, а не для чтения.
 """
 
+from datetime import timedelta
+
 from django.db import transaction
-from django.db.models import Case, Max, PositiveSmallIntegerField, Value, When
+from django.db.models import (
+    Case,
+    Exists,
+    Max,
+    OuterRef,
+    PositiveSmallIntegerField,
+    Value,
+    When,
+)
 from django.utils import timezone
 
 from ..domain.slugs import slugify_kz
@@ -360,6 +370,14 @@ def submit_story_for_review(story) -> int:
     черновиком (V10 в AUDIT-WRITE-FLOW: до этого автор правил текст после
     отправки, и модератор читал не то, что ему отправляли).
 
+    **Одной транзакцией**, как и решение модератора (`apply_moderation`):
+    подача — одно действие автора, сколько бы глав оно ни затронуло.
+    Падение посреди цикла оставляло часть глав поданными, часть нет, и
+    статус работы непересчитанным; автор при этом видел ошибку и
+    естественным образом нажимал «отправить» ещё раз — а половина глав
+    уже была в очереди. Состояния «подана наполовину» в модели нет, и
+    заводить его отказом базы тем более незачем.
+
     Возвращает число поданных глав.
     """
     if not can_submit_for_review(story):
@@ -368,14 +386,62 @@ def submit_story_for_review(story) -> int:
 
     now = timezone.now()
     submitted = 0
-    for chapter in story.chapter_set.all():
-        if not chapter_needs_submission(chapter):
-            continue
-        ChapterRevision.objects.filter(chapter=chapter, state='pending').update(
-            state='draft')
-        ChapterRevision.objects.create(
-            chapter=chapter, title=chapter.title, body=chapter.body,
-            state='pending', submitted_at=now)
-        submitted += 1
-    story.refresh_status()
+    with transaction.atomic():
+        for chapter in story.chapter_set.all():
+            if not chapter_needs_submission(chapter):
+                continue
+            ChapterRevision.objects.filter(chapter=chapter, state='pending').update(
+                state='draft')
+            ChapterRevision.objects.create(
+                chapter=chapter, title=chapter.title, body=chapter.body,
+                state='pending', submitted_at=now)
+            submitted += 1
+        story.refresh_status()
     return submitted
+
+
+# ── Уборка истории ревизий ───────────────────────────────────────────────
+#
+# Каждая отправка на модерацию заводит `ChapterRevision` с **полной
+# копией** тела главы, а потолок у главы — миллион знаков. Десять
+# возвратов на доработку это десять копий одного текста, и удалялись они
+# только каскадом вместе с главой.
+#
+# Растёт это медленно и монотонно, и заметить рост не по чему: таблица не
+# показывается нигде, кроме истории решений в карточке модерации, а та
+# читает `ModerationDecision`.
+
+KEEP_REVISION_DAYS = 30
+
+
+def prune_revisions() -> int:
+    """Удалить старые снимки текста. Отдаёт, сколько удалено.
+
+    Что **никогда** не удаляется, и оба исключения обязательные:
+
+    - **опубликованная ревизия.** На неё смотрит `Chapter` через
+      `published_revision`, и связь эта `SET_NULL` — удалить её значит
+      обнулить поле, то есть снять главу с публикации. Читатель потерял
+      бы текст, а автор не понял бы почему;
+    - **поданная.** Она ждёт модератора, сколько бы ни ждала: очередь
+      бывает длинной, и чистка не должна решать за него.
+
+    Остальное старше месяца уходит. По возрасту, а не «оставить N
+    последних на главу»: число означало бы разную глубину истории у
+    плодовитого автора и у медленного, а окно в месяц читается одинаково
+    для обоих. Оконная функция здесь потребовала бы подзапроса ради
+    правила, которое никто не просил.
+
+    Автор своих старых версий не видит нигде, то есть уборка ничего у
+    него не отнимает. Появится «вернуть предыдущую версию» — правило
+    придётся пересмотреть раньше, чем оно что-то сэкономит, и это
+    осознанный размен.
+    """
+    edge = timezone.now() - timedelta(days=KEEP_REVISION_DAYS)
+    published = Chapter.objects.filter(published_revision=OuterRef('pk'))
+    removed, _ = (ChapterRevision.objects
+                  .filter(created_at__lt=edge)
+                  .exclude(state='pending')
+                  .exclude(Exists(published))
+                  .delete())
+    return removed
