@@ -35,30 +35,17 @@
     font-display: swap;
 }
 
-@font-face {
-    font-family: "Inter";
-    src: url("/static/fonts/inter-variable.woff2") format("woff2-variations");
-    font-weight: 100 900;
-    font-style: normal;
-    font-display: swap;
-}
-@font-face {
-    font-family: "Inter";
-    src: url("/static/fonts/inter-italic-variable.woff2") format("woff2-variations");
-    font-weight: 100 900;
-    font-style: italic;
-    font-display: swap;
-}
-
 /* ─────────────────────────────── @theme ────────────────────────────────────
    Дизайн-токены по docs/ui.md. Все цвета/шрифты/радиусы/тени — отсюда.
    Запрещено использовать сырые rgb() и hex в шаблонах.
 */
 @theme {
     /* — Шрифты — */
+    /* Два, а не три: Inter объявлялся третьим и стоял только на витрине
+       токенов. Витрины больше нет, и шрифт, который не читает ни одна
+       страница, — это 734 КБ в репозитории и лишняя строка в реестре. */
     --font-display: "Montserrat", system-ui, sans-serif;       /* заголовки */
     --font-sans:    "Open Sans", system-ui, sans-serif;         /* основной */
-    --font-ui:      "Inter", system-ui, sans-serif;             /* акценты */
 
     /* — Бренд: единый accent teal на весь портал — */
     --color-brand:        rgb(3, 102, 114);

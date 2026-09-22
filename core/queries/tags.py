@@ -46,10 +46,6 @@ def with_counts(tags):
     )
 
 
-def all_tags():
-    return with_counts(Tag.objects.all())
-
-
 def tag_by_slug(slug: str):
     return with_counts(Tag.objects.filter(slug=slug)).first()
 

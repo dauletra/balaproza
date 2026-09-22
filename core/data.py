@@ -147,7 +147,6 @@ from .queries.story import (
     comment_of,
     comment_count_of_chapter,
     comment_page_of,
-    comments_of,
     comments_of_chapter,
     delete_comment,
     poll_for,
@@ -171,7 +170,6 @@ from .media_cleanup import orphan_media_files
 from .queries.tags import (
     accept_tags,
     accepted_tags_json,
-    all_tags,
     blocked_tag_patterns_list,
     is_blocked,
     popular_tags,

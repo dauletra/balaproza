@@ -239,11 +239,6 @@ def _attach_liked(comments: list, viewer) -> list:
     return comments
 
 
-def comments_of(story_slug: str, viewer=None) -> list:
-    """Все верхнеуровневые комментарии произведения; ответы висят на них."""
-    return _attach_liked(list(_comments(story_slug)), viewer)
-
-
 def _chapter_window(story_slug: str, chapter_number: int):
     """Разговор под главой: её реплики плюс общие — те, у которых главы
     нет вовсе. Одна выборка на показ, счёт и резолв страницы, чтобы

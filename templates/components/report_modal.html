@@ -2,11 +2,10 @@
     ReportModal (docs/ui.md). Жалоба на контент.
     Триггер: $dispatch('open-report', { report_url: '/story/.../report/' })
 
-    Настоящий POST на `report_url` — по образцу DeleteConfirm
-    (delete_confirm_modal.html, Ф15 Этап 1): csrf-токен один на форму,
-    `:action` меняется под адрес конкретной цели из события. Пустой
-    `report_url` (витрина /_design/) не даёт отправить форму на текущую
-    страницу молча.
+    Настоящий POST на `report_url` — тот же приём, что у
+    `delete_confirm_modal.html`: csrf-токен один на форму, `:action`
+    меняется под адрес конкретной цели из события. Пустой `report_url`
+    не даёт отправить форму на текущую страницу молча.
 {% endcomment %}
 <div x-data="modal('open-report', ['report_url', 'reason', 'comment'])"
      @close-report.window="open = false"

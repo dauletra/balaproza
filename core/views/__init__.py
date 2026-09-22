@@ -36,7 +36,6 @@ from .contests import (
     contest_withdraw,
     my_submissions,
 )
-from .design import design_components, design_states, design_tokens
 from .home import home
 from .moderation import (
     held_comment_decide,

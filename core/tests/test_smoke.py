@@ -56,9 +56,6 @@ PUBLIC_URLS = [
     ('core:my_submissions',    {},                                'my-submissions'),
 ]
 
-DEBUG_ONLY_URLS = ['core:design_tokens', 'core:design_components', 'core:design_states']
-
-
 class EveryRouteRenders(TestCase):
     """Самая дешёвая защита от типовых поломок: сломанный `{% url %}`,
     потерянный `{% include %}`, запрещённое имя переменной, зацикленный
@@ -117,21 +114,6 @@ class EveryRouteRenders(TestCase):
                 self.assertEqual(self.client.get(url).status_code, 404)
 
 
-class DesignPagesAreDebugOnly(TestCase):
-    """Витрина компонентов не должна открываться в проде."""
-
-    def test_they_are_gone_without_debug(self):
-        for name in DEBUG_ONLY_URLS:
-            with self.subTest(url=name):
-                self.assertEqual(self.client.get(reverse(name)).status_code, 404)
-
-    @override_settings(DEBUG=True)
-    def test_they_render_with_debug(self):
-        for name in DEBUG_ONLY_URLS:
-            with self.subTest(url=name):
-                self.assertEqual(self.client.get(reverse(name)).status_code, 200)
-
-
 class TemplateContext(TestCase):
     """Что видит каждый шаблон о том, кто на него смотрит."""
 
@@ -171,8 +153,7 @@ class TemplateContext(TestCase):
                  ('/contests/', 'contests'), ('/contests/altyn-qalam/', 'contests'),
                  ('/catalog/', 'catalog'), ('/genres/', 'catalog'),
                  ('/collections/', 'catalog'), ('/search/', 'catalog'),
-                 ('/story/sample/', 'story'), ('/auth/login/', 'auth'),
-                 ('/_design/tokens/', '')]
+                 ('/story/sample/', 'story'), ('/auth/login/', 'auth')]
         for path, expected in cases:
             with self.subTest(path=path):
                 self.assertEqual(nav_state(self._request_as(path=path))['nav_active'],
@@ -273,7 +254,7 @@ class DesignStatesAreOptIn(TestCase):
 
 
 class DesignStatesDoNotExistOnTheLiveSite(TestCase):
-    """Леса дизайн-обзора — только при `DEBUG` (A5).
+    """Леса состояний — только при `DEBUG`.
 
     Без этой проверки любой посетитель открывал бы главную с
     `?state=error` и видел «Бір нәрсе сәтсіз болды» на работающем сайте:

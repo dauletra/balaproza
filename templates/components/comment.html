@@ -132,7 +132,7 @@
                     </button>
                 </form>
             {% else %}
-                {# Показ вне страницы произведения (_design showcase) — некуда слать POST #}
+                {# Показ вне страницы произведения — некуда слать POST #}
                 <span aria-label="Ұнату" aria-pressed="{{ liked|yesno:'true,false' }}"
                       class="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 {% if liked %}text-status-error-fg{% else %}text-slate-500{% endif %}">
                     {% if liked %}

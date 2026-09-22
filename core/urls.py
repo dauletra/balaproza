@@ -128,8 +128,4 @@ urlpatterns = [
     # SEO — краулерам (чек-лист запуска, docs/deploy.md)
     path('robots.txt', views.robots_txt, name='robots_txt'),
 
-    # DESIGN — внутренние страницы (только при DEBUG=True)
-    path('_design/tokens/', views.design_tokens, name='design_tokens'),
-    path('_design/components/', views.design_components, name='design_components'),
-    path('_design/states/', views.design_states, name='design_states'),
 ]
