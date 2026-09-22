@@ -1,6 +1,6 @@
 """CONT — байқау как объект: даты, фазы, условия, награды.
 
-Главное правило раздела: **фаза выводится из трёх дат** (DEC-45).
+Главное правило раздела: **фаза выводится из трёх дат**.
 Хранимых `status`, `days_left`, `year` и числа заявок нет — «87 өтінім»
 стояло при одной настоящей заявке, а `days_left=12` протухал назавтра.
 
@@ -28,7 +28,7 @@ def _timing(contest) -> str:
 
 def _all_submissions() -> dict:
     """Заявки по авторам. Нужны затем, чтобы проверить, что число заявок
-    у конкурса считается, а не хранится (BR-40a)."""
+    у конкурса считается, а не хранится."""
     out = {}
     for sub in Submission.objects.select_related('author', 'contest', 'story'):
         out.setdefault(sub.author.username, []).append(sub)
@@ -44,7 +44,7 @@ def _eligibility(contest) -> str:
 # ───────────────────────────────────────────────────────────────────────
 
 class ContestDatesAreTheSource(TestCase):
-    """DEC-45: фаза, отсчёт, год и число заявок выводятся, а не хранятся."""
+    """Фаза, отсчёт, год и число заявок выводятся, а не хранятся."""
 
     def test_every_contest_has_the_fields_its_phase_implies(self):
         for contest in data.all_contests():
@@ -61,7 +61,7 @@ class ContestDatesAreTheSource(TestCase):
 
     def test_the_demo_set_covers_all_four_phases(self):
         """Иначе `judging` и `upcoming` не на чем увидеть, а ради них
-        DEC-45 и заводился."""
+        фазы и выводятся из дат."""
         self.assertEqual({c.phase for c in data.all_contests()},
                          set(data.CONTEST_PHASES))
         self.assertEqual(data.contest_by_slug('altyn-qalam').name, 'Алтын қалам')
@@ -175,9 +175,9 @@ class ContestTimingLineIsOneImplementation(TestCase):
 
 
 class AgeIsTheContestsRule(TestCase):
-    """Возрастную вилку ставит конкурс, а не платформа (BR-48).
+    """Возрастную вилку ставит конкурс, а не платформа.
 
-    Прежнее BR-20 объявляло «14-18 лет» правилом платформы, и потому
+    Прежде «14-18 лет» объявлялось правилом платформы, и потому
     конкурс со своей вилкой выразить было нечем: четыре конкурса из пяти
     повторяли одну и ту же строку руками, чек-лист держал её в коде,
     а форма регистрации сообщала её каждому новому пришедшему.
@@ -210,7 +210,8 @@ class AgeIsTheContestsRule(TestCase):
                 with self.subTest(contest=contest.slug, cond=condition):
                     self.assertNotIn('жас', condition,
                                      'возраст приходит из min_age/max_age')
-                    # «(BR-23)» и «(DEC-21)» читал подросток.
+                    # Внутренние коды требований в условиях конкурса
+                    # читал подросток. Их место — в коде, а не на экране.
                     self.assertNotRegex(condition, r'\b(BR|DEC|FR|NFR)-\d+')
 
     def test_the_page_states_the_bracket_only_when_there_is_one(self):
@@ -228,7 +229,7 @@ class AgeIsTheContestsRule(TestCase):
 
 
 class CommonRulesAreWrittenOnce(TestCase):
-    """Общие правила — один реестр, а не копия в каждом конкурсе (BR-48a).
+    """Общие правила — один реестр, а не копия в каждом конкурсе.
 
     Копия успела разойтись тремя способами: неполно (AI-декларация
     обязательна для всех, названа была у одного из пяти), литералом
@@ -255,7 +256,7 @@ class CommonRulesAreWrittenOnce(TestCase):
                     self.assertContains(response, rule['label'])
 
     def test_own_conditions_never_restate_a_common_rule(self):
-        """Свои условия и общие правила лежат в одном списке (FR-CONT-15).
+        """Свои условия и общие правила лежат в одном списке.
 
         Разделён был показ, а не источник: соблазн вписать общее правило
         себе в `conditions` от слияния только вырос, а расходиться копия
@@ -300,7 +301,7 @@ class CommonRulesAreWrittenOnce(TestCase):
         per_work = {r['key'] for r in data.common_rules(contest) if r['per_work']}
         self.assertTrue(per_work <= checklist)
         # «Бір автор — бір өтінім» — про автора, не про текст: его держит
-        # сама форма (BR-23), в чек-лист работы он не идёт.
+        # сама форма, в чек-лист работы он не идёт.
         self.assertNotIn('one_entry', checklist)
         # Пункт возраста приходит от конкурса: без ценза вечно пройденный
         # пункт показывать незачем.
@@ -331,7 +332,7 @@ class CommonRulesAreWrittenOnce(TestCase):
 
 
 # ───────────────────────────────────────────────────────────────────────
-# Награды конкурса: номинации и присуждения (DEC-46)
+# Награды конкурса: номинации и присуждения
 # ───────────────────────────────────────────────────────────────────────
 
 class ContestAwardsData(TestCase):
@@ -388,7 +389,7 @@ class ContestAwardsData(TestCase):
                 self.assertEqual(contest.winners, ())
 
     def test_the_generic_winner_award_is_retired(self):
-        """DEC-46 снял общий «Байқау жеңімпазы» — его вытеснила награда
+        """Общего «Байқау жеңімпазы» больше нет — его вытеснила награда
         конкретного конкурса. Знаки участия остались."""
         keys = {a.key for a in data.AWARDS}
         self.assertNotIn('contest_winner', keys)
@@ -438,7 +439,7 @@ class ContestAwardImages(TestCase):
 
 
 class ContestEditionsAreLinked(TestCase):
-    """Завершённый конкурс перестал быть тупиком (FR-CONT-13, BR-47)."""
+    """Завершённый конкурс перестал быть тупиком."""
 
     def test_the_editions_see_each_other(self):
         old = data.contest_by_slug('zhas-aldym-2023')

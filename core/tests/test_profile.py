@@ -1,7 +1,7 @@
 """PROF — профиль автора: что видно и кому.
 
 Один вопрос проходит через весь файл и проверяется здесь чаще прочего —
-**кто зритель** (BR-73): посторонний видит только публичное, и однажды эти
+**кто зритель**: посторонний видит только публичное, и однажды эти
 две выдачи уже склеили — на `/u/<username>/` висели черновик и работа на
 модерации.
 
@@ -50,7 +50,7 @@ class PublicSurfaceOfAnAuthor(TestCase):
             data.public_stats(user('aidana'))['works'],
             len(data.my_stories_of(user('aidana'))) - len(hidden),
         )
-        # Рейл — публичная поверхность, и BR-73 действует в нём так же.
+        # Рейл — публичная поверхность, и правило зрителя действует в нём так же.
         top = data.top_stories_of(user('aidana'), limit=99)
         self.assertTrue(all(s.is_public for s in top))
         for story in hidden:
@@ -58,7 +58,7 @@ class PublicSurfaceOfAnAuthor(TestCase):
                 self.assertNotIn(story.slug, {s.slug for s in top})
 
     def test_public_list_keeps_serials(self):
-        # DEC-37: публичный сериал носит OnProcess/Completed. Фильтр по
+        # Публичный сериал носит OnProcess/Completed. Фильтр по
         # литералу 'Published' молча выкинул бы их все.
         public = data.public_stories_of(user('rudazov'))
         self.assertEqual(len(public), 3)
@@ -134,7 +134,7 @@ class OwnProfile(TestCase):
         response = self.client.get(reverse('core:profile_me'))
         self.assertContains(response, 'aidana')
         self.assertContains(response, '@aidana')
-        # DEC-44: вкладка показывает публичные работы — то же, что видит
+        # Вкладка показывает публичные работы — то же, что видит
         # читатель. Черновик и работа на модерации сюда не попадают.
         for story in data.public_stories_of(user('aidana')):
             with self.subTest(story=story.slug):
@@ -179,7 +179,7 @@ class OwnProfile(TestCase):
         # Приватный блок — только владельцу
         self.assertContains(about, 'Тек саған көрінеді')
         # Строка выводится из даты прихода, а не сверяется с литералом: она
-        # относительная (DEC-57), и корпус двигает её вместе с сегодня.
+        # относительная, и корпус двигает её вместе с сегодня.
         self.assertContains(about, user('aidana').joined_since)
         self.assertContains(about, len(data.my_stories_of(user('aidana'))))
         self.assertContains(about, 'жобалармен бірге')
@@ -208,7 +208,7 @@ class StrangerProfile(TestCase):
         self.assertEqual(item['count'], len(response.context['works']))
 
     def test_drafts_and_moderation_stay_hidden(self):
-        """BR-10 / DEC-23: профиль строился на `my_stories_of` — выдаче
+        """Профиль строился на `my_stories_of` — выдаче
         кабинета, — и на `/u/aidana/` черновик с работой на модерации
         висели обычными кликабельными карточками."""
         response = self.client.get(
@@ -260,7 +260,7 @@ class StrangerProfile(TestCase):
 
 
 class ProfileIsNotASecondCabinet(TestCase):
-    """DEC-44: профиль — публичный вид на автора, кабинет — рабочее место.
+    """Профиль — публичный вид на автора, кабинет — рабочее место.
 
     `/me/?tab=works` рендерил `my_stories_of` строками `my_story_row`, то
     есть ровно список из `/my-stories/` минус полоса внимания. Две
@@ -290,7 +290,7 @@ class ProfileIsNotASecondCabinet(TestCase):
         # потеряли, и знать, где они лежат.
         self.assertEqual(self.response.context['hidden_n'], 2)
         self.assertContains(self.response, reverse('core:my_stories'))
-        # Разбивка не потеряна — она во вкладке «Статистика» (FR-PROF-08).
+        # Разбивка не потеряна — она во вкладке «Статистика».
         stats = self.client.get(reverse('core:profile_me') + '?tab=stats')
         self.assertContains(stats, 'Тек саған көрінеді')
         self.assertEqual(stats.context['writer']['total'],
@@ -309,7 +309,7 @@ class ProfileIsNotASecondCabinet(TestCase):
 
 
 class ProfileRailByViewer(TestCase):
-    """Рейл профиля разный по зрителю (FR-PROF-09).
+    """Рейл профиля разный по зрителю.
 
     Чужой профиль показывал «Жазылымдар» — на кого подписан **он**.
     Читателю это не сообщало ничего и занимало единственный блок колонки.
@@ -342,14 +342,14 @@ class ProfileRailByViewer(TestCase):
 
 
 class PeoplePages(TestCase):
-    """Подписчики и подписки открываются страницей (FR-PROF-10, BR-75)."""
+    """Подписчики и подписки открываются страницей."""
 
     def _url(self, username, kind):
         return reverse('core:profile_people',
                        kwargs={'username': username, 'kind': kind})
 
     def test_both_lists_are_public_and_name_everyone(self):
-        # BR-75: число подписчиков и так объявлено плиткой профиля, а
+        # Число подписчиков и так объявлено плиткой профиля, а
         # подписки показывал рейл. Гость получает обе страницы.
         for kind, fetch in (('followers', data.followers_of),
                             ('following', data.following_of)):
@@ -388,7 +388,7 @@ class PeoplePages(TestCase):
 
 
 class ProfileStatTilesLinkToLists(TestCase):
-    """Числа профиля кликабельны там, где за ними стоит список (FR-PROF-10)."""
+    """Числа профиля кликабельны там, где за ними стоит список."""
 
     def test_only_the_tiles_with_a_list_behind_them_are_links(self):
         response = self.client.get(
@@ -475,7 +475,7 @@ class ProfileTemplatesShareParts(TestCase):
 # ───────────────────────────────────────────────────────────────────────
 
 class FollowingAnAuthorIsWrittenDown(TestCase):
-    """Кнопка «Жазылу» заводит подписку (FR-PROF-04, BR-75).
+    """Кнопка «Жазылу» заводит подписку.
 
     Обе формы — в шапке профиля и в карточке автора — стояли с
     `action="#"` и отвечали тостом «(демо)». Строки `Follow` при этом
@@ -598,7 +598,7 @@ class ProfileEdit(TestCase):
                              reverse('core:profile_me_edit'))
 
     def test_the_avatar_takes_raster_only_and_a_refusal_blocks_the_form(self):
-        """Тот же валидатор, что у Story.cover (BR-46) — SVG не проходит."""
+        """Тот же валидатор, что у Story.cover — SVG не проходит."""
         self._post(avatar=factories.tiny_image('фото.png'))
         user = self._aidana()
         self.assertTrue(user.avatar.name.startswith('avatars/aidana'))
@@ -615,15 +615,15 @@ class ProfileEdit(TestCase):
         self.assertEqual(self._aidana().pen_name, before)
 
     def test_resubmitting_the_same_username_is_not_a_conflict_with_self(self):
-        """BR-91: `clean_username` исключает себя из проверки уникальности —
+        """`clean_username` исключает себя из проверки уникальности —
         иначе форма без единого изменения ника всегда отвечала бы «занят»."""
         response = self._post()
         self.assertRedirects(response, reverse('core:profile_me'))
         self.assertEqual(self._aidana().username, 'aidana')
 
     def test_changing_the_username_moves_the_public_address_and_frees_the_old_one(self):
-        """BR-91: адрес меняется вместе с ником, старый — обычный 404
-        (BR-76), не редирект и не «занято навсегда»."""
+        """Адрес меняется вместе с ником, старый — обычный 404,
+ не редирект и не «занято навсегда»."""
         pk = self._aidana().pk
         response = self._post(username='zhanaidana')
         self.assertRedirects(response, reverse('core:profile_me'))
@@ -636,7 +636,7 @@ class ProfileEdit(TestCase):
             'core:profile_other', kwargs={'username': 'aidana'})).status_code, 404)
 
     def test_remove_avatar_clears_it_without_a_new_file(self):
-        """BR-86: убрать фото, не заменив его другим."""
+        """Убрать фото, не заменив его другим."""
         self._post(avatar=factories.tiny_image('фото.png'))
         self.assertTrue(self._aidana().avatar)
         self._post(remove_avatar='on')
@@ -660,14 +660,14 @@ class ProfileEdit(TestCase):
 
 
 class StoryMetricIsCalledAReaction(TestCase):
-    """Метрика произведения — сумма реакций по главам, а не лайки (DEC-32).
+    """Метрика произведения — сумма реакций по главам, а не лайки.
 
     Слово «ұнату» стояло на шести поверхностях: карточка каталога, строка
     кабинета, шапка произведения, «Аптаның кітабы», плитка профиля и
     список глав. Ни одна из них не показывала лайки — все показывали
     `Chapter.likes`, то есть сумму пяти реакций.
 
-    **Лайк комментария (BR-31) — другое понятие и остаётся лайком.**
+    **Лайк комментария — другое понятие и остаётся лайком.**
     Читатель действительно нажимает «ұнату» под комментарием; там нет ни
     глав, ни пяти реакций. Тест обязан различать эти два случая, иначе
     следующий проход по «ұнату» сравняет и его.
@@ -690,7 +690,7 @@ class StoryMetricIsCalledAReaction(TestCase):
             with self.subTest(surface=label):
                 html = self.client.get(
                     reverse(name, kwargs=kwargs)).content.decode()
-                # Вырезаем комментарии: их «Ұнату» законен (BR-31).
+                # Вырезаем комментарии: их «Ұнату» законен.
                 without_comments = html.replace('aria-label="Ұнату"', '')
                 self.assertNotIn('ұнату', without_comments)
                 self.assertNotIn('ұнатты', without_comments)
@@ -699,7 +699,7 @@ class StoryMetricIsCalledAReaction(TestCase):
         self.assertContains(story, 'aria-label="Ұнату"')
 
     def test_one_glyph_for_one_metric(self):
-        """`thumbs-up` означал жест, который DEC-32 убрал."""
+        """`thumbs-up` означал жест, которого в интерфейсе больше нет."""
         offenders = []
         for path in list((TEMPLATES / 'components').glob('*.html')) + \
                 list((TEMPLATES / 'pages').rglob('*.html')):

@@ -3,7 +3,7 @@
 Главная — единственная страница, где проверяется **порядок**, а не только
 наличие: подросток заходит с телефона, и если первый экран занят поиском,
 ценность портала не считывается. Поэтому здесь много `assertLess` по
-индексам в разметке — это не хрупкость, а само требование (DEC-31).
+индексам в разметке — это не хрупкость, а само требование.
 
 Один запрос на класс, а не на утверждение: сценарий «гость открыл
 главную» один, и вопросов к нему полтора десятка.
@@ -33,7 +33,7 @@ from core.tests.base import TestCase, login_as, login_as_newcomer
 class GuestSeesTheEditorialFront(TestCase):
     """Первый фолд: hero, полоса жанров, жинақтар, наполненный ряд.
 
-    Порядок задан DEC-31: жанр — вывеска, а вопрос о настроении идёт
+    Порядок не случаен: жанр — вывеска, а вопрос о настроении идёт
     вперёд ряда обложек.
     """
 
@@ -65,7 +65,7 @@ class GuestSeesTheEditorialFront(TestCase):
         self.assertEqual(positions, sorted(positions), order)
 
     def test_the_four_rows_are_the_ones_the_editors_chose(self):
-        """Жанровый скроллер убран (DEC-31) — осталась полоса-вывеска."""
+        """Жанровый скроллер убран — осталась полоса-вывеска."""
         for present in ('Қазір не оқығың келеді?', 'Көп оқылған шығармалар',
                         'Қысқа оқылатын әңгімелер', 'Жалғасып жатқан шығармалар'):
             self.assertContains(self.response, present)
@@ -94,7 +94,7 @@ class GuestSeesTheEditorialFront(TestCase):
 class TheGenreStripIsASignNotNavigation(TestCase):
     """Двенадцать цветных слов за пару секунд объясняют, что это
     литературный портал. Чип ведёт на страницу жанра, а не переключает
-    состояние внутри главной (DEC-31)."""
+    состояние внутри главной."""
 
     def setUp(self):
         self.html = self.client.get(reverse('core:home')).content.decode()
@@ -137,7 +137,7 @@ class RailContentSurvivesOnAPhone(TestCase):
             r'<div class="xl:hidden">\s*<a[^>]*>[\s\S]*?Белсенді байқау', self.html))
 
     def test_both_tag_showcases_reach_the_flow(self):
-        """Теги — единственная ось, обновляющаяся без редакции (DEC-31),
+        """Теги — единственная ось, обновляющаяся без редакции,
         поэтому накопленной популярности мало: нужен срез недели, и списки
         обязаны различаться."""
         trending = self.response.context['trending_tags']
@@ -166,7 +166,7 @@ class RailContentSurvivesOnAPhone(TestCase):
 class TheContestsSectionIsAnOverview(TestCase):
     """Обзор нескольких конкурсов, а не только ближайшего по дедлайну —
     того показывает баннер рядом. Карточка ведёт прямо на страницу
-    конкурса: отдельной сущности под конкурс нет (DEC-50)."""
+    конкурса: отдельной сущности под конкурс нет."""
 
     def test_open_first_capped_and_linked_to_their_pages(self):
         response = self.client.get(reverse('core:home'))
@@ -208,7 +208,7 @@ class EditorialBlocksAreWiredUp(TestCase):
         """Социальное доказательство: подросток должен видеть, что здесь
         пишут такие же начинающие.
 
-        По дате прихода, а не по числу подписчиков (DEC-57): мало
+        По дате прихода, а не по числу подписчиков: мало
         подписчиков бывает и у того, кто пишет второй год, и ряд звал бы
         читать его как новичка. Проверяется свойство, а не ники — правка
         корпуса не должна ломать тест.
@@ -222,7 +222,7 @@ class EditorialBlocksAreWiredUp(TestCase):
         self.assertNotContains(self.response, 'барлық авторлар')
 
     def test_an_empty_profile_does_not_displace_one_with_a_story(self):
-        """DEC-89: карточка аккаунта без работ показывала «0 шығарма ·
+        """Карточка аккаунта без работ показывала «0 шығарма ·
         0 жазылушы» — социальное доказательство, доказывающее обратное.
         Пришедший последним, но ничего не опубликовавший, уступает место
         тому, у кого есть что читать.
@@ -269,7 +269,7 @@ class TwoRowsMustNotSayTheSameThing(TestCase):
     def test_the_date_is_the_readers_one_not_the_rows_updated_at(self):
         """`updated_at` двигает любое сохранение строки — пересчёт статуса,
         решение модератора о соседней главе. Берётся дата, с которой часть
-        стала видна читателю (BR-79).
+        стала видна читателю.
         """
         story = factories.story(author=factories.user(), chapters=2)
         shown = story.last_published_at
@@ -320,7 +320,7 @@ class TheContestBannerGivesEnoughToDecide(TestCase):
 
     def test_the_count_appears_only_once_someone_has_sent_something(self):
         """«0 жұмыс» в промо-блоке сообщает ровно обратное тому, зачем
-        блок стоит, — та же беда, что у карточки автора с нулями (DEC-89).
+        блок стоит, — та же беда, что у карточки автора с нулями.
         """
         self.assertNotIn('жұмыс жіберілді', self._banner())
 
@@ -364,7 +364,7 @@ class TheWeeklyPickSaysWhatOpens(TestCase):
 
 
 class TheCardCarriesWhatTheReaderAlreadyDid(TestCase):
-    """BR-96: закладка и прогресс прямо на карточке. На телефоне наведения
+    """Закладка и прогресс прямо на карточке. На телефоне наведения
     нет, и действие, которое появляется только на hover, не существует.
     """
 
@@ -455,7 +455,7 @@ class GuestHeaderAndBottomNav(TestCase):
         self.assertContains(response, reverse('core:catalog'))
 
     def test_the_guest_fab_is_write_and_the_slots_are_labelled(self):
-        """DEC-88: в центре «Жазу», а не поиск. Поиск у гостя был доступен
+        """В центре «Жазу», а не поиск. Поиск у гостя был доступен
         ещё из двух мест первого экрана (иконка в шапке и поле в hero), а
         намерения писать не было видно ниоткуда. Барьер входа остаётся, но
         `next` ведёт человека в редактор сразу после входа."""
@@ -490,10 +490,10 @@ class GuestHeaderAndBottomNav(TestCase):
                 self.assertIn(f'>{label}</span>', nav)
 
     def test_the_footer_accordion_is_open_in_the_markup(self):
-        """DEC-90: сворачивает группы Alpine при инициализации, а разметка
+        """Сворачивает группы Alpine при инициализации, а разметка
         приходит раскрытой. Обратный порядок (`hidden` в HTML, скрипт
         снимает) без JS прятал бы карту сайта навсегда — а footer и есть
-        единственная карта сайта после DEC-25.
+        единственная карта сайта.
         """
         html = self.client.get(reverse('core:home')).content.decode()
         footer = html[html.index('<footer'):]
@@ -502,7 +502,7 @@ class GuestHeaderAndBottomNav(TestCase):
         self.assertNotIn('hidden sm:!flex', footer)
 
     def test_the_header_and_footer_carry_the_site_map(self):
-        """DEC-25: единственная контент-ссылка в шапке — «Байқаулар»,
+        """Единственная контент-ссылка в шапке — «Байқаулар»,
         остальные разделы живут в подвале."""
         response = self.client.get(reverse('core:home'))
         self.assertContains(response, reverse('core:contest_list'))
@@ -516,7 +516,7 @@ class GuestHeaderAndBottomNav(TestCase):
 
 class GuestCtaKeepsTheIntent(TestCase):
     """Гостевые CTA расходились: hero вёл на signup, become_author — на login.
-    Вход и регистрация — одна и та же дверь Telegram (DEC-83), отдельного
+    Вход и регистрация — одна и та же дверь Telegram, отдельного
     signup-адреса больше нет вовсе."""
 
     def test_both_lead_to_login_with_next_preserved(self):
@@ -540,7 +540,7 @@ class ReturningHomeAsksWhatYouWereDoing(TestCase):
         self.response = self.client.get(reverse('core:home'))
 
     def test_writing_is_primary_when_there_is_an_unfinished_work(self):
-        # DEC-37: одночастевая «aidana-koshe» больше не «жазылып жатыр» —
+        # Одночастевая «aidana-koshe» больше не «жазылып жатыр» —
         # незакончен теперь сериал, он и есть активная работа.
         active = self.response.context['active_work']
         self.assertEqual(self.response.context['hero_focus'], 'writing')

@@ -219,7 +219,7 @@ from .queries.profile import (
     update_profile,
 )
 
-# ── Уведомления: лента и события, которые её наполняют (FR-NOTIF-*) ──────
+# ── Уведомления: лента и события, которые её наполняют ─────────────────
 # Пишущая сторона названа поимённо, как и всё здесь, хотя views её не
 # зовут: события заводят слой записей и админка. Список в фасаде — карта
 # того, откуда в ленте берётся каждая строка.
@@ -243,7 +243,7 @@ from .queries.notifications import (
     unread_count_for_user,
 )
 
-# ── Конкурсы (DEC-45, DEC-46) ────────────────────────────────────────────
+# ── Конкурсы ─────────────────────────────────────────────────────────────
 from .queries.contests import (
     accepting_contests,
     all_contests,
@@ -266,7 +266,7 @@ from .queries.contests import (
     withdraw_submission,
 )
 
-# ── Модерация как раздел (DEC-71) — и жалобы на опубликованное (BR-33) ──
+# ── Модерация как раздел — и жалобы на опубликованное ───────────────────
 from .queries.moderation import (
     claim_story,
     comment_is_blocked,
@@ -295,5 +295,5 @@ from .queries.moderation import (
 # ── Ограничение частоты: сколько раз в минуту это можно ─────────────────
 from .queries.throttle import export_too_often, too_often
 
-# ── Ссылки «Авторлар мектебі» (DEC-22) ───────────────────────────────────
+# ── Ссылки «Авторлар мектебі» ────────────────────────────────────────────
 from .queries.site import school_links

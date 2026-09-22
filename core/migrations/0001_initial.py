@@ -4,7 +4,7 @@
 проде. Не `squashmigrations`: две миграции с `RunPython` стоят барьером
 для оптимизатора, и схлопнутая версия продолжала бы заводить
 `Story.chapters`, `Tag.usage_count`, `LibraryEntry.progress_chapter` с
-их индексами, чтобы следующей операцией удалить (DEC-51, DEC-52, DEC-53).
+их индексами, чтобы следующей операцией удалить.
 История ходов лежит в git и в реестре решений; схеме от неё ничего не
 нужно.
 
@@ -138,7 +138,7 @@ class Migration(migrations.Migration):
                 ('bio', models.CharField(blank=True, max_length=200, verbose_name='өзі туралы')),
                 ('age', models.PositiveSmallIntegerField(blank=True, null=True, verbose_name='жасы')),
                 ('gender', models.CharField(blank=True, choices=[('boy', 'Ұл'), ('girl', 'Қыз')], max_length=4, verbose_name='жынысы')),
-                ('avatar', models.FileField(blank=True, max_length=200, upload_to=core.models.user_avatar_path, validators=[django.core.validators.FileExtensionValidator(['png', 'jpg', 'jpeg', 'webp'], message='Тек растр сурет: png, jpg, webp. SVG қабылданбайды (BR-46).')], verbose_name='аватар')),
+                ('avatar', models.FileField(blank=True, max_length=200, upload_to=core.models.user_avatar_path, validators=[django.core.validators.FileExtensionValidator(['png', 'jpg', 'jpeg', 'webp'], message='Тек растр сурет: png, jpg, webp. SVG қабылданбайды.')], verbose_name='аватар')),
                 ('followers', models.PositiveIntegerField(default=0, verbose_name='оқырман саны')),
                 ('groups', models.ManyToManyField(blank=True, help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.', related_name='user_set', related_query_name='user', to='auth.group', verbose_name='groups')),
                 ('user_permissions', models.ManyToManyField(blank=True, help_text='Specific permissions for this user.', related_name='user_set', related_query_name='user', to='auth.permission', verbose_name='user permissions')),
@@ -202,7 +202,7 @@ class Migration(migrations.Migration):
                 ('closes_on', models.DateField(verbose_name='қабылдау жабылады')),
                 ('results_on', models.DateField(verbose_name='қорытынды жарияланады')),
                 ('prize_kzt', models.PositiveIntegerField(blank=True, null=True, verbose_name='сыйлық (₸)')),
-                ('poster', models.FileField(blank=True, max_length=200, upload_to=core.models.contest_poster_path, validators=[django.core.validators.FileExtensionValidator(['png', 'jpg', 'jpeg', 'webp'], message='Тек растр сурет: png, jpg, webp. SVG қабылданбайды (BR-46).')], verbose_name='афиша')),
+                ('poster', models.FileField(blank=True, max_length=200, upload_to=core.models.contest_poster_path, validators=[django.core.validators.FileExtensionValidator(['png', 'jpg', 'jpeg', 'webp'], message='Тек растр сурет: png, jpg, webp. SVG қабылданбайды.')], verbose_name='афиша')),
                 ('series', models.SlugField(blank=True, max_length=64, verbose_name='серия')),
                 ('description', models.TextField(blank=True, verbose_name='сипаттамасы')),
                 ('min_chars', models.PositiveIntegerField(default=5000, verbose_name='ең аз көлемі')),
@@ -223,7 +223,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('slug', models.SlugField(max_length=48, verbose_name='slug')),
                 ('title', models.CharField(max_length=80, verbose_name='атауы')),
-                ('image', models.FileField(blank=True, max_length=200, upload_to=core.models.award_image_path, validators=[django.core.validators.FileExtensionValidator(['png', 'jpg', 'jpeg', 'webp'], message='Тек растр сурет: png, jpg, webp. SVG қабылданбайды (BR-46).')], verbose_name='эмблема')),
+                ('image', models.FileField(blank=True, max_length=200, upload_to=core.models.award_image_path, validators=[django.core.validators.FileExtensionValidator(['png', 'jpg', 'jpeg', 'webp'], message='Тек растр сурет: png, jpg, webp. SVG қабылданбайды.')], verbose_name='эмблема')),
                 ('description', models.CharField(blank=True, max_length=200, verbose_name='сипаттамасы')),
                 ('position', models.PositiveSmallIntegerField(default=0, verbose_name='реті')),
                 ('contest', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='award_set', to='core.contest', verbose_name='байқау')),
@@ -313,7 +313,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('slug', models.SlugField(max_length=64, unique=True, verbose_name='slug')),
                 ('title', models.CharField(max_length=120, verbose_name='атауы')),
-                ('cover', models.FileField(blank=True, max_length=200, upload_to=core.models.story_cover_path, validators=[django.core.validators.FileExtensionValidator(['png', 'jpg', 'jpeg', 'webp'], message='Тек растр сурет: png, jpg, webp. SVG қабылданбайды (BR-46).')], verbose_name='мұқаба')),
+                ('cover', models.FileField(blank=True, max_length=200, upload_to=core.models.story_cover_path, validators=[django.core.validators.FileExtensionValidator(['png', 'jpg', 'jpeg', 'webp'], message='Тек растр сурет: png, jpg, webp. SVG қабылданбайды.')], verbose_name='мұқаба')),
                 ('annotation', models.TextField(blank=True, verbose_name='аннотация')),
                 ('status', models.CharField(choices=[('Published', 'Published'), ('NotPublished', 'NotPublished'), ('OnProcess', 'OnProcess'), ('Completed', 'Completed'), ('OnModeration', 'OnModeration')], default='NotPublished', max_length=16, verbose_name='мәртебесі')),
                 ('audience', models.CharField(blank=True, max_length=8, verbose_name='жас белгісі')),

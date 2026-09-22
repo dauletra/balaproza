@@ -23,7 +23,7 @@ from core.tests.base import TEMPLATES, TestCase, login_as, user
 # ───────────────────────────────────────────────────────────────────────
 
 class AchievementsRow(TestCase):
-    """Ряд знаков и строка фактов (FR-PROF-06)."""
+    """Ряд знаков и строка фактов."""
 
     def test_the_row_renders_for_owner_and_stranger_alike(self):
         """Достижение публично по определению — набор не зависит от зрителя."""
@@ -83,7 +83,7 @@ class AchievementsRow(TestCase):
 
 
 class AchievementsAreDerivedNotStored(TestCase):
-    """Знаки автора выводятся из его работ (BR-ACH-01, DEC-41).
+    """Знаки автора выводятся из его работ.
 
     Колонки «награды автора» нет и быть не может — она разошлась бы с тем,
     что человек сделал. Рейтинга здесь тоже нет: знак говорит «ты
@@ -124,7 +124,7 @@ class AchievementsAreDerivedNotStored(TestCase):
     def test_gold_stays_rare_and_every_tier_has_art(self):
         """Металл — сигнал ценности. Позолотить всё значит обесценить золото.
 
-        «Байқау жеңімпазы» из системного реестра убран (DEC-46): победу
+        «Байқау жеңімпазы» из системного реестра убран: победу
         называет награда конкретного конкурса, и металла у неё нет.
         """
         gold = {ach['key'] for _, ach in self._all() if ach['tier'] == 'gold'}
@@ -141,8 +141,8 @@ class AchievementsAreDerivedNotStored(TestCase):
 
     def test_a_mark_never_outruns_its_reason(self):
         """Каждый знак обязан иметь под собой факт: редакционный — публичную
-        работу с этим бейджем, конкурсный — заявку, прошедшую жюри
-        (DEC-46), «дописанный сериал» — сериал."""
+        работу с этим бейджем, конкурсный — заявку, прошедшую жюри,
+ «дописанный сериал» — сериал."""
         editorial = data.BADGE_LABELS['editorial']
         for author in data.all_authors():
             keys = {m['key'] for m in data.achievements_of(author)}
@@ -161,7 +161,7 @@ class AchievementsAreDerivedNotStored(TestCase):
 
 
 class AwardRegistry(TestCase):
-    """Один реестр на «что получено» и «что можно получить» (FR-PROF-08)."""
+    """Один реестр на «что получено» и «что можно получить»."""
 
     def test_the_row_and_the_catalog_come_from_the_same_source(self):
         keys = [x.key for x in data.AWARDS]
@@ -208,7 +208,7 @@ class AwardRegistry(TestCase):
 
 
 class ContestAwardsInProfile(TestCase):
-    """DEC-46: награды конкурсов стоят тем же рядом, что и системные знаки."""
+    """Награды конкурсов стоят тем же рядом, что и системные знаки."""
 
     def test_a_winner_gets_a_medallion_with_a_complete_shape(self):
         awards = data.contest_awards_of(user('bekzhan_t'))
@@ -222,12 +222,12 @@ class ContestAwardsInProfile(TestCase):
                         {'key', 'title', 'image', 'contest', 'story', 'year', 'note'})
                     self.assertTrue(item['title'])
                     # Работа скрыта — награда остаётся: она принадлежит
-                    # автору, а не видимости текста (BR-73).
+                    # автору, а не видимости текста.
                     if item['story'] is not None:
                         self.assertTrue(item['story'].is_public)
 
     def test_the_row_shows_the_emblem_and_names_both_nomination_and_contest(self):
-        """Медальон без подписи; смысл несёт тултип (BR-ACH-06), и одной
+        """Медальон без подписи; смысл несёт тултип, и одной
         номинации мало — «Бас жүлде» бывает у каждого конкурса."""
         response = self.client.get(reverse('core:profile_other',
                                            kwargs={'username': 'bekzhan_t'}))
@@ -246,7 +246,7 @@ class ContestAwardsInProfile(TestCase):
 
 
 class ContestHistoryPrivacy(TestCase):
-    """FR-PROF-07 / BR-74a: публично — участие, не приговор."""
+    """Публично — участие, не приговор."""
 
     JURY_NOTE = 'Көлемі шарттан аз'
 
@@ -271,7 +271,7 @@ class ContestHistoryPrivacy(TestCase):
                 self.assertEqual(len(history), len(data.submissions_of(author)))
                 years = [i['year'] for i in history]
                 self.assertEqual(years, sorted(years, reverse=True))
-                # BR-73: подача не раскрывает снятую с публикации работу.
+                # Подача не раскрывает снятую с публикации работу.
                 for item in history:
                     if item['story'] is not None:
                         self.assertTrue(item['story'].is_public)
@@ -282,7 +282,7 @@ class ContestHistoryPrivacy(TestCase):
         winners = [i for i in data.contest_history(user('dina_books'))
                    if i['result'] == 'winner']
         self.assertEqual([i['contest'].slug for i in winners], ['zhas-aldym-2023'])
-        # Строка называет номинацию, а не общее «Жеңімпаз» (DEC-46):
+        # Строка называет номинацию, а не общее «Жеңімпаз»:
         # «Оқырман таңдауы» и «Бас жүлде» — разные вещи.
         response = self.client.get(
             reverse('core:profile_other', kwargs={'username': 'dina_books'})

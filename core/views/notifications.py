@@ -1,4 +1,4 @@
-"""Лента событий автора (FR-NOTIF-01)."""
+"""Лента событий автора."""
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -12,7 +12,7 @@ from .common import _current_user, _page_state
 
 # ───────────────────────── NOTIF — уведомления ───────────────────────────
 def notifications(request):
-    """Список уведомлений с группировкой БҮГІН / КЕШЕ / ӨТКЕН АПТАДА (FR-NOTIF-01)."""
+    """Список уведомлений с группировкой БҮГІН / КЕШЕ / ӨТКЕН АПТАДА."""
     user = _current_user(request)
     grouped = data.notifications_for_user(user)
     has_any = any(grouped.get(b) for b in data.NOTIF_BUCKETS)
@@ -33,7 +33,7 @@ def notifications(request):
         # Шапка страницы стояла выше ветвления по состоянию и говорила о
         # данных, которых на экране нет: в `?state=error` сводка «4
         # оқылмаған» и кнопка «отметить всё» соседствовали с сообщением
-        # о неудачной загрузке (DEC-17).
+        # о неудачной загрузке.
         'has_data':      state == 'content',
         'unread_total':  data.unread_count_for_user(user),
     })
@@ -43,7 +43,7 @@ def notifications(request):
 def notification_open(request, pk):
     """Открыть уведомление: снять «непрочитано» и уйти к его предмету.
 
-    BR-71 говорит, что метку снимает **открытие уведомления**, а не ленты:
+    Метку снимает **открытие уведомления**, а не ленты:
     строка, погасшая раньше, чем её прочли, обесценивает бейдж. Адрес
     собирает `notification_href` — тот же, что рисует ссылки в карточке.
     Предмета может не быть (объект удалили): тогда возвращаемся в ленту.
@@ -57,7 +57,7 @@ def notification_open(request, pk):
 @require_POST
 @login_required
 def notifications_read_all(request):
-    """«Барлығын оқылды деп белгілеу» — кнопка над лентой (FR-NOTIF-04).
+    """«Барлығын оқылды деп белгілеу» — кнопка над лентой.
 
     Была формой с `@submit.prevent` и тостом «(демо)»: бейдж в шапке
     после неё показывал ровно то же число.

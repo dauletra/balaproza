@@ -1,6 +1,6 @@
-"""Авторский кабинет (FR-WRITE-*).
+"""Авторский кабинет.
 
-Рейла у этих страниц нет вовсе (DEC-48): агрегаты автора живут в профиле,
+Рейла у этих страниц нет вовсе: агрегаты автора живут в профиле,
 кабинет отвечает на «что делать».
 
 Владение проверяется везде одинаково: `story_by_slug_for_author` отдаёт
@@ -49,7 +49,7 @@ def _settings_initial(story) -> dict:
                             if story.secondary_genre else ''),
         'audience':        story.audience,
         # Радио отвечает за «дописано / продолжается», а не за статус:
-        # статус выводится из глав (BR-79).
+        # статус выводится из глав.
         'status':          'Completed' if story.completed_by_author else 'OnProcess',
         'tags':            ','.join(t.name for t in data.tags_of(story)),
     }
@@ -57,7 +57,7 @@ def _settings_initial(story) -> dict:
 
 def _poll_option_slots(form) -> list:
     """Поля вариантов опроса: столько, сколько уже набрано, но не меньше
-    двух (BR-POLL-02) и не больше четырёх.
+    двух и не больше четырёх.
 
     Считается здесь, а не в шаблоне: дополнить список пустыми строками
     средствами шаблонных тегов можно только некрасиво, а само число —
@@ -101,7 +101,7 @@ def _active_chapter_id(request, story):
 
 def _chapter_pane_context(story, slug, chapter, can_submit, missing, *,
                           form=None, current=...) -> dict:
-    """Контекст встроенного редактора главы (BR-83) — общий для
+    """Контекст встроенного редактора главы — общий для
     `manage_story` (глава выбрана `?chapter=`, 11.1b) и `chapter_edit`/
     `chapter_new` (глава — часть адреса).
 
@@ -128,19 +128,19 @@ def _chapter_pane_context(story, slug, chapter, can_submit, missing, *,
         'current':   current,
         'is_new':    chapter is None,
         'form':      form,
-        # FR-STORY-13: опрос главы, если автор его уже создал
+        # Опрос главы, если автор его уже создал
         'poll':      poll,
         'poll_option_slots': _poll_option_slots(form),
-        # BR-78. Адрес зависит от того, есть ли у главы номер: у новой его
+        # Адрес зависит от того, есть ли у главы номер: у новой его
         # присвоит первый же ответ сервера.
         'autosave_url': (
             reverse('core:chapter_autosave',
                     kwargs={'slug': slug, 'chapter': chapter}) if chapter
             else reverse('core:chapter_autosave_new', kwargs={'slug': slug})),
-        # Пишется рабочая копия, читателю невидимая (BR-79), — поэтому
+        # Пишется рабочая копия, читателю невидимая, — поэтому
         # автосохранение доступно и публичной работе тоже.
         'autosave_enabled': story is not None,
-        # V14 (AUDIT-WRITE-FLOW): «Модерацияға жіберу» стояла активной и
+        # «Модерацияға жіберу» стояла активной и
         # на первой главе новой работы, где аннотации и жас белгісі ещё
         # нет и быть не может, — гарантированный отказ после нажатия.
         # Тот же вопрос, что уже отвечает publish_panel.html.
@@ -152,7 +152,7 @@ def _chapter_pane_context(story, slug, chapter, can_submit, missing, *,
 def _checklist_actionable(story, missing, can_submit, pending_since, moderation_note) -> bool:
     """Есть ли в `publish_panel.html` вообще что показывать активного —
     незакрытый обязательный пункт, замечание модератора, или сам блок
-    отправки (11.2, AUDIT-WRITE-FLOW). Панель — `<details>`, свёрнутая по
+    отправки. Панель — `<details>`, свёрнутая по
     умолчанию, когда ответ `False`: список закрытых пунктов внутри —
     единственное, что остаётся, а он и так уже свёрнут своим `<details>`.
 
@@ -180,17 +180,17 @@ def _workspace_context(story, slug) -> dict:
     """
     checklist = checklist_links(story)
     return {
-        # Кабинет показывает все главы, включая неопубликованные (BR-79).
+        # Кабинет показывает все главы, включая неопубликованные.
         'chapters': data.chapters_of(slug, as_author=True),
-        # FR-WRITE-09: чек-лист как следующий шаг, а не как опись.
+        # Чек-лист как следующий шаг, а не как опись.
         'checklist': checklist,
         'missing': [i['key'] for i in checklist if i['required'] and not i['ok']],
-        # Работа уже в очереди — отдельный ответ, не «нельзя отправить»
-        # (BR-79): кнопки нет по разным причинам, и автору важно, по какой.
+        # Работа уже в очереди — отдельный ответ, не «нельзя отправить»:
+        # кнопки нет по разным причинам, и автору важно, по какой.
         # Момент, а не флаг: «сколько уже ждёт» — второй его вопрос.
         'pending_since': data.pending_review_since(story),
         # Замечание модератора висит на рабочем экране до повторной
-        # отправки (BR-80): помнить его наизусть, пока правишь, — не работа
+        # отправки: помнить его наизусть, пока правишь, — не работа
         # автора.
         'moderation_note': data.moderation_note(story),
     }
@@ -198,13 +198,13 @@ def _workspace_context(story, slug) -> dict:
 
 def my_stories(request):
     user = _current_user(request)
-    # Агрегатов автора здесь больше нет — DEC-48. Они жили в правом рейле и
+    # Агрегатов автора здесь больше нет. Они жили в правом рейле и
     # в полосе под шапкой, повторяя `partials/profile/_stats.html` слово
     # в слово, а на страницах одного произведения тот же рейл читался как
     # статистика этого произведения. Кабинет отвечает на «что делать»,
     # профиль — на «как идёт».
     return render(request, 'pages/write/my_stories.html', {
-        # FR-WRITE-08: что требует внимания — модерация, новые пікір, пустой
+        # Что требует внимания — модерация, новые пікір, пустой
         # черновик. Страница перечисляла имущество и молчала о том, что делать.
         'attention':  attention_links(user),
         'page_state': _page_state(request),
@@ -216,9 +216,9 @@ def my_stories(request):
 
 
 def new_story(request):
-    """Создание черновика (FR-WRITE-01).
+    """Создание черновика.
 
-    Неудачная отправка **возвращает форму**, а не редиректит (BR-77): у
+    Неудачная отправка **возвращает форму**, а не редиректит: у
     редиректа нет тела, и введённое пропадало вместе с ним. Успех остаётся
     Post/Redirect/Get — от повторной отправки защищаться всё ещё надо.
     """
@@ -237,18 +237,18 @@ def new_story(request):
 
     return render(request, 'pages/write/new_story.html', {
         'form': form,
-        # Форма — три поля (FR-WRITE-01). Название говорит, что увидит
+        # Форма — три поля. Название говорит, что увидит
         # читатель: тег к ненаписанному рассказу не выбирается, аннотация
         # к нему не пишется, а «Аяқталды» у нуля бөлім — невозможное
-        # состояние (BR-10). Оба поля просятся при отправке на модерацию
-        # (FR-WRITE-09), не при создании черновика.
+        # состояние. Оба поля просятся при отправке на модерацию,
+        # не при создании черновика.
         'genres': data.all_genres(),
     })
 
 
 def manage_story(request, slug):
     # Гостю — «кір» (auth_gate, как у my_stories/new_story), не найденному
-    # и чужому слагу (уже вошедшему) — 404 (M6/M8 в AUDIT-WRITE-FLOW):
+    # и чужому слагу (уже вошедшему) — 404:
     # раньше оба случая рисовали одну и ту же карточку «табылмады» с кодом
     # 200, и POST на чужой слаг тихо проваливался в неё же.
     user = _current_user(request)
@@ -256,7 +256,7 @@ def manage_story(request, slug):
             if user is not None else None)
 
     if request.method == 'POST' and story is not None:
-        # Действий два — отправить и отозвать (BR-80), и различает их поле
+        # Действий два — отправить и отозвать, и различает их поле
         # формы, а не отдельный маршрут: страница уже своя, обе кнопки
         # стоят в одной панели и относятся к одному и тому же.
         if request.POST.get('action') == 'withdraw':
@@ -267,7 +267,7 @@ def manage_story(request, slug):
             data.submit_story_for_review(story)
             messages.success(request, 'Шығарма модерацияға жіберілді.')
         except ValueError:
-            # Причина называется словами и берётся из чек-листа (BR-81), а
+            # Причина называется словами и берётся из чек-листа, а
             # не перечисляется на память: прежняя строка говорила «толтыр
             # міндетті тармақтарды» и не называла, какие именно.
             messages.error(
@@ -301,9 +301,9 @@ def manage_story(request, slug):
 
 
 def story_settings(request, slug):
-    """Баптаулар (FR-WRITE-04).
+    """Баптаулар.
 
-    Ошибка возвращает заполненную форму (BR-77). Здесь это стоило дороже
+    Ошибка возвращает заполненную форму. Здесь это стоило дороже
     всего: одна отвергнутая обложка уносила и аннотацию, и отметку, и
     теги — всё, что человек только что набрал. Файл вернуть нельзя,
     браузер его не отдаёт; остальное возвращается целиком.
@@ -314,7 +314,7 @@ def story_settings(request, slug):
     form = None
 
     if request.method == 'POST' and story is not None:
-        # Обложку проверяет валидатор поля (BR-46) — ручного вызова
+        # Обложку проверяет валидатор поля — ручного вызова
         # `RASTER_ONLY` рядом больше нет, а вместе с ним и шанса забыть его
         # в третьем месте. Статус и второй жанр форма чинит молча: чужое
         # значение значит «не меняем», совпавший жанр — «не выбран».
@@ -345,7 +345,7 @@ def story_settings(request, slug):
                 response['HX-Refresh'] = 'true'
                 return response
             # `story.slug`, а не URL-параметр: переименование до публикации
-            # (M1, BR-87) могло сдвинуть адрес прямо в этом запросе.
+            # (M1) могло сдвинуть адрес прямо в этом запросе.
             return redirect('core:story_settings', slug=story.slug)
     elif story is not None:
         form = StorySettingsForm(story=story, initial=_settings_initial(story))
@@ -355,7 +355,7 @@ def story_settings(request, slug):
         'story':  story,
         'form':   form,
         'genres': data.all_genres(),
-        # BR-10b: отметка выбирается автором, а не достаётся дефолтом.
+        # Отметка выбирается автором, а не достаётся дефолтом.
         'story_audiences': data.STORY_AUDIENCES,
         # docs/ui.md: данные для tag_input + текущие теги стори для edit-режима
         'accepted_tags':    data.accepted_tags_json(),
@@ -370,21 +370,21 @@ def story_settings(request, slug):
     if request.headers.get('HX-Request') == 'true':
         # 11.3: то же, что chapter_editor/manage_story — панель грузит
         # только форму (`settings_drawer_body.html`), не всю страницу.
-        # Отклонённая форма (BR-77) перерисовывает этот же фрагмент —
+        # Отклонённая форма перерисовывает этот же фрагмент —
         # набранное не пропадает, панель не закрывается.
         return render(request, 'partials/write/settings_drawer_body.html', context)
     return render(request, 'pages/write/story_settings.html', context)
 
 
 def chapter_editor(request, slug, chapter=None):
-    """Редактор главы (FR-WRITE-05).
+    """Редактор главы.
 
     Здесь возврат формы стоит дороже всего на портале: тело главы —
     единственное, что автор писал часами, и до этого любая ошибка (пустой
     заголовок, вопрос опроса без вариантов) уносила его целиком, а тост
     при этом требовал «жаз мәтінін» — ровно то, что только что стёрли.
 
-    `chapter` в адресе — `pk`, а не номер (BR-83): кабинет не должен
+    `chapter` в адресе — `pk`, а не номер: кабинет не должен
     зависеть от значения, которое сдвигается при удалении или перестановке
     соседних глав.
     """
@@ -394,7 +394,7 @@ def chapter_editor(request, slug, chapter=None):
     if (story is not None and chapter is None
             and story.is_single and story.chapter_set.exists()):
         # Прямой `/chapter/new/` на уже написанном `single` заводил бы
-        # вторую главу в обход интерфейса (S6, BR-85) — интерфейс всегда
+        # вторую главу в обход интерфейса (S6) — интерфейс всегда
         # ведёт «Мәтінді өңдеу» в существующую.
         messages.info(request, 'Бір бөлімді жұмыста бір ғана мәтін болады.')
         return redirect('core:chapter_edit', slug=slug, chapter=story.text_chapter)
@@ -422,7 +422,7 @@ def chapter_editor(request, slug, chapter=None):
                 except ValueError:
                     # Прежняя строка называла «аннотация мен жас белгісі»
                     # на память — и врала, когда не хватало текста. Теперь
-                    # подписи живут в домене (BR-81), и причина называется
+                    # подписи живут в домене, и причина называется
                     # та, что есть на самом деле.
                     messages.error(
                         request,
@@ -432,7 +432,7 @@ def chapter_editor(request, slug, chapter=None):
                 messages.success(request, 'Жоба сақталды.')
             return redirect('core:chapter_edit', slug=slug, chapter=saved.pk)
         # Форма невалидна — рендерим страницу заново с ошибками, вместе с
-        # остальным телом рабочего места (BR-77): редирект стёр бы набранное.
+        # остальным телом рабочего места: редирект стёр бы набранное.
         rejected_form = form
 
     context = {'slug': slug, 'story': story}
@@ -456,15 +456,15 @@ def chapter_editor(request, slug, chapter=None):
 @require_POST
 @login_required
 def chapter_autosave(request, slug, chapter=None):
-    """Автосохранение черновика главы (BR-78).
+    """Автосохранение черновика главы.
 
     Ограничения «только непубличная работа» здесь больше нет: с
-    разделением ревизий (BR-79) автосохранение пишет в **рабочую копию**,
+    разделением ревизий автосохранение пишет в **рабочую копию**,
     которой читатель не видит вовсе. Оно и было введено только потому, что
     до разделения записанная глава немедленно уходила читателю.
 
     Ответ — JSON, а не редирект: у запроса нет страницы, на которую можно
-    вернуться. `chapter` в ответе (`pk`, BR-83) обязателен: первый автосейв
+    вернуться. `chapter` в ответе (`pk`) обязателен: первый автосейв
     новой главы присваивает ей id, и редактор обязан переключиться на него,
     иначе следующий заход заведёт вторую главу.
     """
@@ -495,7 +495,7 @@ def chapter_autosave(request, slug, chapter=None):
 @require_POST
 @login_required
 def chapter_delete(request, slug, chapter):
-    """Удалить главу (FR-WRITE-05, BR-84) — опасная зона, как и вся работа:
+    """Удалить главу — опасная зона, как и вся работа:
     POST только из `delete_confirm_modal.html`. Чужая работа не находится
     (IDOR, `story_by_slug_for_author`), чужой `pk` внутри своей — тоже
     (`delete_chapter` фильтрует через `story.chapter_set`)."""
@@ -508,7 +508,7 @@ def chapter_delete(request, slug, chapter):
 @require_POST
 @login_required
 def chapter_move(request, slug, chapter):
-    """Главу на место выше/ниже (FR-WRITE-05, BR-84). Без toast — новый
+    """Главу на место выше/ниже. Без toast — новый
     порядок в списке кабинета виден и так."""
     story = data.story_by_slug_for_author(slug, request.user)
     if story is not None:
@@ -519,7 +519,7 @@ def chapter_move(request, slug, chapter):
 @require_POST
 @login_required
 def delete_story(request, slug):
-    """Опасная зона (FR-WRITE-06): удаление происходит только POST'ом из
+    """Опасная зона: удаление происходит только POST'ом из
     `delete_confirm_modal.html`. Чужая работа не находится вовсе —
     `story_by_slug_for_author` режет по автору (IDOR)."""
     story = data.story_by_slug_for_author(slug, request.user)

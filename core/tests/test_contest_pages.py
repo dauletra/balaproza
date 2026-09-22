@@ -128,7 +128,7 @@ class ContestDetail(TestCase):
         self.assertNotContains(response, 'Бөлісу', status_code=404)
 
     def test_every_phase_can_be_shared(self):
-        """FR-CONT-12: конкурс живёт тем, что о нём рассказывают."""
+        """Конкурс живёт тем, что о нём рассказывают."""
         for contest in data.all_contests():
             with self.subTest(contest=contest.slug):
                 self.assertContains(
@@ -157,11 +157,11 @@ class ContestDetail(TestCase):
 
 
 class ContestRail(TestCase):
-    """Правый рейл конкурса: не копия страницы и не пустая колонка (DEC-25)."""
+    """Правый рейл конкурса: не копия страницы и не пустая колонка."""
 
     def test_the_rail_appears_only_when_it_has_something_to_say(self):
         # Неизвестного конкурса больше нет как страницы — рейлу не на чем
-        # появиться: 404 (FR-CONT-14).
+        # появиться: 404.
         for url in ('/contests/unknown-slug/', '/contests/unknown-slug/submit/'):
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 404)
@@ -189,7 +189,7 @@ class ContestRail(TestCase):
 
 
 class WinnersAndNominationsOnDetail(TestCase):
-    """FR-CONT-08. `winner_stories` существовал и не был отрендерен нигде."""
+    """`winner_stories` существовал и не был отрендерен нигде."""
 
     def test_the_winners_section_names_every_winner_and_links_out(self):
         contest = data.contest_by_slug('zhas-aldym-2023')
@@ -230,7 +230,7 @@ class WinnersAndNominationsOnDetail(TestCase):
 
 class ContestParticipants(TestCase):
     """Список участников после описания — все допущенные работы, не только
-    победители (BR-74a). Это и есть чтение байқауды как коллекции
+    победители. Это и есть чтение байқауды как коллекции
     произведений, без отдельной сущности Collection под конкурс.
     """
 
@@ -242,14 +242,14 @@ class ContestParticipants(TestCase):
             with self.subTest(story=slug):
                 self.assertContains(response, Story.objects.get(slug=slug).title)
         # aidana подавала «aidana-kysh» на этот же конкурс, и её отклонили —
-        # BR-74a запрещает публично показывать отказ.
+        # публично показывать отказ нельзя.
         self.assertNotContains(response,
                                Story.objects.get(slug='aidana-kysh').title)
 
     def test_participation_does_not_wait_for_the_results(self):
         """«Жас алдым — 2026» — идущий конкурс с реальными участниками:
         приём открыт, победители ещё не названы, но принятые работы уже
-        видны (FR-CONT-16)."""
+        видны."""
         contest = data.contest_by_slug('zhas-aldym-2026')
         self.assertTrue(contest.is_accepting)
         response = self.client.get(
@@ -270,7 +270,7 @@ class ContestParticipants(TestCase):
 
 
 class ContestPosterIsItsOwn(TestCase):
-    """Афиша конкурса — своя, а не фотография чужой книги (FR-CONT-11).
+    """Афиша конкурса — своя, а не фотография чужой книги.
 
     В `static/img/bookN.jpg` лежат книжные обложки; четыре конкурса
     различались тем, чья книга досталась каждому.
@@ -292,7 +292,7 @@ class ContestPosterIsItsOwn(TestCase):
             with self.subTest(url=url):
                 self.assertIn('oklch(', self.client.get(url).content.decode(),
                               'типографическая афиша не отрендерилась')
-        # Афишу грузит админ в MEDIA_ROOT, как эмблему награды (BR-46).
+        # Афишу грузит админ в MEDIA_ROOT, как эмблему награды.
         for contest in data.all_contests():
             if contest.poster:
                 with self.subTest(contest=contest.slug):

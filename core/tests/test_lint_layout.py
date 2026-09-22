@@ -189,7 +189,7 @@ class RailContentHasMobileEquivalent(TestCase):
 
 
 class ProfileStatsNotDuplicated(TestCase):
-    """Четыре числа профиля рендерились и в теле (FR-PROF-01), и в рейле."""
+    """Четыре числа профиля рендерились и в теле, и в рейле."""
 
     def setUp(self):
         login_as(self.client)

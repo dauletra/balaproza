@@ -123,7 +123,7 @@ class SeededStoriesDeriveWhatIsDerived(TestCase):
     """
 
     def test_audience_stays_unset_where_the_author_did_not_choose(self):
-        """Пустая отметка — отдельное состояние, а не «10+» (BR-10b). Если
+        """Пустая отметка — отдельное состояние, а не «10+». Если
         сид её подменит, чек-лист кабинета нарисует зелёную галку за автора."""
         unset = [s.slug for s in _corpus.STORIES if not s.audience]
         self.assertTrue(unset, 'в стабе нет работы без отметки — проверять нечего')
@@ -136,7 +136,7 @@ class SeededStoriesDeriveWhatIsDerived(TestCase):
         считается из текста глав, а не из колонки. Значит, дойти до базы
         обязан сам текст, а не число.
 
-        Считается **опубликованное** (BR-79): у работы, чьи главы ещё у
+        Считается **опубликованное**: у работы, чьи главы ещё у
         модератора, объём честно нулевой — обещать читателю минуты чтения,
         которых он не получит, тот же обман, что хранимая колонка.
         """
@@ -155,7 +155,7 @@ class SeededStoriesDeriveWhatIsDerived(TestCase):
 
     def test_editorial_badge_is_stored(self):
         """«Редакция таңдауы» — акт редакции: из данных он не выводится,
-        как и присуждение награды (DEC-46)."""
+        как и присуждение награды."""
         editorial = 'Редакция таңдауы'
         for stub in _corpus.STORIES:
             with self.subTest(story=stub.slug):
@@ -181,7 +181,7 @@ class SeededStoriesDeriveWhatIsDerived(TestCase):
 
     def test_single_story_points_at_its_own_chapter(self):
         """Кнопка «Мәтін» у одночастного ведёт в существующую главу, а не
-        в пустой редактор. Адрес — `pk` главы (BR-83), не её номер."""
+        в пустой редактор. Адрес — `pk` главы, не её номер."""
         for stub in _corpus.STORIES:
             if stub.format != 'single':
                 continue
@@ -209,7 +209,7 @@ class SeededChapterReactionsAddUp(TestCase):
         self.assertTrue(checked, 'ни у одной главы нет реакций — тест пуст')
 
     def test_story_total_equals_the_sum_of_its_chapters(self):
-        """BR-14a на моделях: где главы несут реакции, итог в шапке обязан
+        """На моделях: где главы несут реакции, итог в шапке обязан
         сходиться с числами в списке глав — читатель может сложить их сам."""
         checked = 0
         for story in Story.objects.all():
@@ -223,7 +223,7 @@ class SeededChapterReactionsAddUp(TestCase):
 
 
 class SeedPreservesRealVotes(TestCase):
-    """DEC-61: живой голос читателя (`ChapterReactionVote`) главнее
+    """Живой голос читателя (`ChapterReactionVote`) главнее
     декоративного корпуса. Раньше повторный `seed_demo` стирал реакции
     главы до состояния корпуса, не глядя, проголосовал ли уже кто-то, —
     у `arhimag` (`reactions=()` в корпусе) это на живых данных выглядело
@@ -263,7 +263,7 @@ class SeedPreservesRealVotes(TestCase):
             story=story, text='Живой комментарий читателя').exists())
 
     def test_real_views_survive_a_reseed(self):
-        """DEC-63: `_seed_views` поднимает `views`/`recent_views` до
+        """`_seed_views` поднимает `views`/`recent_views` до
         decorative-минимума корпуса, а не присваивает его — раньше
         `StoryView.objects.all().delete()` сносил журнал целиком на
         каждый прогон, вместе с настоящими прочтениями."""
@@ -280,7 +280,7 @@ class SeedPreservesRealVotes(TestCase):
         self.assertEqual(story.recent_views, before_recent + 2)
 
     def test_a_real_poll_vote_survives_a_reseed_and_still_blocks_a_second(self):
-        """DEC-64: `_seed_polls` апсертит варианты по (poll, slug) вместо
+        """`_seed_polls` апсертит варианты по (poll, slug) вместо
         delete-и-пересоздать. У `PollOption` раньше пересоздавалась сама
         строка, а на неё ссылается `PollVote.option` с `on_delete=CASCADE`
         — пересид каскадом убивал настоящий голос и открывал повторное
@@ -301,10 +301,9 @@ class SeedPreservesRealVotes(TestCase):
         self.assertFalse(data.cast_poll_vote(poll, reader, option.slug))
 
     def test_a_real_notification_survives_a_reseed(self):
-        """DEC-64: `_seed_notifications` апсертит по (user, kind, actor,
+        """`_seed_notifications` апсертит по (user, kind, actor,
         story, contest, text) вместо delete-и-пересоздать — настоящее
-        уведомление о решении модератора (`Story.apply_moderation`,
-        DEC-23) больше не стирается вместе с декоративной лентой корпуса."""
+        уведомление о решении модератора (`Story.apply_moderation`) больше не стирается вместе с декоративной лентой корпуса."""
         seed()
         story = Story.objects.get(slug='aidana-erteg', status='OnModeration')
         before = Notification.objects.filter(user=story.author).count()
@@ -325,7 +324,7 @@ class SeededContestsDeriveTheirPhase(TestCase):
 
     # Какую фазу даты корпуса обязаны дать сегодня. Это и есть предмет
     # проверки: сдвиги `_d(±N)` подобраны так, чтобы все четыре фазы были
-    # представлены (DEC-45), и правка одного числа тихо оставляет портал
+    # представлены, и правка одного числа тихо оставляет портал
     # без «Жақында» или без судейства.
     PHASES = {
         'qys-ertegisi':     'upcoming',
@@ -362,7 +361,7 @@ class SeededContestsDeriveTheirPhase(TestCase):
                     self.assertIn(stage.state, ('done', 'active', 'upcoming'))
 
     def test_submission_count_is_counted_not_stored(self):
-        """«87 өтінім» стояло при одной настоящей заявке (BR-40a)."""
+        """«87 өтінім» стояло при одной настоящей заявке."""
         for stub in _corpus.CONTESTS:
             expected = sum(1 for subs in _corpus.SUBMISSIONS_BY_USER.values()
                            for x in subs if x.contest_slug == stub.slug)
@@ -371,7 +370,7 @@ class SeededContestsDeriveTheirPhase(TestCase):
                                  expected)
 
     def test_winners_come_from_grants(self):
-        """Победа — присуждение (DEC-46), а не вычисление по данным."""
+        """Победа — присуждение, а не вычисление по данным."""
         for stub in _corpus.CONTESTS:
             expected = [g.story_slug for g in _corpus.AWARD_GRANTS
                         if g.contest_slug == stub.slug]
@@ -388,8 +387,8 @@ class SeededContestsDeriveTheirPhase(TestCase):
         self.assertEqual(len(finished.winners), 2)
 
     def test_editions_link_by_series(self):
-        """Связь выпусков по слагу семейства, а не по совпадению имён
-        (BR-47): без неё завершённый конкурс — тупик."""
+        """Связь выпусков по слагу семейства, а не по совпадению имён:
+ без неё завершённый конкурс — тупик."""
         for stub in _corpus.CONTESTS:
             expected = {c.slug for c in _corpus.CONTESTS
                         if c.series and c.series == stub.series
@@ -404,7 +403,7 @@ class SeededSubmissionsSitInsideTheirWindow(TestCase):
 
     def test_relative_label_is_derived(self):
         """«5 күн бұрын» считается от даты. Хранимая строка не просто
-        устаревала — она лгала проверяемо (BR-41a)."""
+        устаревала — она лгала проверяемо."""
         for username, subs in _corpus.SUBMISSIONS_BY_USER.items():
             for stub in subs:
                 with self.subTest(author=username, contest=stub.contest_slug):
@@ -423,7 +422,7 @@ class SeededSubmissionsSitInsideTheirWindow(TestCase):
                 self.assertLessEqual(row.submitted_on, row.contest.closes_on)
 
     def test_one_submission_per_author_per_contest(self):
-        """BR-23 — ограничение базы, а не только формы: вторая заявка
+        """Одна заявка на автора — ограничение базы, а не только формы: вторая
         ломает и счёт участников, и конкурсную биографию."""
         row = Submission.objects.first()
         with self.assertRaises(IntegrityError):
@@ -453,7 +452,7 @@ class SeededCollectionsCountThemselves(TestCase):
 class SeededShelvesDoNotOverlap(TestCase):
 
     def test_the_shelf_remembers_when_it_was_filled(self):
-        """Давность лежит датой, а подпись выводится (BR-70a): хранимая
+        """Давность лежит датой, а подпись выводится: хранимая
         строка «1 апта бұрын» назавтра врала бы."""
         today = timezone.localdate()
         for username, entries in _corpus.LIBRARY_BY_USER.items():
@@ -465,7 +464,7 @@ class SeededShelvesDoNotOverlap(TestCase):
                     self.assertTrue(since(row.added_on))
 
     def test_a_story_lies_in_exactly_one_shelf(self):
-        """Три вида не пересекаются (BR-60/61): иначе «Оқуды жалғастыру»
+        """Три вида не пересекаются: иначе «Оқуды жалғастыру»
         предложит то, что читатель уже закрыл."""
         row = LibraryEntry.objects.first()
         with self.assertRaises(IntegrityError):
@@ -476,7 +475,7 @@ class SeededShelvesDoNotOverlap(TestCase):
 class SeededCommentsStayOneLevelDeep(TestCase):
 
     def test_nesting_is_one_level_deep(self):
-        """BR-30: ответ на ответ превращает обсуждение в дерево, которое
+        """Ответ на ответ превращает обсуждение в дерево, которое
         на телефоне не читается и которое некому модерировать."""
         for row in StoryComment.objects.filter(parent__isnull=False):
             with self.subTest(comment=row.pk):
@@ -491,7 +490,7 @@ class SeededCommentsStayOneLevelDeep(TestCase):
                     self.assertEqual(row.is_author_badge, stub.is_author_badge)
 
     def test_ownership_decides_the_menu(self):
-        """Свой комментарий предлагает «Жою», чужой — «Шағым» (BR-33)."""
+        """Свой комментарий предлагает «Жою», чужой — «Шағым»."""
         row = StoryComment.objects.first()
         self.assertTrue(row.belongs_to(row.author.username))
         self.assertFalse(row.belongs_to('someone-else'))
@@ -501,7 +500,7 @@ class SeededCommentsStayOneLevelDeep(TestCase):
         """Подпись выводится, а не хранится строкой. Две формулировки при
         этом поменялись: «1 күн бұрын» стало «кеше», «1 апта бұрын» —
         «7 күн бұрын». Лесенка в проекте одна, и рукописная строка была
-        ровно тем, что BR-70a запрещает."""
+        ровно тем, чего в проекте быть не должно."""
         fresh = StoryComment.objects.order_by('-created_at').first()
         self.assertIn('бұрын', ago(fresh.created_at))
         self.assertNotIn('апта', ago(fresh.created_at))
@@ -510,7 +509,7 @@ class SeededCommentsStayOneLevelDeep(TestCase):
 class SeededPollsDeriveTheirResults(TestCase):
 
     def test_closing_is_derived_from_the_next_chapter(self):
-        """Опрос закрывается публикацией следующей главы (BR-POLL-05):
+        """Опрос закрывается публикацией следующей главы:
         ответ приходит там, сюжетом."""
         for (story_slug, number), stub in _corpus.POLLS_BY_CHAPTER.items():
             with self.subTest(story=story_slug, chapter=number):
@@ -554,7 +553,7 @@ class SeededNotificationsDeriveTheirTime(TestCase):
 
     def test_labels_and_buckets_are_derived(self):
         """`when` и `bucket` считаются из момента. Хранимые, они устаревали
-        назавтра (BR-70a)."""
+        назавтра."""
         for username, stub, row in self._pairs():
             with self.subTest(user=username, kind=stub.kind):
                 self.assertEqual(row.days_ago, stub.days_ago)
@@ -564,7 +563,7 @@ class SeededNotificationsDeriveTheirTime(TestCase):
                                      stub.days_ago, 'past_week'))
 
     def test_moderation_outcome_is_stored_with_its_label(self):
-        """Исход — акт модератора (BR-72b): из `Story.status` он не
+        """Исход — акт модератора: из `Story.status` он не
         выводится, потому что статус живёт дальше события."""
         for username, stub, row in self._pairs():
             with self.subTest(user=username, kind=stub.kind):
@@ -628,14 +627,14 @@ class SeededCorpusHoldsItsInvariants(TestCase):
                 self.assertEqual(story.chapters, 1)
 
     def test_recent_views_never_exceed_the_total(self):
-        """Окно в 14 дней — подмножество накопленного (DEC-36). Обратное
+        """Окно в 14 дней — подмножество накопленного. Обратное
         означало бы, что за две недели прочитали больше, чем за всё время."""
         for story in Story.objects.all():
             with self.subTest(story=story.slug):
                 self.assertLessEqual(story.recent_views, story.views)
 
     def test_collections_are_deep_enough_and_public(self):
-        """Жинақ — первичный вход в чтение (DEC-31): подборка из двух
+        """Жинақ — первичный вход в чтение: подборка из двух
         работ это тупик, а черновик в ней — утечка ненапечатанного."""
         for collection in data.all_collections():
             with self.subTest(collection=collection.slug):
@@ -682,8 +681,8 @@ class SeededCorpusHoldsItsInvariants(TestCase):
         self.assertNotEqual(newest, alltime)
 
     def test_the_two_tag_showcases_do_not_coincide(self):
-        """Иначе «Осы аптада» — копия «Танымал тегтер» и занимает место зря
-        (DEC-31). Держится это на разбросе дат правок в корпусе: сид
+        """Иначе «Осы аптада» — копия «Танымал тегтер» и занимает место зря.
+ Держится это на разбросе дат правок в корпусе: сид
         датирует связку последней правкой работы."""
         self.assertNotEqual(
             [t.slug for t in data.trending_tags(6)],

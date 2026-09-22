@@ -15,7 +15,7 @@
     «Сайтта қарау» показывается только для публичных статусов: у черновика и
     работы на модерации публичной страницы нет. Проверка идёт через
     `story.is_public` (PUBLIC_STATUSES), а не по литералу 'Published' —
-    иначе пункт пропал бы у всех сериалов разом (DEC-37).
+    иначе пункт пропал бы у всех сериалов разом.
 {% endcomment %}
 <div class="relative shrink-0" x-data="{ open: false }"
      @click.outside="open = false" @keydown.escape.window="open = false">

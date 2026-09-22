@@ -1,5 +1,5 @@
 {% comment %}
-    Шапка профиля — общая для своего и чужого (FR-PROF-01/02/04).
+    Шапка профиля — общая для своего и чужого.
 
     Была скопирована в profile_me.html и profile_other.html. Копии уже
     разошлись: в своей висела кнопка «Профильді өңдеу», в чужой — три ветки
@@ -18,7 +18,7 @@
     <div class="flex min-w-0 flex-1 flex-col gap-1.5">
         <h1 class="font-display text-3xl font-bold text-slate-900">{{ profile_user.public_name }}</h1>
         {% comment %}
-            Строка фактов (FR-PROF-06). Числа работ здесь сознательно нет:
+            Строка фактов. Числа работ здесь сознательно нет:
             плитка «Шығарма» стоит на десять пикселей ниже, и это ровно тот
             дубль, который уже вычищали из правого рейла
             (test_lint.ProfileStatsNotDuplicated). Остаётся то,
@@ -40,7 +40,7 @@
             {% url 'core:profile_me_edit' as edit_href %}
             {% include "components/button.html" with kind="secondary" label="Профильді өңдеу" icon="pen" href=edit_href %}
         {% elif not signed_in %}
-            {# Гостю — не форма, а ссылка на вход с возвратом сюда (FR-PROF-04) #}
+            {# Гостю — не форма, а ссылка на вход с возвратом сюда #}
             <a href="{% url 'core:login' %}?next={{ request.path|urlencode }}"
                class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:border-brand hover:text-brand">
                 {% include "components/icon.html" with name="plus" size=16 only %}

@@ -1,4 +1,4 @@
-"""Главная — редакционная витрина (FR-HOME-*)."""
+"""Главная — редакционная витрина."""
 
 from django.conf import settings
 from django.shortcuts import render
@@ -8,7 +8,7 @@ from .common import _current_user, _page_state
 
 # HOME
 def home(request):
-    """Главная — редакционная витрина. Гость vs возвращающийся (FR-HOME-01)."""
+    """Главная — редакционная витрина. Гость vs возвращающийся."""
     user = _current_user(request)
     is_signed_in = user is not None
     my_stories = user.authored if user else []
@@ -45,7 +45,7 @@ def home(request):
     # пропали бы все сериалы.
     rows = data.home_rows(viewer=user)
 
-    # Жанры на главной — полоса-вывеска, а не навигация (DEC-31): 12 цветных слов
+    # Жанры на главной — полоса-вывеска, а не навигация: 12 цветных слов
     # объясняют, что это литературный портал, и ведут на /genres/<slug>/.
     # Скроллер произведений активного жанра убран вместе с ?genre= — его работу
     # делают жинақтар и тематические ряды.

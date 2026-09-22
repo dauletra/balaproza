@@ -25,7 +25,7 @@ from core.tests.base import login_as, user
 
 
 class SettingsOfferOnlyWhatMayBeChanged(TestCase):
-    """BR-10a/BR-11: радио «Мәртебесі» рендерилось всегда и в ветке `else`
+    """Радио «Мәртебесі» рендерилось всегда и в ветке `else`
     подставляло черновику отмеченным «Аяқталды» — статус, которого у
     работы с нулём бөлім быть не может. У `single` допустимый статус один,
     а перевести работу в публичный может только модератор."""
@@ -62,7 +62,7 @@ class SettingsOfferOnlyWhatMayBeChanged(TestCase):
                 self.assertContains(response, 'name="audience"')
 
     def test_the_age_mark_is_offered_and_preselected(self):
-        """BR-10b: отметку выбирает автор, и выбирает он её здесь."""
+        """Отметку выбирает автор, и выбирает он её здесь."""
         story = data.story_by_slug('aidana-tan')
         response = self._get('aidana-tan')
         for key, _mark, _hint in data.STORY_AUDIENCES:
@@ -91,7 +91,7 @@ class SettingsOfferOnlyWhatMayBeChanged(TestCase):
 
 
 class TheAgeMarkIsChosenNotDefaulted(TestCase):
-    """BR-10b: поле хранилось с дефолтом «10+», не спрашивалось ни в одной
+    """Поле хранилось с дефолтом «10+», не спрашивалось ни в одной
     форме и при этом раскладывало работы по оси «Жасың» каталога.
     Чек-лист рисовал за это решение зелёную галку — галку за несделанное."""
 
@@ -117,7 +117,7 @@ class TheAgeMarkIsChosenNotDefaulted(TestCase):
 
 
 class TheChecklistLeadsToTheFieldItNames(TestCase):
-    """FR-WRITE-09: прежний список был описью — шесть строк, ни одна не
+    """Прежний список был описью — шесть строк, ни одна не
     кликалась, и над ними не было перехода, ради которого список нужен."""
 
     def setUp(self):
@@ -195,7 +195,7 @@ class StorySettingsSavesFields(TestCase):
         login_as(self.client)
         self.genre = data.all_genres()[0]
         # `title='Жаңа атау'` в дефолте `_post` меняет название, а с ним, у
-        # непубличной работы, и слаг (M1, BR-87) — дальше по классу объект
+        # непубличной работы, и слаг (M1) — дальше по классу объект
         # ищется по `pk`, застрахованному от этого сдвига, а не по слагу.
         self.pk = Story.objects.get(slug=self.SLUG).pk
 
@@ -215,7 +215,7 @@ class StorySettingsSavesFields(TestCase):
         self.assertEqual(story.title, 'Жаңа атау')
         self.assertEqual(story.annotation, 'Жаңа аннотация мәтіні.')
         self.assertEqual(story.audience, '10+')
-        # M1/BR-87: переименование до публикации сдвигает и адрес — работа
+        # Переименование до публикации сдвигает и адрес — работа
         # не живёт вечно по адресу первого черновика.
         self.assertNotEqual(story.slug, self.SLUG)
         self.assertRedirects(
@@ -236,7 +236,7 @@ class StorySettingsSavesFields(TestCase):
         self.assertEqual(story.format, 'serial')
 
     def test_an_annotation_past_the_limit_saves_nothing(self):
-        """BR-16: 500 знаков. Число жило в поле счётчика шаблона и в этом
+        """500 знаков. Число жило в поле счётчика шаблона и в этом
         правиле, но в проверке не участвовало вовсе — сохранялось что
         угодно."""
         before = Story.objects.get(pk=self.pk).annotation
@@ -247,18 +247,18 @@ class StorySettingsSavesFields(TestCase):
 
     def test_status_field_outside_the_allowed_set_is_ignored(self):
         # 'aidana-kus' — черновик, радио «Мәртебесі» на этой странице у
-        # него вообще не рендерится (BR-10a) — POST в обход формы не
+        # него вообще не рендерится — POST в обход формы не
         # должен провести статус мимо модерации.
         self._post(status='Published')
         story = Story.objects.get(pk=self.pk)
         self.assertFalse(story.is_public)
-        # Статус вообще не берётся из формы — он выводится из глав (BR-79),
-        # а эту работу корпус вернул автору на доработку (BR-80).
+        # Статус вообще не берётся из формы — он выводится из глав,
+        # а эту работу корпус вернул автору на доработку.
         self.assertEqual(story.status, 'NeedsWork')
 
 
 class TheSettingsDrawerLoadsViaHtmx(TestCase):
-    """11.3 (AUDIT-WRITE-FLOW): баптаулар — выезжающая панель поверх
+    """Баптаулар — выезжающая панель поверх
     рабочего места. `StorySettingsForm`/`update_story_settings` не
     тронуты — меняется только транспорт (HX-Request), не форма."""
 
@@ -292,7 +292,7 @@ class TheSettingsDrawerLoadsViaHtmx(TestCase):
         self.assertNotContains(fragment, 'Менің шығармаларым')
 
     def test_hx_success_closes_the_drawer_with_a_refresh_not_a_redirect(self):
-        """Успех отвечает `HX-Refresh`, а не редиректом (BR-77-совместимо):
+        """Успех отвечает `HX-Refresh`, а не редиректом:
         htmx перезагружает текущую страницу рабочего места целиком —
         адрес в браузере и не был `/settings/`, панель туда не уводила."""
         r = self.client.post(
@@ -306,7 +306,7 @@ class TheSettingsDrawerLoadsViaHtmx(TestCase):
         self.assertEqual(Story.objects.get(pk=self.pk).title, 'Жаңа атау')
 
     def test_hx_rejected_form_redraws_the_fragment_not_a_redirect(self):
-        """Отклонённая форма (BR-77) перерисовывает тот же фрагмент —
+        """Отклонённая форма перерисовывает тот же фрагмент —
         панель остаётся открытой с набранным, а не закрывается и не
         уводит на отдельную страницу."""
         before = Story.objects.get(pk=self.pk).annotation
@@ -323,7 +323,7 @@ class TheSettingsDrawerLoadsViaHtmx(TestCase):
 
 
 class StorySettingsCoverUpload(TestCase):
-    """Тот же валидатор, что у User.avatar (BR-46) — SVG не проходит.
+    """Тот же валидатор, что у User.avatar — SVG не проходит.
 
     Отсекает его сам `RASTER_ONLY` на поле модели: форма страницы —
     `StorySettingsForm`, и валидаторы поля в ней срабатывают. Ручной вызов
@@ -337,7 +337,7 @@ class StorySettingsCoverUpload(TestCase):
         login_as(self.client)
         self.genre = data.all_genres()[0]
         # Название в payload остаётся тем же, что уже стоит: смена вызвала
-        # бы сдвиг слага непубличной работы (M1, BR-87), а эти тесты про
+        # бы сдвиг слага непубличной работы (M1), а эти тесты про
         # обложку, не про адрес.
         self.title = Story.objects.get(slug=self.SLUG).title
 
@@ -372,7 +372,7 @@ class StorySettingsCoverUpload(TestCase):
         self.assertTrue(story.cover.name.startswith(f'covers/{self.SLUG}'))
 
     def test_the_refused_cover_does_not_take_the_rest_of_the_form_with_it(self):
-        """BR-77. Отказ по обложке — самая дорогая ошибка этой страницы:
+        """Отказ по обложке — самая дорогая ошибка этой страницы:
         вместе с файлом уносило аннотацию, отметку и теги, то есть всё, что
         человек только что набрал. Файл вернуть нельзя, браузер его не
         отдаёт, — об этом форма говорит прямо; остальное на месте."""
@@ -399,7 +399,7 @@ class StorySettingsCoverUpload(TestCase):
         self.assertFalse(Tag.objects.filter(name='мүлдем-жаңа-тег').exists())
 
     def test_remove_cover_clears_it_without_a_new_file(self):
-        """BR-86: третье состояние рядом с «новый файл» и «пусто значит не
+        """Третье состояние рядом с «новый файл» и «пусто значит не
         меняем» — раньше убрать обложку, не заменив её другой, было нечем."""
         self._post(cover=factories.tiny_image('мұқаба.png'))
         self.assertTrue(Story.objects.get(slug=self.SLUG).cover)
@@ -420,7 +420,7 @@ class StorySettingsTagResolution(TestCase):
         login_as(self.client)
         self.genre = data.all_genres()[0]
         # Тот же довод, что у StorySettingsCoverUpload: неизменное название
-        # не сдвигает слаг непубличной работы (M1, BR-87).
+        # не сдвигает слаг непубличной работы (M1).
         self.title = Story.objects.get(slug=self.SLUG).title
 
     def _post(self, tags):

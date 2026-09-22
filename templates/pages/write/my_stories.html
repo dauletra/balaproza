@@ -19,7 +19,7 @@
     </header>
 
     {% comment %}
-        Полосы агрегатов здесь больше нет — DEC-48. Она повторяла четыре
+        Полосы агрегатов здесь больше нет. Она повторяла четыре
         плитки `partials/profile/_stats.html` (там они ещё и кликабельны),
         а её напарник в правом рейле стоял на страницах одного произведения
         и читался как статистика этого произведения: в шапке «1 042 оқылым»,
@@ -37,7 +37,7 @@
         {% include "components/error_state.html" with message="Шығармалар тізімін жүктеу мүмкін болмады." %}
     {% elif stories %}
         {% comment %}
-            Полоса внимания (FR-WRITE-08). Список отвечал на вопрос «что у меня
+            Полоса внимания. Список отвечал на вопрос «что у меня
             есть» и молчал о том, что с этим делать: работа висела на модерации
             без единого признака, сколько она там, новые пікір были видны только
             в другом разделе, а начатый черновик ничем не отличался от готовой
@@ -55,7 +55,7 @@
                     {% elif item.kind == 'comments' %}
                         {% include "components/attention_item.html" with icon="message-caption" text=item.count|spaced|add:" жаңа пікір" href=item.href %}
                     {% elif item.kind == 'returned' %}
-                        {# Возвращённое ждёт не модератора, а автора (BR-80). #}
+                        {# Возвращённое ждёт не модератора, а автора. #}
                         {% include "components/attention_item.html" with icon="pen" text=item.count|spaced|add:" шығарма толықтыруды күтеді" href=item.href %}
                     {% elif item.kind == 'draft' %}
                         {% include "components/attention_item.html" with icon="pen" text=item.count|spaced|add:" жоба бастамада тұр" href=item.href %}
@@ -71,8 +71,8 @@
         </div>
 
         {% comment %}
-            Единственный вход в агрегаты — и он ведёт туда, где они живут
-            (FR-PROF-08). Тихая строка, а не блок: «как идёт» — вопрос,
+            Единственный вход в агрегаты — и он ведёт туда, где они живут.
+ Тихая строка, а не блок: «как идёт» — вопрос,
             который задают раз в неделю, а не на каждом заходе в кабинет.
         {% endcomment %}
         <p class="mt-6 text-center font-sans text-sm">
@@ -83,7 +83,7 @@
             </a>
         </p>
     {% else %}
-        {# Empty state — FR-WRITE-02 (MyStoriesEmpty), через общий компонент DEC-17 #}
+        {# Пустое состояние кабинета — через общий компонент #}
         {% include "components/empty_state.html" with icon="pen" title="Әлі шығарма жоқ" text="Алғашқы шығармаңды бастамас бұрын — тек идея керек. Жариялау тегін, авторлық сақталады." cta_label="Жаңа шығарма жазу" cta_href=new_href %}
     {% endif %}
 {% endif %}

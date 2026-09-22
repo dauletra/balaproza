@@ -64,9 +64,9 @@ def spaced(value):
 
 @register.filter(name="belongs_to")
 def belongs_to(comment, username):
-    """Свой ли это комментарий — для набора пунктов меню (BR-33).
+    """Свой ли это комментарий — для набора пунктов меню.
 
-    Фильтр, а не вычисление во view: комментарии вложены (BR-30), и view
+    Фильтр, а не вычисление во view: комментарии вложены, и view
     пришлось бы разворачивать нити в плоскую структуру ради одного булева
     поля. Логика владения — в `StoryComment.belongs_to`.
     """
@@ -141,7 +141,7 @@ def period(stage):
 
 @register.filter(name="format_badge")
 def format_badge(story):
-    """Знак формата на карточке: «Бір оқылым» или «Серия» (DEC-28)."""
+    """Знак формата на карточке: «Бір оқылым» или «Серия»."""
     return "Бір оқылым" if story.is_single else "Серия"
 
 
@@ -169,7 +169,7 @@ def start_label(story):
 
 @register.filter(name="update_meta")
 def update_meta(story):
-    """«9-бөлім · 3 күн бұрын» — мера продолжающейся работы (FR-HOME-07).
+    """«9-бөлім · 3 күн бұрын» — мера продолжающейся работы.
 
     У ряда «Жалғасып жатқан» оқылым отвечает не на тот вопрос: читатель
     выбирает сериал по тому, жив ли он и докуда дошёл, а не по тому,
@@ -188,7 +188,7 @@ def update_meta(story):
 
 @register.filter(name="phase_label")
 def phase_label(contest):
-    """Фаза словом — из реестра `CONTEST_PHASE_LABELS` (BR-40)."""
+    """Фаза словом — из реестра `CONTEST_PHASE_LABELS`."""
     return CONTEST_PHASE_LABELS[contest.phase] if contest else ""
 
 
@@ -205,7 +205,7 @@ def timing_line(contest):
 
 @register.filter(name="eligibility_line")
 def eligibility_line(contest):
-    """Возрастное требование словами (BR-48)."""
+    """Возрастное требование словами."""
     if not contest:
         return ""
     return contest_eligibility_line(contest.min_age, contest.max_age)
@@ -213,7 +213,7 @@ def eligibility_line(contest):
 
 @register.filter(name="outcome_label")
 def outcome_label(notification):
-    """Подпись исхода модерации — из реестра, а не из шаблона (BR-72b).
+    """Подпись исхода модерации — из реестра, а не из шаблона.
     Незнакомый исход не называется никак: лучше пусто, чем чужая подпись."""
     return MODERATION_OUTCOME_LABELS.get(notification.outcome, "")
 

@@ -1,7 +1,7 @@
 """Каталог, жанры, теги, жинақтар — один движок на три режима.
 
-DEC-27 свёл `/genres/<slug>/`, `/tag/<slug>/` и `/catalog/` в одну выдачу
-с общим набором осей. Поэтому здесь почти нет тестов «на страницу»:
+`/genres/<slug>/`, `/tag/<slug>/` и `/catalog/` — одна выдача с общим
+набором осей. Поэтому здесь почти нет тестов «на страницу»:
 проверяются оси и то, что состояние выбора не теряется при переходах —
 именно это ломалось молча, отдавая 200 без половины работ.
 
@@ -47,7 +47,7 @@ class GenreAndCollectionPages(TestCase):
         self.assertContains(response, reverse('core:genre_index'))
 
     def test_collections_are_editorial_and_count_themselves(self):
-        """Пользовательских подборок нет (DEC-31): личное хранение — это
+        """Пользовательских подборок нет: личное хранение — это
         «Кітапхана»."""
         login_as(self.client)
         response = self.client.get(reverse('core:collections'))
@@ -72,7 +72,7 @@ class GenreAndCollectionPages(TestCase):
 
     def test_an_unknown_slug_is_not_a_page(self):
         """404 у всех трёх: выдуманный адрес — не страница с сообщением
-        внутри, и профиль отвечал так с первого дня (FR-PROF-02)."""
+        внутри, и профиль отвечал так с первого дня."""
         for name, kwargs in (
             ('core:genre_detail', {'slug': 'no-such-genre'}),
             ('core:collection_detail', {'slug': 'no-such'}),
@@ -84,7 +84,7 @@ class GenreAndCollectionPages(TestCase):
 
 
 class TagPagesShowMovement(TestCase):
-    """Тег — единственная ось, обновляющаяся без участия редакции (DEC-31).
+    """Тег — единственная ось, обновляющаяся без участия редакции.
     Её ценность в том, что там видно движение, поэтому «жаңа» вперёд."""
 
     def _suggest(self, query: str) -> dict:
@@ -103,7 +103,7 @@ class TagPagesShowMovement(TestCase):
         self.assertContains(response, reverse('core:catalog'))
 
     def test_a_pending_tag_has_no_public_page_or_index_entry(self):
-        """BR-TAG-07: тег ещё не прошёл модератора, и его страницы для
+        """Тег ещё не прошёл модератора, и его страницы для
         постороннего не существует."""
         pending = make.tag(status='pending')
         make.story(chapters=1).tags.add(pending)
@@ -124,8 +124,8 @@ class TagPagesShowMovement(TestCase):
                       [t['slug'] for t in self._suggest('mektep')['tags']])
 
     def test_a_tag_opens_on_recent_while_the_rest_open_on_trending(self):
-        """DEC-36 сделал дефолтом окно в 14 дней. Тег при этом остаётся на
-        «Жаңалары»: DEC-31 не отменён, свежесть там ценна сама по себе."""
+        """Дефолт каталога — окно в 14 дней. Тег при этом остаётся на
+        «Жаңалары»: у тега свежесть ценна сама по себе."""
         tag_page = self.client.get(reverse('core:tag_detail', kwargs={'slug': 'mektep'}))
         self.assertEqual(tag_page.context['sort'], 'recent')
 
@@ -139,7 +139,7 @@ class TagPagesShowMovement(TestCase):
                 self.assertEqual(
                     self.client.get(reverse(name, kwargs=kwargs)).context['sort'],
                     'trending')
-        # `?q=` — тот же /catalog/, тот же дефолт (DEC-65).
+        # `?q=` — тот же /catalog/, тот же дефолт.
         self.assertEqual(
             self.client.get(reverse('core:catalog') + '?q=x').context['sort'],
             'trending')
@@ -226,7 +226,7 @@ class TheCatalogPageRendersItsParts(TestCase):
 class ChoiceSurvivesEveryTransition(TestCase):
     """Чипы жанра и тега вели на голый путь и молча сбрасывали остальные оси:
     человек ставил «14+» и «көп бөлімді», тыкал в жанр — и обе оси исчезали
-    без единого следа в интерфейсе (FR-CAT-08)."""
+    без единого следа в интерфейсе."""
 
     def _href(self, response, key, slug):
         return next(o['href'] for o in response.context[f'{key}_options']
@@ -245,7 +245,7 @@ class ChoiceSurvivesEveryTransition(TestCase):
         self.assertIn('audience=14%2B', tag_href)
 
     def test_only_an_explicit_sort_travels(self):
-        """DEC-31: тег открывается «жаңалары» вперёд. Неявная сортировка
+        """Тег открывается «жаңалары» вперёд. Неявная сортировка
         каталога не должна ехать в ссылку и отменять это."""
         plain = self.client.get(reverse('core:catalog'))
         self.assertNotIn('sort=', self._href(plain, 'tag', 'mektep'))
@@ -268,7 +268,7 @@ class ChoiceSurvivesEveryTransition(TestCase):
         self.assertEqual(bare.context['clear_href'], reverse('core:catalog'))
 
     def test_the_second_axis_may_arrive_as_a_query(self):
-        """DEC-27 обещал `/genres/triller/?tag=mektep`, но view параметр не
+        """`/genres/triller/?tag=mektep` обещан движком, но view параметр не
         читал. Путь при этом сильнее query — канонический адрес остаётся
         источником истины."""
         base = reverse('core:genre_detail', kwargs={'slug': 'fantezi'})
@@ -404,7 +404,7 @@ class PresetsAreOneTapCombinations(TestCase):
 
 
 class NothingUnmoderatedLeaksOut(TestCase):
-    """DEC-23: в публичный каталог работа попадает только после модерации.
+    """В публичный каталог работа попадает только после модерации.
     `filter_catalog` стартовала с полного списка, и «Модерацияда» лежала в
     открытом каталоге наравне с опубликованными."""
 
@@ -432,7 +432,7 @@ class NothingUnmoderatedLeaksOut(TestCase):
 
 class AnEmptyResultIsNotADeadEnd(TestCase):
     """Пустой экран предлагал «поменяй сүзгі» — и всё. Жинақтар отвечают на
-    «зачем читать сейчас» (DEC-31), ровно то, чего ждёт человек с
+    «зачем читать сейчас», ровно то, чего ждёт человек с
     несложившимся запросом."""
 
     def test_collections_are_offered_in_the_empty_state_and_in_the_rail(self):
@@ -488,7 +488,7 @@ class TheNewAuthorAxisFindsWhoIsNotReadYet(TestCase):
     что «новые имена» стоят отдельным блоком на главной, а культура портала
     построена вокруг растущего автора (docs/ui.md).
 
-    Новизна — возраст аккаунта (DEC-57). По числу подписчиков ось не
+    Новизна — возраст аккаунта. По числу подписчиков ось не
     работала ни в одну сторону: порог либо не отсекал никого, либо держал
     в «новых» того, кто пишет второй год и просто не набрал аудиторию.
     """
@@ -513,7 +513,7 @@ class TheNewAuthorAxisFindsWhoIsNotReadYet(TestCase):
             self.assertGreaterEqual(story.author.date_joined, edge)
 
     def test_it_does_not_select_everyone(self):
-        """Ось, показывающая всю выдачу, ничего не сообщает: до DEC-57 порог
+        """Ось, показывающая всю выдачу, ничего не сообщает: прежний порог
         в 150 подписчиков не отсекал ни одного автора корпуса, и чип честно
         отвечал «21 из 21»."""
         everything = data.public_stories().count()
@@ -525,7 +525,7 @@ class TheNewAuthorAxisFindsWhoIsNotReadYet(TestCase):
         """Ряд «Жаңа авторлар» и ось каталога обязаны говорить об одном:
         иначе главная зовёт читать одних, а каталог находит других.
 
-        После DEC-89 они сошлись ещё ближе: ось каталога фильтрует работы,
+        Позже они сошлись ещё ближе: ось каталога фильтрует работы,
         то есть автора без единой публикации не показывает никогда, и ряд
         на главной теперь тоже ставит таких в хвост. Порядок по дате
         проверяется внутри группы «есть что читать» — сортировка у ряда
@@ -548,7 +548,7 @@ class TheNewAuthorAxisFindsWhoIsNotReadYet(TestCase):
 
 
 class TheAgeAxisIsCumulative(TestCase):
-    """DEC-38: «Жасың» отвечает на «сколько мне лет», а не «какая отметка у
+    """«Жасың» отвечает на «сколько мне лет», а не «какая отметка у
     работы».
 
     Точное совпадение работало против читателя: четырнадцатилетний выбирал
@@ -582,7 +582,7 @@ class TheAgeAxisIsCumulative(TestCase):
 
 
 class KindReplacedFormatAndStatus(TestCase):
-    """DEC-37: одна ось «Түрі» вместо «Формат» + «Мәртебесі».
+    """Одна ось «Түрі» вместо «Формат» + «Мәртебесі».
 
     `status` держал две несовместимые вещи: путь модерации и завершённость
     сериала. Первая читателю не нужна — в каталоге всё уже прошло
@@ -608,7 +608,7 @@ class KindReplacedFormatAndStatus(TestCase):
             self.assertEqual(story.status, 'OnProcess')
 
     def test_the_old_axes_are_gone_from_the_panel_and_from_the_code(self):
-        """Ось «Формат» снята и как параметр (DEC-49): она тянулась через
+        """Ось «Формат» снята и как параметр: она тянулась через
         восемь мест каталога и требовала внимания при каждой правке."""
         names = [g['name'] for g in
                  self.client.get(reverse('core:catalog')).context['filter_groups']]
@@ -618,8 +618,8 @@ class KindReplacedFormatAndStatus(TestCase):
         self.assertFalse(hasattr(data, 'CATALOG_FORMAT_FILTERS'))
 
     def test_completion_of_a_public_serial_is_always_known(self):
-        """Правило данных, ради которого DEC-37 и принят (BR-10a). Раньше
-        все сериалы были помечены просто «Жарияланған», и узнать, дописан
+        """Правило данных, ради которого сериалу и заведены свои статусы.
+        Раньше все сериалы были помечены просто «Жарияланған», и узнать, дописан
         ли сериал, было нельзя ни по одному."""
         for story in Story.objects.all():
             if story.status not in data.PUBLIC_STATUSES:
@@ -633,7 +633,7 @@ class KindReplacedFormatAndStatus(TestCase):
 
 class SerialsDoNotVanishFromAnySurface(TestCase):
     """Литерал `'Published'` вместо `PUBLIC_STATUSES` — тихая пропажа: после
-    DEC-37 опубликованный сериал носит `OnProcess` или `Completed`, и место,
+    опубликованный сериал носит `OnProcess` или `Completed`, и место,
     сравнивающее с одним литералом, теряет их все разом, ничего не ломая.
     Страница отдаёт 200, просто без половины работ."""
 
@@ -655,7 +655,7 @@ class SerialsDoNotVanishFromAnySurface(TestCase):
 
 
 class TheCatalogIsPaginated(TestCase):
-    """NFR-13: длинный список не грузится разом. До этого каталог отдавал
+    """Длинный список не грузится разом. До этого каталог отдавал
     **всю** публичную выдачу в одном ответе — на двадцати трёх работах
     незаметно, на десяти тысячах это полная выборка со всеми join'ами.
     Компонент пагинации при этом был написан и лежал неподключённым."""

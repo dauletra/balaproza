@@ -1,4 +1,4 @@
-"""Вход и онбординг (FR-AUTH-*, NFR-25)."""
+"""Вход и онбординг."""
 
 from django.utils import timezone
 from django.utils.crypto import get_random_string
@@ -9,7 +9,7 @@ from ..models import User
 def _unique_username() -> str:
     """`id` + 6 случайных цифр — как `_unique_story_slug`
     (`core/queries/write.py`), но без исходного текста: username при
-    первом входе не несёт ни telegram_id, ни имени (BR-90) — его правят
+    первом входе не несёт ни telegram_id, ни имени — его правят
     вручную потом, отдельной задачей."""
     while True:
         candidate = f'id{get_random_string(6, allowed_chars="0123456789")}'
@@ -25,17 +25,18 @@ def find_telegram_user(telegram_id: int) -> User | None:
 
 
 def get_or_create_telegram_user(telegram_id: int) -> tuple[User, bool]:
-    """Найти по `telegram_id` или завести нового (FR-AUTH-03: аккаунт
-    заводит первая авторизация — точнее, её завершение анкетой, см.
-    `onboarding`). Второй элемент — правда ли создан только что."""
+    """Найти по `telegram_id` или завести нового.
+
+    Аккаунт заводит первая авторизация — точнее, её завершение анкетой
+    (`onboarding`). Второй элемент — правда ли создан только что."""
     return User.objects.get_or_create(
         telegram_id=telegram_id, defaults={'username': _unique_username()})
 
 
 def complete_onboarding(user: User, *, pen_name: str, bio: str) -> User:
-    """Онбординг после первого входа (FR-AUTH-04). `terms_accepted_at` —
-    акт согласия (FR-AUTH-05); его дата и делает регистрацию завершённой
-    (BR-90), отдельного флага нет.
+    """Онбординг после первого входа. `terms_accepted_at` —
+    акт согласия; его дата и делает регистрацию завершённой,
+ отдельного флага нет.
 
     Полей два. Возраст и пол не спрашиваются вовсе (D4/D5): ни то, ни
     другое нигде не использовалось, а на детской площадке каждое поле —

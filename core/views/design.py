@@ -31,7 +31,7 @@ def design_components(request):
         'genres':    data.all_genres(),
         'stories':   data.public_stories(),
         'authors':   data.all_authors(),
-        # Стаб-набор покрывает все четыре фазы (DEC-45), поэтому showcase
+        # Стаб-набор покрывает все четыре фазы, поэтому showcase
         # бейджа — это просто перебор конкурсов, а не четыре ручных вызова
         # с выдуманными аргументами, которые разойдутся с компонентом.
         'contests':  data.all_contests(),
@@ -46,7 +46,7 @@ def design_components(request):
 
 
 def design_states(request):
-    """Каталог всех loading/error/empty состояний (DEC-17). Только при DEBUG."""
+    """Каталог всех loading/error/empty состояний. Только при DEBUG."""
     if not settings.DEBUG:
         raise Http404
     return render(request, 'pages/_design/states.html', {

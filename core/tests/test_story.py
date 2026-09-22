@@ -54,8 +54,8 @@ class StoryPageAnswersTheQuestionShouldIRead(TestCase):
         self.assertNotContains(self.response, 'Авторлар әлемі')
 
     def test_the_first_chapter_opens_in_full(self):
-        """Чтение идёт inline: отдельного маршрута `/read/` нет (DEC-30),
-        и старого scrollspy-блока тоже. Текст не обрезается (DEC-59) —
+        """Чтение идёт inline: отдельного маршрута `/read/` нет,
+        и старого scrollspy-блока тоже. Текст не обрезается —
         последнее предложение главы обязано попасть в ответ целиком."""
         body = data.chapter_of(STORY_SLUG, 1).body
         self.assertContains(self.response, data.chapter_of(STORY_SLUG, 1).title)
@@ -133,7 +133,7 @@ class ChapterNavigationIsForgiving(TestCase):
 
 
 class PendingTagsAreVisibleOnlyToTheirAuthor(TestCase):
-    """BR-TAG-07: тег ещё не прошёл модератора. Автор обязан видеть свой —
+    """Тег ещё не прошёл модератора. Автор обязан видеть свой —
     иначе он решит, что тег не сохранился, и поставит его второй раз."""
 
     def test_the_accepted_ones_are_public_and_the_pending_one_is_not(self):
@@ -208,7 +208,7 @@ class StoryDetailSaveButton(TestCase):
         """Снятие обязано пережить редирект, который его же и показывает.
 
         Кнопка отвечает POST'ом и редиректит на страницу произведения, а та
-        по BR-61 кладёт читаемую работу на «оқу үстінде». Пока полку двигал
+        кладёт читаемую работу на «оқу үстінде». Пока полку двигал
         сам факт открытия, запись воскресала раньше, чем читатель видел
         результат нажатия: снять работу с полки было нельзя ни на одном
         произведении, у которого есть главы. Держалось это на том, что
@@ -245,7 +245,7 @@ class StoryDetailSaveButton(TestCase):
 
 
 class TheReadingSurfaceIsBuiltForAPhone(TestCase):
-    """DEC-35 и FR-STORY-07. На 375px контейнер `px-4` и карточка `p-6`
+    """На 375px контейнер `px-4` и карточка `p-6`
     оставляли тексту 295px — около 35 знаков при комфортных 45-75. Причём
     все три настройки работали против читателя: ось ширины на телефоне не
     делала ничего, крупный кегль сужал меру, а тёплый и ночной фон
@@ -358,7 +358,7 @@ class RelatedStoriesCoverAllPublicStatuses(TestCase):
     """«Басқа шығармалар» не должен состоять из одних `Published`.
 
     Блок сужался литералом `status='Published'` поверх уже публичной
-    выдачи, и после DEC-37 это выкидывало из рекомендаций **все** сериалы —
+    выдачи, и это выкидывало из рекомендаций **все** сериалы —
     почти половину публичного корпуса. Тест смотрит на весь корпус, а не на
     один слаг: сужение возвращается незаметно и не в одной работе.
     """
@@ -377,7 +377,7 @@ class RelatedStoriesCoverAllPublicStatuses(TestCase):
         self.assertTrue(
             seen_statuses - {'Published'},
             'в рекомендациях по всему корпусу нет ни одного сериала — '
-            'выдача снова сужена до литерала Published (DEC-37)',
+            'выдача снова сужена до литерала Published',
         )
 
 
@@ -412,7 +412,7 @@ class WhatsNextPlacement(TestCase):
 
 
 class StoryLinksBackToItsCollections(TestCase):
-    """DEC-31: дочитавший ищет «ещё такого же». Жанр отвечает на это хуже
+    """Дочитавший ищет «ещё такого же». Жанр отвечает на это хуже
     всего — две фэнтези бывают совсем разными; подборка собрана по состоянию."""
 
     def setUp(self):
@@ -441,7 +441,7 @@ class StoryLinksBackToItsCollections(TestCase):
 
 
 class AnUnpublishedWorkExistsOnlyForItsAuthorAndTheModerator(TestCase):
-    """BR-76. Страница произведения не смотрела на статус вообще: черновик
+    """Страница произведения не смотрела на статус вообще: черновик
     и работа на модерации отдавались целиком любому, кто открыл адрес, —
     включая гостя. Слаг при этом собирается из названия (`slugify_kz`),
     то есть подбирается, а не только утекает ссылкой.
@@ -500,7 +500,7 @@ class AnUnpublishedWorkExistsOnlyForItsAuthorAndTheModerator(TestCase):
     def test_the_moderator_sees_the_queue_because_he_has_to_read_it(self):
         """Решение по работе принимается по её тексту, а в админке лежат
         номера глав. Закрыть страницу от модератора значит закрыть
-        модерацию (BR-11)."""
+        модерацию."""
         staff = Client()
         moderator = make.user(username='audit_moderator')
         moderator.is_staff = True

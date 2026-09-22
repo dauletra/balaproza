@@ -24,7 +24,7 @@ from django.utils import timezone
 
 
 class ReadingMovesTheWorkBetweenShelves(TestCase):
-    """Автопереходы полки (BR-61, FR-LIB-02).
+    """Автопереходы полки.
 
     Вкладка «Оқу үстіндегі» наполнялась одним сидом: у настоящего читателя
     она оставалась пустой, сколько бы он ни читал.
@@ -72,7 +72,7 @@ class ReadingMovesTheWorkBetweenShelves(TestCase):
 
 
 class ReadingCountsAsAView(TestCase):
-    """Оқылым засчитывается при открытии работы (FR-STORY-01, DEC-36).
+    """Оқылым засчитывается при открытии работы.
 
     До этого счётчик в базу клал только сид: `views` и `recent_views` не
     росли ни от одного захода. То есть «Қазір танымал» — дефолтная
@@ -132,10 +132,10 @@ class ReadingCountsAsAView(TestCase):
 
 
 class TheRecentWindowActuallyShrinks(TestCase):
-    """Окно «Қазір танымал» убывает, потому что убывает журнал (DEC-55).
+    """Окно «Қазір танымал» убывает, потому что убывает журнал.
 
     До журнала с датами оба счётчика росли вместе и никогда не падали: ось
-    DEC-36 обещала две недели, а показывала всё время — то есть со
+    «Қазір танымал» обещала две недели, а показывала всё время — то есть со
     временем повторяла «Ең көп оқылған», и главная задавала два вопроса с
     одним ответом.
     """
@@ -187,7 +187,7 @@ class TheRecentWindowActuallyShrinks(TestCase):
 
 
 class ReadingRemembersWhereYouStopped(TestCase):
-    """Закладка двигается по мере чтения (FR-HOME-02).
+    """Закладка двигается по мере чтения.
 
     `ReadingProgress` до этого создавал только сид: «Оқуды жалғастыру» на
     главной всегда указывало в одно и то же место, сколько бы читатель ни
@@ -231,7 +231,7 @@ class ReadingRemembersWhereYouStopped(TestCase):
     def test_the_first_visit_is_not_a_return_but_the_next_one_is(self):
         """Закладка пишется после резолва главы, а не до него: иначе первое
         знакомство с работой выглядело бы возвращением к ней, и заход не
-        засчитался бы `is_first_look` ни разу (DEC-59)."""
+        засчитался бы `is_first_look` ни разу."""
         first = self.client.get(self._url())
         self.assertTrue(first.context['is_first_look'])
         self.assertFalse(first.context['has_progress'])

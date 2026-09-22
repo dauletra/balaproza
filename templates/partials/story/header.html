@@ -1,5 +1,5 @@
 {% comment %}
-    Шапка произведения (FR-STORY-01), собранная mobile-first: рядом с
+    Шапка произведения, собранная mobile-first: рядом с
     обложкой только то, что отвечает на «что это» — жанр, название, автор,
     аудитория и длительность. Метрики, теги и действия идут полноширинными
     рядами под сеткой, где на 375px есть место.
@@ -49,11 +49,11 @@
         </div>
     {% endif %}
 
-    {# docs/ui.md: UGC-теги. Pending видны только автору (BR-TAG-07). #}
+    {# docs/ui.md: UGC-теги. Pending видны только автору. #}
     {% include "components/tag_list.html" with tags=tags viewer_is_author=is_author size="md" %}
 
     <div class="flex flex-wrap items-center gap-4">
-        {# FR-STORY-12 + DEC-32: общий счётчик = сумма реакций по главам #}
+        {# Общий счётчик = сумма реакций по главам #}
         {% include "components/stat_pill.html" with icon="heart" value=story.likes|compact_count label=story.likes|spaced|add:" реакция" %}
         {% include "components/stat_pill.html" with icon="eye" value=story.views|compact_count label=story.views|spaced|add:" оқылым" %}
         {% include "components/stat_pill.html" with icon="message-caption" value=story.comments|compact_count label=story.comments|spaced|add:" пікір" %}
@@ -62,7 +62,7 @@
     {% comment %}
         Действия. На мобильном главная кнопка занимает всю ширину, а «Сақтау»
         и «Бөлісу» делят вторую строку — так primary-действие ни с чем не
-        конкурирует. «Шағым» из этого ряда убран вниз страницы (FR-STORY-09):
+        конкурирует. «Шағым» из этого ряда убран вниз страницы:
         жалоба — не то, что предлагают человеку до чтения.
     {% endcomment %}
     <div class="flex flex-col gap-2.5 sm:flex-row sm:items-center">
@@ -73,7 +73,7 @@
         </a>
 
         {% comment %}
-            В предпросмотре «Сақтау» и «Бөлісу» не показываются (BR-76).
+            В предпросмотре «Сақтау» и «Бөлісу» не показываются.
             Полка непубличной работе не заводится вовсе, а ссылка, которую
             даёт «Бөлісу», у получателя открывается 404 — кнопка обещала бы
             то, чего нет. Раньше она работала ровно потому, что черновик был

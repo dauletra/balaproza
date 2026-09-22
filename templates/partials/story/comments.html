@@ -1,5 +1,5 @@
 {% comment %}
-    Разговор под главой (FR-STORY-10, BR-30: один уровень ответов).
+    Разговор под главой: один уровень ответов.
     Ожидает контекст `story_detail`.
 {% endcomment %}
 {% load qazaqnovel %}
@@ -44,7 +44,7 @@
                 <div>
                     {% include "components/comment.html" with story_slug=story.slug chapter_number=chapter_number comment_id=cm.id author_name=cm.author.public_name author_username=cm.author.username author_avatar=cm.author.avatar date=cm.created_at|ago text=cm.text likes=cm.likes liked=cm.liked badge=cm.is_author_badge|yesno:"Автор," own=cm|belongs_to:current_user_username allow_reply=True reply_avatar_name=current_user_name %}
 
-                    {# Replies (BR-30: один уровень — реплай-форма у реплая отсутствует) #}
+                    {# Replies: один уровень — реплай-форма у реплая отсутствует #}
                     {% for rp in cm.replies %}
                         {% if rp.author %}
                             {% include "components/comment.html" with story_slug=story.slug chapter_number=chapter_number comment_id=rp.id author_name=rp.author.public_name author_username=rp.author.username author_avatar=rp.author.avatar date=rp.created_at|ago text=rp.text likes=rp.likes liked=rp.liked badge=rp.is_author_badge|yesno:"Автор," own=rp|belongs_to:current_user_username depth=1 allow_reply=False %}

@@ -53,6 +53,6 @@
         <span class="font-sans text-xs text-slate-500">{{ collection.stories|length }} шт.</span>
     </div>
 
-    {# Shared list-partial (DEC-27) — переиспользуется каталогом и коллекциями #}
+    {# Shared list-partial — переиспользуется каталогом и коллекциями #}
     {% include "partials/catalog/_book_list.html" with results=collection.stories empty_title="Шығарма жоқ" empty_text="Бұл жинаққа әлі шығарма қосылмаған." %}
 {% endblock %}

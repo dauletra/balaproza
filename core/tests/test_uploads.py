@@ -1,4 +1,4 @@
-"""Растровые файлы (BR-86): валидатор, пережатие, уборка старого файла.
+"""Растровые файлы: валидатор, пережатие, уборка старого файла.
 
 `MEDIA_ROOT` подменяется на временную папку в тестах, которые реально
 пишут и удаляют файлы на диске — тот же приём, что в
@@ -55,9 +55,9 @@ class ValidateRasterImageChecksContentNotJustTheName(TestCase):
             validate_raster_image(upload)
 
     def test_the_rejection_does_not_name_an_internal_rule_code(self):
-        """V2 (AUDIT-WRITE-FLOW): тост показывал «(BR-46)» — идентификатор
-        внутреннего требования ребёнку-автору. Пометка нужна в коде и в
-        docs/, не в сообщении."""
+        """Тост показывал ребёнку-автору идентификатор внутреннего
+        требования. Объяснить отказ должно само сообщение, а не код, по
+        которому нечего найти."""
         upload = SimpleUploadedFile('cover.svg', b'<svg/>',
                                     content_type='image/svg+xml')
         with self.assertRaises(ValidationError) as caught:
@@ -81,7 +81,7 @@ class ValidateRasterImageChecksContentNotJustTheName(TestCase):
 
 
 class ResizeRasterImageBoundsAndConverts(TestCase):
-    """BR-86: пережатие — граница стороны и формат хранения по имени."""
+    """Пережатие — граница стороны и формат хранения по имени."""
 
     def test_an_oversized_image_is_thumbnailed(self):
         big = SimpleUploadedFile(
@@ -133,7 +133,7 @@ MEDIA = tempfile.mkdtemp()
 
 @override_settings(MEDIA_ROOT=MEDIA)
 class MediaCleanupSignalsRemoveOrphanFiles(TestCase):
-    """BR-86: замена и удаление объекта убирают файл из storage — раньше
+    """Замена и удаление объекта убирают файл из storage — раньше
     (S8) старый файл оставался в `media/` навсегда."""
 
     @classmethod

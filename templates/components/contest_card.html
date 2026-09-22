@@ -1,13 +1,13 @@
 {% load qazaqnovel %}
 {% comment %}
-    ContestCard (FR-CONT-01). Карточка конкурса для списка.
+    ContestCard. Карточка конкурса для списка.
     Параметры:
       contest — Contest
 {% endcomment %}
 <a href="{% url 'core:contest_detail' slug=contest.slug %}"
    class="group flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition-shadow hover:shadow-card-hover">
 
-    {# ── Афиша: своя, а не фотография чужой книги (FR-CONT-11) ── #}
+    {# ── Афиша: своя, а не фотография чужой книги ─────────────── #}
     <div class="relative h-32 w-full overflow-hidden">
         {% include "components/contest_poster.html" with contest=contest letter_cls="text-[96px]" only %}
 

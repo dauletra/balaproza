@@ -1,5 +1,5 @@
 {% load qazaqnovel %}{% comment %}
-    Правый рейл главной (docs/ui.md + FR-HOME-09).
+    Правый рейл главной (docs/ui.md).
     Контекст: hero_contest, school_links_global (глобальный — тот же список,
     что в футере; свой запрос ради того же ответа главная не делает)
 {% endcomment %}
@@ -106,7 +106,7 @@
         </a>
     {% endif %}
 
-    {# ── Теги: срез недели + накопленное (DEC-31). Дубль потоковой секции с xl ── #}
+    {# ── Теги: срез недели + накопленное. Дубль потоковой секции с xl ─────────── #}
     {% if trending_tags or popular_tags %}
         <section class="rounded-lg border border-slate-200 bg-white p-5">
             {% if trending_tags %}
@@ -134,7 +134,7 @@
         </section>
     {% endif %}
 
-    {# ── Авторлар мектебі — блок внешних ссылок (FR-LINKS, DEC-22) ── #}
+    {# ── Авторлар мектебі — блок внешних ссылок ───────────────────── #}
     {% if school_links_global %}
         {% include "components/school_links.html" with links=school_links_global layout="list" heading="Авторлар мектебі" hint="Вебинарлар, идеялар, кеңестер — сыртқы арналарда." %}
     {% endif %}

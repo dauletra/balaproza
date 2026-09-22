@@ -1,7 +1,7 @@
-"""Свой и чужой профиль, подписчики и подписки (FR-PROF-*).
+"""Свой и чужой профиль, подписчики и подписки.
 
 Разделение, которое здесь легко потерять, — **кто зритель**: посторонний
-видит только публичное (BR-73). Правило живёт в слое данных, но выбор
+видит только публичное. Правило живёт в слое данных, но выбор
 между двумя выдачами делается здесь.
 """
 
@@ -26,7 +26,7 @@ from .common import (
 
 
 def _report(request, form) -> None:
-    """Ошибки формы — тостами (FR-SYS-01), по строке на причину."""
+    """Ошибки формы — тостами, по строке на причину."""
     for errors in form.errors.values():
         for error in errors:
             messages.error(request, error)
@@ -45,7 +45,7 @@ def _resolve_prof_tab(request, allowed) -> str:
 
 def _prof_items(author, allowed: tuple, is_self: bool) -> list:
     """Сегменты PROF (label + count). Счётчик работ считается по публичным
-    работам **для обоих** (DEC-44): две арифметики под одним словом дали бы
+    работам **для обоих**: две арифметики под одним словом дали бы
     «Шығармалар 5» над списком из трёх."""
     works_n = len(author.public_works) if author else 0
     lib_n   = len(author.library_entries) if (author and is_self) else 0
@@ -61,7 +61,7 @@ def _prof_items(author, allowed: tuple, is_self: bool) -> list:
 
 
 def profile_me(request):
-    """Свой профиль (FR-PROF-01/03). Реальное переключение секций через ?tab=."""
+    """Свой профиль. Реальное переключение секций через ?tab=."""
     username = _current_username(request)
     # Автор с аннотацией работ и со снимком их на самом объекте: страница
     # спрашивает их из восьми мест — сегменты, две сводки, пять наград,
@@ -85,10 +85,10 @@ def profile_me(request):
         'is_self':         True,
         'tab':             tab,
         'prof_items':      _prof_items(author, _PROF_TABS_ME, True) if author else [],
-        # DEC-44: профиль — публичный вид на автора, а не второй кабинет.
+        # Профиль — публичный вид на автора, а не второй кабинет.
         # Здесь то же, что видит читатель; черновики и модерация живут
         # только в кабинете, а их число — во вкладке «Статистика» под
-        # пометкой «Тек саған көрінеді» (FR-PROF-08).
+        # пометкой «Тек саған көрінеді».
         'works':           works_page.object_list if author else [],
         'works_page':      works_page,
         'works_base':      reverse('core:profile_me'),
@@ -103,7 +103,7 @@ def profile_me(request):
         'contest_awards':  data.contest_awards_of(author),
         'contests_n':      len(author.own_submissions) if author else 0,
         'contest_history': data.contest_history(author, is_self=True),
-        # FR-PROF-08 — своя статистика. Ничего из этого посторонний не видит.
+        # Своя статистика. Ничего из этого посторонний не видит.
         'writer':          data.writer_stats(author) if author else None,
         'award_catalog':   catalog,
         'awards_earned':   sum(1 for a in catalog if a['earned']),
@@ -117,14 +117,14 @@ def profile_me(request):
 
 
 def profile_me_edit(request):
-    """Редактирование своего профиля (FR-PROF-01, Ф15 Этап 6)."""
+    """Редактирование своего профиля (Ф15 Этап 6)."""
     username = _current_username(request)
     author = data.author_by_username(username)
 
     if request.method == 'POST' and author is not None:
-        # Аватар проверяет валидатор поля (BR-46), лимиты имён и био — сама
+        # Аватар проверяет валидатор поля, лимиты имён и био — сама
         # модель: третьего места для тех же чисел здесь быть не должно.
-        # `current_user` нужен `clean_username` (BR-91) — без него
+        # `current_user` нужен `clean_username` — без него
         # уникальность ника проверялась бы без исключения самого владельца.
         # Не `instance=`: см. комментарий в `ProfileForm.__init__`.
         form = ProfileForm(request.POST, request.FILES, current_user=request.user)
@@ -148,7 +148,7 @@ def profile_me_edit(request):
 
 @login_required
 def export_texts(request):
-    """Забрать свои тексты одним файлом (FR-PROF-12).
+    """Забрать свои тексты одним файлом.
 
     GET, а не POST: это чтение своего же, и обычная ссылка здесь честнее
     формы — человек приходит сюда в худший день, когда что-то уже пошло
@@ -157,7 +157,7 @@ def export_texts(request):
     нет вовсе.
 
     Файл строится в запросе и целиком в памяти. Фона и очереди не надо:
-    черновиков у автора не больше пятнадцати (BR-85), и даже портфель из
+    черновиков у автора не больше пятнадцати, и даже портфель из
     романов — это мегабайты текста, а не гигабайты.
 
     Одна выгрузка в минуту. Не против человека — дважды подряд свои
@@ -186,9 +186,9 @@ def export_texts(request):
 @require_POST
 @login_required
 def delete_account(request):
-    """Аккаунтты өшіру — қауіпті аймақ (FR-PROF-11). Каскад весь в моделях
-    (`Story.author` → `CASCADE` и далее, BR-95) — тот же приём, что у
-    `delete_story` (BR-84): вызов `.delete()` напрямую, без обёртки в
+    """Аккаунтты өшіру — қауіпті аймақ. Каскад весь в моделях
+    (`Story.author` → `CASCADE` и далее) — тот же приём, что у
+    `delete_story`: вызов `.delete()` напрямую, без обёртки в
     `queries/`. `user` захвачен до `logout()` — тот подменяет
     `request.user` на `AnonymousUser`."""
     user = request.user
@@ -199,7 +199,7 @@ def delete_account(request):
 
 
 def profile_other(request, username):
-    """Чужой профиль (FR-PROF-02/04); гостю кнопка «Жазылу» ведёт на вход.
+    """Чужой профиль; гостю кнопка «Жазылу» ведёт на вход.
 
     Несуществующий автор — 404, а не 200 с заглушкой: иначе поисковик
     индексирует любой выдуманный `@username`. Данные — только публичные.
@@ -213,8 +213,8 @@ def profile_other(request, username):
     # сегменты, тело вкладки, рейл, сводка и три награды.
     works = author.public_works
     works_page = _paged(request, works)
-    # Рейл чужого профиля — «Ең көп оқылғаны», а не «на кого он подписан»
-    # (FR-PROF-09): список чужих подписок читателю ничего не сообщает.
+    # Рейл чужого профиля — «Ең көп оқылғаны», а не «на кого он подписан»:
+    # список чужих подписок читателю ничего не сообщает.
     # Порог в четыре работы — против дубля: на вкладке «Шығармалар» тело
     # показывает те же работы целиком, и топ-3 из трёх был бы копией
     # соседней колонки. На «Туралы» работ в теле нет, там блок полезен
@@ -236,13 +236,13 @@ def profile_other(request, username):
         'rail_top':      rail_top,
         'stats':         data.public_stats(author),
         # Знаки одинаковы для владельца и для постороннего: достижение
-        # публично по определению (FR-PROF-06). Число конкурсов — участие
+        # публично по определению. Число конкурсов — участие
         # без статуса, поэтому совпадает с длиной публичного списка и не
-        # выдаёт вычитанием, что какая-то заявка отклонена (BR-74a).
+        # выдаёт вычитанием, что какая-то заявка отклонена.
         'achievements':  data.achievements_of(author),
         'contest_awards': data.contest_awards_of(author),
         'contests_n':    len(author.own_submissions),
-        # is_self=False режет результат и комментарий жюри (BR-74a)
+        # is_self=False режет результат и комментарий жюри
         'contest_history': data.contest_history(author),
         'is_followed':   data.is_following(me, author),
     })
@@ -254,7 +254,7 @@ def profile_other(request, username):
 @require_POST
 @login_required
 def follow_toggle(request, username):
-    """Кнопка «Жазылу» (FR-PROF-04): подписаться или отписаться.
+    """Кнопка «Жазылу»: подписаться или отписаться.
 
     Возврат — по `?next=`, потому что кнопок две и стоят они на разных
     страницах. `_safe_next` не пускает наружу (open-redirect).
@@ -277,8 +277,8 @@ _PEOPLE_KINDS = {
 
 
 def profile_people(request, username, kind):
-    """Подписчики и подписки автора (FR-PROF-10). Оба списка публичны
-    (BR-75). Один view на два набора: страницы отличаются тем, кого
+    """Подписчики и подписки автора. Оба списка публичны.
+ Один view на два набора: страницы отличаются тем, кого
     показывают, и ничем больше. Неизвестный `kind` или автор — 404."""
     author = data.author_by_username(username)
     if not author or kind not in _PEOPLE_KINDS:

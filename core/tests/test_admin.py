@@ -1,10 +1,10 @@
-"""Админка как инструмент модерации (DEC-23).
+"""Админка как инструмент модерации.
 
 Кастомного UI до V2 не будет, значит проверять надо не «страница
 открылась», а то, что модератор может довести дело до конца: решение по
-работе доходит до автора (BR-11), причина отказа обязательна (BR-72b),
-статус после одобрения зависит от формата (BR-10a), а в `media/` не
-попадает SVG (BR-46).
+работе доходит до автора, причина отказа обязательна,
+статус после одобрения зависит от формата, а в `media/` не
+попадает SVG.
 
 Смоук по всем зарегистрированным моделям стоит здесь же: `list_display`
 и `list_filter` проверяются системными чеками не полностью — свойство
@@ -39,7 +39,7 @@ from core.tests.base import TestCase
 def _story(author, submitted=True, **kwargs):
     """Работа под тестом, а не из корпуса: статусами здесь двигают.
 
-    Работа приходит **с поданной главой** (BR-79): решение принимается по
+    Работа приходит **с поданной главой**: решение принимается по
     ревизии, а не по статусу, и работа без единой ждущей ревизии для
     модератора пуста — решать в ней нечего.
     """
@@ -60,8 +60,8 @@ def _story(author, submitted=True, **kwargs):
 
 
 class ADecisionReachesTheAuthor(TestCase):
-    """`Story.apply_moderation` — одна дверь на решение и уведомление
-    (BR-11). Порознь они бессмысленны: статус без уведомления оставляет
+    """`Story.apply_moderation` — одна дверь на решение и уведомление.
+ Порознь они бессмысленны: статус без уведомления оставляет
     автора гадать, что случилось, а уведомление без статуса обещает
     публикацию, которой не произошло."""
 
@@ -69,7 +69,7 @@ class ADecisionReachesTheAuthor(TestCase):
         self.author = User.objects.get(username='aidana')
 
     def test_approval_depends_on_the_format(self):
-        """BR-10a: у сериала `Published` невалиден — он продолжается. Обе
+        """У сериала `Published` невалиден — он продолжается. Обе
         его читательские метки это `OnProcess` и `Completed`, и литерал в
         одобрении отнял бы у сериала ответ на «дописан ли он»."""
         single = _story(self.author, format='single')
@@ -85,13 +85,13 @@ class ADecisionReachesTheAuthor(TestCase):
         self.assertEqual(note.text, '')
 
     def test_a_return_carries_its_reason_all_the_way(self):
-        """Подпись исхода берётся из реестра (BR-72b), а не собирается в
+        """Подпись исхода берётся из реестра, а не собирается в
         шаблоне."""
         story = _story(self.author)
         note = story.apply_moderation('needs_work', 'Диалогтар үзіліп қалған.')
         story.refresh_from_db()
         # Не `NotPublished`: возвращённое отличается от нетронутого
-        # черновика (BR-80) — автор обязан видеть, что работа ждёт его.
+        # черновика — автор обязан видеть, что работа ждёт его.
         self.assertEqual(story.status, 'NeedsWork')
         self.assertEqual(note.user, self.author)
         self.assertEqual(note.kind, 'moderation')
@@ -101,9 +101,9 @@ class ADecisionReachesTheAuthor(TestCase):
         self.assertEqual(outcome_label(note), 'Толықтыру қажет')
 
     def test_what_the_door_refuses(self):
-        """Отказ без причины не сообщает автору ничего (BR-11). Одобрить
+        """Отказ без причины не сообщает автору ничего. Одобрить
         чужой черновик значит опубликовать непоказанное: готовность
-        объявляет автор (FR-WRITE-09), модератор отвечает «да» или «нет»."""
+        объявляет автор, модератор отвечает «да» или «нет»."""
         story = _story(self.author)
         for outcome, reason in (('rejected', '   '), ('maybe', 'себебі')):
             with self.subTest(outcome=outcome):
@@ -123,7 +123,7 @@ class ADecisionReachesTheAuthor(TestCase):
 
 class TheModeratorWorksThroughTheAdmin(TestCase):
     """Тот же путь, каким им пользуются: список работ и действие над ним.
-    Кастомного UI до V2 не будет (DEC-23), значит проверять надо не
+    Кастомного UI до V2 не будет, значит проверять надо не
     «страница открылась», а то, что дело доводится до конца."""
 
     def setUp(self):
@@ -175,7 +175,7 @@ class TheModeratorWorksThroughTheAdmin(TestCase):
     def test_a_work_outside_the_queue_is_named_not_skipped_silently(self):
         """Иначе модератор считает решёнными все, что выбрал.
 
-        «Вне очереди» теперь значит «нет ждущей ревизии» (BR-79): очередь
+        «Вне очереди» теперь значит «нет ждущей ревизии»: очередь
         собрана из поданного текста, а не из значения статуса."""
         ChapterRevision.objects.filter(chapter__story=self.story).delete()
         self.story.status = 'NotPublished'
@@ -214,7 +214,7 @@ MEDIA = tempfile.mkdtemp()
 
 @override_settings(MEDIA_ROOT=MEDIA)
 class MediaUploadsTakeRasterOnly(TestCase):
-    """BR-46: файл из `/media/` открывается в origin сайта, а SVG — это
+    """Файл из `/media/` открывается в origin сайта, а SVG — это
     документ, а не картинка."""
 
     @classmethod
@@ -258,7 +258,7 @@ class TheWholeToolOpens(TestCase):
                 self.assertEqual(self.client.get(reverse(
                     f'admin:{opts.app_label}_{opts.model_name}_changelist')
                 ).status_code, 200)
-                # 403 — тоже ответ: уведомление руками не заводят (BR-72b).
+                # 403 — тоже ответ: уведомление руками не заводят.
                 self.assertIn(self.client.get(reverse(
                     f'admin:{opts.app_label}_{opts.model_name}_add')
                 ).status_code, (200, 403))
@@ -269,7 +269,7 @@ class TheWholeToolOpens(TestCase):
         ).status_code, 200)
 
     def test_a_notification_is_written_by_the_event_not_by_hand(self):
-        """BR-72b. Django отдаёт карточку в режиме просмотра, но без формы
+        """Django отдаёт карточку в режиме просмотра, но без формы
         сохранения."""
         note = Notification.objects.first()
         self.assertEqual(self.client.get(

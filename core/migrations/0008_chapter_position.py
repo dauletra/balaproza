@@ -6,7 +6,7 @@ from django.db.models import F
 
 def _backfill_position(apps, schema_editor):
     """Порядок до этой миграции и был номером — переносим как есть
-    (Этап 6 AUDIT-WRITE-FLOW.md, BR-84)."""
+    ."""
     Chapter = apps.get_model('core', 'Chapter')
     Chapter.objects.update(position=F('number'))
 

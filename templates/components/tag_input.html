@@ -4,13 +4,13 @@
     Параметры:
       name      — form-field name (default 'tags'). Отправляется в submit
                   как comma-separated имена тегов (backend сам резолвит slug
-                  и создаёт Tag(status=pending) для новых, см. BR-TAG-02/03/06).
+                  и создаёт Tag(status=pending) для новых).
       tags      — initial list of Tag (для edit mode); default — пусто
-      max_tags  — лимит (default 10, BR-TAG-01)
+      max_tags  — лимит (default 10)
 
     Контекст view (обязательно):
       accepted_tags     — list[Tag] для автокомплита (status='accepted')
-      blocked_patterns  — list[str], нижний регистр (BR-TAG-05)
+      blocked_patterns  — list[str], нижний регистр
 
     Использовать один раз на страницу (json_script id-конфликты иначе).
 {% endcomment %}

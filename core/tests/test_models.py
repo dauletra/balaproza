@@ -31,8 +31,8 @@ from core.tests.base import TestCase, user
 class UserSaysWhoTheAuthorIs(TestCase):
 
     def test_public_name_falls_back_to_the_nickname(self):
-        """Читателю автор известен под лақап аты (DEC-82: другого имени
-        сайт не хранит). Ник — запасной вариант при пустом псевдониме, а
+        """Читателю автор известен под лақап аты — другого имени сайт не
+        хранит. Ник — запасной вариант при пустом псевдониме, а
         не второе имя: пустого места у карточки не бывает."""
         named = User.objects.create_user('demo-pen', pen_name='sayyn')
         self.assertEqual(named.public_name, 'sayyn')
@@ -65,11 +65,11 @@ class UserSaysWhoTheAuthorIs(TestCase):
 
 class ReferenceDataArrivesWithTheSchema(TestCase):
     """Жанры и блок-лист залиты миграцией: без первых не работает ни
-    каталог, ни главная, без второго `is_blocked` пропускает всё
-    (BR-TAG-05). Команду сида можно и не запустить — миграцию нельзя."""
+    каталог, ни главная, без второго `is_blocked` пропускает всё.
+ Команду сида можно и не запустить — миграцию нельзя."""
 
     def test_twelve_genres_in_editorial_order(self):
-        """Порядок — редакторский выбор (DEC-11). Проверяется, что он не
+        """Порядок — редакторский выбор. Проверяется, что он не
         совпадает с алфавитом: иначе `position` выглядит декоративным, и
         первая же сортировка «для порядка» переставит полосу на главной."""
         names = [g.name for g in Genre.objects.all()]
@@ -99,8 +99,8 @@ class ReferenceDataArrivesWithTheSchema(TestCase):
 class TagsFollowTheirPath(TestCase):
 
     def test_a_new_tag_waits_for_a_moderator(self):
-        """Дефолт — `pending`: тег заводит автор, публикует модератор
-        (BR-TAG-03)."""
+        """Дефолт — `pending`: тег заводит автор, публикует модератор.
+ """
         fresh = Tag.objects.create(slug='demo-jana', name='жаңа тег')
         self.assertEqual(fresh.status, 'pending')
         self.assertFalse(fresh.is_public)
@@ -115,8 +115,8 @@ class TagsFollowTheirPath(TestCase):
 
 
 class CountersAreDerivedNotStored(TestCase):
-    """Три числа, которые перестали быть колонками: части работы (DEC-51),
-    глава закладки (DEC-52) и оба счётчика тега (DEC-53).
+    """Три числа, которые перестали быть колонками: части работы,
+    глава закладки и оба счётчика тега.
 
     Общее у них одно: колонку никто не обновлял, и она расходилась с тем,
     что лежит рядом. Здесь проверяется само правило вывода, поэтому
@@ -125,7 +125,7 @@ class CountersAreDerivedNotStored(TestCase):
     """
 
     def test_chapter_count_follows_the_written_text(self):
-        """DEC-51 про написанное — значит про `chapters_written` (BR-79).
+        """Счётчик автора — про написанное, то есть про `chapters_written`.
         Число, которое видит читатель, отвечает на другой вопрос и считает
         только опубликованные главы: проверяется ниже."""
         story = make.story(chapters=0, format='serial')
@@ -156,7 +156,7 @@ class CountersAreDerivedNotStored(TestCase):
 
     def test_tag_counts_come_from_the_links(self):
         """Недельный счётчик не может быть больше накопленного — состояние,
-        которое до DEC-53 было достижимо: числа стояли рядом независимо."""
+        которое прежде было достижимо: числа стояли рядом независимо."""
         subject = make.tag()
         recent, old = make.story(chapters=1), make.story(chapters=1)
         for story in (recent, old):
@@ -189,14 +189,14 @@ class ReadingEffortIsHonest(TestCase):
     def test_text_chapter_points_at_the_only_chapter(self):
         """Кнопка «Мәтін» обязана вести в существующую главу, а не в
         пустой редактор: у `single` глава ровно одна, и второй быть не
-        должно. Адрес — `pk` главы (BR-83), не её отображаемый номер."""
+        должно. Адрес — `pk` главы, не её отображаемый номер."""
         single = make.story(chapters=1)
         self.assertEqual(single.text_chapter, single.chapter_set.get().pk)
         self.assertIsNone(make.story(chapters=0, format='single').text_chapter)
         self.assertIsNone(make.story(chapters=3, format='serial').text_chapter)
 
     def test_unwritten_work_falls_back_to_the_floor(self):
-        """Оценки по заявленным частям больше нет (DEC-51): ненаписанная
+        """Оценки по заявленным частям больше нет: ненаписанная
         работа честно показывает нижнюю границу времени чтения."""
         empty = make.story(chapters=0, format='serial')
         self.assertEqual(empty.total_chars, 0)
@@ -252,7 +252,7 @@ class TimeIsWordedNotStored(TestCase):
     """«Когда трогали» выводится из `updated_at`, а не хранится числом дней.
 
     Хранимая дельта устаревала бы каждые сутки — та же ошибка, за которую
-    убрали `days_left` у конкурса (DEC-45). Состояния «не задано» у
+    убрали `days_left` у конкурса. Состояния «не задано» у
     подписи нет: у строки в базе времени изменения не может не быть.
     """
 
@@ -268,7 +268,7 @@ class TimeIsWordedNotStored(TestCase):
 
 
 class ReadTiersAreLadderNotRating(TestCase):
-    """Ступени прочтений (FR-PROF-06). Рейтинга нет и не будет (DEC-41):
+    """Ступени прочтений. Рейтинга нет и не будет:
     знак говорит «ты сделал», рейтинг — «ты хуже вон того»."""
 
     def test_boundaries(self):
@@ -291,7 +291,7 @@ class ReadTiersAreLadderNotRating(TestCase):
         self.assertIsNone(data.next_tier_for(100_000))
 
     def test_reads_count_public_work_only(self):
-        """BR-73: прочтения приходят от читателей, читатель видит публичное."""
+        """Прочтения приходят от читателей, читатель видит публичное."""
         author = make.user()
         make.story(author=author, chapters=1, views=500)
         make.story(author=author, chapters=1, views=700, status='NotPublished')
@@ -303,10 +303,10 @@ class ReadTiersAreLadderNotRating(TestCase):
 
 
 class PublicWorkCountIsDerived(TestCase):
-    """`User.works` — число публичных работ, а не колонка (BR-ACH-01).
+    """`User.works` — число публичных работ, а не колонка.
 
     Хранимый счётчик здесь однажды уже разошёлся с реальностью, и это
-    решение стало образцом для DEC-51/52/53.
+    решение стало образцом для всех остальных счётчиков.
     """
 
     def test_it_counts_the_public_ones_only(self):

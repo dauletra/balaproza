@@ -13,7 +13,7 @@
         </div>
     </header>
 
-    {# ── Реальное переключение табов (FR-LIB-01) ── #}
+    {# ── Реальное переключение табов ────────────── #}
     {% include "components/segmented_control.html" with items=lib_items current=tab base_url=request.path %}
 
     {% if page_state == 'loading' %}

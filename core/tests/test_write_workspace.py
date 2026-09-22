@@ -28,7 +28,7 @@ from core.templatetags.qazaqnovel import since, spaced
 # ───────────────────────── Кабинет: my_stories_of / writer_stats ─────────
 
 class TheCabinetAnswersWhatToDoNext(TestCase):
-    """FR-WRITE-02/08. Список был описью имущества: он перечислял работы и
+    """Список был описью имущества: он перечислял работы и
     молчал о том, что с ними делать. Порядок был порядком объявления в
     корпусе, а у непубличных строк вместо метрик стояло «0 · 0 · 0» —
     три нуля вместо ответа на единственный вопрос к такой работе."""
@@ -53,7 +53,7 @@ class TheCabinetAnswersWhatToDoNext(TestCase):
         self.assertNotContains(self.response, 'Әлі шығарма жоқ')
 
     def test_only_a_public_work_offers_the_readers_view(self):
-        """DEC-37: сериал в работе публичен, хотя статус не `Published`."""
+        """Сериал в работе публичен, хотя статус не `Published`."""
         for story in self.mine:
             url = reverse('core:story_detail', kwargs={'slug': story.slug})
             with self.subTest(story=story.slug, public=story.is_public):
@@ -78,7 +78,7 @@ class TheCabinetAnswersWhatToDoNext(TestCase):
         озвучки целиком. Кабинет при этом показывает точное число —
         «1,0 мың» здесь не годится."""
         story = data.story_by_slug('aidana-tan')
-        views = spaced(story.recent_views)      # за две недели (DEC-36)
+        views = spaced(story.recent_views)      # за две недели
         self.assertContains(self.response, f'{views} оқылым')
         self.assertContains(self.response, f'class="sr-only">{views} оқылым')
         self.assertContains(self.response, f'{spaced(story.likes)} реакция')
@@ -103,7 +103,7 @@ class TheCabinetAnswersWhatToDoNext(TestCase):
 
 
 class TheAttentionStripSpeaksOnlyWhenThereIsSomething(TestCase):
-    """FR-WRITE-08: сигналы, которые лежали в данных и нигде не сходились.
+    """Сигналы, которые лежали в данных и нигде не сходились.
     `slug` заполнен только когда элемент один — вести «3 шығарма
     модерацияда» в одну из трёх было бы враньём."""
 
@@ -142,7 +142,7 @@ class TheAttentionStripSpeaksOnlyWhenThereIsSomething(TestCase):
 
 
 class TheCabinetCarriesNoAuthorTotals(TestCase):
-    """DEC-48: агрегаты автора живут в профиле, а не в кабинете.
+    """Агрегаты автора живут в профиле, а не в кабинете.
 
     Рейл повторял четыре плитки `partials/profile/_stats.html` — и на
     странице одного произведения читался как статистика этого
@@ -183,7 +183,7 @@ class TheCabinetCarriesNoAuthorTotals(TestCase):
 
 
 class StatusIsSpokenInOneVocabulary(TestCase):
-    """BR-10/DEC-39. «Жоба» — дефолт нового произведения, то есть первое,
+    """«Жоба» — дефолт нового произведения, то есть первое,
     что видит автор; красным помечено то, что означает отказ или
     необратимое действие, а не нормальный этап пути."""
 
@@ -218,7 +218,7 @@ class StatusIsSpokenInOneVocabulary(TestCase):
                     + stats['on_moderation'] + stats['draft']
                     + stats['needs_work'],
                     stats['total'])
-        # Шестой статус (BR-80) обязан попасть и в разбивку: иначе
+        # Шестой статус обязан попасть и в разбивку: иначе
         # возвращённая работа считалась бы только в `total`.
         buckets = ('Published', 'Completed', 'OnProcess',
                    'OnModeration', 'NotPublished', 'NeedsWork')
@@ -266,7 +266,7 @@ class TheTextButtonOpensTheTextThatExists(TestCase):
 
 
 class TheCreationFormAsksThreeThings(TestCase):
-    """FR-WRITE-01: атау, формат, негізгі жанр. Форма из восьми полей
+    """Атау, формат, негізгі жанр. Форма из восьми полей
     стояла между автором и первой строкой текста и спрашивала о работе,
     которой ещё нет: тег к ненаписанному рассказу не выбирается,
     аннотация к нему не пишется."""
@@ -294,7 +294,7 @@ class TheCreationFormAsksThreeThings(TestCase):
         self.assertContains(self.response, 'Жазуға кірісу')
 
     def test_status_is_not_asked_but_is_stated(self):
-        """BR-10: новое произведение — всегда черновик. Форма предлагала
+        """Новое произведение — всегда черновик. Форма предлагала
         `OnProcess` и `Completed` — оба публичные, причём «Аяқталды»
         стояло вариантом для работы с нулём бөлім. Убрать выбор мало:
         автор должен понимать, в каком состоянии окажется работа."""
@@ -322,7 +322,7 @@ class ManageStoryShowsTheWorkAndItsParts(TestCase):
     def test_it_names_this_work_its_status_and_every_chapter(self):
         """Бейдж показывает статус ЭТОЙ работы. Проверка искала
         «Жарияланды» и проходила по слову из разбивки в правом рейле — та
-        самая подмена, из-за которой рейл и убрали (DEC-48)."""
+        самая подмена, из-за которой рейл и убрали."""
         login_as(self.client)
         response = self.client.get(
             reverse('core:manage_story', kwargs={'slug': self.SLUG}))
@@ -373,7 +373,7 @@ class ManageStoryShowsTheWorkAndItsParts(TestCase):
 
 
 class TheWorkspaceMergesListAndEditor(TestCase):
-    """11.1b (AUDIT-WRITE-FLOW): `manage_story` и `chapter_edit`/
+    """`manage_story` и `chapter_edit`/
     `chapter_new` рендерят одно тело (`partials/write/workspace_body.html`)
     — список глав и редактор активной главы на одном экране, не два
     отдельных шаблона с половиной разметки, повторённой один в один."""
@@ -505,7 +505,7 @@ class TheWorkspaceMergesListAndEditor(TestCase):
 
 
 class TheMobileLayoutTabsInsteadOfStacking(TestCase):
-    """11.4 (AUDIT-WRITE-FLOW): на узком экране чек-лист, редактор и
+    """На узком экране чек-лист, редактор и
     список глав переключаются вкладками (`x-data`), а не идут одна под
     другой длинной прокруткой. С `lg` все три показаны разом — вкладки
     только прячут/показывают то, что и так есть в разметке."""
@@ -524,7 +524,7 @@ class TheMobileLayoutTabsInsteadOfStacking(TestCase):
         self.assertContains(response, 'lg:order-1 lg:block" :class="tab === \'chapters\'')
 
     def test_no_aria_tablist_role_is_claimed(self):
-        """DEC-15: `role="tablist"`/`role="tab"`/`aria-selected` обещают
+        """`role="tablist"`/`role="tab"`/`aria-selected` обещают
         скринридеру клавиатурную раскладку табов, которой тут нет —
         только три кнопки, переключающие видимость. Тот же разбор, что
         уже привёл к правке `segmented_control.html`."""
@@ -596,7 +596,7 @@ class NewStoryCreatesADraft(TestCase):
         self.assertEqual(len(slugs), 2)
 
     def test_missing_required_field_returns_the_form_not_an_empty_page(self):
-        """BR-77. Здесь стоял `assertRedirects` — то есть тест закреплял
+        """Здесь стоял `assertRedirects` — то есть тест закреплял
         саму потерю ввода: у редиректа нет тела, и набранное пропадало
         вместе с ним."""
         before = Story.objects.count()
@@ -623,7 +623,7 @@ class NewStoryCreatesADraft(TestCase):
         self.assertEqual(Story.objects.count(), before)
 
     def test_a_pile_of_empty_drafts_hits_a_ceiling(self):
-        """M2/BR-88: ничем не ограниченное создание заводило горы черновиков
+        """Ничем не ограниченное создание заводило горы черновиков
         — 25 POST подряд давали 25 работ. Опубликованное или поданное на
         модерацию в потолок не идёт — считаются только `NotPublished`, и
         корпус уже даёт автору один такой (`aidana-kus`)."""
@@ -686,7 +686,7 @@ class OwnershipIsEnforced(TestCase):
     def test_manage_story_of_a_foreign_slug_is_not_found(self):
         # M6/M8: раньше чужой слаг рисовал ту же карточку «табылмады» кодом
         # 200, что и у вошедшего гостя на любую страницу, — теперь у уже
-        # вошедшего это настоящий 404 (BR-89), а auth_gate остаётся у гостя.
+        # вошедшего это настоящий 404, а auth_gate остаётся у гостя.
         r = self.client.get(
             reverse('core:manage_story', kwargs={'slug': self.foreign.slug}))
         self.assertEqual(r.status_code, 404)
@@ -714,7 +714,7 @@ class OwnershipIsEnforced(TestCase):
         self.assertTrue(Story.objects.filter(pk=self.foreign.pk).exists())
 
     def test_a_foreign_chapter_id_is_not_editable_deletable_or_movable(self):
-        """S5/BR-83: адрес кабинета — `pk`, но `pk` чужой главы своей
+        """Адрес кабинета — `pk`, но `pk` чужой главы своей
         работой всё равно не находится."""
         foreign_chapter = self.foreign.chapter_set.first()
         if foreign_chapter is None:

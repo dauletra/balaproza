@@ -1,7 +1,7 @@
-"""Каталог, поиск, жанры, теги и жинақтар (DEC-27, DEC-36, DEC-65).
+"""Каталог, поиск, жанры, теги и жинақтар.
 
 Один движок на три режима: `/genres/<slug>/`, `/tag/<slug>/` и `/catalog/`.
-Поиск (DEC-65, отменяет часть DEC-27) — не отдельный режим, а обычный `?q=`
+Поиск — не отдельный режим, а обычный `?q=`
 на `/catalog/`: до публичного запуска отдельная entry-страница ради SEO не
 стоила двух копий одного движка и разного chrome вокруг одной и той же
 выдачи. `/search/` остаётся рабочим адресом — редиректом на `/catalog/`.
@@ -32,30 +32,30 @@ _EMPTY = {
 }
 
 # Сколько карточек на страницу: двадцать — четыре полных ряда по пять, то
-# есть экран с небольшим запасом на прокрутку (NFR-13).
+# есть экран с небольшим запасом на прокрутку.
 PAGE_SIZE = 20
 
 
 def _accepted_tag(slug: str):
-    """Тег, если он есть и прошёл модератора (BR-TAG-07)."""
+    """Тег, если он есть и прошёл модератора."""
     tag = data.tag_by_slug(slug) if slug else None
     return tag if (tag and tag.status == 'accepted') else None
 
 
 def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str = ''):
-    """Единая точка рендера унифицированного каталога (DEC-27)."""
+    """Единая точка рендера унифицированного каталога."""
     genre = data.genre_by_slug(genre_slug) if genre_slug else None
     tag = _accepted_tag(tag_slug)
     if mode == 'genre':
         _found_or_404(genre, f'Жанр «{genre_slug}» табылмады')
     if mode == 'tag':
-        # Pending-тег публично не существует (BR-TAG-07) — тот же ответ,
+        # Pending-тег публично не существует — тот же ответ,
         # что у выдуманного слага. Автору объяснять нечего: у его
         # собственного тега чип не ссылка, а подпись «проверкада».
         _found_or_404(tag, f'Тег «{tag_slug}» табылмады')
 
     # Вторая ось приходит query-параметром — но только если путь эту ось
-    # не занял. DEC-27 это описывал, а код параметр не читал и терял его.
+    # не занял. Раньше код этот параметр не читал и терял его.
     eff_genre = genre_slug if genre else ''
     if not eff_genre:
         candidate = request.GET.get('genre', '')
@@ -123,7 +123,7 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
         # `popular_tags` здесь не отдаётся: чипы тегов панели приходят
         # готовыми ссылками в `tag_options`, и второй список тех же тегов ни
         # один шаблон каталога не читает.
-        # Жинақтар (DEC-31) нужны ровно там, где сүзгі не дали результата:
+        # Жинақтар нужны ровно там, где сүзгі не дали результата:
         # пустой экран не должен быть тупиком с выходом только назад.
         'rail_collections':   data.all_collections()[:3],
         'empty_title':        empty_title,
@@ -138,7 +138,7 @@ def _render_catalog(request, *, mode: str, genre_slug: str = '', tag_slug: str =
 
 
 def search_results(request):
-    """Legacy-адрес (DEC-65): /search/?q=... живёт редиректом на /catalog/
+    """Legacy-адрес: /search/?q=... живёт редиректом на /catalog/
     с тем же querystring — старые ссылки и закладки не 404, а просто ведут
     туда же, куда теперь ведёт и шапка.
 
@@ -172,7 +172,7 @@ def genre_detail(request, slug):
 
 
 def tag_detail(request, slug):
-    """Каталог по UGC-тегу (docs/ui.md Phase 3, DEC-26+27). URL: /tag/<slug>/"""
+    """Каталог по UGC-тегу (docs/ui.md). URL: /tag/<slug>/"""
     return _render_catalog(request, mode='tag', tag_slug=slug)
 
 

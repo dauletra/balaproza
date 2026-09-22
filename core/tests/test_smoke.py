@@ -1,4 +1,4 @@
-"""Каркас портала: маршруты, вход, контекст, гейты, состояния DEC-17.
+"""Каркас портала: маршруты, вход, контекст, гейты, демо-состояния.
 
 Пять файлов сошлись сюда потому, что отвечают на один вопрос — **держится
 ли обвязка**. Ни один из них не про раздел: сломанный `{% url %}`,
@@ -29,7 +29,7 @@ PUBLIC_URLS = [
     # гостю — 200, проверено ниже отдельно, test_login_renders_for_a_guest.
     ('core:signup_success',    {},                                'auth/signup-success'),
     ('core:catalog',           {},                                'catalog'),
-    # search_results нет в этом списке: с DEC-65 это редирект (302), а не
+    # search_results нет в этом списке: это редирект (302), а не
     # страница — свой тест ниже, test_search_results_redirects_to_catalog.
     ('core:genre_index',       {},                                'genre-index'),
     ('core:genre_detail',      {'slug': 'fantastika'},            'genre-detail'),
@@ -40,7 +40,7 @@ PUBLIC_URLS = [
     ('core:my_stories',        {},                                'my-stories'),
     ('core:new_story',         {},                                'new-story'),
     # `manage_story`/`story_settings`/`chapter_new`/`chapter_edit` со
-    # слагом 'sample' здесь не стоят: с BR-89 они отвечают по-разному в
+    # слагом 'sample' здесь не стоят: они отвечают по-разному в
     # разных режимах (гостю — auth_gate 200, вошедшему без такой работы —
     # 404), а не одним 200 во всех трёх, — свой обход в
     # `test_write_pages_gate_guests_and_404_the_rest` ниже.
@@ -80,7 +80,7 @@ class EveryRouteRenders(TestCase):
         self.assertEqual(self.client.get(reverse('core:login')).status_code, 200)
 
     def test_search_results_redirects_to_catalog(self):
-        """DEC-65: /search/ — legacy-адрес, не страница. Старая ссылка с
+        """/search/ — legacy-адрес, не страница. Старая ссылка с
         запросом обязана довести до тех же результатов, а не потеряться."""
         response = self.client.get(reverse('core:search_results') + '?q=шам')
         self.assertRedirects(response, reverse('core:catalog') + '?q=шам')
@@ -98,7 +98,7 @@ class EveryRouteRenders(TestCase):
         self._walk('authored')
 
     def test_write_pages_gate_guests_and_404_the_rest(self):
-        """BR-89: кабинет автора отвечает гостю и вошедшему по-разному на
+        """Кабинет автора отвечает гостю и вошедшему по-разному на
         один и тот же несуществующий слаг — auth_gate (200) против 404,
         а не одним и тем же 200 для всех, как раньше (M4–M8)."""
         urls = [
@@ -149,7 +149,7 @@ class TemplateContext(TestCase):
 
     def test_the_greeting_uses_the_persons_own_name(self):
         """«Қайта қош келдің, aidana»: то же лақап аты, что видит читатель —
-        другого имени сайт не хранит (DEC-82)."""
+        другого имени сайт не хранит."""
         aidana = User.objects.get(username='aidana')
         ctx = auth_state(self._request_as(aidana))
         self.assertTrue(ctx['signed_in'])
@@ -180,7 +180,7 @@ class TemplateContext(TestCase):
 
     def test_school_links_reach_every_page_globally(self):
         """Ссылки «Авторлар мектебі» отдаёт глобальный контекст-процессор
-        (DEC-22) — их ждёт подвал на любой странице, в том числе у гостя."""
+         — их ждёт подвал на любой странице, в том числе у гостя."""
         for url in (reverse('core:home'), reverse('core:library')):
             with self.subTest(url=url):
                 response = self.client.get(url)
@@ -230,7 +230,7 @@ class GatedPagesExplainThemselves(TestCase):
 
 @override_settings(DEBUG=True)
 class DesignStatesAreOptIn(TestCase):
-    """`?state=loading|error` — леса DEC-17: пока данные приходят синхронно,
+    """`?state=loading|error` — леса: пока данные приходят синхронно,
     показать скелетон и ошибку больше нечем. Проверяется, что опт-ин
     работает и что мусорное значение не ломает страницу.
 
@@ -309,7 +309,7 @@ class MessagesReachTheToastHost(TestCase):
         self.assertNotIn('DOMContentLoaded', self._rendered_base())
 
     def test_the_host_stacks_on_the_left_not_over_the_action_bar(self):
-        """V4 (AUDIT-WRITE-FLOW): справа тост вставал ровно поверх
+        """Справа тост вставал ровно поверх
         «Сақтау»/«Болдырмау» — панели действий по проекту прижаты вправо
         (`justify-end`: new_story, story_settings, contest_submit)."""
         html = self._rendered_base()

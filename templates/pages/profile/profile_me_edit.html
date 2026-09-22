@@ -33,17 +33,17 @@
                     <input type="file" name="avatar" accept="image/*" class="sr-only">
                 </label>
                 <span class="font-sans text-xs text-slate-500">PNG/JPG/WEBP.</span>
-                {# Убрать без замены (BR-86) — см. тот же чекбокс у обложки. #}
+                {# Убрать без замены — см. тот же чекбокс у обложки. #}
                 {% if profile_user.avatar %}
                     {% include "components/checkbox.html" with name="remove_avatar" label="Фотоны алып тастау" %}
                 {% endif %}
             </div>
         </div>
 
-        {# ── Ник (BR-91): публичный адрес /u/<username>/ ── #}
+        {# ── Ник: публичный адрес /u/<username>/ ────────── #}
         {% include "components/input_field.html" with name="username" label="Қолданушы аты" value=profile_user.username required=True maxlength=30 hint="Профиль сілтемесі: qazaqnovel.kz/u/…/. Кіші әріп, сан, «_» — 3–30 таңба." %}
 
-        {# ── Авторлық аты (FR-AUTH-04) ── #}
+        {# ── Авторлық аты ─────────────── #}
         {% include "components/input_field.html" with name="pen_name" label="Авторлық атың" value=profile_user.pen_name required=True maxlength=60 %}
 
         {# ── Био ── #}
@@ -139,7 +139,7 @@
         </a>
     </div>
 
-    {# ── Қауіпті аймақ (FR-PROF-11, BR-95): жою — қайтарылмайды, кезеңі жоқ ── #}
+    {# ── Қауіпті аймақ: жою — қайтарылмайды, кезеңі жоқ ────────────────────── #}
     <div class="mt-8 flex flex-col items-start gap-3 rounded-hero border border-status-error-fg/30 bg-status-error-bg/40 p-6">
         <h2 class="font-display text-lg font-bold text-status-error-fg">Қауіпті аймақ</h2>
         <p class="font-sans text-sm text-slate-600">

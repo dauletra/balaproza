@@ -17,8 +17,8 @@ from core.models import ChapterReactionVote, PollVote, Story
 
 
 class ReactionsReplaceTheSingleLike(TestCase):
-    """FR-STORY-12 / DEC-32 / DEC-58: пять реакций вместо лайка. Кнопка
-    рендерится эмодзи без подписи (DEC-52), но доступное имя не теряется —
+    """Пять реакций вместо лайка. Кнопка
+    рендерится эмодзи без подписи, но доступное имя не теряется —
     оно стоит в aria-label вместе со счётом."""
 
     def setUp(self):
@@ -44,7 +44,7 @@ class ReactionsReplaceTheSingleLike(TestCase):
         self.assertEqual('jyladym', data.chapter_of(STORY_SLUG, 4).top_reaction.slug)
 
     def test_the_chapter_list_shows_counts_but_offers_no_button(self):
-        """Реакция требует прочтения (BR-REACT-04), поэтому ряд живёт
+        """Реакция требует прочтения, поэтому ряд живёт
         только под текстом главы."""
         first = data.chapter_of(STORY_SLUG, 1)
         self.assertTrue(first.likes, 'нужна глава с реакциями для проверки')
@@ -53,9 +53,9 @@ class ReactionsReplaceTheSingleLike(TestCase):
 
 
 class ChapterReactionVoting(TestCase):
-    """BR-REACT-02/03 (Ф15, Этап 3): реакция ставится, повтор снимает,
+    """Реакция ставится, повтор снимает,
     другой вид заменяет; Story.likes — агрегат по числу голосов, а не по
-    сумме реакций (BR-14a) — смена вида его не трогает."""
+    сумме реакций — смена вида его не трогает."""
 
     CHAPTER = 1
 
@@ -155,7 +155,7 @@ class ChapterReactionVoting(TestCase):
 
 
 class ChapterPollStates(TestCase):
-    """FR-STORY-13 / DEC-33: необязательный опрос автора под главой."""
+    """Необязательный опрос автора под главой."""
 
     OPEN_CHAPTER = 12    # последняя вышедшая — ответа ещё нет
     CLOSED_CHAPTER = 3   # следующая глава вышла, опрос закрыт
@@ -193,9 +193,9 @@ class ChapterPollStates(TestCase):
         self.assertNotContains(signed_in, 'Жауап беру үшін')
 
     def test_a_chapter_without_a_poll_shows_nothing_at_all(self):
-        """Опрос необязателен — его отсутствие не пустое состояние
-        (BR-POLL-01). Декоративный блок из трёх захардкоженных вариантов,
-        одинаковых на всех произведениях, снят DEC-33."""
+        """Опрос необязателен — его отсутствие не пустое состояние.
+ Декоративный блок из трёх захардкоженных вариантов,
+        одинаковых на всех произведениях, снят."""
         self.assertIsNone(data.poll_of(STORY_SLUG, 5))
         self.assertNotContains(self._get(5), 'Автордың сұрағы')
         first = self._get(1)
@@ -205,7 +205,7 @@ class ChapterPollStates(TestCase):
 
 class ChapterPollVoting(TestCase):
     """Ф15 Этап 4: голос в открытом опросе — один на опрос, не меняется
-    (BR-POLL-*); закрытый опрос голос не принимает (BR-POLL-05)."""
+    закрытый опрос голос не принимает."""
 
     OPEN_CHAPTER = 12    # последняя вышедшая — ответа ещё нет
     CLOSED_CHAPTER = 3   # следующая глава вышла, опрос закрыт

@@ -117,7 +117,7 @@ class CommentMenu(TestCase):
 
 
 class CommentLike(TestCase):
-    """BR-31: лайк комментария переключается (Ф15, POST), гость уходит на логин."""
+    """Лайк комментария переключается (Ф15, POST), гость уходит на логин."""
 
     def test_a_guest_sees_the_button_and_is_gated_to_login(self):
         response = self.client.get(
@@ -154,7 +154,7 @@ class CommentLike(TestCase):
 
 
 class CommentReplies(TestCase):
-    """BR-30: один уровень ответов — на ответ ответить нельзя."""
+    """Один уровень ответов — на ответ ответить нельзя."""
 
     def test_the_reply_form_belongs_to_the_signed_in(self):
         url = reverse('core:story_detail', kwargs={'slug': STORY_SLUG})
@@ -222,7 +222,7 @@ class CommentCreatePersists(TestCase):
 
     def test_a_forged_parent_an_empty_text_and_a_guest_save_nothing(self):
         url = reverse('core:comment_create', kwargs={'slug': self.SLUG})
-        # BR-30: ответ сам уже на верхнем уровне не лежит, одна вложенность.
+        # Ответ сам уже на верхнем уровне не лежит, одна вложенность.
         existing_reply = next(c.replies[0]
                               for c in data.comments_of_chapter(self.SLUG, 3)
                               if c.replies)

@@ -42,7 +42,7 @@
         </div>
     </dl>
 
-    {# Подписка (FR-PROF-04) — настоящий POST, тот же маршрут, что в шапке профиля #}
+    {# Подписка — настоящий POST, тот же маршрут, что в шапке профиля #}
     {% if not signed_in %}
         <a href="{% url 'core:login' %}?next={{ request.get_full_path|urlencode }}"
            class="mt-4 flex h-11 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 font-sans text-sm font-semibold text-slate-700 hover:border-brand hover:text-brand">

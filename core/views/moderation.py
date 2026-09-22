@@ -1,13 +1,13 @@
-"""Раздел модерации (FR-MOD-*, DEC-71).
+"""Раздел модерации.
 
 Раньше это были действия в списке админки. Решение они принимали, но
 работу модератора не поддерживали: текст лежал инлайном глав — номерами,
 повторная подача была неотличима от первой, очередь не приоритизировалась,
 и двое, открывшие одну работу, узнавали друг о друге по результату.
 
-Доступ — `is_staff`, и отказ здесь **404, а не 403** (BR-82): существование
+Доступ — `is_staff`, и отказ здесь **404, а не 403**: существование
 раздела не подтверждается тому, кому он не открыт, ровно как и чужой
-черновик (BR-76).
+черновик.
 """
 
 from functools import wraps
@@ -45,7 +45,7 @@ def moderator_only(view):
 
 @moderator_only
 def moderation_queue(request):
-    """Очередь: что ждёт решения и с чего начать (FR-MOD-01)."""
+    """Очередь: что ждёт решения и с чего начать."""
     user = _current_user(request)
     kind = request.GET.get('kind', '')
     if kind not in QUEUE_FILTER_KEYS:
@@ -77,7 +77,7 @@ def moderation_queue(request):
 @moderator_only
 def moderation_detail(request, slug):
     """Карточка решения: текст, сравнение с опубликованным, история и три
-    исхода (FR-MOD-02…05)."""
+    исхода."""
     story = data.story_for_moderation(slug)
     if story is None:
         raise Http404(f'Шығарма «{slug}» табылмады')
@@ -97,7 +97,7 @@ def moderation_detail(request, slug):
         'claim':      getattr(story, 'claim', None),
         'viewer':     _current_user(request),
         # Работа могла быть отозвана автором, пока модератор читал: решать
-        # нечего, и три кнопки об этом молчали бы (BR-79).
+        # нечего, и три кнопки об этом молчали бы.
         'has_pending': bool(submitted),
     })
 
@@ -105,7 +105,7 @@ def moderation_detail(request, slug):
 @moderator_only
 @require_POST
 def moderation_claim(request, slug):
-    """Взять работу в работу или отпустить (BR-82)."""
+    """Взять работу в работу или отпустить."""
     story = data.story_for_moderation(slug)
     if story is None:
         raise Http404(f'Шығарма «{slug}» табылмады')
@@ -125,7 +125,7 @@ def moderation_claim(request, slug):
 @moderator_only
 @require_POST
 def moderation_decide(request, slug):
-    """Решение по поданному тексту (BR-11, BR-79, BR-82).
+    """Решение по поданному тексту.
 
     Причина отрицательного исхода обязательна — её проверяет и
     `apply_moderation`, но сообщение отсюда адресно и возвращает на ту же
@@ -216,7 +216,7 @@ def held_comment_decide(request, pk):
     return redirect('core:moderation_comments')
 
 
-# ───────────────────── Жалобы (BR-33, FR-STORY-09) ────────────────────────
+# ───────────────────── Жалобы ─────────────────────────────────────────────
 
 @moderator_only
 def reports_queue(request):
@@ -232,7 +232,7 @@ def reports_queue(request):
 @moderator_only
 @require_POST
 def report_resolve(request, pk):
-    """Шешім: «бұзушылық жоқ» немесе контентті алып тастау (BR-33).
+    """Шешім: «бұзушылық жоқ» немесе контентті алып тастау.
 
     Алып тастауға себеп міндетті — `Story.take_down`/`resolve_report`
     соны талап етеді; бос қалса, `ValueError` осында ұсталады, дәл

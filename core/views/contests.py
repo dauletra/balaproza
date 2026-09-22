@@ -1,4 +1,4 @@
-"""Конкурсы: список, страница, подача, свои заявки (FR-CONT-*)."""
+"""Конкурсы: список, страница, подача, свои заявки."""
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -12,11 +12,11 @@ from .common import _current_user, _found_or_404, _page_state
 # ───────────────────────── CONT — конкурсы ───────────────────────────────
 def contest_list(request):
     return render(request, 'pages/contests/contest_list.html', {
-        # DEC-17 требует состояний на всех data-зависимых страницах, и
+        # Состояния нужны всем страницам, зависящим от данных, и
         # раздел конкурсов был единственным, где их не было ни на одной.
         'page_state':        _page_state(request),
         # Секций по-прежнему две, но «идущий» больше не значит «принимает
-        # заявки»: точную фазу называет бейдж на карточке (DEC-45).
+        # заявки»: точную фазу называет бейдж на карточке.
         'active_contests':   data.open_contests(),
         'finished_contests': data.finished_contests(),
     })
@@ -28,7 +28,7 @@ PICKER_SEARCH_FROM = 8
 
 
 def _contest_rail_has_content(contest, *, submitted: bool, hide_cta: bool) -> bool:
-    """Есть ли что показать в правом рейле конкурса (DEC-25). Флаг ставится
+    """Есть ли что показать в правом рейле конкурса. Флаг ставится
     по наличию данных: у завершённого конкурса рейл пуст, а пустая колонка
     в 300px не пустует — она сдвигает контент от центра."""
     if contest.current_stage or contest.next_stage:
@@ -48,14 +48,14 @@ def contest_detail(request, slug):
         'page_state':     _page_state(request),
         'slug':           slug,
         'contest':        contest,
-        # Общие правила приходят из одного реестра (BR-48a), а не
+        # Общие правила приходят из одного реестра, а не
         # переписываются в `conditions` каждого конкурса.
         'common_rules':   data.common_rules(contest) if contest else [],
         # Присуждения, а не просто работы: строка победителя называет
-        # номинацию, а её знает только грант (DEC-46).
+        # номинацию, а её знает только грант.
         'grants':         contest.grants if contest else [],
         # Все допущенные работы, не только победители — «список
-        # участников» после описания (BR-74a решает видимость).
+        # участников» после описания; видимость решает сам конкурс.
         'participants':   data.contest_participants(contest) if contest else [],
         'already_submitted': submitted,
     })
@@ -67,7 +67,7 @@ def contest_submit(request, slug):
     user = _current_user(request)
 
     if request.method == 'POST' and user and contest:
-        # Кандидаты — те же публичные работы автора, что и на GET (BR-10):
+        # Кандидаты — те же публичные работы автора, что и на GET:
         # чужой или непубличный слаг здесь не найдётся, и отдельной
         # проверки владения форме не нужно.
         candidates = {c['story'].slug: c['story']
@@ -87,8 +87,8 @@ def contest_submit(request, slug):
             if created:
                 messages.success(request, 'Өтінім жіберілді.')
             else:
-                # Екінші рет басу немесе тікелей POST — BR-23 бір автордан
-                # бір өтінім алдын ала тексерілсе де, жарыс жағдайынан.
+                # Екінші рет басу немесе тікелей POST: бір автордан бір өтінім
+                # алдын ала тексерілсе де, жарыс жағдайы қалады.
                 messages.error(request, 'Сен бұл байқауға өтінім бергенсің.')
         return redirect('core:contest_submit', slug=slug)
 
@@ -99,7 +99,7 @@ def contest_submit(request, slug):
     candidates = data.submission_candidates(user, contest) if contest else []
 
     # Выбранная по умолчанию — первая без заметок, иначе просто первая:
-    # форма ничего не отклоняет (BR-24), но начинать выбор с работы, о
+    # форма ничего не отклоняет, но начинать выбор с работы, о
     # которой есть что сказать, незачем.
     preview = next((c for c in candidates if not c['notes']),
                    candidates[0] if candidates else None)
@@ -109,7 +109,7 @@ def contest_submit(request, slug):
         if preview and contest else []
     )
     # Чек-лист зависит от выбранной работы, а выбор меняется в браузере:
-    # пересчёт идёт на стороне клиента, из этой таблицы (FR-CONT-04).
+    # пересчёт идёт на стороне клиента, из этой таблицы.
     volumes = {}
     for item in candidates:
         # Объём уже посчитан в `submission_candidates` — передаём его, а не
@@ -170,7 +170,7 @@ def my_submissions(request):
 @require_POST
 @login_required
 def contest_withdraw(request, slug):
-    """Отзыв заявки (BR-23b). Условие проверяет `data.withdraw_submission`
+    """Отзыв заявки. Условие проверяет `data.withdraw_submission`
     заново: `can_withdraw` на странице решает только, показать ли кнопку."""
     user = request.user
     contest = data.contest_by_slug(slug)

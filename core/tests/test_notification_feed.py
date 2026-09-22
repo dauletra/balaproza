@@ -5,8 +5,8 @@
 его увидит, прочтёт и попадёт по нему туда, куда обещано.
 
 Два правила держат почти весь файл: **хранится момент, выводится
-подпись** (BR-70a) и **уведомление ведёт к своему предмету и не
-переписывает его имя** (BR-72a).
+подпись** и **уведомление ведёт к своему предмету и не
+переписывает его имя**.
 """
 
 
@@ -97,8 +97,8 @@ class NotificationFeed(TestCase):
         for bucket in ('Бүгін', 'Кеше', 'Өткен аптада'):
             with self.subTest(bucket=bucket):
                 self.assertContains(self.response, bucket)
-        # `like` больше не говорит «ұнатты»: DEC-32 заменил одиночный лайк
-        # главы пятью реакциями. Модерация называет исход, а не раздел.
+        # `like` больше не говорит «ұнатты»: одиночный лайк главы
+        # давно заменён пятью реакциями. Модерация называет исход, а не раздел.
         for words in ('пікір қалдырды', 'реакция қалдырды', 'саған жазылды',
                       'жаңа бөлім', 'Модерацияда', 'Байқау'):
             with self.subTest(words=words):
@@ -131,7 +131,7 @@ class NotificationFeed(TestCase):
 
     @override_settings(DEBUG=True)
     def test_the_header_says_nothing_about_data_that_is_not_on_screen(self):
-        """DEC-17: шапка стояла выше ветвления по `page_state`, и в
+        """Шапка стояла выше ветвления по `page_state`, и в
         `?state=error` страница сообщала «жүктеу мүмкін болмады» и
         «4 оқылмаған» — с рабочей кнопкой «оқылды деп белгілеу».
 
@@ -154,10 +154,10 @@ class NotificationFeed(TestCase):
 
 
 class NotificationTimeIsDerived(TestCase):
-    """Время выводится из момента, а не хранится строкой (BR-70a).
+    """Время выводится из момента, а не хранится строкой.
 
     Хранимые `when="5 күн бұрын"` и `bucket="past_week"` устаревали на
-    следующий день — тот же класс ошибки, что `days_left=12` до DEC-45,
+    следующий день — тот же класс ошибки, что хранимый `days_left=12`,
     только незаметнее: лента выглядит правдоподобной всегда.
     """
 
@@ -176,7 +176,7 @@ class NotificationTimeIsDerived(TestCase):
                     _notification(kind='like', days_ago=days).bucket, expected)
 
     def test_older_than_a_week_is_neither_shown_nor_counted(self):
-        """Групп три; четвёртой «раньше» в FR-NOTIF-01 нет.
+        """Групп три; четвёртой, «раньше», нет вовсе.
 
         Значит, событие старше недели в ленту не попадает — и в бейдж
         тоже, иначе шапка звала бы на страницу, где его нет.
@@ -205,7 +205,7 @@ class NotificationTimeIsDerived(TestCase):
 
 
 class NotificationsLeadSomewhere(TestCase):
-    """Уведомление ведёт к своему предмету (FR-NOTIF-05, BR-72a).
+    """Уведомление ведёт к своему предмету.
 
     Конкурсное событие знало о конкурсе только по имени внутри `text`
     и потому не вело никуда: прочитав «шорт-лист басталды», автор шёл
@@ -221,7 +221,7 @@ class NotificationsLeadSomewhere(TestCase):
         """Куда приводит клик по уведомлению.
 
         Ссылка ведёт не прямо на предмет, а через `notification_open`: по
-        BR-71 метку «непрочитано» снимает именно открытие. Проверяется
+        метку «непрочитано» снимает именно открытие. Проверяется
         поэтому конечная точка, а не строка адреса в разметке, — заодно
         это ловит и саму таблицу соответствий `notification_href`.
         """
@@ -245,7 +245,7 @@ class NotificationsLeadSomewhere(TestCase):
         for notification in moderation:
             with self.subTest(story=notification.story.slug):
                 # Работа на модерации не публична — вести на неё можно
-                # только в авторский кабинет (BR-73).
+                # только в авторский кабинет.
                 self.assertRedirects(
                     self._opens_at(notification),
                     reverse('core:manage_story',
@@ -255,7 +255,7 @@ class NotificationsLeadSomewhere(TestCase):
         """Имя предмета берётся у предмета, а не переписывается литералом.
 
         Второй литерал разошёлся бы с первым ровно так же, как хранимый
-        `Author.works` разошёлся с числом произведений (DEC-40).
+        `Author.works` разошёлся с числом произведений.
         """
         for notification in _aidana_notifications():
             if notification.kind == 'comment':
@@ -268,7 +268,7 @@ class NotificationsLeadSomewhere(TestCase):
                     self.assertNotIn(notification.story.title, notification.text)
 
     def test_the_deadline_is_counted_by_the_contest(self):
-        """FR-NOTIF-06: срок считает конкурс, а не текст уведомления."""
+        """Срок считает конкурс, а не текст уведомления."""
         contest = data.contest_by_slug('bolashak-mektebi')
         line = timing_line(contest.phase, contest.opens_on,
                            contest.closes_on, contest.results_on)
@@ -277,13 +277,13 @@ class NotificationsLeadSomewhere(TestCase):
 
 
 class ModerationNotificationNamesItsOutcome(TestCase):
-    """Исход модерации хранится и назван словом (BR-11).
+    """Исход модерации хранится и назван словом.
 
     Поля не было вовсе: и одобрение, и отказ, и «ещё идёт» приходили
     одной строкой с зелёной галкой. Выводить исход из `Story.status`
     нельзя — статус живёт дальше события: автор правит работу и шлёт её
     снова, и вчерашний отказ начал бы говорить «Модерацияда». Тот же
-    довод, по которому DEC-46 хранит `AwardGrant`.
+    довод, по которому конкурсная награда хранится актом `AwardGrant`.
     """
 
     def setUp(self):
@@ -320,7 +320,7 @@ class ModerationNotificationNamesItsOutcome(TestCase):
                                  'работа не прошла модерацию и при этом публична')
 
     def test_a_negative_outcome_carries_a_reason(self):
-        """BR-11: автор узнаёт, что именно исправить.
+        """Автор узнаёт, что именно исправить.
 
         Без причины «Толықтыру қажет» сообщает ровно столько же, сколько
         «Қабылданбады», — то есть ничего, кроме факта неудачи.
@@ -357,7 +357,7 @@ class ModerationNotificationNamesItsOutcome(TestCase):
         # docs/ui.md: «толықтыру қажет» — приглашение, а не приговор.
         # Пока оба отрицательных исхода были одним `rejected`, возврат на
         # доработку приходил под красным `status-error` — токеном,
-        # подписанным «Отказ и удаление» (DEC-39).
+        # подписанным «Отказ и удаление».
         branch = chip.split("n.outcome == 'needs_work'", 1)[1].split('{% el', 1)[0]
         self.assertNotIn('status-error', branch)
         self.assertIn('status-warning', branch)
@@ -383,11 +383,11 @@ class ModerationNotificationNamesItsOutcome(TestCase):
 class NotificationChipFollowsTheRegistry(TestCase):
     """Иконку выбирают по значению, а не по наличию формы (docs/ui.md).
 
-    Конкурс носил `bookmark-filled` — глиф, который по DEC-09b означает
+    Конкурс носил `bookmark-filled` — глиф, который означает
     активное «сохранено» и стоит на текущей главе и на кнопке «сақталды».
     Модерация носила `check`: галка утверждает «одобрено», хотя событие
     бывает отказом и ожиданием. Лайк носил пару `status-error-*` — токен,
-    подписанный в `@theme` как «Отказ и удаление (DEC-39)».
+    подписанный в `@theme` как «Отказ и удаление».
     """
 
     def setUp(self):
@@ -409,7 +409,7 @@ class NotificationChipFollowsTheRegistry(TestCase):
         html = self.client.get(reverse('core:notifications')).content.decode()
         self.assertIn('icon-trophy', html)
         self.assertNotIn('bookmark', chip,
-                         'залитая закладка по DEC-09b значит «сохранено»')
+                         'залитая закладка значит «сохранено»')
         self.assertIn('icon-shield', html)
         self.assertNotIn('name="check"', chip,
                          'галка утверждает «одобрено» независимо от исхода')
@@ -418,7 +418,7 @@ class NotificationChipFollowsTheRegistry(TestCase):
                 self.assertIn(f"n.kind == '{kind}'", chip)
 
     def test_the_reaction_borrows_neither_the_error_token_nor_a_single_face(self):
-        """`heart-filled` после DEC-32 — реакция «Жүрегім», одна из пяти.
+        """`heart-filled` — реакция «Жүрегім», одна из пяти.
 
         Совокупность в проекте уже подписана контурным `heart`: им помечен
         `Chapter.likes` в списке глав, а это сумма всех пяти.
@@ -466,7 +466,7 @@ class NotificationChipFollowsTheRegistry(TestCase):
 
 
 class ReadingANotificationClearsIt(TestCase):
-    """«Непрочитано» снимает открытие уведомления (BR-71).
+    """«Непрочитано» снимает открытие уведомления.
 
     Метку не выставлял никто, кроме сида: колокольчик в шапке навсегда
     показывал число из демо-данных, а кнопка «Барлығын оқылды деп
@@ -525,7 +525,7 @@ class ReadingANotificationClearsIt(TestCase):
 
 
 class NotificationsReachableWithoutDesktopHeader(TestCase):
-    """Раздел открывается с телефона (FR-NOTIF-02).
+    """Раздел открывается с телефона.
 
     Единственная ссылка на уведомления лежала внутри `hidden … md:flex` —
     десктопного кластера шапки. В mobile bottom nav уведомлений нет

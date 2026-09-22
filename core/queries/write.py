@@ -45,8 +45,8 @@ def _unique_story_slug(title: str, *, exclude_pk=None) -> str:
 
 
 def create_story(author, *, title: str, format: str, genre_primary) -> Story:
-    """Новый черновик (FR-WRITE-01). Статус всегда `NotPublished` — автор
-    не выбирает его на создании (BR-10)."""
+    """Новый черновик. Статус всегда `NotPublished` — автор
+    не выбирает его на создании."""
     return Story.objects.create(
         slug=_unique_story_slug(title), title=title, author=author,
         primary_genre=genre_primary, format=format, status='NotPublished',
@@ -57,17 +57,17 @@ def update_story_settings(story, *, title: str, annotation: str, format: str,
                           genre_primary, genre_secondary, audience: str,
                           status: str, cover, remove_cover: bool = False,
                           tag_names) -> Story:
-    """Сохранить баптаулар (FR-WRITE-04).
+    """Сохранить баптаулар.
 
     `status` и `cover` — пусто значит «не меняем»: радио статуса рендерится
-    только для публичного сериала (BR-10a), а файл обложки автор не
+    только для публичного сериала, а файл обложки автор не
     выбирает при каждом сохранении настроек. `remove_cover` — третье
-    состояние (BR-86): явно убрать обложку, не заменяя её другой. Новый
+    состояние: явно убрать обложку, не заменяя её другой. Новый
     файл важнее снятия — отмеченный чекбокс рядом с выбранным файлом
     значения не имеет.
     """
     if title != story.title and not story.is_public:
-        # Слаг живёт названием, пока у работы нет читателя (M1, BR-87):
+        # Слаг живёт названием, пока у работы нет читателя (M1):
         # переименованная до публикации живёт по адресу первого черновика
         # иначе — постоянного адреса ещё ни у кого нет, менять нечего. После
         # первой опубликованной главы название и адрес расходятся насовсем:
@@ -79,10 +79,10 @@ def update_story_settings(story, *, title: str, annotation: str, format: str,
     story.primary_genre = genre_primary
     story.secondary_genre = genre_secondary
     story.audience = audience
-    # Радио «Мәртебесі» больше не пишет статус — статус выводится из глав
-    # (BR-79). Оно отвечает на единственный вопрос, который в нём и был:
+    # Радио «Мәртебесі» больше не пишет статус — статус выводится из глав.
+    # Оно отвечает на единственный вопрос, который в нём и был:
     # дописана работа или продолжается. Пусто значит «не меняем» — радио
-    # рендерится только публичному сериалу (BR-10a).
+    # рендерится только публичному сериалу.
     if status:
         story.completed_by_author = status == 'Completed'
     if cover:
@@ -96,7 +96,7 @@ def update_story_settings(story, *, title: str, annotation: str, format: str,
 
 
 def chapter_by_id(story, chapter_id):
-    """Глава этой работы по `pk` — стабильный адрес кабинета (BR-83).
+    """Глава этой работы по `pk` — стабильный адрес кабинета.
 
     Фильтр идёт через `story.chapter_set`, а не голый `Chapter.objects`:
     чужой `pk` той же дорогой не находится (IDOR) — так же, как
@@ -117,7 +117,7 @@ def _next_chapter_slot(story) -> int:
 
 
 def _touch_story(story) -> None:
-    """Написание главы — правка работы (S4, AUDIT-WRITE-FLOW): без этого
+    """Написание главы — правка работы: без этого
     автор, писавший часами через автосохранение, не поднимался в списке
     кабинета «что трогал последним» (`latest_edited()` смотрит на
     `Story.updated_at`, а `Chapter.save()` его не трогает).
@@ -131,7 +131,7 @@ def _touch_story(story) -> None:
 
 
 def _resolve_chapter_id(story, chapter_id):
-    """Куда на самом деле пишет `chapter_id is None` (BR-85).
+    """Куда на самом деле пишет `chapter_id is None`.
 
     У `single` глава ровно одна: прямой POST на `/chapter/new/` в обход
     интерфейса не должен заводить вторую — он дописывает существующую.
@@ -148,7 +148,7 @@ def _resolve_chapter_id(story, chapter_id):
 def save_chapter(story, chapter_id, *, title: str, body: str,
                  poll_question: str = '', poll_options=()) -> Chapter:
     """Сохранить главу вместе с её опросом — новую (`chapter_id=None` берёт
-    следующий номер) или существующую, по `pk` (BR-83).
+    следующий номер) или существующую, по `pk`.
 
     Одна дверь и одна транзакция, потому что для автора это одно действие:
     он нажал «сохранить». Порознь они означали бы состояние «глава есть,
@@ -174,7 +174,7 @@ def save_chapter(story, chapter_id, *, title: str, body: str,
 
 
 def autosave_chapter(story, chapter_id, *, title: str, body: str) -> Chapter | None:
-    """Автосохранение черновика главы (BR-78).
+    """Автосохранение черновика главы.
 
     Отдельная дверь от `save_chapter`, потому что у автосохранения другие
     обязанности. Оно не трогает опрос — тот автор правит осознанно, и
@@ -182,7 +182,7 @@ def autosave_chapter(story, chapter_id, *, title: str, body: str) -> Chapter | N
     может не быть, нельзя. И оно не требует законченности: пустой
     заголовок посреди набора — состояние, а не ошибка.
 
-    `None` — если `chapter_id` не находится в этой работе (BR-83): чужой
+    `None` — если `chapter_id` не находится в этой работе: чужой
     или устаревший id не заводит главу заново, вызывающая сторона отвечает
     404, а не тихо создаёт дубль.
 
@@ -221,8 +221,8 @@ def autosave_chapter(story, chapter_id, *, title: str, body: str) -> Chapter | N
 
 
 def _remap_comment_chapter_numbers(story, mapping: dict[int, int]) -> None:
-    """Перевести `StoryComment.chapter_number` вслед за пересчётом номеров
-    (BR-84). Комментарий швартуется к номеру, а не к `pk` главы, и без
+    """Перевести `StoryComment.chapter_number` вслед за пересчётом номеров.
+ Комментарий швартуется к номеру, а не к `pk` главы, и без
     этого перестановка сдвигала бы комментарии на чужой текст: правка
     первой главы главой номер два делает старый комментарий про вторую
     выглядящим так, будто он про то, что раньше было третьей.
@@ -248,7 +248,7 @@ def _remap_comment_chapter_numbers(story, mapping: dict[int, int]) -> None:
 @transaction.atomic
 def _renumber_chapters(story) -> None:
     """Пересчитать `number`/`position` контигом 1..N по текущему порядку
-    (BR-84) — после удаления главы или перестановки соседних.
+     — после удаления главы или перестановки соседних.
 
     Двухпроходный `bulk_update`: `unique(story, number)` не отложен
     (Postgres проверяет его посуше, а не в конце транзакции), и прямая
@@ -272,7 +272,7 @@ def _renumber_chapters(story) -> None:
 
 
 def delete_chapter(story, chapter_id) -> bool:
-    """Удалить главу автора (BR-84) — безвозвратно, как и всю работу
+    """Удалить главу автора — безвозвратно, как и всю работу
     («Қауіпті аймақ» в `manage_story.html`). Оставшиеся смыкаются в контиг,
     статус работы пересчитывается — удаление последней главы, например,
     возвращает её в черновик.
@@ -281,7 +281,7 @@ def delete_chapter(story, chapter_id) -> bool:
     они разбирали, ушёл, но не мнение о нём. Они становятся общими
     (`chapter_number=None`), той же категории, что и комментарий ко всему
     произведению, а не молча переезжают на главу, занявшую освободившийся
-    номер (BR-84)."""
+    номер."""
     chapter = story.chapter_set.filter(pk=chapter_id).first()
     if chapter is None:
         return False
@@ -297,7 +297,7 @@ def delete_chapter(story, chapter_id) -> bool:
 
 
 def move_chapter(story, chapter_id, direction: str) -> bool:
-    """Переставить главу с соседом (BR-84). No-op на границе списка и на
+    """Переставить главу с соседом. No-op на границе списка и на
     неизвестном `direction` — кнопки вверх/вниз сами не рисуются на
     границах, но прямой POST не должен падать."""
     chapters = list(story.chapter_set.order_by('position', 'id'))
@@ -319,7 +319,7 @@ def move_chapter(story, chapter_id, direction: str) -> bool:
 
 
 def _save_poll(chapter, question: str, option_texts) -> None:
-    """Опрос под главой (FR-STORY-13, BR-POLL-01/02).
+    """Опрос под главой.
 
     Пустой `question` — убрать опрос, если он был: автор передумал, и это
     законный исход, а не ошибка. Варианты не обновляются по одному — опрос
@@ -340,7 +340,7 @@ def _save_poll(chapter, question: str, option_texts) -> None:
 
 @transaction.atomic
 def withdraw_story_from_review(story) -> int:
-    """Отозвать поданное с модерации (BR-80).
+    """Отозвать поданное с модерации.
 
     Ревизия не удаляется, а возвращается в `draft`: это по-прежнему снимок
     текста, просто больше не заявка. Опубликованного отзыв не касается —
@@ -357,7 +357,7 @@ def withdraw_story_from_review(story) -> int:
 
 @transaction.atomic
 def submit_story_for_review(story) -> int:
-    """Отправить на модерацию **то, что изменилось** (FR-WRITE-09, BR-79).
+    """Отправить на модерацию **то, что изменилось**.
 
     Раньше это был переход статуса: `NotPublished -> OnModeration`. С
     модерацией по главам подаётся текст — по ревизии на каждую главу, чья
@@ -367,8 +367,8 @@ def submit_story_for_review(story) -> int:
 
     Правка главы, уже стоящей в очереди, не заводит вторую заявку —
     прежняя ревизия перестаёт быть поданной и остаётся в истории
-    черновиком (V10 в AUDIT-WRITE-FLOW: до этого автор правил текст после
-    отправки, и модератор читал не то, что ему отправляли).
+    черновиком: до этого автор правил текст после отправки, и модератор
+    читал не то, что ему отправляли.
 
     **Одной транзакцией**, как и решение модератора (`apply_moderation`):
     подача — одно действие автора, сколько бы глав оно ни затронуло.

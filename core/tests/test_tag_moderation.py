@@ -63,7 +63,7 @@ class ARejectedTagLeavesTheWork(TestCase):
             reverse('core:story_settings', kwargs={'slug': self.story.slug}))
 
     def test_a_reason_is_required(self):
-        """«Нельзя» без «почему» автор исправить не может (BR-11)."""
+        """«Нельзя» без «почему» автор исправить не может."""
         with self.assertRaises(ValueError):
             data.reject_tags([self.tag], '   ')
 

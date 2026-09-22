@@ -17,7 +17,7 @@ def _titles(entries):
 
 
 # ───────────────────────────────────────────────────────────────────────
-# LIB — библиотека читателя: три непересекающиеся полки (BR-60/61)
+# LIB — библиотека читателя: три непересекающиеся полки
 # ───────────────────────────────────────────────────────────────────────
 
 class LibraryShelves(TestCase):
@@ -62,7 +62,7 @@ class LibraryShelves(TestCase):
                 for slug, title in everything.items():
                     if slug not in mine:
                         self.assertNotContains(response, title)
-        # Прогресс «N / M бөлім» считается, а не хранится (DEC-52).
+        # Прогресс «N / M бөлім» считается, а не хранится.
         reading = self.client.get(reverse('core:library') + '?tab=reading')
         for entry in data.library_of(user('aidana'), 'reading'):
             with self.subTest(story=entry.story.slug):

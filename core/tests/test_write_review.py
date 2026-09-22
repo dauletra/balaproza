@@ -23,7 +23,7 @@ from core.domain.formatting import kk_within_hours
 
 
 class OnlyAReadyDraftMayBeSubmitted(TestCase):
-    """BR-11: «готова» и «уже ушла» — разные вопросы. У работы на
+    """«готова» и «уже ушла» — разные вопросы. У работы на
     модерации кнопка означала бы повторную заявку, у публичной — откат в
     непубличное, чего автор ею не просит."""
 
@@ -51,7 +51,7 @@ class OnlyAReadyDraftMayBeSubmitted(TestCase):
                 self.assertNotContains(self._get(slug), 'Модерацияға жіберу')
 
     def test_readiness_asks_the_text_and_not_the_status(self):
-        """BR-79: подаётся то, что изменилось, и статус тут ни при чём.
+        """Подаётся то, что изменилось, и статус тут ни при чём.
 
         Прежняя проверка требовала `status == 'NotPublished'` — то есть
         публичный сериал не мог отправить дописанную главу вовсе, и она
@@ -187,13 +187,13 @@ class ManageStorySubmitsForReview(TestCase):
 
 
 class ModerationIsPerChapterNotPerWork(TestCase):
-    """BR-79 — то, ради чего заведены ревизии.
+    """То, ради чего заведены ревизии.
 
     До них одобрение выдавалось работе один раз и дальше не значило
     ничего: вторая глава публичного сериала появлялась у читателя в момент
     сохранения, а переписанный одобренный текст — тем же движением. То
     есть модерация фактически отсутствовала у всего длинного контента
-    (C1/C2 в AUDIT-WRITE-FLOW).
+    .
     """
 
     def setUp(self):
@@ -313,7 +313,7 @@ class ModerationIsPerChapterNotPerWork(TestCase):
 
 
 class ReturnedWorkKnowsItWasReturned(TestCase):
-    """BR-80/BR-81. Возврат «на доработку» не оставлял следа: работа падала
+    """Возврат «на доработку» не оставлял следа: работа падала
     в черновики, чек-лист снова горел зелёным, кнопка отправки была
     активна, и единственный экземпляр причины лежал в ленте уведомлений —
     автор должен был помнить её наизусть, пока правит (S1)."""
@@ -382,7 +382,7 @@ class ReturnedWorkKnowsItWasReturned(TestCase):
 
 
 class TheAuthorMayTakeTheSubmissionBack(TestCase):
-    """BR-80 (S2). Кнопки отзыва не было вовсе: заметив опечатку через
+    """Кнопки отзыва не было вовсе: заметив опечатку через
     минуту после отправки, автор мог только ждать модератора."""
 
     def setUp(self):
@@ -421,7 +421,7 @@ class TheAuthorMayTakeTheSubmissionBack(TestCase):
 
 
 class TheRefusalNamesWhatIsMissing(TestCase):
-    """BR-81 (S3). Сообщение перечисляло причины на память — «аннотация
+    """Сообщение перечисляло причины на память — «аннотация
     мен жас белгісі», — и врало всякий раз, когда не хватало текста."""
 
     def setUp(self):

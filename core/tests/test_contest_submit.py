@@ -1,6 +1,6 @@
 """CONT — подача работы на конкурс и свои заявки.
 
-Главное правило: **форма ничего не отклоняет** (BR-24). У кандидатов
+Главное правило: **форма ничего не отклоняет**. У кандидатов
 бывают заметки — про объём, про занятость другим конкурсом, — но решение
 принимает человек. Прежняя версия гасила радио и кнопку, то есть
 отказывала от имени конкурса до всякого жюри.
@@ -34,10 +34,10 @@ from core.tests.test_contests import _all_submissions, _eligibility
 class SubmissionHelpers(TestCase):
 
     def test_candidates_are_the_public_works_and_nothing_else(self):
-        """Черновик и работа на модерации на конкурс не выставляются
-        (DEC-23): их нельзя ни дать прочитать жюри, ни показать читателю
+        """Черновик и работа на модерации на конкурс не выставляются:
+ их нельзя ни дать прочитать жюри, ни показать читателю
         рядом с победителями. Это единственное, что список сужает — всё
-        остальное заметки, не запреты (BR-24)."""
+        остальное заметки, не запреты."""
         items = data.submission_candidates(user('aidana'), 'altyn-qalam')
         self.assertEqual([i['story'].slug for i in items],
                          [s.slug for s in data.public_stories_of(user('aidana'))])
@@ -60,7 +60,7 @@ class SubmissionHelpers(TestCase):
     def test_the_checklist_marks_volume_and_demands_the_declaration(self):
         contest = data.contest_by_slug('altyn-qalam')
         # Кандидат на конкурс — работа автора, и берётся она авторской
-        # дверью: `aidana-erteg` стоит на модерации, читателю её нет (BR-76).
+        # дверью: `aidana-erteg` стоит на модерации, читателю её нет.
         def mine(slug):
             return data.story_by_slug_for_author(slug, user('aidana'))
 
@@ -152,7 +152,7 @@ class SubmitFormShowsWhatCanBeSent(TestCase):
 
 
 class SubmitIsGatedByPhase(TestCase):
-    """Форма подачи живёт только в фазе приёма (DEC-45).
+    """Форма подачи живёт только в фазе приёма.
 
     Прямая ссылка открывалась в любой момент и предлагала подать работу в
     конкурс, который ещё не начался или уже ушёл на судейство.
@@ -187,7 +187,7 @@ class SubmitIsGatedByPhase(TestCase):
 
 
 class SubmissionNotesInformButDoNotBlock(TestCase):
-    """Форма ничего не отклоняет — она сообщает (BR-24).
+    """Форма ничего не отклоняет — она сообщает.
 
     Раньше работа короче порога или занятая другим конкурсом приходила с
     `disabled`, а кнопка отправки гасла: отказ от имени конкурса,
@@ -210,7 +210,7 @@ class SubmissionNotesInformButDoNotBlock(TestCase):
         self.assertIn(data.SUBMISSION_NOTES['too_short'],
                       short['notes'][0]['text'])
         # Одним текстом идти в двух конкурсах — повод для разговора,
-        # а не для молча закрытой двери (BR-23a).
+        # а не для молча закрытой двери.
         busy = mine['aidana-tan']
         self.assertIn('busy', self._keys(busy))
         self.assertIn('Алтын қалам',
@@ -255,7 +255,7 @@ class SubmissionNotesInformButDoNotBlock(TestCase):
 
 
 class ChecklistFollowsTheChoice(TestCase):
-    """FR-CONT-04: чек-лист пересчитывается при смене работы, не застывает."""
+    """Чек-лист пересчитывается при смене работы, не застывает."""
 
     def test_the_view_ships_volume_data_for_every_candidate(self):
         login_as(self.client, 'bekzhan_t')
@@ -401,7 +401,7 @@ class ContestSubmitCreatesSubmission(TestCase):
             'partial')
 
     def test_a_missing_or_forged_field_creates_nothing(self):
-        """BR-24 не блокирует выбор работы, но не отменяет обязательные поля."""
+        """Форма не блокирует выбор работы, но обязательные поля остаются."""
         cases = {
             'нет работы': {'story_slug': ''},
             # 'aidana-tan' — чужая работа, в кандидатах bekzhan_t её нет.
@@ -426,7 +426,7 @@ class ContestSubmitCreatesSubmission(TestCase):
         self.assertEqual(self._count(), 1)
 
     def test_a_direct_post_cannot_bypass_the_phase_or_the_one_entry_rule(self):
-        """DEC-45 и BR-23: то, что форма прячет, POST обойти не должен."""
+        """То, что форма прячет, POST обойти не должен."""
         for slug in ('altyn-qalam', 'qys-ertegisi'):
             with self.subTest(contest=slug):
                 self._post(slug=slug)
@@ -447,7 +447,7 @@ class ContestSubmitCreatesSubmission(TestCase):
 
 
 class WithdrawSubmission(TestCase):
-    """BR-23b: одна работа на конкурс — но заявку можно забрать назад."""
+    """Одна работа на конкурс — но заявку можно забрать назад."""
 
     OPEN = 'bolashak-mektebi'   # dina_books подала, приём идёт
 
@@ -553,7 +553,7 @@ class MySubmissions(TestCase):
             short_date(data.contest_by_slug('altyn-qalam').results_on))
 
     def test_accepted_stays_the_jury_word(self):
-        """«Қабылданды» — решение жюри (BR-41), а не факт получения формы.
+        """«Қабылданды» — решение жюри, а не факт получения формы.
 
         Тост подачи говорил именно это слово, и автор читал отправку как
         победу в первом же круге. Одна сущность — одно слово (docs/ui.md).
@@ -576,7 +576,7 @@ class MySubmissions(TestCase):
 class SubmissionIntegrity(TestCase):
 
     def test_a_submission_belongs_to_its_author_and_stands_alone(self):
-        """BR-23: один автор — не больше одной заявки на конкретный конкурс."""
+        """Один автор — не больше одной заявки на конкретный конкурс."""
         for username, subs in _all_submissions().items():
             slugs = [s.contest.slug for s in subs]
             with self.subTest(user=username):
@@ -609,7 +609,7 @@ class SubmissionIntegrity(TestCase):
     def test_the_date_is_a_date_and_lies_inside_the_window(self):
         """Хранимое `submitted_relative="6 ай бұрын"` стояло у заявки на
         конкурс, закрывшийся в декабре 2023-го: подача приходилась на
-        полгода позже дедлайна, и заметить это было нечем (BR-41a)."""
+        полгода позже дедлайна, и заметить это было нечем."""
         stored = {f.name for f in Submission._meta.get_fields()}
         self.assertNotIn('submitted_relative', stored,
                          '`submitted_relative` снова стало полем')

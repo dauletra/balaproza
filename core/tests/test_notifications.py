@@ -39,7 +39,7 @@ def _notes(user, kind: str = '') -> list:
 
 
 class ACommentReachesTheAuthor(TestCase):
-    """Автор узнаёт о любом комментарии под своей работой (BR-30)."""
+    """Автор узнаёт о любом комментарии под своей работой."""
 
     def setUp(self):
         super().setUp()
@@ -98,7 +98,7 @@ class ACommentReachesTheAuthor(TestCase):
 
 
 class AReactionReachesTheAuthorOnceADay(TestCase):
-    """Отклик — событие дня, а не нажатия (BR-REACT-02)."""
+    """Отклик — событие дня, а не нажатия."""
 
     def setUp(self):
         super().setUp()
@@ -164,7 +164,7 @@ class AReactionReachesTheAuthorOnceADay(TestCase):
 
 
 class ANewChapterReachesTheSubscribers(TestCase):
-    """Подписка ведёт к чтению, а не только к цифре в профиле (BR-79)."""
+    """Подписка ведёт к чтению, а не только к цифре в профиле."""
 
     def setUp(self):
         super().setUp()
@@ -259,7 +259,7 @@ class ANewChapterReachesTheSubscribers(TestCase):
 
 
 class AFollowReachesTheAuthor(TestCase):
-    """Новый подписчик — событие; ушедший — нет (FR-PROF-04)."""
+    """Новый подписчик — событие; ушедший — нет."""
 
     def setUp(self):
         super().setUp()

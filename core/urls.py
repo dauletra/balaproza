@@ -16,7 +16,7 @@ urlpatterns = [
     path('auth/onboarding/decline/', views.decline_onboarding, name='decline_onboarding'),
     path('auth/signup/success/', views.signup_success, name='signup_success'),
 
-    # CAT — каталог и поиск (DEC-27: search/genre/tag — единый catalog-движок)
+    # CAT — каталог и поиск: search/genre/tag — единый движок каталога
     path('catalog/', views.catalog, name='catalog'),
     path('search/', views.search_results, name='search_results'),
     path('genres/', views.genre_index, name='genre_index'),
@@ -51,7 +51,7 @@ urlpatterns = [
     path('write/<slug:slug>/settings/', views.story_settings, name='story_settings'),
     path('write/<slug:slug>/chapter/new/', views.chapter_editor, name='chapter_new'),
     path('write/<slug:slug>/chapter/<int:chapter>/edit/', views.chapter_editor, name='chapter_edit'),
-    # Автосохранение (BR-78). Два адреса, потому что у новой главы ещё нет
+    # Автосохранение. Два адреса, потому что у новой главы ещё нет
     # номера: первый ответ его и присваивает, дальше редактор пишет во
     # второй — иначе каждое автосохранение заводило бы новую главу.
     path('write/<slug:slug>/chapter/autosave/',
@@ -64,7 +64,7 @@ urlpatterns = [
         views.chapter_move, name='chapter_move'),
     path('write/<slug:slug>/delete/', views.delete_story, name='delete_story'),
 
-    # MOD — модерация как раздел (DEC-71). Открыт только `is_staff`;
+    # MOD — модерация как раздел. Открыт только `is_staff`;
     # остальным раздела не существует — 404, а не 403.
     path('moderation/', views.moderation_queue, name='moderation_queue'),
     # ВАЖНО: reports/ ДОЛЖЕН идти до <slug:slug>/, иначе Django смэтчит
@@ -94,7 +94,7 @@ urlpatterns = [
     path('me/export/', views.export_texts, name='export_texts'),
     path('me/delete/', views.delete_account, name='delete_account'),
     path('u/<str:username>/', views.profile_other, name='profile_other'),
-    # Люди автора (FR-PROF-10). Один маршрут на оба списка: страницы
+    # Люди автора. Один маршрут на оба списка: страницы
     # различаются набором, а не устройством. Неизвестный `kind` — 404 во
     # view, а не молчаливый фолбэк: `/u/aidana/garbage/` не должен отдавать
     # подписчиков под чужим заголовком.
@@ -118,14 +118,14 @@ urlpatterns = [
     # API — внутренние JSON-эндпоинты (search popup и др.)
     path('api/search.json', views.search_suggest, name='api_search'),
 
-    # LEGAL/INFO — статичные стабы для footer-ссылок (DEC-22, FR-AUTH-05)
+    # LEGAL/INFO — статичные стабы для footer-ссылок
     path('rules/moderation/', views.legal_moderation_rules, name='legal_moderation'),
     path('rules/publishing/', views.legal_publishing_terms, name='legal_publishing'),
     path('about/',            views.legal_about,            name='legal_about'),
     path('terms/',            views.legal_terms,            name='legal_terms'),
     path('privacy/',          views.legal_privacy,          name='legal_privacy'),
 
-    # SEO — краулерам (DEC-?, чек-лист README п. 9)
+    # SEO — краулерам (чек-лист запуска, docs/deploy.md)
     path('robots.txt', views.robots_txt, name='robots_txt'),
 
     # DESIGN — внутренние страницы (только при DEBUG=True)

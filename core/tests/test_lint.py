@@ -15,7 +15,6 @@
 отсюда, чтобы «где лежат шаблоны» не оказалось записано трижды.
 """
 
-
 import re
 import unittest
 from html.parser import HTMLParser
@@ -27,13 +26,11 @@ from core import data
 from core.tests.base import TestCase, login_as
 
 
-TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "templates"
+_ROOT = Path(__file__).resolve().parent.parent.parent
 
-
-STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
-
-
-STATIC_SRC_DIR = Path(__file__).resolve().parent.parent.parent / "static_src"
+TEMPLATES_DIR = _ROOT / "templates"
+STATIC_DIR = _ROOT / "static"
+STATIC_SRC_DIR = _ROOT / "static_src"
 
 
 def _templates():
@@ -257,7 +254,7 @@ class IconNamesExistInSprite(TestCase):
 
     Пустой квадрат в консоль не пишет и в вёрстке почти не виден. Раньше
     все имена были литералами в шаблонах и проверялись глазами при ревью;
-    с достижениями (FR-PROF-06) они приходят из данных, где опечатку
+    с достижениями они приходят из данных, где опечатку
     заметить уже негде.
     """
 
@@ -324,17 +321,17 @@ class MoneyFormatting(TestCase):
 
 
 class PlatformDoesNotNameItsAudience(TestCase):
-    """Продукт не объявляет, для кого он (DEC-47, BR-48).
+    """Продукт не объявляет, для кого он.
 
     Аудитория — внутренняя информация: платформой пользуются и школьники,
     и студенты колледжей и вузов. Пока возрастной ценз был правилом
-    платформы (прежнее BR-20), «14-18» стояло в подсказке поля на
+    платформы, «14-18» стояло в подсказке поля на
     регистрации и в редактировании профиля — то есть каждый, кто доходил
     до формы, читал, что здесь для 14-18 лет, ещё не увидев ни одного
     конкурса.
 
     **Возрастная вилка законна ровно в одном месте — на странице
-    конкретного конкурса**, где это его собственное условие (BR-48).
+    конкретного конкурса**, где это его собственное условие.
     Поэтому маршруты конкурсов из проверки исключены, а все остальные
     обязаны молчать.
 
@@ -370,7 +367,7 @@ class PlatformDoesNotNameItsAudience(TestCase):
                     found,
                     f'{label}: страница называет возрастную вилку '
                     f'«{found.group(0) if found else ""}». Ценз ставит конкурс, '
-                    f'не платформа (BR-48)')
+                    f'не платформа')
 
     def test_rendered_pages_do_not_declare_the_audience(self):
         from django.urls import reverse
@@ -400,10 +397,10 @@ class PlatformDoesNotNameItsAudience(TestCase):
 class LegalPagesSpeakToPeople(TestCase):
     """Страница правил — текст для подростка, а не выписка из требований.
 
-    В ней было семь внутренних кодов (`FR-AUTH-01`, `BR-22`, `BR-76`,
-    `NFR-20…26`) и отсылка в `docs/spec.md` — то есть читателя правил
-    отправляли в исходники. Плюс три незакрытых плейсхолдера, один из них
-    ровно там, где человеку объясняют, как забрать свои данные.
+    В ней было семь внутренних кодов требований и отсылка в
+    `docs/spec.md` — то есть читателя правил отправляли в исходники.
+    Плюс три незакрытых плейсхолдера, один из них ровно там, где
+    человеку объясняют, как забрать свои данные.
 
     Глазами это не ловится: страницы длинные, по-казахски, и открывают их
     редко. Поэтому числом.
@@ -446,3 +443,83 @@ class LegalPagesSpeakToPeople(TestCase):
                 body = self.client.get(reverse(f'core:{name}')).content.decode()
                 self.assertTrue('@qazaqnovel' in body or '@' in body,
                                 'на странице нет ни одного канала связи')
+
+
+class RequirementCodesDoNotComeBack(unittest.TestCase):
+    """Код требования в коде — ссылка в никуда.
+
+    Их было 1246 в 185 файлах: `DEC-31`, `BR-79`, `FR-PROF-08` и ещё
+    390 уникальных. Ни один не определён нигде — реестр решений и
+    нумерованные модули документации удалены ещё при слиянии `docs/` в
+    три файла. То есть комментарий отсылал к документу, которого нет уже
+    несколько итераций, и это хуже, чем отсутствие ссылки: по ней идут
+    искать.
+
+    Ровно это правило уже применили один раз — к правовым страницам
+    (`LegalPagesSpeakToPeople` выше), и довод там был тот же: пометка
+    правила должна жить там, где правило объяснено словами.
+
+    Проверка стоит здесь, а не в ревью, потому что коды возвращаются
+    по памяти: они короткие, привычные и выглядят как знание о проекте.
+    """
+
+    _CODE = re.compile(r'\b(?:DEC|BR|FR|NFR)-[A-Z]*-?\d')
+    _SUFFIXES = ('.py', '.html', '.js', '.css')
+
+    def test_no_file_mentions_a_requirement_code(self):
+        # Сам этот файл — единственное исключение: образец кода в нём
+        # живёт по делу.
+        myself = Path(__file__).resolve()
+        roots = (TEMPLATES_DIR, STATIC_SRC_DIR, myself.parent.parent)
+
+        offenders = []
+        for root in roots:
+            for path in root.rglob('*'):
+                if (path.suffix not in self._SUFFIXES
+                        or '__pycache__' in path.parts
+                        or path.resolve() == myself):
+                    continue
+                for number, line in enumerate(
+                        path.read_text(encoding='utf-8').splitlines(), 1):
+                    if self._CODE.search(line):
+                        offenders.append(
+                            f'{path.name}:{number}: {line.strip()[:70]}')
+
+        self.assertEqual(offenders, [],
+                         'коды требований ведут в никуда — реестра, на который '
+                         'они ссылались, в docs/ больше нет:\n'
+                         + '\n'.join(offenders[:20]))
+
+    # Только то, что выглядит ссылкой: путь со слэшем или имя плана
+    # прописными. Иначе под правило попадает имя файла выгрузки, которое
+    # тест собирает сам.
+    _DOC = re.compile(r'\b(?:[\w.-]+/[\w./-]+\.md|[A-Z][A-Z-]+\.md)\b')
+
+    def test_no_file_points_at_a_document_that_is_gone(self):
+        """Та же беда крупнее: ссылка на удалённый файл плана.
+
+        `AUDIT-WRITE-FLOW.md` упоминался 45 раз спустя долгое время
+        после того, как был удалён; закрытые планы удаляются регулярно,
+        а ссылки на них остаются в комментариях.
+        """
+        myself = Path(__file__).resolve()
+        offenders = []
+        for root in (TEMPLATES_DIR, STATIC_SRC_DIR, myself.parent.parent):
+            for path in root.rglob('*'):
+                if (path.suffix not in self._SUFFIXES
+                        or '__pycache__' in path.parts
+                        or path.resolve() == myself):
+                    continue
+                text = path.read_text(encoding='utf-8')
+                for number, line in enumerate(text.splitlines(), 1):
+                    for name in self._DOC.findall(line):
+                        # Путь бывает и относительным — из шаблона в
+                        # `docs/` через `../..`.
+                        bases = (_ROOT, path.parent, _ROOT / 'docs')
+                        if any((base / name).resolve().exists() for base in bases):
+                            continue
+                        offenders.append(f'{path.name}:{number}: {name}')
+
+        self.assertEqual(offenders, [],
+                         'ссылка на документ, которого нет:\n'
+                         + '\n'.join(offenders[:20]))

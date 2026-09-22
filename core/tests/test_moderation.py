@@ -1,4 +1,4 @@
-"""MOD — модерация как раздел (FR-MOD-*, BR-82, DEC-71).
+"""MOD — модерация как раздел.
 
 Раньше это были действия в списке админки: решение они принимали, но
 работу модератора не поддерживали. Здесь проверяется не «страница
@@ -35,7 +35,7 @@ def _moderator(client, username='mod_one'):
 
 
 class TheSectionExistsOnlyForModerators(TestCase):
-    """404, а не 403 (BR-82): «нельзя» подтверждало бы, что раздел есть."""
+    """404, а не 403: «нельзя» подтверждало бы, что раздел есть."""
 
     def setUp(self):
         super().setUp()
@@ -71,8 +71,8 @@ class TheSectionExistsOnlyForModerators(TestCase):
 
 
 class TheQueueIsBuiltFromSubmittedText(TestCase):
-    """Очередь — работы с поданными ревизиями, а не работы в статусе: с
-    BR-79 публичный сериал остаётся публичным, пока его новая глава ждёт
+    """Очередь — работы с поданными ревизиями, а не работы в статусе:
+    публичный сериал остаётся публичным, пока его новая глава ждёт
     проверки, и фильтр по статусу прятал бы её от модератора."""
 
     def setUp(self):
@@ -129,7 +129,7 @@ class TheQueueIsBuiltFromSubmittedText(TestCase):
 
 
 class TheCardCarriesWhatTheDecisionIsMadeOn(TestCase):
-    """FR-MOD-02/03/05. В админке текста среди страниц решения не было
+    """В админке текста среди страниц решения не было
     вовсе — только номера глав."""
 
     def setUp(self):
@@ -183,7 +183,7 @@ class TheCardCarriesWhatTheDecisionIsMadeOn(TestCase):
         self.assertContains(card, 'Диалог үзілген.')
 
     def test_a_withdrawn_submission_leaves_nothing_to_decide(self):
-        """Автор мог отозвать заявку, пока модератор читал (BR-80): три
+        """Автор мог отозвать заявку, пока модератор читал: три
         кнопки об этом молчали бы."""
         self.chapter.body += ' Өзгеріс.'
         self.chapter.save()
@@ -196,7 +196,7 @@ class TheCardCarriesWhatTheDecisionIsMadeOn(TestCase):
 
 
 class TakingAWorkInHandIsAWarningNotALock(TestCase):
-    """BR-82. Двое, открывшие одну работу, до этого узнавали друг о друге
+    """Двое, открывшие одну работу, до этого узнавали друг о друге
     только по результату — второй читал уже решённое."""
 
     def setUp(self):
@@ -241,7 +241,7 @@ class TakingAWorkInHandIsAWarningNotALock(TestCase):
 
 
 class ADecisionLeavesAnActWithItsAuthor(TestCase):
-    """BR-82. След решения был один — `Notification`, адресованное автору;
+    """След решения был один — `Notification`, адресованное автору;
     у него нет автора решения, и вопрос «кто одобрил вот это» ответа не
     имел вовсе."""
 

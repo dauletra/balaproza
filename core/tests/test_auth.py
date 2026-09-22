@@ -431,8 +431,8 @@ class DecliningOnboarding(TestCase):
 
 
 class OnboardingGuardMiddleware(TestCase):
-    """DEC-85, отменяет заявленное в BR-90 «онбординг не гейтит остальной
-    сайт»: без завершённого `terms_accepted_at` любой прямой переход
+    """Анкета гейтит весь сайт, а не только редирект после входа:
+    без завершённого `terms_accepted_at` любой прямой переход
     подальше от `/auth/onboarding/` возвращает туда же, а не открывает
     страницу."""
 
@@ -479,7 +479,7 @@ class OnboardingGuardMiddleware(TestCase):
 
 
 # ───────────────────────────────────────────────────────────────────────
-# Удаление аккаунта (FR-PROF-11, BR-95, DEC-86) — немедленное и полное,
+# Удаление аккаунта — немедленное и полное,
 # каскад собран в моделях (Story.author → CASCADE и далее)
 # ───────────────────────────────────────────────────────────────────────
 class DeletingYourAccount(TestCase):
@@ -502,7 +502,7 @@ class DeletingYourAccount(TestCase):
 
     def test_deleting_the_author_takes_the_story_and_others_engagement_with_it(self):
         """Story.author → CASCADE: удаление автора уносит его работу целиком,
-        а с ней и чужие данные, оставленные на ней (BR-95) — не просто
+        а с ней и чужие данные, оставленные на ней — не просто
         отвязывает их от удалённого аккаунта."""
         author = login_as_newcomer(self.client, 'author_who_leaves')
         story = factories.story(author=author, chapters=1)

@@ -1,7 +1,7 @@
 {% comment %}
-    Текст главы с реакциями, опросом и переходом к соседней (DEC-30:
-    отдельного маршрута `/read/` нет, глава открывается на той же
-    странице через `?chapter=N`).
+    Текст главы с реакциями, опросом и переходом к соседней: отдельного
+    маршрута `/read/` нет, глава открывается на той же странице через
+    `?chapter=N`.
 
     На телефоне карточка раскрыта во всю ширину экрана: `-mx-4` гасит
     `px-4` контейнера, свой `px-4` возвращает поля. Текст получает 343px
@@ -43,7 +43,7 @@
         {% endif %}
     </header>
 
-    {# Текст показывается сразу целиком, сколько бы в нём ни было (DEC-59: обрезка тизера убрана) #}
+    {# Текст показывается сразу целиком, сколько бы в нём ни было: обрезки тизера нет #}
     <div :class="readerTheme" class="reader-surface">
         <article data-chapter-body :class="[readerSize, readerLead]"
                  class="prose-reader font-sans text-slate-800">
@@ -51,10 +51,10 @@
         </article>
     </div>
 
-    {# FR-STORY-12 / DEC-32: реакции на главу вместо одиночного лайка #}
+    {# Реакции на главу вместо одиночного лайка #}
     {% include "components/reaction_bar.html" with items=reactions story_slug=story.slug chapter_number=chapter_number %}
 
-    {# FR-STORY-13: опрос автора — необязательный, рендерится если создан #}
+    {# Опрос автора — необязательный, рендерится если создан #}
     {% if poll %}
         {% include "components/chapter_poll.html" with poll=poll story_slug=story.slug chapter_number=chapter_number %}
     {% endif %}

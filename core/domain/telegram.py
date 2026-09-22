@@ -1,4 +1,4 @@
-"""Проверка подписи Telegram Login Widget (NFR-25).
+"""Проверка подписи Telegram Login Widget.
 
 Redirect-режим: виджет не шлёт JS-колбэк, а редиректит браузер на наш
 `data-auth-url` с подписанными параметрами в query string. Алгоритм —

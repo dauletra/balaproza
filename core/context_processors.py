@@ -10,7 +10,7 @@ def auth_state(request):
 
     `current_user_name` — как платформа обращается к самому человеку, и это
     не `public_name`: приветствие «Қайта қош келдің» адресовано ему самому.
-    Настоящее имя видит только он (BR-73), в чужом профиле его нет.
+    Настоящее имя видит только он, в чужом профиле его нет.
     """
     user = getattr(request, 'user', None)
     is_in = bool(user and user.is_authenticated)
@@ -24,7 +24,7 @@ def auth_state(request):
 
 
 def site_links(request):
-    """Глобально доступные внешние ссылки (FR-LINKS-06): «Авторлар мектебі».
+    """Глобально доступные внешние ссылки: «Авторлар мектебі».
     Используется в footer и любых страницах без явного контекста.
     """
     return {'school_links_global': data.school_links()}

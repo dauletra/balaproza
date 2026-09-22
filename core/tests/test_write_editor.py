@@ -22,7 +22,7 @@ from core.tests.base import login_as, login_as_newcomer, user
 
 
 class TheChapterEditorReportsTheTruth(TestCase):
-    """FR-WRITE-05. Счётчик знаков не двигался при вводе, кнопки уходили за
+    """Счётчик знаков не двигался при вводе, кнопки уходили за
     нижний край, а индикатор изображал автосохранение, которого нет."""
 
     SLUG = 'aidana-tan'
@@ -31,7 +31,7 @@ class TheChapterEditorReportsTheTruth(TestCase):
         login_as(self.client)
 
     def test_a_new_chapter_opens_empty_with_both_ways_to_save(self):
-        """BR-11: автор не публикует, публикует модератор. Кнопка
+        """Автор не публикует, публикует модератор. Кнопка
         называлась «Жариялау», а тост рядом говорил «модерацияға
         жіберілді» — правду говорил тост. «Тексеруге» тоже не годится:
         docs/ui.md отводит ему оттенок экзамена.
@@ -90,7 +90,7 @@ class TheChapterEditorReportsTheTruth(TestCase):
         рисовал прежний фейковый submit."""
         fresh = self.client.get(reverse(
             'core:chapter_new', kwargs={'slug': self.SLUG})).content.decode()
-        # Состояние ведёт `chapterEditor` (BR-78): индикатор больше не
+        # Состояние ведёт `chapterEditor`: индикатор больше не
         # изображает автосохранение — оно у него настоящее, и «сақталды»
         # он говорит по ответу сервера, а не по таймеру.
         self.assertIn('chapterEditor(', fresh)
@@ -186,7 +186,7 @@ class ChapterEditorSavesADraft(TestCase):
                 {'title': f'{number}-бөлім', 'body': 'Мәтін.', 'action': 'draft'})
 
         story = Story.objects.get(slug=self.SLUG)
-        # Написанное, а не опубликованное (BR-79): автор, написавший три
+        # Написанное, а не опубликованное: автор, написавший три
         # бөлім, обязан видеть три — даже пока их никто не одобрил.
         self.assertEqual(story.chapters_written, 3)
         self.assertEqual(story.chapters, 0)
@@ -196,7 +196,7 @@ class ChapterEditorSavesADraft(TestCase):
         self.assertEqual(from_feed.chapters_written, 3)
 
     def test_a_rejected_form_gives_the_text_back(self):
-        """BR-77 — главный отказ этой страницы.
+        """Отказ по обложке — главный отказ этой страницы.
 
         Автор набирал текст, ошибался в заголовке и получал **пустую**
         форму с тостом «Атауын және мәтінін жаз» — требованием написать
@@ -263,7 +263,8 @@ class ChapterEditorSavesAPoll(TestCase):
         self.assertEqual(chapter.poll.option_set.count(), 2)
 
     def test_a_single_option_is_an_error_and_not_silence(self):
-        """BR-POLL-02 остаётся, меняется способ сказать о нём.
+        """Правило «двух вариантов мало» остаётся, меняется способ сказать
+        о нём.
 
         Раньше глава сохранялась, опрос молча исчезал, и автор получал
         «Жоба сақталды» — про главу правду, про опрос ложь. Молчание было
@@ -311,7 +312,7 @@ class ChapterEditorSavesAPoll(TestCase):
 
 
 class AutosaveKeepsTheTextWithoutBeingAsked(TestCase):
-    """BR-78. Индикатор «Сақталмаған өзгеріс бар» честно показывал, что
+    """Индикатор «Сақталмаған өзгеріс бар» честно показывал, что
     текст не сохранён, и ничего с этим не делал: сохранить мог только сам
     автор, нажав кнопку. Теперь черновик доезжает до сервера сам."""
 
@@ -328,7 +329,7 @@ class AutosaveKeepsTheTextWithoutBeingAsked(TestCase):
                        kwargs={'slug': self.SLUG, 'chapter': chapter})
 
     def test_it_creates_the_chapter_and_names_its_number(self):
-        """`pk` в ответе обязателен (BR-83): без него редактор писал бы
+        """`pk` в ответе обязателен: без него редактор писал бы
         снова по адресу новой главы и заводил вторую на каждом
         автосохранении."""
         r = self.client.post(self._url(), {'title': '', 'body': 'Жаза бастадым'})
@@ -370,7 +371,7 @@ class AutosaveKeepsTheTextWithoutBeingAsked(TestCase):
         self.assertEqual(chapter.poll.option_set.count(), 2)
 
     def test_a_public_work_may_autosave_without_showing_anything(self):
-        """Ограничение снято разделением ревизий (BR-79): автосохранение
+        """Ограничение снято разделением ревизий: автосохранение
         пишет рабочую копию, которой читатель не видит. Раньше оно было
         запрещено публичной работе, потому что записанная глава уходила
         читателю немедленно."""
@@ -497,7 +498,7 @@ class AutosaveWritesOnlyWhatChanged(TestCase):
 
 
 class ChapterAddressIsAStableIdNotItsNumber(TestCase):
-    """S5 (AUDIT-WRITE-FLOW.md): кабинет адресует главу `pk` (BR-83).
+    """Кабинет адресует главу `pk`.
     Раньше GET на несуществующий номер рисовал пустой «новый» редактор, а
     POST по тому же адресу заводил главу с этим самым номером — дыру в
     нумерации."""
@@ -525,7 +526,7 @@ class ChapterAddressIsAStableIdNotItsNumber(TestCase):
 
 
 class SingleFormatCapsAtOneChapter(TestCase):
-    """S6 (AUDIT-WRITE-FLOW.md, BR-85): обратный переход формата запрещала
+    """Обратный переход формата запрещала
     только форма настроек — прямой `/chapter/new/` был открыт всегда и
     заводил `single`-работе вторую главу в обход интерфейса."""
 
@@ -557,7 +558,7 @@ class SingleFormatCapsAtOneChapter(TestCase):
 
 
 class ChaptersCanBeDeletedAndReordered(TestCase):
-    """M3 (AUDIT-WRITE-FLOW.md, BR-84): ни удаления, ни перестановки не
+    """Ни удаления, ни перестановки не
     было вовсе — таких маршрутов в `urls.py` не было."""
 
     def setUp(self):
