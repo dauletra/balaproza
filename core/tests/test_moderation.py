@@ -388,7 +388,7 @@ class ThePortalCountsItself(TestCase):
         self.assertEqual(reader.get(self.url).status_code, 404)
 
 
-# ── Суточный снимок и возвращаемость читателя (3.1 в PLAN-AUDIT.md) ──────
+# ── Суточный снимок и возвращаемость читателя ────────────────────────────
 
 def _read(story, viewer, day):
     """Засчитанное прочтение в конкретный день, полднем по Алматы —
