@@ -109,6 +109,8 @@ core/
 ├── forms.py       проверка ввода; пишет всё равно core.data
 ├── templatetags/  подписи и числа для шаблона; правило записи — в domain
 ├── views/         модуль на раздел, имена собраны в __init__
+├── legal_texts.py правовые тексты литералами — рядом с вью, но не в нём:
+│                  то же правило, что у _corpus.py и seed_demo
 ├── admin.py       редакционный инструмент: теги, конкурсы, справочники.
 │                  Модерация переехала в раздел /moderation/ —
 │                  действия списка остались запасным путём
@@ -116,16 +118,18 @@ core/
 │                  Чистые функции, моделей не знает
 ├── counters.py    │ сигналы post_save/post_delete — то, что доменные
 ├── media_cleanup.py │ функции не видят (массовое удаление, каскад):
-│                  счётчики и уборка файла обложки/аватара/афиши/эмблемы
+│                  счётчики и уборка файла обложки/аватара/афиши/эмблемы.
+│                  Там же сверка папки со строками для prune_media
 ├── management/commands/  seed_demo + _corpus.py (демо-содержимое литералами),
 │                  пять суточных (snapshot_portal, recount_views,
 │                  recount_engagement, prune_old_rows, prune_media) и
 │                  push_notifications
+│                  (общее у команд — _base.QuietCommand)
 └── tests/         base.py (login_as), factories.py, runner.py
 templates/         base.html, components/, partials/, pages/ — всё в корневой
 static/js/         components.js (Alpine-компоненты портала), reader.js (читалка),
                    editor.js (автосохранение редактора)
-static_src/input.css   @theme с токенами и стили читалки
+static_src/input.css   @theme с токенами, стили читалки, каркас диалога
 media/             обложки, афиши, эмблемы наград (в .gitignore целиком)
 ```
 
