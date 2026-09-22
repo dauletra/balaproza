@@ -9,7 +9,9 @@
 import shutil
 import tempfile
 from io import BytesIO
+from pathlib import Path
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -105,6 +107,25 @@ class ResizeRasterImageBoundsAndConverts(TestCase):
         processed = resize_raster_image(upload, '.png')
         with Image.open(processed) as out:
             self.assertEqual(out.format, 'PNG')
+
+
+class TestsDoNotWriteIntoTheRealMediaFolder(TestCase):
+    """Сторож над подменой `MEDIA_ROOT` (`core/tests/runner.py`).
+
+    Стоит здесь, а не в раннере, потому что проверять надо **тот**
+    процесс, в котором выполняются тесты, а не тот, который их запускает.
+    Именно этим разошлось прежнее решение: подмену включал головной
+    процесс, а тесты шли в отдельных, поднятых с нуля, — и обложка из
+    теста ложилась в настоящую `media/` разработчика. Нашлось только
+    счётом файлов: `--parallel 1` не оставлял ни одного, `--parallel 4`
+    оставлял два за прогон.
+
+    Тест ничего не пишет: сравнивает пути. Молчаливая утечка на диск —
+    как раз то, чего никакое обычное утверждение не заметит."""
+
+    def test_media_root_is_not_the_project_folder(self):
+        self.assertNotEqual(Path(settings.MEDIA_ROOT).resolve(),
+                            (Path(settings.BASE_DIR) / 'media').resolve())
 
 
 MEDIA = tempfile.mkdtemp()

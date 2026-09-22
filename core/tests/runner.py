@@ -43,13 +43,46 @@ import shutil
 import tempfile
 
 from django.core.management import call_command
-from django.test.runner import DiscoverRunner
+from django.test.runner import DiscoverRunner, ParallelTestSuite, _init_worker
 from django.test.utils import override_settings, setup_databases
 
 DEFAULT_PARALLEL = 4
 
+# Через окружение, потому что через память нельзя: на Windows и macOS
+# процессы прогона не наследуют состояние головного, а создаются заново
+# (`spawn`). Переменные окружения они при этом получают — это
+# единственный канал, по которому путь доезжает до работника.
+MEDIA_ROOT_ENV = 'QAZAQNOVEL_TEST_MEDIA_ROOT'
+
+
+def _init_worker_with_media(counter, *args, **kwargs):
+    """Инициализация процесса прогона: как у Django, плюс временная `media/`.
+
+    Django поднимает работника с нуля — `django.setup()`,
+    `setup_test_environment()`, своя копия базы, — и подмены настроек,
+    включённые в головном процессе, до него не доезжают. То есть тест,
+    сохраняющий обложку, писал её в **настоящую** `media/` разработчика,
+    хотя раннер подменил путь: подмена осталась в том процессе, который
+    тестов не выполняет.
+
+    Видно это было только числом: прогон оставлял два файла в
+    `media/covers/`, и `--parallel 1` не оставлял ни одного.
+    """
+    _init_worker(counter, *args, **kwargs)
+    root = os.environ.get(MEDIA_ROOT_ENV)
+    if root:
+        # Без `disable()`: процесс работника живёт ровно прогон, и снимать
+        # подмену с него некому и незачем.
+        override_settings(MEDIA_ROOT=root).enable()
+
+
+class _SeededParallelSuite(ParallelTestSuite):
+    init_worker = _init_worker_with_media
+
 
 class SeededTestRunner(DiscoverRunner):
+
+    parallel_test_suite = _SeededParallelSuite
 
     def __init__(self, *args, parallel=0, **kwargs):
         if not parallel:
@@ -76,14 +109,21 @@ class SeededTestRunner(DiscoverRunner):
     # головном процессе (см. `setup_databases`), и покрыть надо именно
     # его. Тем двум классам, что грузят файлы сами, свои временные папки
     # оставлены — они от этого не зависят.
+    #
+    # Головным процессом дело не кончается: сами тесты идут в других, и
+    # до них подмена доезжает через `MEDIA_ROOT_ENV` и
+    # `_init_worker_with_media` — см. их выше. Папка одна на прогон и
+    # удаляется здесь же, поэтому работникам её убирать не надо.
     def setup_test_environment(self, **kwargs):
         super().setup_test_environment(**kwargs)
         self._media_root = tempfile.mkdtemp(prefix='qnovel-test-media-')
+        os.environ[MEDIA_ROOT_ENV] = self._media_root
         self._media = override_settings(MEDIA_ROOT=self._media_root)
         self._media.enable()
 
     def teardown_test_environment(self, **kwargs):
         self._media.disable()
+        os.environ.pop(MEDIA_ROOT_ENV, None)
         shutil.rmtree(self._media_root, ignore_errors=True)
         super().teardown_test_environment(**kwargs)
 

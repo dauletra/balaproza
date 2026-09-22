@@ -12,6 +12,10 @@
 трогало его файл вовсе (S8 в AUDIT-WRITE-FLOW.md).
 """
 
+import time
+from pathlib import Path
+
+from django.conf import settings
 from django.db.models.signals import post_delete, pre_save
 from django.dispatch import receiver
 
@@ -86,3 +90,48 @@ def _delete_raster_field_file(sender, instance, **kwargs):
     file = getattr(instance, RASTER_FIELDS[sender])
     if file:
         file.storage.delete(file.name)
+
+
+# ───────────────────── Сверка папки со строками (уборка) ──────────────────
+
+def referenced_media_names() -> set:
+    """Все имена файлов, на которые ссылается хоть одна строка.
+
+    Четыре поля из `RASTER_FIELDS`, по запросу на каждое, одними именами:
+    объекты тут не нужны, а работ в базе однажды будет тысяча.
+    """
+    names = set()
+    for model, field in RASTER_FIELDS.items():
+        names.update(
+            name for name in
+            model.objects.exclude(**{field: ''}).values_list(field, flat=True)
+            if name)
+    return names
+
+
+def orphan_media_files(*, older_than_hours: int = 24) -> list:
+    """Файлы в `MEDIA_ROOT`, которых не держит ни одна строка.
+
+    Сигналы выше убирают файл, когда объект меняется или удаляется через
+    ORM. Не покрыто ими ровно одно: файл, записанный в транзакции, которая
+    потом откатилась. Отката диск не знает, и такой файл остаётся навсегда
+    — за время разработки их накопилось 12 825 на 341 МБ.
+
+    **Отсрочка обязательна.** Файл пишется до `COMMIT`, то есть в момент
+    прохода уборки строки на него может ещё не быть, хотя через секунду
+    будет. Сутки по умолчанию — запас, за который любая живая транзакция
+    успевает закончиться сто раз.
+
+    Возвращает пути, а не удаляет: решение о том, что делать со списком,
+    принимает команда, и без `--apply` она не делает ничего.
+    """
+    root = Path(settings.MEDIA_ROOT)
+    if not root.is_dir():
+        return []
+    keep = {(root / name).resolve() for name in referenced_media_names()}
+    edge = time.time() - older_than_hours * 3600
+    return sorted(
+        path for path in root.rglob('*')
+        if path.is_file()
+        and path.resolve() not in keep
+        and path.stat().st_mtime < edge)

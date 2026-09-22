@@ -154,8 +154,9 @@ core/
 ├── media_cleanup.py │ функции не видят (массовое удаление, каскад):
 │                  счётчики и уборка файла обложки/аватара/афиши/эмблемы
 ├── management/commands/  seed_demo + _corpus.py (демо-содержимое литералами),
-│                  четыре суточных (snapshot_portal, recount_views,
-│                  recount_engagement, prune_old_rows) и push_notifications
+│                  пять суточных (snapshot_portal, recount_views,
+│                  recount_engagement, prune_old_rows, prune_media) и
+│                  push_notifications
 └── tests/         base.py (login_as), factories.py, runner.py
 templates/         base.html, components/, partials/, pages/ — всё в корневой
 static/js/         components.js (Alpine-компоненты портала), reader.js (читалка),

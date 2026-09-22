@@ -1,15 +1,24 @@
-"""Уборка того, что копится молча: уведомления и снимки текста глав.
+"""Уборка того, что копится молча: уведомления, снимки текста глав, файлы.
 
-Обе таблицы растут линейно с возрастом портала и не показываются нигде,
+Две таблицы растут линейно с возрастом портала и не показываются нигде,
 где рост было бы видно, — поэтому проверяется не только «удалилось», но
 и «не удалилось то, чего трогать нельзя». Вторая половина здесь важнее:
 опубликованная ревизия связана с главой через `SET_NULL`, и удалить её
 значит снять текст с публикации.
+
+Третья часть — про `media/`, и там «не удалилось» важнее вдвойне:
+строку возвращает бэкап базы, обложку — только бэкап файлов.
 """
 
+import os
+import shutil
+import tempfile
+import time
 from datetime import timedelta
+from pathlib import Path
 
 from django.core.management import call_command
+from django.test import override_settings
 from django.utils import timezone
 
 from core import data
@@ -133,3 +142,78 @@ class TheCommandDoesBothAndSaysSo(TestCase):
     def test_it_runs_and_is_idempotent(self):
         call_command('prune_old_rows', '--quiet')
         call_command('prune_old_rows', '--quiet')
+
+
+# ───────────────────── Файлы, которых не держит ни строка ─────────────────
+
+MEDIA = tempfile.mkdtemp()
+
+
+@override_settings(MEDIA_ROOT=MEDIA)
+class OrphanFilesGoAwayButNotTheOnesInUse(TestCase):
+    """Сигналы `media_cleanup` убирают файл при правке и удалении объекта
+    через ORM. Не покрыт ими один случай — файл, записанный в откатившейся
+    транзакции: диск про откат не знает. За время разработки таких
+    накопилось 12 825 штук на 341 МБ при пятнадцати строках в базе.
+
+    Своя `MEDIA_ROOT`, как у `test_uploads`: здесь по-настоящему пишут и
+    удаляют файлы на диске.
+    """
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(MEDIA, ignore_errors=True)
+        super().tearDownClass()
+
+    def _orphan(self, name='covers/ешкімдікі.png', *, hours_old=48):
+        path = Path(MEDIA) / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'x')
+        stamp = time.time() - hours_old * 3600
+        os.utime(path, (stamp, stamp))
+        return path
+
+    def test_a_file_no_row_points_at_is_an_orphan(self):
+        path = self._orphan()
+        self.assertIn(path, data.orphan_media_files())
+
+    def test_a_file_a_row_points_at_is_not(self):
+        story = make.story(author=make.user())
+        story.cover = make.tiny_image('мұқаба.png')
+        story.save()
+        path = Path(MEDIA) / story.cover.name
+        stamp = time.time() - 48 * 3600
+        os.utime(path, (stamp, stamp))
+
+        self.assertNotIn(path, data.orphan_media_files())
+
+    def test_a_fresh_file_is_left_alone(self):
+        """Отсрочка закрывает гонку: файл пишется до `COMMIT`, и строки на
+        него в момент прохода может ещё не быть."""
+        path = self._orphan('covers/жаңа.png', hours_old=0)
+        self.assertNotIn(path, data.orphan_media_files())
+        self.assertIn(path, data.orphan_media_files(older_than_hours=0))
+
+    def test_without_apply_the_command_deletes_nothing(self):
+        path = self._orphan()
+        call_command('prune_media', '--quiet')
+        self.assertTrue(path.exists())
+
+    def test_with_apply_the_command_deletes_the_orphan(self):
+        orphan = self._orphan()
+        story = make.story(author=make.user())
+        story.cover = make.tiny_image('мұқаба.png')
+        story.save()
+        kept = Path(MEDIA) / story.cover.name
+        stamp = time.time() - 48 * 3600
+        os.utime(kept, (stamp, stamp))
+
+        call_command('prune_media', '--apply', '--quiet')
+
+        self.assertFalse(orphan.exists())
+        self.assertTrue(kept.exists())
+
+    def test_it_is_idempotent(self):
+        self._orphan()
+        call_command('prune_media', '--apply', '--quiet')
+        call_command('prune_media', '--apply', '--quiet')

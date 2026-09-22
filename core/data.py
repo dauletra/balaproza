@@ -164,6 +164,9 @@ from .queries.story import (
 # ── Счётчики-кэши: сверка сигналов из core/counters.py ──────────────────
 from .counters import recount_engagement
 
+# ── Файлы: сверка папки `media/` со строками ────────────────────────────
+from .media_cleanup import orphan_media_files
+
 # ── Теги (docs/ui.md) ───────────────────────────────────────────────────────
 from .queries.tags import (
     accept_tags,
