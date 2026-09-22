@@ -72,15 +72,45 @@
         </div>
     </form>
 
-    {# ── Бас тарту: жалғыз шығу жолы, гейт өзгені жібермейді ── #}
+    {% comment %}
+        Бас тарту: жалғыз шығу жолы, гейт өзгені жібермейді.
+
+        Две кнопки, потому что за ними два разных действия, и одна подпись
+        на оба врала бы одному из них. У анонимного (первый вход по
+        Telegram, анкета ещё не отправлена) в базе нет ничего — отказ
+        стирает ключ сессии, и подтверждать тут нечего. У вошедшего без
+        анкеты аккаунт уже существует, и та же кнопка удаляет его
+        каскадом: всё, что он успел написать, все подписки, все
+        комментарии.
+
+        До этого обе вели в один голый сабмит. Несоответствие уровня
+        опасности уровню защиты: удаление одной главы на этом же портале
+        подтверждается модалкой, а удаление аккаунта отсюда — нет. И это
+        не теория: `createsuperuser` заводит аккаунт с пустым согласием,
+        то есть первый же администратор, открывший главную, упирается в
+        эту анкету и видит кнопку, которая сносит его аккаунт.
+    {% endcomment %}
     <div class="mt-5 text-center">
-        <form method="post" action="{% url 'core:decline_onboarding' %}" role="none">
-            {% csrf_token %}
-            <button type="submit"
+        {% if user.is_authenticated %}
+            <button type="button" x-data
+                    @click="$dispatch('open-delete-confirm', {
+                        name: 'тіркелгеніңді',
+                        title: 'Тіркеуден бас тарту керек пе?',
+                        body: 'Аккаунтың және онымен байланысты бәрі — жазғаның, пікірлерің, жазылымдарың — қайтарылмастай өшіріледі.',
+                        confirm_url: '{% url "core:decline_onboarding" %}'
+                    })"
                     class="font-sans text-sm font-semibold text-slate-500 hover:text-status-error-fg">
                 Тіркеуден бас тарту
             </button>
-        </form>
+        {% else %}
+            <form method="post" action="{% url 'core:decline_onboarding' %}" role="none">
+                {% csrf_token %}
+                <button type="submit"
+                        class="font-sans text-sm font-semibold text-slate-500 hover:text-status-error-fg">
+                    Тіркеуден бас тарту
+                </button>
+            </form>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

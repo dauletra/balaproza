@@ -5,7 +5,7 @@
 
 {% block content %}
 {% comment %}
-    Сводка портала (D6). Контекст: summary, promise_hours.
+    Сводка портала (D6). Контекст: summary, week_ago, promise_hours.
 
     Все числа — про **воронку**, а не про трафик: сколько людей дошло,
     сколько текстов дошло, сколько ждёт и как долго. Трафик считает
@@ -14,12 +14,26 @@
     Стороннего счётчика на портале нет намеренно: на детской площадке
     чужой скрипт — это абзац в политике конфиденциальности и данные,
     ушедшие наружу, а всё нужное и так лежит в своих таблицах.
+
+    Рядом с каждым числом — то же число неделю назад (`PortalDay`).
+    Снимок, а не пересчёт: накопленные счётчики убывают вместе с
+    удалёнными аккаунтами и работами, а журнал оқылым живёт две недели, —
+    «сколько нас было в среду» после среды не восстанавливается ничем.
+
+    Колонка появляется на восьмой день работы суточной команды. Первую
+    неделю сравнивать не с чем, и это честнее подставленной ближайшей
+    строки.
 {% endcomment %}
 <header class="mb-6">
     <h1 class="font-display text-3xl font-bold text-slate-900">Портал сандары</h1>
     <p class="mt-2 font-sans text-sm text-slate-600">
         Тек өз базамыздан. Сыртқы санауыш жоқ.
     </p>
+    {% if not week_ago %}
+        <p class="mt-2 font-sans text-xs text-slate-500">
+            Апталық салыстыру әлі жоқ: күнделікті түсірілім жиналып жатыр.
+        </p>
+    {% endif %}
 </header>
 
 {% comment %}
@@ -30,37 +44,46 @@
 <section class="mb-8">
     <h2 class="mb-3 font-display text-lg font-bold text-slate-800">Автор жолы</h2>
     <dl class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div class="rounded-lg border border-slate-200 bg-white p-4">
-            <dt class="font-sans text-xs text-slate-600">Кірді</dt>
-            <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ summary.signed_up|spaced }}</dd>
-        </div>
-        <div class="rounded-lg border border-slate-200 bg-white p-4">
-            <dt class="font-sans text-xs text-slate-600">Анкетаны аяқтады</dt>
-            <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ summary.onboarded|spaced }}</dd>
-        </div>
-        <div class="rounded-lg border border-slate-200 bg-white p-4">
-            <dt class="font-sans text-xs text-slate-600">Жаза бастады</dt>
-            <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ summary.wrote|spaced }}</dd>
-        </div>
-        <div class="rounded-lg border border-slate-200 bg-white p-4">
-            <dt class="font-sans text-xs text-slate-600">Жариялады</dt>
-            <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ summary.published|spaced }}</dd>
-        </div>
+        {% include "components/stat_card.html" with label="Кірді" value=summary.signed_up was=week_ago.signed_up has_was=week_ago %}
+        {% include "components/stat_card.html" with label="Анкетаны аяқтады" value=summary.onboarded was=week_ago.onboarded has_was=week_ago %}
+        {% include "components/stat_card.html" with label="Жаза бастады" value=summary.wrote was=week_ago.wrote has_was=week_ago %}
+        {% include "components/stat_card.html" with label="Жариялады" value=summary.published was=week_ago.published has_was=week_ago %}
     </dl>
 </section>
 
 <section class="mb-8">
     <h2 class="mb-3 font-display text-lg font-bold text-slate-800">Мәтін жолы</h2>
     <dl class="grid grid-cols-2 gap-3">
-        <div class="rounded-lg border border-slate-200 bg-white p-4">
-            <dt class="font-sans text-xs text-slate-600">Жоба</dt>
-            <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ summary.drafts|spaced }}</dd>
-        </div>
-        <div class="rounded-lg border border-slate-200 bg-white p-4">
-            <dt class="font-sans text-xs text-slate-600">Жарияланған</dt>
-            <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ summary.public|spaced }}</dd>
-        </div>
+        {% include "components/stat_card.html" with label="Жоба" value=summary.drafts was=week_ago.drafts has_was=week_ago %}
+        {% include "components/stat_card.html" with label="Жарияланған" value=summary.public was=week_ago.public has_was=week_ago %}
     </dl>
+</section>
+
+{% comment %}
+    Читатель. Единственный блок здесь не про автора — и единственный
+    вопрос, на который портал не мог ответить вовсе: возвращается ли
+    человек на второй день.
+
+    Считается по журналу оқылым, и потому только по **вошедшим**: у
+    гостя личности нет, а заводить её ради счётчика значило бы следить
+    за ребёнком ровно там, где политика обещает обратное. Число поэтому
+    заведомо ниже настоящего числа читателей — важно не оно само, а
+    как оно движется.
+
+    За вчера, а не за сегодня: сегодняшние сутки неполны всегда, и число
+    из них читалось бы как падение.
+{% endcomment %}
+<section class="mb-8">
+    <h2 class="mb-3 font-display text-lg font-bold text-slate-800">Оқырман: кеше</h2>
+    <dl class="grid grid-cols-2 gap-3">
+        {% include "components/stat_card.html" with label="Кірген оқырман оқыды" value=summary.readers was=week_ago.readers has_was=week_ago note="Қонақтар саналмайды" %}
+        {% include "components/stat_card.html" with label="Алдыңғы күні де оқыған" value=summary.returning_readers was=week_ago.returning_readers has_was=week_ago %}
+    </dl>
+    {% if summary.readers %}
+        <p class="mt-3 font-sans text-sm text-slate-600">
+            Кешегі оқырманның {{ summary.returning_share }}%-ы алдыңғы күні де болған.
+        </p>
+    {% endif %}
 </section>
 
 {% comment %}
@@ -71,18 +94,9 @@
 <section>
     <h2 class="mb-3 font-display text-lg font-bold text-slate-800">Модерация: соңғы апта</h2>
     <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <div class="rounded-lg border border-slate-200 bg-white p-4">
-            <dt class="font-sans text-xs text-slate-600">Шешім қабылданды</dt>
-            <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ summary.decided_week|spaced }}</dd>
-        </div>
-        <div class="rounded-lg border border-slate-200 bg-white p-4">
-            <dt class="font-sans text-xs text-slate-600">Қайтарылды</dt>
-            <dd class="mt-1 font-display text-2xl font-bold text-slate-900">{{ summary.returned_week|spaced }}</dd>
-        </div>
-        <div class="rounded-lg border p-4 {% if summary.overdue %}border-status-attention-fg/40 bg-status-attention-bg/40{% else %}border-slate-200 bg-white{% endif %}">
-            <dt class="font-sans text-xs text-slate-600">Мерзімнен асқан ({{ promise_hours }} сағат)</dt>
-            <dd class="mt-1 font-display text-2xl font-bold {% if summary.overdue %}text-status-attention-fg{% else %}text-slate-900{% endif %}">{{ summary.overdue|spaced }}</dd>
-        </div>
+        {% include "components/stat_card.html" with label="Шешім қабылданды" value=summary.decided_week was=week_ago.decided_week has_was=week_ago %}
+        {% include "components/stat_card.html" with label="Қайтарылды" value=summary.returned_week was=week_ago.returned_week has_was=week_ago %}
+        {% include "components/stat_card.html" with label=overdue_label value=summary.overdue was=week_ago.overdue has_was=week_ago attention=summary.overdue %}
     </dl>
     {% if summary.oldest_wait %}
         <p class="mt-3 font-sans text-sm text-slate-600">

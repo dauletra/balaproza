@@ -25,11 +25,28 @@
             <p class="mt-1.5 max-w-[620px] font-sans text-[14px] leading-[1.45] text-slate-600 sm:mt-2 sm:leading-[1.55]">
                 Құрдастарың жазған қазақша әңгімелер мен повестер. Оқы, ұнатқаныңды сақта.
             </p>
-            <p class="mt-1 font-sans text-[12px] leading-[1.4] text-slate-500">
-                {{ portal_stats.stories }} шығарма
-                <span aria-hidden="true">·</span> {{ portal_stats.authors }} автор
-                <span aria-hidden="true">·</span> {{ portal_stats.genres }} жанр
-            </p>
+            {% comment %}
+                Масштаб называется, только когда его есть чем назвать.
+
+                Строка стояла безусловной, и в день открытия первым, что
+                видел первый посетитель, было «0 шығарма · 3 автор» —
+                цифра, сообщающая, что читать нечего, и считающая авторами
+                администраторов портала. Тот же приём, которым тут уже
+                прячутся пустые ряды: главная честно сжимается под то, что
+                есть, и растёт вместе с каталогом.
+
+                Условие по работам, а не по авторам: автор без единой
+                публичной работы в счёт больше не идёт (`portal_stats`),
+                значит нули у обоих появляются и исчезают вместе, а
+                спрашивать надо о том, ради чего сюда пришли.
+            {% endcomment %}
+            {% if portal_stats.stories %}
+                <p class="mt-1 font-sans text-[12px] leading-[1.4] text-slate-500">
+                    {{ portal_stats.stories }} шығарма
+                    <span aria-hidden="true">·</span> {{ portal_stats.authors }} автор
+                    <span aria-hidden="true">·</span> {{ portal_stats.genres }} жанр
+                </p>
+            {% endif %}
         </div>
 
         <div class="mt-3 flex flex-col gap-3 sm:mt-5 lg:flex-row lg:items-center">

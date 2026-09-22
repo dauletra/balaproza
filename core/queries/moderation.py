@@ -14,7 +14,7 @@
 у которой без поданной ревизии нет входа, а через `Story.take_down`.
 """
 
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
 from django.db import transaction
 from django.db.models import Count, Min
@@ -33,9 +33,11 @@ from ..models import (
     ChapterRevision,
     ModerationClaim,
     ModerationDecision,
+    PortalDay,
     Report,
     Story,
     StoryComment,
+    StoryView,
     User,
 )
 from .notifications import notify_comment
@@ -341,6 +343,8 @@ def portal_summary() -> dict:
               .order_by('submitted_at').values_list('submitted_at', flat=True)
               .first())
 
+    readers = reader_day(timezone.localdate() - timedelta(days=1))
+
     return {
         # Воронка автора: пришёл → дозаполнил → начал писать → опубликовал.
         # Разрыв между первыми двумя — цена анкеты; между вторым и
@@ -359,4 +363,101 @@ def portal_summary() -> dict:
         # Самое старое ожидание — то, по чему видно нарушенное обещание.
         'oldest_wait': oldest,
         'overdue': overdue_count(),
+        # Читатель — за **вчера**, а не за сегодня: сегодняшние сутки
+        # неполны всегда, и число из них читалось бы как падение.
+        **readers,
+        # Доля считается здесь, а не хранится строкой дня: у строки для
+        # неё есть `PortalDay.returning_share`, и второй экземпляр того
+        # же деления разошёлся бы с первым.
+        'returning_share': (
+            round(100 * readers['returning_readers'] / readers['readers'])
+            if readers['readers'] else 0),
     }
+
+
+# ── Читатель за сутки и снимок дня (3.1 в PLAN-AUDIT.md) ─────────────────
+#
+# Сводка выше отвечает «сколько сейчас». Чего она не умеет и не может
+# уметь — сказать, растёт это или падает: в базе лежат только текущие
+# числа, а вчерашние не восстанавливаются ничем (см. `PortalDay`).
+#
+# Возвращаемость читателя при этом уже лежит в базе и просто не
+# спрашивалась: журнал `StoryView` несёт читателя и момент. Живёт он две
+# недели — значит снять это число можно только вовремя, и в этом вся
+# причина суточной команды.
+
+
+def _day_bounds(day):
+    """Границы календарных суток в часовом поясе портала.
+
+    Явными моментами, а не `created_at__date`: тот перекладывает
+    преобразование зоны на базу, то есть требует от неё свежей базы
+    часовых поясов, и молча съезжает на час там, где её нет.
+    """
+    start = timezone.make_aware(datetime.combine(day, time.min))
+    return start, start + timedelta(days=1)
+
+
+def _reader_ids(day) -> set:
+    """Кто читал в этот день. Только вошедшие: у гостя личности нет, и
+    заводить её ради счётчика значило бы следить за ребёнком там, где
+    политика обещает обратное."""
+    start, end = _day_bounds(day)
+    return set(StoryView.objects
+               .filter(created_at__gte=start, created_at__lt=end,
+                       viewer__isnull=False)
+               .values_list('viewer_id', flat=True))
+
+
+def reader_day(day) -> dict:
+    """Сколько вошедших читало в этот день и сколько из них читало
+    накануне.
+
+    Два множества, а не запрос с подзапросом: журнал держит только окно в
+    две недели, а читателей за сутки на детской площадке столько, что
+    пересечение в Python дешевле второго прохода по индексу. Когда суток
+    перестанет хватать — это место и станет первым, что перепишут.
+    """
+    today = _reader_ids(day)
+    if not today:
+        return {'readers': 0, 'returning_readers': 0}
+    yesterday = _reader_ids(day - timedelta(days=1))
+    return {'readers': len(today),
+            'returning_readers': len(today & yesterday)}
+
+
+def record_portal_day(day=None) -> PortalDay:
+    """Заморозить сводку за сутки. По умолчанию — за вчера.
+
+    Вчера, а не сегодня: сутки должны быть полными, иначе строка врёт про
+    читателя тем сильнее, чем раньше отработал cron.
+
+    Идемпотентна: повторный запуск за тот же день переписывает строку, а
+    не заводит вторую. Пропуск дня наверстывается `--day`, но не глубже
+    окна журнала — дальше читателя уже не посчитать.
+    """
+    day = day or timezone.localdate() - timedelta(days=1)
+    numbers = portal_summary()
+    row, _ = PortalDay.objects.update_or_create(
+        day=day,
+        defaults={
+            **{k: numbers[k] for k in (
+                'signed_up', 'onboarded', 'wrote', 'published',
+                'drafts', 'public', 'decided_week', 'returned_week',
+                'overdue')},
+            **reader_day(day),
+        },
+    )
+    return row
+
+
+def portal_day_ago(days: int = 7):
+    """Строка за столько-то дней назад или `None`, если её нет.
+
+    `None` — нормальный ответ первую неделю работы команды, и страница
+    обязана его выдержать: колонка «апта бұрын» просто не рисуется.
+    Ближайшей строки вместо отсутствующей не подставляем — «неделю
+    назад» должно значить неделю назад.
+    """
+    return PortalDay.objects.filter(
+        day=timezone.localdate() - timedelta(days=days)).first()

@@ -20,9 +20,11 @@ Telegram, право писать ей получено ещё на входе (
 """
 
 import time
+from contextlib import contextmanager
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.db import connection
 
 from core import data
 from core.domain.telegram import PUSH_BLOCKED, PUSH_OK, send_telegram_message
@@ -32,6 +34,42 @@ from core.links import push_message
 # укладываются в предел с запасом и не растягивают проход: двести
 # сообщений это восемь секунд.
 PAUSE_SECONDS = 0.04
+
+# Ключ блокировки. Произвольное число, но постоянное: по нему два запуска
+# узнают друг о друге.
+_LOCK_KEY = 4_820_260_922
+
+
+@contextmanager
+def single_run():
+    """Один проход за раз — консультативной блокировкой Postgres.
+
+    Команда ходит раз в минуту и берёт до двухсот строк, а таймаут на
+    сообщение — десять секунд: медленная сеть растягивает проход на
+    полчаса. Отметка «отправлено» ставится **после** ответа Telegram и
+    пачкой в конце, поэтому второй запуск, стартовавший через минуту,
+    видит те же неотмеченные строки и шлёт их второй раз.
+
+    То есть идемпотентность ломалась не от падения, а от штатной
+    медленной сети — и человек получал дубли.
+
+    `flock` в cron решал бы то же, но снаружи и молча: забытый при
+    переносе на другой сервер, он ничем о себе не напомнит. Блокировка
+    здесь едет вместе с командой.
+
+    Она **консультативная и посессионная**: Postgres сам отпускает её,
+    когда соединение умирает, — упавший посреди прохода процесс не
+    оставляет очередь запертой навсегда.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute('SELECT pg_try_advisory_lock(%s)', [_LOCK_KEY])
+        acquired = cursor.fetchone()[0]
+    try:
+        yield acquired
+    finally:
+        if acquired:
+            with connection.cursor() as cursor:
+                cursor.execute('SELECT pg_advisory_unlock(%s)', [_LOCK_KEY])
 
 
 class Command(BaseCommand):
@@ -48,6 +86,16 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        with single_run() as acquired:
+            if not acquired:
+                # Прошлый запуск ещё идёт. Не ошибка: хвост подберёт
+                # следующая минута, а дубль у человека не исправить.
+                if not options['quiet']:
+                    self.stdout.write('another run is still going, skipped')
+                return
+            self._send(**options)
+
+    def _send(self, **options):
         if not settings.TELEGRAM_BOT_TOKEN:
             # В разработке без бота это норма, а не ошибка: событие уже
             # записано и видно на сайте. Молчать всё же нельзя — иначе

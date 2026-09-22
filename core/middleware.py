@@ -7,6 +7,7 @@
 
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.shortcuts import redirect
 from django.urls import Resolver404, resolve, reverse
 
@@ -30,7 +31,7 @@ _EXEMPT_URL_NAMES = frozenset({
     'sitemap',
 })
 
-_EXEMPT_PATH_PREFIXES = ('/admin/', '/static/', '/media/', '/__debug__/')
+_EXEMPT_PATH_PREFIXES = ('/static/', '/media/', '/__debug__/')
 
 
 class OnboardingGuardMiddleware:
@@ -52,6 +53,18 @@ class OnboardingGuardMiddleware:
         if not user.is_authenticated or user.terms_accepted_at:
             return False
         if request.path.startswith(_EXEMPT_PATH_PREFIXES):
+            return False
+        # Админка — по адресу из настроек, а не литералом `/admin/`:
+        # префикс настраивается (`DJANGO_ADMIN_PATH`), и записанный
+        # константой он совпал бы с маршрутом только при умолчании.
+        # Сменили адрес в проде — и человек из админки уезжает на анкету
+        # портала, причём именно тот, у кого согласия нет по построению:
+        # `createsuperuser` его не проставляет.
+        #
+        # Читается в момент запроса, а не при импорте: модулем выше это
+        # было бы неизменяемым на весь процесс, то есть непроверяемым
+        # тестом с другим адресом.
+        if request.path.startswith(f'/{settings.ADMIN_PATH}/'):
             return False
         try:
             match = resolve(request.path)

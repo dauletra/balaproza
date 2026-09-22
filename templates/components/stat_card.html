@@ -1,0 +1,33 @@
+{% load qazaqnovel %}{% comment %}
+    Одно число сводки портала: подпись, значение и что было на этом месте
+    неделю назад.
+
+    Параметры (через include with):
+      label     — подпись
+      value     — число
+      was       — оно же неделю назад (опц.)
+      has_was   — правда ли строка за ту неделю вообще есть (опц.)
+      attention — число, по которому надо действовать сегодня
+      note      — строка под числом (опц.)
+
+    `has_was` отдельно от `was` обязателен: ноль — законное значение, и
+    `{% if was %}` спрятал бы честную неделю без единого читателя ровно
+    так же, как отсутствующую строку. Первую неделю работы команды
+    сравнивать не с чем, и колонка просто не рисуется — подставлять
+    ближайшую строку вместо отсутствующей нельзя: «неделю назад» должно
+    значить неделю назад.
+
+    Карточек на странице девять, и до этого каждая была отдельной копией
+    той же разметки: добавить сравнение значило бы девять раз повторить
+    одно и то же — то есть завести восемь мест, где его можно забыть.
+{% endcomment %}
+<div class="rounded-lg border p-4 {% if attention %}border-status-attention-fg/40 bg-status-attention-bg/40{% else %}border-slate-200 bg-white{% endif %}">
+    <dt class="font-sans text-xs text-slate-600">{{ label }}</dt>
+    <dd class="mt-1 font-display text-2xl font-bold {% if attention %}text-status-attention-fg{% else %}text-slate-900{% endif %}">{{ value|spaced }}</dd>
+    {% if note %}
+        <p class="mt-1 font-sans text-xs text-slate-500">{{ note }}</p>
+    {% endif %}
+    {% if has_was %}
+        <p class="mt-1 font-sans text-xs text-slate-500">апта бұрын: {{ was|spaced }}</p>
+    {% endif %}
+</div>

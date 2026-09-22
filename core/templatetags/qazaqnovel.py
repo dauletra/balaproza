@@ -14,7 +14,15 @@ from django.utils import timezone
 from core.domain.contests import CONTEST_PHASE_LABELS
 from core.domain.contests import eligibility_line as contest_eligibility_line
 from core.domain.contests import timing_line as contest_timing_line
-from core.domain.formatting import kk_ago, kk_date, kk_period, kk_updated, spaced_number
+from core.domain.formatting import (
+    kk_ago,
+    kk_date,
+    kk_period,
+    kk_updated,
+    kk_within_hours,
+    spaced_number,
+)
+from core.domain.moderation import REVIEW_PROMISE_HOURS
 from core.domain.notifications import MODERATION_OUTCOME_LABELS
 
 register = template.Library()
@@ -208,3 +216,20 @@ def outcome_label(notification):
     """Подпись исхода модерации — из реестра, а не из шаблона (BR-72b).
     Незнакомый исход не называется никак: лучше пусто, чем чужая подпись."""
     return MODERATION_OUTCOME_LABELS.get(notification.outcome, "")
+
+
+@register.simple_tag(name="review_promise")
+def review_promise():
+    """Срок, который платформа обещает автору вслух.
+
+    Тегом, а не переменной контекста: обещание одно на портал, а показать
+    его надо из панели отправки, из её htmx-перерисовки и из раздела
+    модерации — протаскивать одно и то же число через три вью значит
+    завести три места, где о нём можно забыть.
+
+    Раньше число жило в домене, а текст автору был литералом «тәулік
+    ішінде»: раздел модерации читал константу, автор — строку в шаблоне,
+    и сдвинуть срок, не разойдясь с тем, что человеку обещано, было
+    нельзя.
+    """
+    return kk_within_hours(REVIEW_PROMISE_HOURS)

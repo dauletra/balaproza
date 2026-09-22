@@ -7,12 +7,21 @@
 остаётся с именем того, кто его принял.
 """
 
+from datetime import datetime, time, timedelta
+
+from django.core.management import call_command
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from core import data
-from core.domain.moderation import diff_summary, paragraph_diff
-from core.models import ModerationClaim, ModerationDecision
+from core.domain.moderation import diff_summary, overdue_label, paragraph_diff
+from core.models import (
+    ModerationClaim,
+    ModerationDecision,
+    PortalDay,
+    StoryView,
+)
 from core.tests import factories as make
 from core.tests.base import TestCase, login_as_newcomer
 
@@ -373,3 +382,160 @@ class ThePortalCountsItself(TestCase):
         login_as_newcomer(reader, 'summary_reader')
 
         self.assertEqual(reader.get(self.url).status_code, 404)
+
+
+# ── Суточный снимок и возвращаемость читателя (3.1 в PLAN-AUDIT.md) ──────
+
+def _read(story, viewer, day):
+    """Засчитанное прочтение в конкретный день, полднем по Алматы —
+    чтобы попадание в сутки не зависело от того, когда идёт прогон."""
+    moment = timezone.make_aware(
+        datetime.combine(day, time.min)) + timedelta(hours=12)
+    return StoryView.objects.create(story=story, viewer=viewer,
+                                    created_at=moment)
+
+
+class TheReaderDayCountsWhoCameBack(TestCase):
+    """Вопрос, на который портал не мог ответить вовсе: возвращается ли
+    человек на второй день.
+
+    Ответ всё это время лежал в базе — журнал оқылым несёт читателя и
+    момент, — и просто не спрашивался. Живёт он две недели, поэтому
+    снимать это число можно только вовремя.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.yesterday = timezone.localdate() - timedelta(days=1)
+        self.before = self.yesterday - timedelta(days=1)
+        self.story = make.story(author=make.user())
+
+    def test_a_reader_of_both_days_counts_as_returning(self):
+        loyal = make.user()
+        _read(self.story, loyal, self.before)
+        _read(self.story, loyal, self.yesterday)
+
+        day = data.reader_day(self.yesterday)
+
+        self.assertEqual(day['readers'], 1)
+        self.assertEqual(day['returning_readers'], 1)
+
+    def test_a_reader_who_came_once_does_not(self):
+        _read(self.story, make.user(), self.yesterday)
+
+        day = data.reader_day(self.yesterday)
+
+        self.assertEqual(day['readers'], 1)
+        self.assertEqual(day['returning_readers'], 0)
+
+    def test_a_guest_is_not_counted_at_all(self):
+        """У гостя личности нет, и заводить её ради счётчика значило бы
+        следить за ребёнком ровно там, где политика обещает обратное."""
+        _read(self.story, None, self.yesterday)
+
+        self.assertEqual(data.reader_day(self.yesterday)['readers'], 0)
+
+    def test_two_visits_in_a_day_are_one_reader(self):
+        twice = make.user()
+        _read(self.story, twice, self.yesterday)
+        _read(self.story, twice, self.yesterday)
+
+        self.assertEqual(data.reader_day(self.yesterday)['readers'], 1)
+
+    def test_an_empty_day_answers_nobody_and_not_a_division_by_zero(self):
+        row = PortalDay(day=self.yesterday, readers=0, returning_readers=0)
+        self.assertEqual(row.returning_share, 0)
+
+
+class TheDailySnapshotKeepsWhatCannotBeRecounted(TestCase):
+    """Накопленные счётчики убывают: аккаунт удаляется полностью, работа
+    сносится автором. «Сколько нас было в среду» после среды не
+    восстанавливается ничем — отсюда строка с датой, а не пересчёт.
+    """
+
+    def test_it_freezes_yesterday_by_default(self):
+        yesterday = timezone.localdate() - timedelta(days=1)
+
+        row = data.record_portal_day()
+
+        self.assertEqual(row.day, yesterday)
+        live = data.portal_summary()
+        for field in ('signed_up', 'onboarded', 'wrote', 'published',
+                      'drafts', 'public', 'decided_week', 'returned_week',
+                      'overdue'):
+            with self.subTest(field=field):
+                self.assertEqual(getattr(row, field), live[field])
+
+    def test_running_it_twice_rewrites_the_same_day(self):
+        data.record_portal_day()
+        data.record_portal_day()
+
+        day = timezone.localdate() - timedelta(days=1)
+        self.assertEqual(PortalDay.objects.filter(day=day).count(), 1)
+
+    def test_a_missed_day_can_be_caught_up(self):
+        day = timezone.localdate() - timedelta(days=4)
+
+        row = data.record_portal_day(day)
+
+        self.assertEqual(row.day, day)
+
+    def test_the_command_writes_the_row(self):
+        call_command('snapshot_portal', '--quiet')
+
+        self.assertTrue(PortalDay.objects.filter(
+            day=timezone.localdate() - timedelta(days=1)).exists())
+
+    def test_the_command_takes_an_explicit_day(self):
+        day = timezone.localdate() - timedelta(days=3)
+
+        call_command('snapshot_portal', '--quiet', f'--day={day.isoformat()}')
+
+        self.assertTrue(PortalDay.objects.filter(day=day).exists())
+
+
+class TheSummaryShowsWhereItIsGoing(TestCase):
+    """Страница отвечала «сколько сейчас» и не умела ответить «растёт или
+    падает»: в базе лежали только текущие числа."""
+
+    def setUp(self):
+        super().setUp()
+        _moderator(self.client, 'trend_mod')
+        self.url = reverse('core:moderation_summary')
+
+    def test_without_a_week_of_snapshots_it_says_so_instead_of_guessing(self):
+        """Ближайшей строки вместо отсутствующей не подставляем: «неделю
+        назад» должно значить неделю назад."""
+        page = self.client.get(self.url)
+
+        self.assertIsNone(page.context['week_ago'])
+        self.assertContains(page, 'Апталық салыстыру әлі жоқ')
+        self.assertNotContains(page, 'апта бұрын')
+
+    def test_with_one_it_puts_the_two_numbers_side_by_side(self):
+        data.record_portal_day(timezone.localdate() - timedelta(days=7))
+
+        page = self.client.get(self.url)
+
+        self.assertEqual(page.context['week_ago'].day,
+                         timezone.localdate() - timedelta(days=7))
+        self.assertContains(page, 'апта бұрын')
+        self.assertNotContains(page, 'Апталық салыстыру әлі жоқ')
+
+    def test_a_zero_week_is_shown_and_not_swallowed(self):
+        """Ноль — законное значение, и `if was` спрятал бы честную неделю
+        без единого читателя так же, как отсутствующую строку."""
+        row = data.record_portal_day(timezone.localdate() - timedelta(days=7))
+        PortalDay.objects.filter(pk=row.pk).update(readers=0, signed_up=0)
+
+        self.assertContains(self.client.get(self.url), 'апта бұрын: 0')
+
+    def test_the_overdue_caption_carries_the_promise(self):
+        self.assertContains(self.client.get(self.url), overdue_label())
+
+    def test_the_page_does_not_grow_with_the_portal(self):
+        """Бюджет: сводка считает полтора десятка чисел, и ни одно из них
+        не должно стоить запроса на строку."""
+        data.record_portal_day(timezone.localdate() - timedelta(days=7))
+        with self.assertNumQueries(16):
+            self.client.get(self.url)

@@ -18,7 +18,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core import data
-from core.domain.telegram import verify_telegram_auth
+from core.domain.telegram import MAX_AUTH_AGE, verify_telegram_auth
 from core.models import User
 from core.tests.base import TestCase, login_as, login_as_newcomer
 
@@ -69,6 +69,23 @@ class VerifyingTheSignature(SimpleTestCase):
         payload = _telegram_payload(auth_date=str(int(time.time()) - 100_000))
         self.assertEqual(
             verify_telegram_auth(payload, settings.TELEGRAM_BOT_TOKEN), 'stale')
+
+    def test_the_window_is_minutes_and_not_a_day(self):
+        """Подписанный адрес равен входу в аккаунт: кто его прочёл, тот
+        вошёл. Суток тут не требовалось ничем — виджет редиректит браузер
+        сразу, — а ссылка все эти сутки лежала в истории браузера и в
+        логах прокси, где запросы пишутся вместе с параметрами."""
+        self.assertEqual(MAX_AUTH_AGE, 5 * 60)
+
+        just_in_time = _telegram_payload(
+            auth_date=str(int(time.time()) - MAX_AUTH_AGE + 30))
+        self.assertIsNone(
+            verify_telegram_auth(just_in_time, settings.TELEGRAM_BOT_TOKEN))
+
+        an_hour_old = _telegram_payload(auth_date=str(int(time.time()) - 3600))
+        self.assertEqual(
+            verify_telegram_auth(an_hour_old, settings.TELEGRAM_BOT_TOKEN),
+            'stale')
 
 
 class TelegramCallback(TestCase):
@@ -370,6 +387,37 @@ class DecliningOnboarding(TestCase):
         self.assertFalse(User.objects.filter(pk=newcomer.pk).exists())
         self.assertFalse(get_user(self.client).is_authenticated)
 
+    # ── Уровень защиты по уровню опасности ────────────────────────────────
+    #
+    # За одной подписью стоят два разных действия. У анонимного в базе нет
+    # ничего, и подтверждать нечего. У вошедшего без анкеты аккаунт уже
+    # есть, и та же кнопка сносит его каскадом — а удаление одной главы на
+    # этом же портале модалку требует. Несоответствие достижимо на первом
+    # же деплое: `createsuperuser` заводит аккаунт с пустым согласием.
+
+    def test_the_account_holder_is_asked_to_confirm(self):
+        login_as_newcomer(self.client, 'thinks_twice', onboarded=False)
+
+        page = self.client.get(reverse('core:onboarding')).content.decode()
+
+        self.assertIn('open-delete-confirm', page,
+                      'удаление аккаунта отсюда идёт без подтверждения')
+        self.assertNotIn(
+            f'action="{reverse("core:decline_onboarding")}"', page,
+            'голый сабмит на удаление остался на странице')
+
+    def test_the_pending_visitor_is_not_asked_to_confirm_nothing(self):
+        """У первого визита по Telegram аккаунта ещё нет: отказ стирает
+        ключ сессии. Модалка «всё будет удалено» обещала бы потерю того,
+        чего не существует."""
+        session = self.client.session
+        session['pending_telegram_id'] = 770333444
+        session.save()
+
+        page = self.client.get(reverse('core:onboarding')).content.decode()
+
+        self.assertIn(f'action="{reverse("core:decline_onboarding")}"', page)
+
 
 class OnboardingGuardMiddleware(TestCase):
     """DEC-85, отменяет заявленное в BR-90 «онбординг не гейтит остальной
@@ -402,3 +450,18 @@ class OnboardingGuardMiddleware(TestCase):
 
     def test_guest_is_not_gated(self):
         self.assertEqual(self.client.get(reverse('core:catalog')).status_code, 200)
+
+    def test_the_admin_is_exempt_at_whatever_path_it_is_mounted(self):
+        """Согласия у `createsuperuser` нет по построению, а адрес админки
+        настраивается. Литеральный `/admin/` в исключениях совпадал бы с
+        маршрутом только при умолчании: сменили адрес — и модератор
+        уезжает из админки на анкету портала.
+
+        Проверяется отсутствие редиректа на анкету, а не код ответа:
+        маршруты собираются при импорте, и подменённый в тесте адрес
+        админки никуда не ведёт — важно, что гейт его пропустил.
+        """
+        login_as_newcomer(self.client, 'staff_without_consent', onboarded=False)
+        with self.settings(ADMIN_PATH='secret-door'):
+            response = self.client.get('/secret-door/')
+        self.assertNotEqual(response.status_code, 302)

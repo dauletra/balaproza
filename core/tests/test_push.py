@@ -12,6 +12,7 @@
 
 import json
 import urllib.error
+from contextlib import contextmanager
 from datetime import timedelta
 from io import StringIO
 from unittest.mock import patch
@@ -450,3 +451,37 @@ class TheSenderUnderstandsWhatTelegramAnswered(TestCase):
         """Чужая HTML-страница от прокси не повод закрыть канал навсегда."""
         self._answer(code=502, description='<html>Bad Gateway</html>')
         self.assertEqual(send_telegram_message('t', 1, 'сәлем'), PUSH_FAILED)
+
+
+@contextmanager
+def _held_lock():
+    """Блокировка, которую уже держит кто-то другой."""
+    yield False
+
+
+class OnlyOneRunAtATime(TestCase):
+    """Проход длиной в полчаса — не гипотеза: двести сообщений при
+    десятисекундном таймауте укладываются ровно в него, а cron ходит раз
+    в минуту.
+
+    Отметка «отправлено» ставится после ответа Telegram и пачкой в конце,
+    поэтому второй запуск видел бы те же неотмеченные строки и слал их
+    второй раз. Ломалась идемпотентность не от падения, а от медленной
+    сети.
+    """
+
+    def test_a_second_run_does_nothing_while_the_first_is_going(self):
+        with patch('core.management.commands.push_notifications.single_run',
+                   lambda: _held_lock()):
+            out = StringIO()
+            call_command('push_notifications', stdout=out)
+
+        self.assertIn('another run is still going', out.getvalue())
+
+    def test_a_free_lock_lets_the_run_through(self):
+        """Обратная сторона: без занятой блокировки команда работает как
+        работала, и это тот же путь, которым идут остальные тесты файла."""
+        out = StringIO()
+        call_command('push_notifications', stdout=out, stderr=StringIO())
+
+        self.assertNotIn('another run is still going', out.getvalue())

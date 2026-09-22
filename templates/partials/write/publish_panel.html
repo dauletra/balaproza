@@ -164,13 +164,13 @@
                     одинаково, пока не названы.
                 {% endcomment %}
                 <p class="mt-2 font-sans text-xs leading-relaxed text-slate-500">
-                    Модератор оқып шығады — әдетте тәулік ішінде. Жауап Telegram-ға
+                    Модератор оқып шығады — әдетте {% review_promise %}. Жауап Telegram-ға
                     келеді. Жарияланған соң шығарма каталогта көрінеді.
                 </p>
             {% elif pending_since %}
                 <p class="flex items-start gap-2 font-sans text-xs leading-relaxed text-slate-700">
                     <span class="mt-px shrink-0 text-status-attention-fg">{% include "components/icon.html" with name="adjustments" size=14 only %}</span>
-                    <span>Мәтін модераторда — жіберілгеніне {{ pending_since|ago }}. Әдетте тәулік ішінде жауап береміз, хабарламасы Telegram-ға келеді. Осы уақытта өңдесең, тексеруге соңғы нұсқа кетеді.</span>
+                    <span>Мәтін модераторда — жіберілгеніне {{ pending_since|ago }}. Әдетте {% review_promise %} жауап береміз, хабарламасы Telegram-ға келеді. Осы уақытта өңдесең, тексеруге соңғы нұсқа кетеді.</span>
                 </p>
                 {% comment %}
                     Отзыв заявки (BR-80). Без него автор, заметивший

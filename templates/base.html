@@ -20,6 +20,23 @@
         <meta name="twitter:card" content="summary_large_image">
     {% endblock %}
 
+    {% comment %}
+        Канонический адрес и запрет индексации.
+
+        До них у каталога не было ни того, ни другого, а осей у него
+        шесть плюс страницы: каждая комбинация — отдельный индексируемый
+        адрес с почти тем же содержимым. На молодом домене краулер тратит
+        обход на фасеты вместо самих работ.
+
+        Умолчание — текущий путь без query: для страницы работы, профиля
+        и жанра это ровно то, что нужно, и переопределять блок им не
+        приходится. Каталог подставляет свой (`canonical`) и закрывает
+        сужённую выдачу `noindex, follow` — «follow», потому что ссылки
+        на работы с неё вести должны, индексироваться должна не она.
+    {% endcomment %}
+    <link rel="canonical" href="{% block canonical %}{{ request.scheme }}://{{ request.get_host }}{{ request.path }}{% endblock %}">
+    {% block robots %}{% endblock %}
+
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicon-32.png' %}">
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'img/favicon-16.png' %}">
     <link rel="icon" href="{% static 'img/favicon.ico' %}">

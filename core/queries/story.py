@@ -10,7 +10,7 @@
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models import Count, OuterRef, Prefetch, Subquery
+from django.db.models import Count, Exists, OuterRef, Prefetch, Subquery
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
@@ -22,6 +22,7 @@ from ..models import (
     Chapter,
     ChapterReactionVote,
     Collection,
+    CollectionItem,
     CommentLike,
     PollVote,
     Story,
@@ -380,7 +381,7 @@ def sitemap_collections():
 
 
 def all_collections():
-    """Все жинақтар с составом — ровно под то, что рисует карточка.
+    """Жинақтар с составом — ровно под то, что рисует карточка.
 
     Карточка подборки показывает три обложки, а `cover_placeholder` берёт
     у работы название, файл и оттенок жанра. Автор и теги ей не нужны:
@@ -388,8 +389,20 @@ def all_collections():
     отдельными запросами, а полный `all_stories()` добавил бы третий за
     теги. Состав одной подборки, наоборот, рисуется полными карточками —
     там `collection_by_slug` и берёт `all_stories()`.
+
+    **Пустая подборка сюда не попадает.** Она существует как заготовка
+    редакции, а для читателя это тупик: карточка обещает подборку,
+    называет «0 шығарма» и открывает пустую страницу. На первый день
+    портала это ровно та цифра, которой там быть не должно, — то же
+    правило, по которому не рендерятся пустые ряды главной.
+
+    Прямая ссылка на пустую подборку при этом работает
+    (`collection_by_slug`): редакция собирает её постепенно и смотрит на
+    то, что уже набрала.
     """
-    return Collection.objects.prefetch_related(
+    return Collection.objects.filter(
+        Exists(CollectionItem.objects.filter(collection=OuterRef('pk')))
+    ).prefetch_related(
         Prefetch('item_set__story',
                  queryset=Story.objects.select_related('primary_genre')))
 

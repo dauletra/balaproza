@@ -12,11 +12,13 @@
 import re
 from datetime import timedelta
 
+from django.core.cache import cache
 from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from core import data
+from core.models import Story, User
 from core.templatetags.qazaqnovel import (
     reading_meta,
     short_date,
@@ -25,7 +27,7 @@ from core.templatetags.qazaqnovel import (
     update_meta,
 )
 from core.tests import factories
-from core.tests.base import TestCase, login_as
+from core.tests.base import TestCase, login_as, login_as_newcomer
 
 
 class GuestSeesTheEditorialFront(TestCase):
@@ -235,16 +237,22 @@ class EditorialBlocksAreWiredUp(TestCase):
         self.assertEqual(shown[0], writer.username)
         self.assertNotIn(newcomer.username, shown)
 
-    def test_the_empty_profile_is_sorted_last_not_filtered_out(self):
-        """Это сортировка, а не фильтр: непустой ряд из DEC-57 остаётся.
-        Когда заполненных профилей не хватает на `limit`, пустые добирают
-        хвост — иначе в тихий месяц ряд на главной исчезал бы совсем.
+    def test_the_empty_profile_is_filtered_out_not_sorted_last(self):
+        """Обратное тому, что тут стояло раньше, и это смена решения.
+
+        Пустые профили уходили в хвост ради правила «ряд на главной обязан
+        быть непустым». Правило с тех пор сменилось на противоположное:
+        пустой ряд не рендерится вовсе — так ведут себя все остальные
+        секции главной. При новом правиле сортировка не спасала от
+        худшего случая, а создавала его: на портале, где ещё никто не
+        опубликовался, в ряду стояли четыре карточки «0 шығарма · 0
+        жазылушы» вместо отсутствующей секции.
         """
         newcomer = factories.user(username='bosprofil-2',
                                   date_joined=timezone.now() + timedelta(days=1))
         everyone = [a.username for a in data.new_authors(1000)]
-        self.assertIn(newcomer.username, everyone)
-        self.assertEqual(everyone[-1], newcomer.username)
+        self.assertNotIn(newcomer.username, everyone)
+        self.assertTrue(everyone, 'ряд опустел на непустом портале')
 
 
 class TwoRowsMustNotSayTheSameThing(TestCase):
@@ -582,3 +590,66 @@ class ReturningHomeAsksWhatYouWereDoing(TestCase):
         response = self.client.get(f"{reverse('core:home')}?hero_state=empty")
 
         self.assertEqual(response.context['hero_focus'], 'writing')
+
+
+class TheFrontPageOnDayOne(TestCase):
+    """Пустой портал — не гипотеза, а первый день работы.
+
+    `seed_demo` намеренно падает в проде, значит первый посетитель
+    приходит на базу, где нет ни одной работы. Пустые ряды главная прячет
+    с самого начала, а строку масштаба в хиро не прятала: первым, что
+    видел этот посетитель, было «0 шығарма · N автор» — цифра, которая
+    сообщает, что читать нечего.
+
+    Корпус здесь сносится целиком, а не подменяется: проверяется в том
+    числе то, что главная на пустой базе вообще отвечает.
+    """
+
+    def setUp(self):
+        super().setUp()
+        Story.objects.all().delete()
+        self.response = self.client.get(reverse('core:home'))
+        self.html = self.response.content.decode()
+
+    def test_the_front_page_still_answers(self):
+        self.assertEqual(self.response.status_code, 200)
+
+    def test_it_names_no_zero_to_the_first_visitor(self):
+        self.assertNotIn('0 шығарма', self.html)
+        self.assertNotIn('0 автор', self.html)
+
+    def test_it_still_asks_the_question_it_exists_for(self):
+        self.assertContains(self.response, 'Бүгін не оқимыз?')
+        self.assertContains(self.response, 'Шығарма, автор, жанр немесе тег')
+
+
+class WhoCountsAsAnAuthor(TestCase):
+    """Автор в счётчике хиро — тот, у кого есть что почитать.
+
+    `User.objects.count()` считал всякого зарегистрированного, включая
+    администраторов портала и тех, кто вошёл и ничего не написал. Отбор
+    теперь тот же, что у карты сайта: второго правила «кто считается
+    автором» на портале быть не должно.
+    """
+
+    def test_a_reader_without_a_public_work_is_not_counted(self):
+        before = data.portal_stats()['authors']
+
+        login_as_newcomer(self.client, 'reads_only')
+        cache.clear()
+
+        self.assertEqual(data.portal_stats()['authors'], before)
+
+    def test_the_first_published_work_makes_you_an_author(self):
+        """Обратное направление: отбор не просто режет, он отвечает на
+        «кто считается автором», и первая же публичная работа переводит
+        человека в это число."""
+        before = data.portal_stats()['authors']
+        newcomer = factories.user(username='first-work')
+        cache.clear()
+        self.assertEqual(data.portal_stats()['authors'], before)
+
+        factories.story(author=newcomer)
+        cache.clear()
+
+        self.assertEqual(data.portal_stats()['authors'], before + 1)

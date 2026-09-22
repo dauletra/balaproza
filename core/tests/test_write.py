@@ -1,6 +1,7 @@
 """WRITE: авторский кабинет — my_stories, new, manage, settings, chapter_editor."""
 
 import re
+from unittest import mock
 from datetime import timedelta
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -14,6 +15,7 @@ from core.domain.story import MAX_DRAFT_STORIES
 from core.models import Chapter, ChapterPoll, Story, Tag
 from core.tests import factories
 from core.tests.base import login_as, login_as_newcomer, user
+from core.domain.formatting import kk_within_hours
 from core.templatetags.qazaqnovel import reading_meta, since, spaced
 
 
@@ -775,6 +777,50 @@ class OnlyAReadyDraftMayBeSubmitted(TestCase):
         response = self.client.get(reverse(
             'core:chapter_edit', kwargs={'slug': 'aidana-tan', 'chapter': chapter.pk}))
         self.assertNotContains(response, 'Модерацияға жіберу')
+
+
+class ThePromisedTurnaroundComesFromOneNumber(TestCase):
+    """Срок, который портал обещает автору, и срок, по которому раздел
+    модерации считает просрочку, — одно число.
+
+    Раньше их было два: константа в домене, которую читала очередь, и
+    литерал «тәулік ішінде» в панели отправки. Комментарий у константы
+    прямо объяснял, что она в домене именно затем, что её читают обе
+    стороны, — а панель её не читала. Сдвинуть обещание, не разойдясь с
+    тем, что человеку сказано, было нельзя.
+    """
+
+    SLUG = 'aidana-kus'
+
+    def setUp(self):
+        login_as(self.client)
+        # Обещание стоит рядом с живой кнопкой отправки, значит работа
+        # должна быть готова к ней: у недозаполненного черновика этого
+        # абзаца нет вовсе — и правильно, обещать нечего.
+        story = Story.objects.get(slug=self.SLUG)
+        story.audience = '10+'
+        story.save(update_fields=['audience'])
+        Chapter.objects.create(story=story, number=1,
+                               title='1-бөлім', body='Мәтін бар.')
+
+    def _panel(self):
+        return self.client.get(
+            reverse('core:manage_story', kwargs={'slug': self.SLUG})
+        ).content.decode()
+
+    def test_the_author_is_told_the_turnaround(self):
+        self.assertIn('әдетте тәулік ішінде', self._panel())
+
+    def test_moving_the_number_moves_what_the_author_reads(self):
+        with mock.patch('core.templatetags.qazaqnovel.REVIEW_PROMISE_HOURS', 48):
+            self.assertIn('әдетте 2 тәулік ішінде', self._panel())
+
+    def test_a_turnaround_shorter_than_a_day_is_spoken_in_hours(self):
+        """Суток нет — нет и слова «тәулік»: «6 сағат ішінде» человек
+        читает без деления в уме."""
+        self.assertEqual(kk_within_hours(6), '6 сағат ішінде')
+        self.assertEqual(kk_within_hours(24), 'тәулік ішінде')
+        self.assertEqual(kk_within_hours(72), '3 тәулік ішінде')
 
 
 class TheChapterEditorReportsTheTruth(TestCase):

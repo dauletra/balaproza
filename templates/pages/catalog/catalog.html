@@ -22,6 +22,18 @@
     {% if query %}Іздеу: «{{ query }}»{% elif mode == 'genre' %}{{ genre.name }}{% elif mode == 'tag' %}#{{ current_tag.name }}{% else %}Каталог{% endif %} — Qazaqnovel
 {% endblock %}
 
+{% comment %}
+    Один канонический адрес на раздел — сам раздел, без осей, без
+    сортировки и без страницы. Оси комбинируются по шесть штук, и каждая
+    комбинация была отдельным индексируемым адресом с тем же списком.
+
+    Сужённая выдача закрыта от индексации, но не от обхода: ссылки на
+    работы с неё вести должны — индексироваться должна не она.
+{% endcomment %}
+{% block canonical %}{{ request.scheme }}://{{ request.get_host }}{{ canonical }}{% endblock %}
+
+{% block robots %}{% if narrowed %}<meta name="robots" content="noindex, follow">{% endif %}{% endblock %}
+
 {% block content %}
 
     {# ── Hero (жанр/тег — свой, иначе нейтральный catalog-hero, который сам знает про ?q=) ── #}
