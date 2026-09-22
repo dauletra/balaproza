@@ -1,8 +1,9 @@
-"""Админка — единственный инструмент модерации в MVP.
+"""Админка — редакционный инструмент: справочники, теги, конкурсы.
 
-Стандартный admin обязан уметь всё, что модератор делает руками: решить
-судьбу отправленной работы, провести тег по его пути,
-собрать конкурс со всем составом и загрузить файлы в `media/`.
+Решение по работе принимается не здесь, а в разделе `/moderation/`:
+там рядом с кнопками лежит то, по чему решают. Админка отвечает за
+остальное — провести тег по его пути, собрать конкурс со всем составом,
+загрузить файлы в `media/`.
 
 **Чего здесь нет намеренно.** Библиотека, прогресс чтения и подписки —
 личные записи читателя, и список чужих полок в админке был бы витриной
@@ -210,13 +211,15 @@ class StoryTagInline(admin.TabularInline):
 
 @admin.register(Story)
 class StoryAdmin(admin.ModelAdmin):
-    """Карточка работы и рабочий стол модератора.
+    """Карточка работы: редакционная правка, но не решение.
 
-    **Решения здесь больше не принимаются** — для них есть раздел
+    **Решения здесь не принимаются.** Для них есть раздел
     `/moderation/`, где рядом с кнопками лежит то, по чему решают:
     текст поданного, сравнение с опубликованным и прошлые замечания.
-    Действия списка остались запасным путём на случай, когда раздел
-    недоступен, и ведут в ту же дверь `Story.apply_moderation`.
+    Действия списка, повторявшие эти три кнопки, сняты: дубль ходил в ту
+    же дверь `Story.apply_moderation`, то есть расхождения в поведении
+    дать не мог, — но каждая правка модерации трогала два экрана и два
+    набора тестов, а показать модератору текст он всё равно не умел.
 
     Поле статуса остаётся редактируемым, но пересчитывается по главам:
     правка руками держится до следующего пересчёта, о чём говорит
@@ -230,7 +233,6 @@ class StoryAdmin(admin.ModelAdmin):
     autocomplete_fields = ('author',)
     prepopulated_fields = {'slug': ('title',)}
     inlines = (ChapterInline, StoryTagInline)
-    actions = ('approve', 'send_back', 'reject')
     fieldsets = (
         (None, {'fields': ('title', 'slug', 'author', 'annotation', 'cover')}),
         ('Сипаттамасы', {
@@ -254,81 +256,6 @@ class StoryAdmin(admin.ModelAdmin):
                            'есептеледі.',
         }),
     )
-
-    # ── Решение модератора ────────────────────────────────────────────────
-
-    @admin.action(description='Жариялау (модерациядан өткізу)')
-    def approve(self, request, queryset):
-        return self._decide(request, queryset, 'approved')
-
-    @admin.action(description='Толықтыруға қайтару')
-    def send_back(self, request, queryset):
-        return self._decide(request, queryset, 'needs_work')
-
-    @admin.action(description='Қабылдамау (ережеге қайшы)')
-    def reject(self, request, queryset):
-        return self._decide(request, queryset, 'rejected')
-
-    def _decide(self, request, queryset, outcome):
-        """Общий ход всех трёх решений: спросить причину и применить.
-
-        Промежуточная страница нужна ради самой причины: без неё
-        отрицательное решение нельзя записать, а форма списка
-        передать текст не умеет. Страница одна на все три кнопки — две
-        механики рядом читались бы как разные по последствиям действия.
-        """
-        # Очередь — работы с **поданной ревизией**, а не со
-        # значением статуса: у публичного сериала, дописавшего главу,
-        # статус остаётся публичным, и фильтр по нему прятал бы от
-        # модератора ровно то, что ему прислали.
-        queue = queryset.filter(chapter__revisions__state='pending').distinct()
-        skipped = queryset.count() - queue.count()
-
-        error = ''
-        if 'apply' in request.POST:
-            reason = (request.POST.get('reason') or '').strip()
-            if outcome != 'approved' and not reason:
-                error = 'Себепті жазу керек: онсыз автор нені түзетерін білмейді.'
-            else:
-                done = [story.apply_moderation(outcome, reason,
-                                               moderator=request.user)
-                        for story in queue]
-                self.message_user(
-                    request,
-                    f'{len(done)} шығарма: «{MODERATION_OUTCOME_LABELS[outcome]}». '
-                    f'Авторларға хабарлама жіберілді.',
-                    messages.SUCCESS)
-                if skipped:
-                    self._warn_skipped(request, skipped)
-                return None
-
-        if not queue:
-            self._warn_skipped(request, skipped)
-            return None
-
-        return render(request, 'admin/core/story/moderation.html', {
-            **self.admin_site.each_context(request),
-            'title': MODERATION_OUTCOME_LABELS[outcome],
-            'opts': self.model._meta,
-            'stories': queue,
-            'outcome': outcome,
-            'outcome_label': MODERATION_OUTCOME_LABELS[outcome],
-            'reason_required': outcome != 'approved',
-            'error': error,
-            'reason': request.POST.get('reason', ''),
-            'action': request.POST.get('action', ''),
-            'selected': queryset.values_list('pk', flat=True),
-        })
-
-    def _warn_skipped(self, request, skipped):
-        """Работы, которых решение не касается, названы числом, а не молча
-        пропущены: иначе модератор считает решёнными все выбранные."""
-        if skipped:
-            self.message_user(
-                request,
-                f'{skipped} шығарма өткізілді: модерацияға жіберілмеген. '
-                f'Шешім автор өзі жібергенге ғана қабылданады.',
-                messages.WARNING)
 
     def save_model(self, request, obj, form, change):
         """Ручная правка статуса — не модерация, и об этом говорится вслух:

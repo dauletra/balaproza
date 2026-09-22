@@ -1,10 +1,12 @@
-"""Админка как инструмент модерации.
+"""Админка как редакционный инструмент.
 
-Кастомного UI до V2 не будет, значит проверять надо не «страница
-открылась», а то, что модератор может довести дело до конца: решение по
-работе доходит до автора, причина отказа обязательна,
-статус после одобрения зависит от формата, а в `media/` не
-попадает SVG.
+Решение по работе здесь больше не принимается — для него есть раздел
+`/moderation/`. Осталось то, ради чего админка и нужна: карточка работы
+с правкой полей, справочники, загрузка растра.
+
+Проверяется поэтому не «страница открылась», а две вещи: одна дверь
+решения (`Story.apply_moderation`) доводит дело до автора, и ручная
+правка поля честно говорит, что уведомления не было.
 
 Смоук по всем зарегистрированным моделям стоит здесь же: `list_display`
 и `list_filter` проверяются системными чеками не полностью — свойство
@@ -121,10 +123,17 @@ class ADecisionReachesTheAuthor(TestCase):
         self.assertEqual(draft.status, 'NotPublished')
 
 
-class TheModeratorWorksThroughTheAdmin(TestCase):
-    """Тот же путь, каким им пользуются: список работ и действие над ним.
-    Кастомного UI до V2 не будет, значит проверять надо не
-    «страница открылась», а то, что дело доводится до конца."""
+class HandEditingIsNotModeration(TestCase):
+    """Решение по работе принимается в разделе `/moderation/`, и только
+    там. В админке оставлена карточка работы — редакционная правка полей,
+    — и она обязана говорить, что уведомления при этом не было.
+
+    Действия списка, повторявшие три кнопки решения, сняты: они ходили в
+    ту же дверь `Story.apply_moderation`, то есть расхождения дать не
+    могли, но показать модератору текст, по которому решают, всё равно не
+    умели. Проверка самих решений — в `ADecisionReachesTheAuthor` выше и
+    в `test_moderation.py`.
+    """
 
     def setUp(self):
         self.moderator = User.objects.create_superuser(
@@ -132,57 +141,15 @@ class TheModeratorWorksThroughTheAdmin(TestCase):
         self.client.force_login(self.moderator)
         self.author = User.objects.get(username='aidana')
         self.story = _story(self.author)
-        self.url = reverse('admin:core_story_changelist')
 
-    def _act(self, action, **extra):
-        return self.client.post(self.url, {
-            'action': action,
-            '_selected_action': [self.story.pk],
-            **extra,
-        }, follow=True)
-
-    def test_a_negative_outcome_asks_for_a_reason_and_only_then_applies(self):
-        asked = self._act('send_back')
-        self.assertContains(asked, 'Толықтыру қажет')
-        self.story.refresh_from_db()
-        self.assertEqual(self.story.status, 'OnModeration')
-
-        empty = self._act('reject', apply='1', reason='  ')
-        self.assertContains(empty, 'Себепті жазу керек')
-        self.story.refresh_from_db()
-        self.assertEqual(self.story.status, 'OnModeration')
-        self.assertFalse(Notification.objects.filter(story=self.story).exists())
-
-        self._act('send_back', apply='1', reason='Соңы жоқ.')
-        self.story.refresh_from_db()
-        self.assertEqual(self.story.status, 'NeedsWork')
-        note = Notification.objects.get(story=self.story)
-        self.assertEqual(note.outcome, 'needs_work')
-        self.assertEqual(note.text, 'Соңы жоқ.')
-
-    def test_approval_goes_through_without_a_reason(self):
-        self._act('approve', apply='1', reason='')
-        self.story.refresh_from_db()
-        self.assertEqual(self.story.status, 'Published')
-        # По `kind`, а не по одной работе: у одобрения два следствия —
-        # решение автору и зов подписчикам (`new_chapter`), — и «единственное
-        # уведомление этой работы» перестало быть правдой ровно тогда, когда
-        # подписка начала к чему-то приводить. Вопрос теста прежний: акт
-        # решения записан и назван верно.
-        note = Notification.objects.get(story=self.story, kind='moderation')
-        self.assertEqual(note.outcome, 'approved')
-
-    def test_a_work_outside_the_queue_is_named_not_skipped_silently(self):
-        """Иначе модератор считает решёнными все, что выбрал.
-
-        «Вне очереди» теперь значит «нет ждущей ревизии»: очередь
-        собрана из поданного текста, а не из значения статуса."""
-        ChapterRevision.objects.filter(chapter__story=self.story).delete()
-        self.story.status = 'NotPublished'
-        self.story.save(update_fields=['status'])
-        self.assertContains(self._act('approve'), 'өткізілді')
-        self.story.refresh_from_db()
-        self.assertEqual(self.story.status, 'NotPublished')
+    def test_the_list_offers_no_moderation_action(self):
+        """Дубля нет и в интерфейсе: выпадающий список действий не
+        предлагает решить судьбу работы."""
+        page = self.client.get(
+            reverse('admin:core_story_changelist')).content.decode()
+        for action in ('approve', 'send_back', 'reject'):
+            with self.subTest(action=action):
+                self.assertNotIn(f'value="{action}"', page)
 
     def test_editing_the_field_by_hand_warns_that_nobody_was_told(self):
         """Правка поля — не модерация: уведомление пишет только решение.
