@@ -24,20 +24,17 @@
 и обратима только бэкапом `media/`.
 """
 
-from django.core.management.base import BaseCommand
-
 from core import data
 
+from ._base import QuietCommand
 
-class Command(BaseCommand):
+
+class Command(QuietCommand):
     help = ('Показывает (а с --apply удаляет) файлы в media/, '
             'на которые не ссылается ни одна строка.')
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            '--quiet', action='store_true',
-            help='Без отчёта в stdout (для вызова из тестов).',
-        )
+        super().add_arguments(parser)
         parser.add_argument(
             '--apply', action='store_true',
             help='Действительно удалить. Без него — только отчёт.',
@@ -63,9 +60,8 @@ class Command(BaseCommand):
                     continue
                 removed += 1
 
-        if not options['quiet']:
-            megabytes = total_bytes / 1048576
-            verb = f'{removed} removed' if options['apply'] else 'dry run'
-            self.stdout.write(
-                f'{len(orphans)} orphan media files ({megabytes:.1f} MB), '
-                f'{verb}')
+        megabytes = total_bytes / 1048576
+        verb = f'{removed} removed' if options['apply'] else 'dry run'
+        self.say(options,
+                 f'{len(orphans)} orphan media files ({megabytes:.1f} MB), '
+                 f'{verb}')

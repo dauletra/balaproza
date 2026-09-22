@@ -26,19 +26,18 @@
 
 from datetime import date
 
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 
 from core import data
 
+from ._base import QuietCommand
 
-class Command(BaseCommand):
+
+class Command(QuietCommand):
     help = 'Замораживает сводку портала за сутки (по умолчанию за вчера).'
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            '--quiet', action='store_true',
-            help='Без отчёта в stdout (для вызова из тестов).',
-        )
+        super().add_arguments(parser)
         parser.add_argument(
             '--day', default='',
             help='Какой день снять, ГГГГ-ММ-ДД. По умолчанию — вчерашний.',
@@ -54,10 +53,7 @@ class Command(BaseCommand):
 
         row = data.record_portal_day(day)
 
-        if not options['quiet']:
-            # Отчёт по-английски, как у остальных команд: это вывод
-            # инструмента, а не строка интерфейса.
-            self.stdout.write(
-                f'{row.day}: {row.readers} readers, '
-                f'{row.returning_readers} of them also read the day before, '
-                f'{row.published} authors published, {row.overdue} overdue')
+        self.say(options,
+                 f'{row.day}: {row.readers} readers, '
+                 f'{row.returning_readers} of them also read the day before, '
+                 f'{row.published} authors published, {row.overdue} overdue')

@@ -11,17 +11,17 @@
 <div x-data="modal('open-delete-confirm', ['name', 'confirm_url', 'title', 'body'])"
      @close-delete-confirm.window="open = false"
      x-show="open" x-cloak
-     class="fixed inset-0 z-50 flex items-center justify-center p-4"
+     class="modal-layer"
      role="alertdialog" aria-modal="true" aria-labelledby="del-modal-title">
 
     <div x-show="open" x-transition.opacity
-         class="absolute inset-0 bg-slate-900/60" @click="open = false"></div>
+         class="modal-backdrop" @click="open = false"></div>
 
     <div x-show="open"
          x-transition:enter="ease-out duration-200"
          x-transition:enter-start="opacity-0 scale-95"
          x-transition:enter-end="opacity-100 scale-100"
-         class="relative w-full max-w-md rounded-hero bg-white p-7 shadow-modal sm:p-9">
+         class="modal-panel">
 
         <div class="grid h-12 w-12 place-items-center rounded-pill bg-status-error-bg text-status-error-fg">
             {% include "components/icon.html" with name="trash" size=22 only %}

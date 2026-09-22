@@ -9,22 +9,15 @@
 расписанию, идемпотентна, повтор через минуту не меняет ничего сверх нормы.
 """
 
-from django.core.management.base import BaseCommand
-
 from core import data
 
+from ._base import QuietCommand
 
-class Command(BaseCommand):
+
+class Command(QuietCommand):
     help = 'Пересчитывает Story.comments/likes, User.followers и смежные счётчики от реальных строк.'
-
-    def add_arguments(self, parser):
-        parser.add_argument(
-            '--quiet', action='store_true',
-            help='Без отчёта в stdout (для вызова из тестов).',
-        )
 
     def handle(self, *args, **options):
         touched = data.recount_engagement()
-        if not options['quiet']:
-            for name, count in touched.items():
-                self.stdout.write(f'{name}: {count} rows recounted')
+        for name, count in touched.items():
+            self.say(options, f'{name}: {count} rows recounted')

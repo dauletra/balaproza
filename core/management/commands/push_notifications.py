@@ -23,12 +23,13 @@ import time
 from contextlib import contextmanager
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
 from django.db import connection
 
 from core import data
 from core.domain.telegram import PUSH_BLOCKED, PUSH_OK, send_telegram_message
 from core.links import push_message
+
+from ._base import QuietCommand
 
 # Пауза между сообщениями. Bot API держит около тридцати в секунду; 40 мс
 # укладываются в предел с запасом и не растягивают проход: двести
@@ -72,14 +73,11 @@ def single_run():
                 cursor.execute('SELECT pg_advisory_unlock(%s)', [_LOCK_KEY])
 
 
-class Command(BaseCommand):
+class Command(QuietCommand):
     help = 'Отправляет неотправленные уведомления в Telegram.'
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            '--quiet', action='store_true',
-            help='Без отчёта в stdout (для вызова из тестов).',
-        )
+        super().add_arguments(parser)
         parser.add_argument(
             '--limit', type=int, default=data.PUSH_BATCH,
             help=f'Сколько уведомлений за проход (по умолчанию {data.PUSH_BATCH}).',
@@ -90,8 +88,7 @@ class Command(BaseCommand):
             if not acquired:
                 # Прошлый запуск ещё идёт. Не ошибка: хвост подберёт
                 # следующая минута, а дубль у человека не исправить.
-                if not options['quiet']:
-                    self.stdout.write('another run is still going, skipped')
+                self.say(options, 'another run is still going, skipped')
                 return
             self._send(**options)
 

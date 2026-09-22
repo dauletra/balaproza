@@ -11,26 +11,17 @@
 Идемпотентна: повтор через минуту не меняет ничего.
 """
 
-from django.core.management.base import BaseCommand
-
 from core import data
 from core.domain.story import RECENT_VIEWS_DAYS
 
+from ._base import QuietCommand
 
-class Command(BaseCommand):
+
+class Command(QuietCommand):
     help = f'Пересчитывает окно в {RECENT_VIEWS_DAYS} дней и чистит журнал.'
-
-    def add_arguments(self, parser):
-        parser.add_argument(
-            '--quiet', action='store_true',
-            help='Без отчёта в stdout (для вызова из тестов).',
-        )
 
     def handle(self, *args, **options):
         touched, removed = data.recount_recent_views()
-        if not options['quiet']:
-            # Отчёт по-английски, как у seed_demo: это вывод инструмента,
-            # а не строка интерфейса.
-            self.stdout.write(
-                f'{touched} stories recounted, {removed} views pruned '
-                f'(window: {RECENT_VIEWS_DAYS} days)')
+        self.say(options,
+                 f'{touched} stories recounted, {removed} views pruned '
+                 f'(window: {RECENT_VIEWS_DAYS} days)')

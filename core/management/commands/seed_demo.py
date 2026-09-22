@@ -17,7 +17,7 @@ from datetime import timedelta
 from random import Random
 
 from django.conf import settings
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils import timezone
 
@@ -59,6 +59,7 @@ from core.managers import CHARS_PER_MINUTE
 from core.queries.story import recount_recent_views
 
 from . import _corpus
+from ._base import QuietCommand
 
 
 def _publish_demo_chapter(chapter, story) -> None:
@@ -93,14 +94,8 @@ def _publish_demo_chapter(chapter, story) -> None:
         chapter.save(update_fields=['published_revision'])
 
 
-class Command(BaseCommand):
+class Command(QuietCommand):
     help = 'Раскладывает демо-корпус по моделям. Идемпотентна.'
-
-    def add_arguments(self, parser):
-        parser.add_argument(
-            '--quiet', action='store_true',
-            help='Без отчёта в stdout (для вызова из тестов).',
-        )
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -134,9 +129,8 @@ class Command(BaseCommand):
             'notifications': self._seed_notifications(),
             'school links': self._seed_school_links(),
         }
-        if not options['quiet']:
-            for name, (added, updated) in report.items():
-                self.stdout.write(f'{name}: {added} created, {updated} updated')
+        for name, (added, updated) in report.items():
+            self.say(options, f'{name}: {added} created, {updated} updated')
 
     def _seed_users(self):
         """Авторы корпуса как пользователи портала.

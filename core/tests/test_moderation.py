@@ -299,45 +299,10 @@ class TheDiffReadsAsProseNotAsCharacters(TestCase):
         self.assertEqual(rows, [{'kind': 'added', 'text': 'Жаңа мәтін.'}])
 
 
-class TheModerationPagesStayWithinTheirQueryBudget(TestCase):
-    """Новой странице заводится бюджет — он один ловит N+1 при полностью
-    зелёной суите."""
-
-    def setUp(self):
-        super().setUp()
-        self.moderator = _moderator(self.client)
-        for n in range(3):
-            story = make.story(chapters=2, format='serial', published=False,
-                               slug=f'mod-budget-{n}')
-            make.submit(story)
-
-    def test_the_queue_does_not_grow_with_the_line(self):
-        """Срок ожидания, число глав и метка приезжают выдачей: без этого
-        очередь из двадцати работ стоила бы шестьдесят запросов.
-
-        Семь, не шесть: плюс один `COUNT` за бейдж открытых жалоб в шапке
-        (BR-33) — тот же счётчик у `/moderation/reports/`.
-
-        Восемь: плюс `COUNT` просроченных заявок (D1). Обещание «әдетте
-        тәулік ішінде» стоит у автора на экране отправки, и видно оно
-        должно быть там, где его выполняют, — иначе о нарушенном сроке
-        узнают из жалобы, то есть позже самого автора. Число не растёт с
-        длиной очереди, как и остальные семь.
-
-        Девять: плюс `COUNT` задержанных комментариев (D2) — тот же
-        бейдж в шапке, что у жалоб. Именно `COUNT`, а не список: тексты
-        задержанного на этой странице не показывают.
-
-        Десять: очередь отдаётся страницей, и пагинатору нужно, сколько
-        всего строк в **этой оси**. Это и есть цена окна — постоянный
-        `COUNT` вместо списка, растущего вместе с очередью."""
-        with self.assertNumQueries(10):
-            self.client.get(reverse('core:moderation_queue'))
-
-    def test_the_card_does_not_grow_with_the_chapters(self):
-        with self.assertNumQueries(8):
-            self.client.get(reverse('core:moderation_detail',
-                                    kwargs={'slug': 'mod-budget-0'}))
+# Бюджеты страниц раздела живут в `test_query_budget.py` — там же, где
+# бюджеты всех остальных. Здесь они стояли отдельным классом с почти тем
+# же именем, что и класс там, и мерили другие страницы: два места, где
+# считают одно и то же, расходятся молча.
 
 
 class ThePortalCountsItself(TestCase):

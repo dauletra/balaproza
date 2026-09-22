@@ -19,11 +19,18 @@
 Один запрос есть у **каждой** страницы: ссылки «Авторлар мектебі» в
 подвале. Их отдаёт глобальный контекст-процессор, и это цена того, что
 список правится в админке, а не в коде.
+
+Здесь лежат бюджеты **страниц** — и только они. Проверки вида «цена
+рассылки не растёт с числом подписчиков», «короткий запрос не доходит до
+базы», «тот же текст дважды пишется один раз» тоже считают запросы, но
+число в них не потолок, а само утверждение теста, и живут они рядом с
+поведением, которое описывают.
 """
 
 from django.urls import reverse
 
 from core.models import Chapter, User
+from core.tests import factories as make
 from core.tests.base import TestCase, login_as, login_as_newcomer
 
 
@@ -292,7 +299,20 @@ class PagesStayWithinTheirQueryBudget(TestCase):
 class ModerationPagesStayWithinTheirQueryBudget(TestCase):
     """`/moderation/` открыт только `is_staff` — у демо-корпуса такого
     пользователя нет, флаг выставляется прямо в тесте и живёт только его
-    транзакцию (BR-33)."""
+    транзакцию (BR-33).
+
+    Очередь и карточка мерились отдельно, в `test_moderation.py`, классом
+    с почти тем же именем. Два места, где считают одно и то же, расходятся
+    молча: правка, роняющая бюджет очереди, не роняла бюджет жалоб.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._login_as_moderator()
+        for n in range(3):
+            story = make.story(chapters=2, format='serial', published=False,
+                               slug=f'mod-budget-{n}')
+            make.submit(story)
 
     def _login_as_moderator(self):
         user = User.objects.get(username='aidana')
@@ -304,9 +324,36 @@ class ModerationPagesStayWithinTheirQueryBudget(TestCase):
         """Пять: сессия и сам вошедший (цена настоящего входа, см.
         `test_home_signed_in`), бейдж уведомлений и ссылки школы — то же,
         что у любой личной страницы, — плюс один `SELECT` жалоб (пуст)."""
-        self._login_as_moderator()
         with self.assertNumQueries(5):
             self.client.get(reverse('core:moderation_reports'))
+
+    def test_the_queue_does_not_grow_with_the_line(self):
+        """Срок ожидания, число глав и метка приезжают выдачей: без этого
+        очередь из двадцати работ стоила бы шестьдесят запросов.
+
+        Семь, не шесть: плюс один `COUNT` за бейдж открытых жалоб в шапке
+        (BR-33) — тот же счётчик у `/moderation/reports/`.
+
+        Восемь: плюс `COUNT` просроченных заявок (D1). Обещание «әдетте
+        тәулік ішінде» стоит у автора на экране отправки, и видно оно
+        должно быть там, где его выполняют, — иначе о нарушенном сроке
+        узнают из жалобы, то есть позже самого автора. Число не растёт с
+        длиной очереди, как и остальные семь.
+
+        Девять: плюс `COUNT` задержанных комментариев (D2) — тот же
+        бейдж в шапке, что у жалоб. Именно `COUNT`, а не список: тексты
+        задержанного на этой странице не показывают.
+
+        Десять: очередь отдаётся страницей, и пагинатору нужно, сколько
+        всего строк в **этой оси**. Это и есть цена окна — постоянный
+        `COUNT` вместо списка, растущего вместе с очередью."""
+        with self.assertNumQueries(10):
+            self.client.get(reverse('core:moderation_queue'))
+
+    def test_the_card_does_not_grow_with_the_chapters(self):
+        with self.assertNumQueries(8):
+            self.client.get(reverse('core:moderation_detail',
+                                    kwargs={'slug': 'mod-budget-0'}))
 
 
 class AuthPagesStayWithinTheirQueryBudget(TestCase):

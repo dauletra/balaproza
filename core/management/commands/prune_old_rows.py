@@ -25,30 +25,21 @@
 `core/queries/write.prune_revisions`.
 """
 
-from django.core.management.base import BaseCommand
-
 from core import data
 from core.queries.notifications import KEEP_DAYS
 from core.queries.write import KEEP_REVISION_DAYS
 
+from ._base import QuietCommand
 
-class Command(BaseCommand):
+
+class Command(QuietCommand):
     help = 'Удаляет старые уведомления и старые снимки текста глав.'
-
-    def add_arguments(self, parser):
-        parser.add_argument(
-            '--quiet', action='store_true',
-            help='Без отчёта в stdout (для вызова из тестов).',
-        )
 
     def handle(self, *args, **options):
         notifications = data.prune_notifications()
         revisions = data.prune_revisions()
 
-        if not options['quiet']:
-            # Отчёт по-английски, как у остальных команд: это вывод
-            # инструмента, а не строка интерфейса.
-            self.stdout.write(
-                f'{notifications} notifications pruned (older than '
-                f'{KEEP_DAYS} days), {revisions} chapter revisions pruned '
-                f'(older than {KEEP_REVISION_DAYS} days)')
+        self.say(options,
+                 f'{notifications} notifications pruned (older than '
+                 f'{KEEP_DAYS} days), {revisions} chapter revisions pruned '
+                 f'(older than {KEEP_REVISION_DAYS} days)')
