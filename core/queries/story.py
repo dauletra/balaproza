@@ -15,7 +15,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from ..counters import bump_reaction_count
-from ..domain.story import REACTIONS, RECENT_VIEWS_DAYS
+from ..domain.story import COMMENTS_PAGE, REACTIONS, RECENT_VIEWS_DAYS
 from ..managers import chapter_count_subquery
 from ..models import (
     BookOfWeek,
@@ -244,13 +244,59 @@ def comments_of(story_slug: str, viewer=None) -> list:
     return _attach_liked(list(_comments(story_slug)), viewer)
 
 
-def comments_of_chapter(story_slug: str, chapter_number: int, viewer=None) -> list:
-    """Комментарии главы плюс общие — те, у которых главы нет вовсе."""
+def _chapter_window(story_slug: str, chapter_number: int):
+    """Разговор под главой: её реплики плюс общие — те, у которых главы
+    нет вовсе. Одна выборка на показ, счёт и резолв страницы, чтобы
+    правило «что относится к этой главе» не разошлось между ними."""
     from django.db.models import Q
 
-    comments = list(_comments(story_slug).filter(
-        Q(chapter_number__isnull=True) | Q(chapter_number=chapter_number)))
-    return _attach_liked(comments, viewer)
+    return _comments(story_slug).filter(
+        Q(chapter_number__isnull=True) | Q(chapter_number=chapter_number))
+
+
+def comments_of_chapter(story_slug: str, chapter_number: int, viewer=None, *,
+                        offset: int = 0, limit: int = COMMENTS_PAGE) -> list:
+    """Окно разговора под главой (BR-30).
+
+    Окно, а не весь список: у популярной работы обсуждение растёт без
+    потолка, и росло оно в телефоне у читателя — вместе с ответами на
+    каждую реплику и запросом «что из этого я лайкал».
+
+    Предел стоит **умолчанием**, а не просьбой вызывающей стороны:
+    забытый параметр должен давать двадцать реплик, а не всё, что есть.
+    """
+    rows = _chapter_window(story_slug, chapter_number)[offset:offset + limit]
+    return _attach_liked(list(rows), viewer)
+
+
+def comment_count_of_chapter(story_slug: str, chapter_number: int) -> int:
+    """Сколько всего реплик в разговоре под главой.
+
+    `COUNT`, а не длина окна: число в заголовке — про весь разговор, и
+    «20» над первой страницей из трёх было бы неправдой. Считаются
+    верхнеуровневые, как и раньше: ответы висят при своих репликах.
+    """
+    return _chapter_window(story_slug, chapter_number).count()
+
+
+def comment_page_of(story_slug: str, chapter_number: int, comment,
+                    *, limit: int = COMMENTS_PAGE) -> int:
+    """На какой странице разговора окажется этот комментарий.
+
+    Нужен после отправки: с окном новая реплика уезжает на последнюю
+    страницу, и возврат на первую означал бы, что человек написал и не
+    увидел написанного. Ответ ищется по **родителю** — сам он живёт при
+    нём, своей позиции в списке у него нет.
+
+    Порядок разговора — по `pk` возрастанием (`StoryComment.Meta`),
+    поэтому позиция это «сколько реплик не позже этой».
+    """
+    root_id = comment.parent_id or comment.pk
+    position = _chapter_window(story_slug, chapter_number).filter(
+        pk__lte=root_id).count()
+    # Целочисленное деление вверх: двадцатая реплика — ещё первая
+    # страница, двадцать первая — уже вторая.
+    return max(1, -(-position // limit))
 
 
 def comment_of(story_slug: str, comment_id) -> StoryComment | None:

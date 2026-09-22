@@ -4,7 +4,7 @@
 {% endcomment %}
 {% load qazaqnovel %}
 {# ─────────────────────── Комментарии этой главы ─────────────────────── #}
-<section class="border-t border-slate-200 pt-6">
+<section id="pikirler" class="border-t border-slate-200 pt-6">
     <div class="mb-5 rounded-md border border-status-info-fg/20 bg-status-info-bg px-4 py-3">
         <div class="flex items-start gap-2.5">
             <span class="mt-0.5 text-status-info-fg">{% include "components/icon.html" with name="shield" size=15 only %}</span>
@@ -15,7 +15,7 @@
     </div>
     <h2 class="mb-4 font-display text-xl font-bold text-slate-900">
         {% if story.is_single %}Шығарма пікірлері{% else %}{{ chapter_number }}-бөлім пікірлері{% endif %}
-        <span class="ml-1 font-sans text-sm font-normal text-slate-500">{{ comments|length }}</span>
+        <span class="ml-1 font-sans text-sm font-normal text-slate-500">{{ comments_total }}</span>
     </h2>
 
     {% if signed_in %}
@@ -58,4 +58,16 @@
             </p>
         {% endfor %}
     </div>
+
+    {% comment %}
+        Разговор отдаётся окном в двадцать реплик: у популярной работы он
+        растёт без потолка, и рос он в телефоне у читателя. Компонент тот
+        же, что у каталога, — своей копии пагинации на портале быть не
+        должно; якорь ведёт к самим репликам, а не на верх работы.
+    {% endcomment %}
+    {% if comments_pages > 1 %}
+        <div class="mt-6">
+            {% include "components/pagination.html" with current=comments_page total=comments_pages base=comments_base qs=comments_qs anchor="pikirler" %}
+        </div>
+    {% endif %}
 </section>

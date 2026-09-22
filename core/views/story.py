@@ -1,5 +1,7 @@
 """Страница произведения и инлайн-чтение главы (FR-STORY-*)."""
 
+from urllib.parse import urlencode
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
@@ -44,15 +46,42 @@ def _count_view(request, story) -> None:
         story, request.user if request.user.is_authenticated else None)
 
 
-def _back_to_story(slug, chapter_number=None, anchor=None):
+def _back_to_story(slug, chapter_number=None, anchor=None, page=None):
     """PRG-редирект обратно на страницу произведения, к той же главе и,
-    если есть на что, к якорю нового/задетого комментария."""
+    если есть на что, к якорю нового/задетого комментария.
+
+    `page` — страница разговора. С окном в двадцать реплик новая уезжает
+    на последнюю, и возврат на первую означал бы, что человек написал
+    комментарий и не увидел написанного; то же у лайка и жалобы на
+    реплику со второй страницы.
+    """
     url = reverse('core:story_detail', kwargs={'slug': slug})
+    params = {}
     if chapter_number:
-        url = f'{url}?chapter={chapter_number}'
+        params['chapter'] = chapter_number
+    if page and page > 1:
+        params['page'] = page
+    if params:
+        url = f'{url}?{urlencode(params)}'
     if anchor:
         url = f'{url}#{anchor}'
     return redirect(url)
+
+
+def _comment_page(request, story, chapter_number):
+    """Какая страница разговора открыта: `?page=N`, но не дальше, чем есть.
+
+    Ни мусор, ни выход за границы не дают 404 — то же, что делает
+    `Paginator.get_page` в каталоге: не-число читается как первая
+    страница, слишком большое число — как последняя. `?page=99` это
+    старая ссылка или опечатка, и работа обязана открыться.
+    """
+    total = data.comment_count_of_chapter(story.slug, chapter_number)
+    # Страниц не бывает ноль: у пустого разговора она одна и пустая.
+    pages = max(1, -(-total // data.COMMENTS_PAGE))
+    raw = request.GET.get('page', '')
+    page = int(raw) if raw.isdigit() else 1
+    return min(max(page, 1), pages), pages, total
 
 
 # ───────────────────────── STORY — произведение и чтение ─────────────────
@@ -124,6 +153,16 @@ def story_detail(request, slug):
         data.move_to_shelf(request.user, story, advanced=advanced,
                            finished=chapter_number == len(chapters))
 
+    if chapter_number:
+        comments_page, comments_pages, comments_total = _comment_page(
+            request, story, chapter_number)
+        comments = data.comments_of_chapter(
+            slug, chapter_number, viewer,
+            offset=(comments_page - 1) * data.COMMENTS_PAGE)
+    else:
+        comments, comments_total = [], 0
+        comments_page, comments_pages = 1, 1
+
     return render(request, 'pages/story/story_detail.html', {
         'has_right_rail': True,
         'slug':     slug,
@@ -134,8 +173,17 @@ def story_detail(request, slug):
         'has_prev': bool(current) and chapter_number > 1,
         'has_next': bool(current) and chapter_number < len(chapters),
         'is_first_look': is_first_look,
-        'comments': (data.comments_of_chapter(slug, chapter_number, viewer)
-                    if chapter_number else []),
+        'comments': comments,
+        # Число в заголовке — про весь разговор, а не про эту страницу:
+        # «20» над первой из трёх было бы неправдой.
+        'comments_total': comments_total,
+        'comments_page':  comments_page,
+        'comments_pages': comments_pages,
+        # Пагинация разговора несёт с собой главу: без неё вторая
+        # страница открывала бы первую главу с чужими репликами.
+        'comments_qs': urlencode({'chapter': chapter_number}) if chapter_number else '',
+        # Компоненту нужен путь без query — он дописывает `?page=N` сам.
+        'comments_base': reverse('core:story_detail', kwargs={'slug': slug}),
         # FR-STORY-12 / DEC-32: пять реакций на главу вместо одиночного лайка
         'reactions': data.reactions_of(current) if current else [],
         # FR-STORY-13: опрос автора — необязателен, чаще всего его нет
@@ -211,7 +259,10 @@ def comment_create(request, slug):
         messages.info(request, 'Пікірің тексеруге жіберілді — модератор қарайды.')
         return _back_to_story(slug, chapter_number)
     messages.success(request, 'Пікірің қосылды.')
-    return _back_to_story(slug, chapter_number, anchor=f'comment-{comment.pk}')
+    # На ту страницу разговора, где реплика и оказалась: с окном новая
+    # уезжает на последнюю, и якорь на первой не нашёл бы ничего.
+    return _back_to_story(slug, chapter_number, anchor=f'comment-{comment.pk}',
+                          page=data.comment_page_of(slug, chapter_number, comment))
 
 
 @require_POST
@@ -236,7 +287,9 @@ def comment_like(request, slug, comment_id):
     comment = data.comment_of(slug, comment_id)
     if comment is not None:
         data.toggle_comment_like(comment, request.user)
-        return _back_to_story(slug, comment.chapter_number, anchor=f'comment-{comment.pk}')
+        return _back_to_story(
+            slug, comment.chapter_number, anchor=f'comment-{comment.pk}',
+            page=data.comment_page_of(slug, comment.chapter_number, comment))
     return _back_to_story(slug, _chapter_from_post(request))
 
 
@@ -275,7 +328,9 @@ def comment_report(request, slug, comment_id):
             note=request.POST.get('comment', ''))
         if report is not None:
             messages.success(request, 'Шағымың жіберілді.')
-        return _back_to_story(slug, comment.chapter_number, anchor=f'comment-{comment.pk}')
+        return _back_to_story(
+            slug, comment.chapter_number, anchor=f'comment-{comment.pk}',
+            page=data.comment_page_of(slug, comment.chapter_number, comment))
     return _back_to_story(slug, _chapter_from_post(request))
 
 

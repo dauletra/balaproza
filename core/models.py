@@ -444,6 +444,12 @@ class Story(models.Model):
             # Поиск по названию — тот же ILIKE с подстрокой, что и по автору.
             GinIndex(fields=['title'], name='story_title_trgm',
                      opclasses=['gin_trgm_ops']),
+            # И по аннотации: читатель ищет не по имени работы, которого
+            # он не знает, а по тому, о чём она. Аннотация — единственное
+            # место, где это написано словами автора, и без индекса
+            # подстрока по ней читает таблицу целиком.
+            GinIndex(fields=['annotation'], name='story_annotation_trgm',
+                     opclasses=['gin_trgm_ops']),
         ]
 
     def __str__(self):

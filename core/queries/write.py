@@ -175,6 +175,17 @@ def autosave_chapter(story, chapter_id, *, title: str, body: str) -> Chapter | N
     `None` — если `chapter_id` не находится в этой работе (BR-83): чужой
     или устаревший id не заводит главу заново, вызывающая сторона отвечает
     404, а не тихо создаёт дубль.
+
+    **Несменившееся не пишется.** Предела частоты у автосохранения нет и
+    по времени быть не должно: автор, пишущий быстро, упирался бы в него
+    ровно тогда, когда страховка нужнее всего. Предел тут по смыслу —
+    запись, ничего не меняющая, не запись вовсе. Она стоила `UPDATE` по
+    тексту главы, второго по `updated_at` работы и сдвигала «когда
+    трогали» у работы, которую не трогали.
+
+    Редактор шлёт автосохранение по таймеру после ввода, но адрес
+    открытый: прямой POST повторял бы одно и то же тело сколько угодно
+    раз.
     """
     chapter_id = _resolve_chapter_id(story, chapter_id)
     if chapter_id is None:
@@ -186,6 +197,12 @@ def autosave_chapter(story, chapter_id, *, title: str, body: str) -> Chapter | N
     chapter = story.chapter_set.filter(pk=chapter_id).first()
     if chapter is None:
         return None
+    # Сравнение по тому же нормализованному виду, в каком тело ляжет в
+    # базу (`Chapter.save`): браузер шлёт CRLF, и без нормализации
+    # «ничего не изменилось» никогда не совпадало бы само с собой.
+    normalized = body.replace('\r\n', '\n').replace('\r', '\n')
+    if (chapter.title, chapter.body) == (title, normalized):
+        return chapter
     chapter.title = title
     chapter.body = body
     chapter.save()

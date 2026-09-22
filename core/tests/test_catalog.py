@@ -19,7 +19,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core import data
-from core.models import Story, User
+from core.models import Story, StoryTag, Tag, User
 from core.tests import factories as make
 from core.tests.base import TestCase, login_as
 from core.views.catalog import PAGE_SIZE
@@ -790,3 +790,65 @@ class QuickSearchAsksTheServer(TestCase):
         found = self._get('mektep')
 
         self.assertIn('mektep', {t['slug'] for t in found['tags']})
+
+
+class SearchLooksWhereTheReaderLooks(TestCase):
+    """Поиск искал по названию и имени автора. Читатель ищет не по имени
+    работы, которого он не знает, а по тому, о чём она.
+
+    Заодно чинится расхождение: быстрый поиск (Cmd+K) теги искал, а
+    каталог — нет, и одно и то же слово давало разный результат в двух
+    местах одного портала.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.author = make.user(username='searchable_author', pen_name='Іздеуші')
+        self.story = make.story(
+            slug='mektep-turaly', author=self.author, chapters=1,
+            title='Атауында сөз жоқ',
+            annotation='Мектеп туралы қысқа әңгіме.')
+        self.tag = Tag.objects.create(slug='qorqynyshty', name='қорқынышты',
+                                      status='accepted')
+        StoryTag.objects.create(story=self.story, tag=self.tag)
+
+    def _found(self, query):
+        return [s.slug for s in data.filter_catalog(query=query)]
+
+    def test_the_annotation_is_searched(self):
+        self.assertIn(self.story.slug, self._found('мектеп'))
+
+    def test_the_tag_is_searched(self):
+        self.assertIn(self.story.slug, self._found('қорқынышты'))
+
+    def test_a_tag_is_found_by_its_latin_slug_too(self):
+        """Тег пишется по-казахски, а ищут его часто латиницей — ровно
+        так же ведёт себя быстрый поиск."""
+        self.assertIn(self.story.slug, self._found('qorqyn'))
+
+    def test_the_title_and_the_author_still_work(self):
+        self.assertIn(self.story.slug, self._found('Атауында'))
+        self.assertIn(self.story.slug, self._found('Іздеуші'))
+
+    def test_a_pending_tag_does_not_make_a_work_findable(self):
+        """Непринятый тег публично не существует, и находиться по нему
+        работа не должна."""
+        hidden = Tag.objects.create(slug='kutude', name='күтудегі',
+                                    status='pending')
+        StoryTag.objects.create(story=self.story, tag=hidden)
+
+        self.assertNotIn(self.story.slug, self._found('күтудегі'))
+
+    def test_two_matching_tags_do_not_double_the_work(self):
+        """`Exists`, а не join: совпади два тега, join вернул бы работу
+        дважды, и каталог показал бы её две строки подряд."""
+        second = Tag.objects.create(slug='qorqynyshty-2', name='қорқыныш',
+                                    status='accepted')
+        StoryTag.objects.create(story=self.story, tag=second)
+
+        found = self._found('қорқыныш')
+
+        self.assertEqual(found.count(self.story.slug), 1)
+
+    def test_nothing_matching_finds_nothing(self):
+        self.assertEqual(self._found('ешқашан-кездеспейтін-сөз'), [])

@@ -137,6 +137,15 @@
                 },
 
                 /* ── Страховка на сервере ──────────────────────────────── */
+
+                /* Совпадает ли то, что в полях сейчас, с тем, что ушло на
+                 * сервер. Ответ приходит к снимку, сделанному несколько
+                 * секунд назад, и за это время автор успевает дописать. */
+                matches: function (sent) {
+                    var now = this.fields();
+                    return now.title === sent.title && now.body === sent.body;
+                },
+
                 save: function () {
                     if (!this.enabled || this.saving) { return; }
                     var values = this.fields();
@@ -160,9 +169,29 @@
                         return response.ok ? response.json() : Promise.reject(response);
                     }).then(function (result) {
                         self.saving = false;
-                        self.dirty = false;
                         self.savedAt = result.saved_at;
-                        self.forget();
+                        /* Сохранён **снимок**, а не то, что в полях сейчас.
+                         *
+                         * Между отправкой и ответом автор продолжает
+                         * писать, и безусловные `dirty = false` плюс
+                         * `forget()` стирали браузерную страховку для
+                         * текста, которого на сервере нет, — и говорили
+                         * при этом «сақталды». Окно узкое, ровно
+                         * длительность запроса, но компонент существует
+                         * ради того, чтобы текст не пропадал, и врать в
+                         * этот момент он не вправе.
+                         *
+                         * Разошлось — оставляем страховку и метку
+                         * «несохранённое», а следующий проход назначаем
+                         * сами: `touch()` больше не сработает, если автор
+                         * как раз допечатал и убрал руки. */
+                        if (self.matches(values)) {
+                            self.dirty = false;
+                            self.forget();
+                        } else {
+                            clearTimeout(self.timer);
+                            self.timer = setTimeout(self.save.bind(self), DEBOUNCE_MS);
+                        }
                         /* Первый автосейв новой главы присвоил ей номер:
                          * дальше пишем в неё, а не заводим следующую. */
                         if (result.autosave_url) {

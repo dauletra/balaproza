@@ -13,6 +13,7 @@
 from datetime import date
 from urllib.parse import unquote
 
+from django.test import Client
 from django.urls import reverse
 
 from core import data
@@ -166,3 +167,50 @@ class TheDownloadIsForTheSignedInAuthorOnly(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('Әзірге жазылған шығарма жоқ', _body(response))
+
+
+class TheExportIsAskedForOnceAMinute(TestCase):
+    """Предел не против человека — дважды подряд свои тексты не просят, —
+    а против скрипта, дёргающего адрес в цикле: портфель собирается
+    целиком в память, и каждый проход собирал бы романы заново.
+
+    Считается кэшем, а не таблицей: выгрузка не оставляет в базе ничего.
+    Локальность кэша здесь приемлема — предел «одна в минуту», умноженный
+    на число воркеров, остаётся единицами, в отличие от «десяти в минуту»
+    у комментария, где умножение меняло бы видимое поведение.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.author = login_as(self.client)
+        self.url = reverse('core:export_texts')
+
+    def test_the_first_ask_gets_the_file(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('attachment', response['Content-Disposition'])
+
+    def test_the_second_ask_is_told_to_wait(self):
+        self.client.get(self.url)
+
+        response = self.client.get(self.url)
+
+        self.assertRedirects(response, reverse('core:profile_me_edit'))
+
+    def test_the_refusal_speaks_instead_of_answering_with_a_code(self):
+        """Сюда приходят в худший день, когда что-то уже пошло не так, и
+        пустой ответ браузера читался бы как «пропало и это»."""
+        self.client.get(self.url)
+
+        response = self.client.get(self.url, follow=True)
+
+        self.assertContains(response, 'жаңа ғана жүктелді')
+
+    def test_the_limit_is_personal(self):
+        self.client.get(self.url)
+
+        other = Client()
+        login_as_newcomer(other, 'other_exporter')
+
+        self.assertEqual(other.get(self.url).status_code, 200)

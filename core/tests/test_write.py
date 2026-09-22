@@ -2155,3 +2155,84 @@ class ChaptersCanBeDeletedAndReordered(TestCase):
         about_second.refresh_from_db()
         self.assertEqual(about_first.chapter_number, 2)
         self.assertEqual(about_second.chapter_number, 1)
+
+
+class AutosaveWritesOnlyWhatChanged(TestCase):
+    """Предела частоты у автосохранения нет и по времени быть не должно:
+    автор, пишущий быстро, упирался бы в него ровно тогда, когда страховка
+    нужнее всего.
+
+    Предел тут по смыслу — запись, ничего не меняющая, не запись вовсе.
+    Она стоила `UPDATE` по тексту главы, второго по `updated_at` работы и
+    сдвигала «когда трогали» у работы, которую не трогали. Редактор шлёт
+    автосохранение по таймеру, но адрес открытый: прямой POST повторял бы
+    одно и то же тело сколько угодно раз.
+    """
+
+    def setUp(self):
+        self.author = login_as(self.client)
+        self.story = factories.story(author=self.author, chapters=1,
+                                     published=False, status='NotPublished')
+        self.chapter = self.story.chapter_set.first()
+        self.url = reverse('core:chapter_autosave',
+                           kwargs={'slug': self.story.slug,
+                                   'chapter': self.chapter.pk})
+
+    def _autosave(self, body, title=None):
+        return self.client.post(self.url, {
+            'title': self.chapter.title if title is None else title,
+            'body': body,
+        })
+
+    def test_the_same_body_twice_writes_once(self):
+        self._autosave('Жаңа мәтін.')
+        self.story.refresh_from_db()
+        touched = self.story.updated_at
+
+        with self.assertNumQueries(5):
+            # Сессия, пользователь, работа, резолв главы и сама глава — и
+            # всё: ни `UPDATE` по тексту, ни сдвига `updated_at` у работы.
+            # Пять — это чтение; писать здесь больше нечего.
+            self._autosave('Жаңа мәтін.')
+
+        self.story.refresh_from_db()
+        self.assertEqual(self.story.updated_at, touched)
+
+    def test_a_changed_body_still_writes(self):
+        self._autosave('Бірінші нұсқа.')
+
+        self._autosave('Екінші нұсқа.')
+
+        self.chapter.refresh_from_db()
+        self.assertEqual(self.chapter.body, 'Екінші нұсқа.')
+
+    def test_a_changed_title_alone_still_writes(self):
+        self._autosave('Мәтін.', title='Бірінші атау')
+
+        self._autosave('Мәтін.', title='Екінші атау')
+
+        self.chapter.refresh_from_db()
+        self.assertEqual(self.chapter.title, 'Екінші атау')
+
+    def test_the_browser_line_endings_do_not_count_as_a_change(self):
+        """Браузер шлёт CRLF, база хранит LF. Без нормализации «ничего не
+        изменилось» никогда не совпадало бы само с собой, и предел не
+        срабатывал бы ни разу."""
+        self._autosave('Бірінші жол.\nЕкінші жол.')
+        self.story.refresh_from_db()
+        touched = self.story.updated_at
+
+        self._autosave('Бірінші жол.\r\nЕкінші жол.')
+
+        self.story.refresh_from_db()
+        self.assertEqual(self.story.updated_at, touched)
+
+    def test_the_answer_is_the_same_either_way(self):
+        """Редактор не должен отличать «сохранено» от «нечего сохранять»:
+        для него это одно и то же состояние."""
+        self._autosave('Мәтін.')
+
+        response = self._autosave('Мәтін.')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['chapter'], self.chapter.pk)

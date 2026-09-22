@@ -313,13 +313,38 @@ class StoryQuerySet(QuerySet):
         return self
 
     def matching(self, query: str):
-        """Поиск по названию и автору — подстрокой (`ILIKE`, GIN-индексы 0009)."""
+        """Поиск подстрокой (`ILIKE`, триграммные индексы) по четырём
+        местам: название, аннотация, имя автора и тег.
+
+        Названия и автора не хватало. Читатель ищет не по имени работы,
+        которого он не знает, а по тому, о чём она: «мектеп туралы»,
+        «қорқынышты». Аннотация — единственное место, где это написано
+        словами автора, а тег — единственное, где это написано коротко.
+
+        Заодно это чинило расхождение: быстрый поиск (Cmd+K) теги искал,
+        а каталог — нет, и одно и то же слово давало разный результат в
+        двух местах одного портала.
+
+        Тег — `Exists`, а не join: у работы их до десяти, и совпади два,
+        join вернул бы её дважды. `distinct()` решил бы то же, но ценой
+        дедупликации всей выдачи с её аннотациями.
+
+        Только **принятые** теги: непринятый публично не существует, и
+        находиться по нему работа не должна.
+        """
+        from .models import StoryTag
+
         q = (query or '').strip()
         if not q:
             return self
+        tagged = Exists(StoryTag.objects.filter(
+            story=OuterRef('pk'), tag__status='accepted',
+        ).filter(Q(tag__name__icontains=q) | Q(tag__slug__icontains=q)))
         return self.filter(Q(title__icontains=q)
+                           | Q(annotation__icontains=q)
                            | Q(author__pen_name__icontains=q)
-                           | Q(author__username__icontains=q))
+                           | Q(author__username__icontains=q)
+                           | tagged)
 
     def in_genre(self, slug: str):
         if not slug:

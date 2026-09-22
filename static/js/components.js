@@ -11,6 +11,91 @@
  * успеть до старта Alpine. Скрипт в конце body опоздал бы, а компонент
  * остался бы неизвестным именем — без единой ошибки в консоли.
  */
+/* ── Фокус внутри диалога ─────────────────────────────────────────────────
+ *
+ * Роли и `aria-modal` у диалогов портала стояли с самого начала, Escape
+ * закрывал — а фокус оставался за диалогом. Для того, кто пользуется
+ * клавиатурой или скринридером, это и есть разница между «диалог
+ * открылся» и «ничего не произошло»: читается по-прежнему страница
+ * позади, Tab уводит в неё же, а после закрытия непонятно, где ты.
+ *
+ * Требования обещали focus-trap с первого дня — обещание выполнено
+ * наполовину, и вторая половина здесь. Общая на все диалоги: у портала
+ * их пять, и пятикратно повторённый обработчик Tab разошёлся бы в
+ * первой же правке.
+ */
+var FOCUSABLE = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled])',
+    'textarea:not([disabled])',
+    'select:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])'
+].join(', ');
+
+function withFocusTrap(component) {
+    /* Куда вернуть фокус после закрытия — как правило, кнопка, которая
+     * диалог и открыла. */
+    component.returnFocusTo = null;
+
+    component.focusables = function () {
+        var found = this.$root.querySelectorAll(FOCUSABLE);
+        return Array.prototype.filter.call(found, function (el) {
+            /* Скрытое `x-show`-ом и `hidden` в счёт не идёт: попасть
+             * туда Tab-ом всё равно нельзя. */
+            return el.offsetParent !== null || el === document.activeElement;
+        });
+    };
+
+    component.captureFocus = function () {
+        var items = this.focusables();
+        if (items.length) { items[0].focus(); }
+    };
+
+    component.releaseFocus = function () {
+        if (this.returnFocusTo && this.returnFocusTo.focus) {
+            this.returnFocusTo.focus();
+        }
+        this.returnFocusTo = null;
+    };
+
+    /* Tab по кругу внутри диалога. Без этого он уходит в страницу
+     * позади — ту самую, которую диалог и перекрывает. */
+    component.keepTabInside = function (event) {
+        var items = this.focusables();
+        if (!items.length) { return; }
+        var first = items[0];
+        var last = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    };
+
+    /* Один обработчик на диалог: Escape закрывает, Tab не выпускает.
+     * Оба — часть самого диалога, а не забота вызывающего. */
+    component.watchFocus = function () {
+        var self = this;
+        this.$watch('open', function (isOpen) {
+            if (isOpen) {
+                self.$nextTick(function () { self.captureFocus(); });
+            } else {
+                self.releaseFocus();
+            }
+        });
+        window.addEventListener('keydown', function (event) {
+            if (!self.open) { return; }
+            if (event.key === 'Escape') { self.open = false; }
+            if (event.key === 'Tab') { self.keepTabInside(event); }
+        });
+    };
+
+    return component;
+}
+
 document.addEventListener('alpine:init', function () {
 
     /* Модалка, которую открывает window-событие с деталями (docs/ui.md).
@@ -25,7 +110,7 @@ document.addEventListener('alpine:init', function () {
      */
     Alpine.data('modal', function (openEvent, fields) {
         var keys = fields || [];
-        var state = { open: false };
+        var state = withFocusTrap({ open: false });
         keys.forEach(function (key) { state[key] = ''; });
 
         state.init = function () {
@@ -33,11 +118,17 @@ document.addEventListener('alpine:init', function () {
             window.addEventListener(openEvent, function (e) {
                 var detail = e.detail || {};
                 keys.forEach(function (key) { self[key] = detail[key] || ''; });
+                /* Запоминаем до открытия: после него активным элементом
+                 * станет уже что-то внутри диалога. */
+                self.returnFocusTo = document.activeElement;
                 self.open = true;
             });
-            window.addEventListener('keydown', function (e) {
-                if (e.key === 'Escape') self.open = false;
-            });
+            /* Escape, перенос фокуса внутрь, Tab по кругу и возврат на
+             * кнопку — всё в `watchFocus`: закрыть диалог можно четырьмя
+             * способами (крестик, «Болдырмау», клик по подложке, Escape),
+             * и вешать возврат фокуса на каждый значило бы забыть его на
+             * пятом. */
+            this.watchFocus();
         };
         return state;
     });
@@ -83,7 +174,7 @@ document.addEventListener('alpine:init', function () {
     var SEARCH_MIN_LENGTH = 2;
 
     Alpine.data('searchPopup', function (searchUrl) {
-        return {
+        return withFocusTrap({
             open: false,
             q: '',
             loading: false,
@@ -94,7 +185,16 @@ document.addEventListener('alpine:init', function () {
             sent: 0,
             shown: 0,
 
+            init: function () {
+                /* Тот же диалог, что и модалки: Tab не должен уводить в
+                 * страницу позади, а Cmd+K, нажатый из середины списка
+                 * работ, обязан вернуть туда же. Поле ввода фокусируется
+                 * своим кодом — оно не первое в разметке. */
+                this.watchFocus();
+            },
+
             openPopup: function () {
+                this.returnFocusTo = document.activeElement;
                 this.open = true;
                 this.$nextTick(function () {
                     if (this.$refs.input) this.$refs.input.focus();
@@ -146,7 +246,7 @@ document.addEventListener('alpine:init', function () {
             filteredStories: function () { return this.results.stories || []; },
             filteredAuthors: function () { return this.results.authors || []; },
             filteredTags: function () { return this.results.tags || []; }
-        };
+        });
     });
 
     /* UGC-теги: чипы, автокомплит, валидация до отправки (BR-TAG-01…06).

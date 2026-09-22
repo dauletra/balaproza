@@ -156,8 +156,13 @@ class PagesStayWithinTheirQueryBudget(TestCase):
         Двадцать: текущая глава берётся из уже выбранного списка глав, а
         опрос приезжает вместе с ней (`select_related('poll')`). До этого
         страница выбирала ту же главу и её реакции второй раз, а за
-        опросом ходила третий."""
-        with self.assertNumQueries(20):
+        опросом ходила третий.
+
+        Двадцать один: разговор отдаётся окном в двадцать реплик, и число
+        в заголовке — про весь разговор, то есть отдельный `COUNT`. Это
+        та цена, ради которой окно и заводилось: до него страница везла
+        все реплики популярной работы с ответами на каждую."""
+        with self.assertNumQueries(21):
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'dalney-berega'}))
 
@@ -185,8 +190,12 @@ class PagesStayWithinTheirQueryBudget(TestCase):
         `Prefetch` с фильтром «не задержанные» (D2), и тот же запрос
         сразу тянет их авторов — раньше это были два обращения.
         Экономия попутная: фильтр заводился ради задержанных, а не ради
-        бюджета."""
-        with self.assertNumQueries(24):
+        бюджета.
+
+        **Плюс один, осознанно.** Счёт всего разговора: окно показывает
+        двадцать реплик, а заголовок обязан называть их общее число.
+        Постоянный `COUNT` вместо списка, растущего с обсуждением."""
+        with self.assertNumQueries(25):
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'dalney-berega'}) + '?chapter=3')
 
@@ -375,7 +384,7 @@ class PersonalPagesStayWithinTheirQueryBudget(TestCase):
         реакции и опрос из одной выборки.
         """
         login_as(self.client, 'bekzhan_t')
-        with self.assertNumQueries(31):
+        with self.assertNumQueries(32):
             self.client.get(reverse('core:story_detail',
                                     kwargs={'slug': 'dalney-berega'}))
 

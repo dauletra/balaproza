@@ -16,9 +16,8 @@
     поэтому лишнего запроса на каждый показ рабочего места (genres,
     accepted_tags, tags_of и так далее) нет.
 {% endcomment %}
-<div x-data="{ open: false }"
-     @open-settings-drawer.window="open = true"
-     @keydown.escape.window="open = false">
+{# `modal(...)` несёт Escape и ловушку фокуса — см. login_modal.html. #}
+<div x-data="modal('open-settings-drawer')">
 
     <div x-show="open" x-cloak x-transition.opacity
          @click="open = false"

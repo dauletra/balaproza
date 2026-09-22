@@ -22,6 +22,7 @@ from core import data
 from core.tests.base import TestCase, login_as
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "templates"
+STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
 
 
 def _templates():
@@ -613,7 +614,7 @@ class ContentColumnWidth(unittest.TestCase):
     def test_main_carries_the_cap(self):
         base = (TEMPLATES_DIR / "base.html").read_text(encoding="utf-8")
         self.assertIn(f'max-w-[{CONTENT_MAX}px]', base)
-        self.assertIn('<main class="mx-auto w-full min-w-0', base)
+        self.assertIn('<main id="main" tabindex="-1" class="mx-auto w-full min-w-0', base)
 
     def test_column_never_widens_when_the_rail_disappears(self):
         with_rail = _main_column(CONTAINER_MAX, rail=True)
@@ -805,3 +806,75 @@ class LegalPagesSpeakToPeople(TestCase):
                 body = self.client.get(reverse(f'core:{name}')).content.decode()
                 self.assertTrue('@qazaqnovel' in body or '@' in body,
                                 'на странице нет ни одного канала связи')
+
+
+class EveryDialogManagesItsFocus(unittest.TestCase):
+    """Роли и `aria-modal` у диалогов стояли с первого дня, Escape
+    закрывал — а фокус оставался за диалогом. Для того, кто ходит с
+    клавиатуры, это и есть разница между «диалог открылся» и «ничего не
+    произошло»: читается страница позади, Tab уводит в неё же, а после
+    закрытия непонятно, где ты.
+
+    Требования обещали focus-trap с самого начала. Здесь проверяется, что
+    обещание не разошлось с кодом снова: диалог обязан пользоваться общим
+    механизмом, а не заводить свой пятый обработчик Tab.
+    """
+
+    #: Компоненты, которым позволено объявлять `aria-modal`.
+    TRAPPED = ('modal(', 'searchPopup(')
+
+    def test_no_dialog_without_a_component_that_traps_focus(self):
+        for path in _templates():
+            markup = path.read_text(encoding='utf-8')
+            if 'aria-modal' not in markup:
+                continue
+            with self.subTest(template=path.name):
+                self.assertTrue(
+                    any(name in markup for name in self.TRAPPED),
+                    'диалог не пользуется компонентом с ловушкой фокуса')
+
+    def test_the_trap_lives_in_one_place(self):
+        source = (STATIC_DIR / 'js' / 'components.js').read_text(encoding='utf-8')
+
+        self.assertIn('function withFocusTrap(', source)
+        # Ровно один обработчик Tab на весь портал: пять копий разошлись
+        # бы в первой же правке.
+        self.assertEqual(source.count("event.key === 'Tab'"), 1)
+
+    def test_both_dialog_components_use_it(self):
+        source = (STATIC_DIR / 'js' / 'components.js').read_text(encoding='utf-8')
+
+        self.assertEqual(source.count('withFocusTrap({'), 2)
+        self.assertEqual(source.count('this.watchFocus();'), 2)
+
+
+class TheKeyboardMaySkipTheHeader(unittest.TestCase):
+    """Шапка — логотип, поиск, четыре раздела, колокольчик и меню — шла
+    заново на каждой странице, прежде чем человек с клавиатуры добирался
+    до текста. Обход навигации стоит одной ссылки и в требованиях
+    доступности стоит первым пунктом."""
+
+    def test_the_skip_link_is_first_and_leads_to_the_content(self):
+        markup = (TEMPLATES_DIR / 'base.html').read_text(encoding='utf-8')
+        body = markup.index('<body')
+
+        self.assertLess(markup.index('href="#main"'), markup.index('<header')
+                        if '<header' in markup else len(markup))
+        self.assertLess(body, markup.index('href="#main"'))
+        self.assertIn('id="main"', markup)
+
+    def test_it_is_hidden_until_focused(self):
+        """Видимая всегда, она заняла бы место у первого экрана ради
+        того, чем пользуются с клавиатуры."""
+        markup = (TEMPLATES_DIR / 'base.html').read_text(encoding='utf-8')
+        link = markup[markup.index('href="#main"'):]
+
+        self.assertIn('sr-only', link[:400])
+        self.assertIn('focus:not-sr-only', link[:400])
+
+    def test_the_target_can_take_focus(self):
+        """Без `tabindex` переход по якорю прокручивает страницу, но
+        фокус оставляет на ссылке — следующий Tab возвращает в шапку."""
+        markup = (TEMPLATES_DIR / 'base.html').read_text(encoding='utf-8')
+
+        self.assertIn('id="main" tabindex="-1"', markup)

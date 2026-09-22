@@ -7,6 +7,11 @@
       total   — общее число страниц
       base    — URL без query (например, "/catalog/"); ?page=N допишется автоматически
       qs      — доп. query-параметры (например, "q=foo&genre=erteg"; без &page=)
+      anchor  — якорь, к которому вести (опц., без «#»)
+
+    Якорь нужен там, где пагинируется не вся страница, а блок внизу:
+    разговор под главой. Без него вторая страница реплик открывается
+    сверху работы, и до самих реплик надо снова прокручивать текст.
 {% endcomment %}
 {% if total > 1 %}
 {% with prev=current|add:-1 next=current|add:1 %}
@@ -14,7 +19,7 @@
 
     {# ‹ Назад #}
     {% if current > 1 %}
-        <a href="{{ base }}{% if qs %}?{{ qs }}&amp;{% else %}?{% endif %}page={{ prev }}"
+        <a href="{{ base }}{% if qs %}?{{ qs }}&amp;{% else %}?{% endif %}page={{ prev }}{% if anchor %}#{{ anchor }}{% endif %}"
            aria-label="Алдыңғы бет"
            class="grid h-9 w-9 place-items-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-100">
             {% include "components/icon.html" with name="chevron-left" size=16 only %}
@@ -37,7 +42,7 @@
                     {{ n }}
                 </span>
             {% else %}
-                <a href="{{ base }}{% if qs %}?{{ qs }}&amp;{% else %}?{% endif %}page={{ n }}"
+                <a href="{{ base }}{% if qs %}?{{ qs }}&amp;{% else %}?{% endif %}page={{ n }}{% if anchor %}#{{ anchor }}{% endif %}"
                    class="grid h-9 min-w-9 place-items-center rounded-md border border-slate-200 px-2.5 font-sans text-sm text-slate-700 hover:bg-slate-100">
                     {{ n }}
                 </a>
@@ -47,7 +52,7 @@
 
     {# › Вперёд #}
     {% if current < total %}
-        <a href="{{ base }}{% if qs %}?{{ qs }}&amp;{% else %}?{% endif %}page={{ next }}"
+        <a href="{{ base }}{% if qs %}?{{ qs }}&amp;{% else %}?{% endif %}page={{ next }}{% if anchor %}#{{ anchor }}{% endif %}"
            aria-label="Келесі бет"
            class="grid h-9 w-9 place-items-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-100">
             {% include "components/icon.html" with name="chevron-right" size=16 only %}

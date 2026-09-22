@@ -15,7 +15,7 @@ from django.test import Client
 from django.urls import reverse
 
 from core import data
-from core.domain.story import RECENT_VIEWS_DAYS
+from core.domain.story import COMMENTS_PAGE, RECENT_VIEWS_DAYS
 from core.models import (
     ChapterReactionVote,
     LibraryEntry,
@@ -1324,3 +1324,142 @@ class AnUnpublishedWorkExistsOnlyForItsAuthorAndTheModerator(TestCase):
         self.assertFalse(LibraryEntry.objects.filter(story=self.draft).exists())
         self.assertFalse(ChapterReactionVote.objects.filter(
             chapter__story=self.draft).exists())
+
+
+class TheConversationComesInAWindow(TestCase):
+    """Разговор отдавался целиком — со всеми ответами и метками «я это
+    лайкал». На популярной работе страница росла вместе с обсуждением,
+    причём росла она в телефоне у читателя, а не на сервере.
+
+    Окно в двадцать верхнеуровневых реплик: ответы живут при своих
+    репликах и страницей не разрываются — половина разговора без второй
+    половины не читается.
+    """
+
+    SLUG = 'window-talk'
+
+    def setUp(self):
+        super().setUp()
+        self.story = make.story(slug=self.SLUG, author=make.user(),
+                                     chapters=1)
+        self.readers = [make.user() for _ in range(3)]
+        self.comments = [
+            data.add_comment(self.story, self.readers[i % 3],
+                             text=f'Пікір {i}', chapter_number=1)
+            for i in range(COMMENTS_PAGE + 5)
+        ]
+
+    def _page(self, number=None):
+        url = reverse('core:story_detail', kwargs={'slug': self.SLUG}) + '?chapter=1'
+        if number:
+            url = f'{url}&page={number}'
+        return self.client.get(url)
+
+    def test_the_first_page_holds_the_window_and_no_more(self):
+        page = self._page()
+
+        self.assertEqual(len(page.context['comments']), COMMENTS_PAGE)
+        self.assertEqual(page.context['comments_pages'], 2)
+
+    def test_the_rest_waits_on_the_second(self):
+        page = self._page(2)
+
+        self.assertEqual(len(page.context['comments']), 5)
+        self.assertEqual([c.text for c in page.context['comments']],
+                         [c.text for c in self.comments[COMMENTS_PAGE:]])
+
+    def test_the_heading_counts_the_whole_conversation(self):
+        """«20» над первой страницей из двух было бы неправдой."""
+        page = self._page()
+
+        self.assertEqual(page.context['comments_total'], COMMENTS_PAGE + 5)
+        self.assertContains(page, f'>{COMMENTS_PAGE + 5}</span>')
+
+    def test_the_pagination_carries_the_chapter_and_the_anchor(self):
+        """Без главы вторая страница открывала бы первую с чужими
+        репликами, без якоря — верх работы, до которого реплики надо
+        снова прокручивать."""
+        page = self._page()
+
+        self.assertContains(page, 'chapter=1&amp;page=2#pikirler')
+
+    def test_a_short_conversation_gets_no_pagination_at_all(self):
+        short = make.story(slug='short-talk', author=make.user(),
+                                chapters=1)
+        data.add_comment(short, self.readers[0], text='Бір ғана пікір',
+                         chapter_number=1)
+
+        page = self.client.get(
+            reverse('core:story_detail', kwargs={'slug': 'short-talk'}) + '?chapter=1')
+
+        self.assertEqual(page.context['comments_pages'], 1)
+        self.assertNotContains(page, 'aria-label="Беттер"')
+
+    def test_garbage_and_overshoot_open_the_work_instead_of_404(self):
+        """`?page=99` это старая ссылка или опечатка — то же, что делает
+        каталог: не-число читается первой страницей, слишком большое —
+        последней."""
+        self.assertEqual(self._page('garbage').context['comments_page'], 1)
+        self.assertEqual(self._page(99).context['comments_page'], 2)
+        self.assertEqual(self._page(0).context['comments_page'], 1)
+
+    def test_a_reply_stays_with_its_parent_and_takes_no_slot(self):
+        parent = self.comments[0]
+        data.add_comment(self.story, self.readers[1], text='Жауап',
+                         chapter_number=1, parent=parent)
+
+        page = self._page()
+
+        self.assertEqual(page.context['comments_total'], COMMENTS_PAGE + 5)
+        shown = next(c for c in page.context['comments'] if c.pk == parent.pk)
+        self.assertEqual([r.text for r in shown.replies], ['Жауап'])
+
+
+class TheAuthorOfACommentSeesItAfterPosting(TestCase):
+    """С окном новая реплика уезжает на последнюю страницу, и возврат на
+    первую означал бы, что человек написал комментарий и не увидел
+    написанного — а якорь на первой странице не нашёл бы ничего."""
+
+    SLUG = 'lands-right'
+
+    def setUp(self):
+        super().setUp()
+        self.story = make.story(slug=self.SLUG, author=make.user(),
+                                     chapters=1)
+        for i in range(COMMENTS_PAGE):
+            data.add_comment(self.story, make.user(),
+                             text=f'Бұрынғы {i}', chapter_number=1)
+        self.reader = login_as_newcomer(self.client, 'lands_right_reader')
+
+    def test_a_new_comment_lands_on_its_own_page(self):
+        response = self.client.post(
+            reverse('core:comment_create', kwargs={'slug': self.SLUG}),
+            {'text': 'Соңғы пікір', 'chapter': '1'})
+
+        fresh = StoryComment.objects.get(text='Соңғы пікір')
+        self.assertEqual(
+            response.url,
+            f"{reverse('core:story_detail', kwargs={'slug': self.SLUG})}"
+            f'?chapter=1&page=2#comment-{fresh.pk}')
+
+    def test_liking_a_comment_returns_to_the_page_it_lives_on(self):
+        # Двадцати реплик хватает ровно на одну страницу — двадцать первая
+        # и есть та, ради которой лайк обязан помнить, где она лежит.
+        far = data.add_comment(self.story, make.user(),
+                               text='Екінші беттегі', chapter_number=1)
+
+        response = self.client.post(
+            reverse('core:comment_like',
+                    kwargs={'slug': self.SLUG, 'comment_id': far.pk}))
+
+        self.assertIn('page=', response.url)
+        self.assertTrue(response.url.endswith(f'#comment-{far.pk}'))
+
+    def test_a_reply_lands_on_the_page_of_its_parent(self):
+        parent = StoryComment.objects.filter(story=self.story).order_by('pk').first()
+
+        response = self.client.post(
+            reverse('core:comment_create', kwargs={'slug': self.SLUG}),
+            {'text': 'Жауабым', 'chapter': '1', 'parent': str(parent.pk)})
+
+        self.assertNotIn('page=', response.url)

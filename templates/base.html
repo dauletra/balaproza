@@ -68,6 +68,21 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body class="min-h-screen bg-slate-100 text-slate-900 antialiased">
+{% comment %}
+    Обход навигации. Шапка портала — логотип, поиск, четыре раздела,
+    колокольчик и меню аккаунта; тому, кто ходит с клавиатуры, она
+    доставалась заново на каждой странице, прежде чем он добирался до
+    текста. Требование доступности называет это первым пунктом, и стоило
+    оно одну ссылку.
+
+    Видна только в фокусе: `sr-only` прячет, `focus:not-sr-only`
+    возвращает на место — поверх шапки, чтобы её было видно там, где
+    фокус и оказался.
+{% endcomment %}
+<a href="#main"
+   class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-brand focus:px-4 focus:py-2 focus:font-sans focus:text-sm focus:font-semibold focus:text-white">
+    Мазмұнға өту
+</a>
 {% include "components/icons/_sprite.html" %}
 
 {% block layout %}
@@ -82,7 +97,7 @@
         центрирует колонку. Иначе на экране <xl контент забирал место рейла и
         становился ШИРЕ, чем на большом экране.
         {% endcomment %}
-        <main class="mx-auto w-full min-w-0 max-w-[860px] flex-1">
+        <main id="main" tabindex="-1" class="mx-auto w-full min-w-0 max-w-[860px] flex-1">
             {% block content %}{% endblock %}
         </main>
 

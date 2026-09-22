@@ -5,10 +5,14 @@
     Триггер из любого места:
         <button @click="$dispatch('open-login')">Кіру</button>
 {% endcomment %}
-<div x-data="{ open: false }"
-     @open-login.window="open = true"
+{% comment %}
+    `modal(...)` вместо `{ open: false }`: Escape и ловушка фокуса живут
+    в нём, а не повторяются атрибутом у каждого диалога. Без ловушки Tab
+    уводил в страницу позади — ту самую, которую диалог перекрывает, — и
+    после закрытия фокус оставался неизвестно где.
+{% endcomment %}
+<div x-data="modal('open-login')"
      @close-login.window="open = false"
-     @keydown.escape.window="open = false"
      x-show="open" x-cloak
      class="fixed inset-0 z-50 flex items-center justify-center p-4"
      role="dialog" aria-modal="true" aria-labelledby="login-modal-title">

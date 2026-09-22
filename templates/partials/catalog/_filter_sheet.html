@@ -10,9 +10,8 @@
     Жанр и тег остались ссылками: это разделы с каноническим URL, и теперь они
     несут остальные сүзгі с собой.
 {% endcomment %}
-<div x-data="{ open: false }"
-     @open-catalog-filters.window="open = true"
-     @keydown.escape.window="open = false"
+{# `modal(...)` несёт Escape и ловушку фокуса — см. login_modal.html. #}
+<div x-data="modal('open-catalog-filters')"
      class="xl:hidden">
 
     {# Backdrop #}
