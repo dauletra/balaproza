@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ─────────────────────────── Self-hosted шрифты ───────────────────────────
-   Variable WOFF2 (см. docs/02.2). Italic подгружаются только при реальном
+   Variable WOFF2 (см. docs/ui.md, «Токены»). Italic подгружаются только при реальном
    использовании (font-style: italic).
 */
 
@@ -51,7 +51,7 @@
 }
 
 /* ─────────────────────────────── @theme ────────────────────────────────────
-   Дизайн-токены по docs/02. Все цвета/шрифты/радиусы/тени — отсюда.
+   Дизайн-токены по docs/ui.md. Все цвета/шрифты/радиусы/тени — отсюда.
    Запрещено использовать сырые rgb() и hex в шаблонах (DEC-05).
 */
 @theme {
@@ -101,7 +101,7 @@
     --color-tg-1: rgb(42, 171, 238);
     --color-tg-2: rgb(34, 158, 217);
 
-    /* — Радиусы (docs/02.3) — */
+    /* — Радиусы — */
     --radius-xs:     2px;     /* свотчи, микроэлементы */
     --radius-sm:     4px;
     --radius-chip:   6px;     /* мелкие чипы */
@@ -111,7 +111,7 @@
     --radius-search: 24px;    /* поле поиска в шапке */
     --radius-pill: 9999px;    /* пилюли / mobile-nav / GenreChip */
 
-    /* — Тени (docs/02.4 — плоский «бумажный» стиль) — */
+    /* — Тени (плоский «бумажный» стиль) — */
     --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.08);
     --shadow-bottom-nav: 0 4px 14px rgba(0, 0, 0, 0.06);
     --shadow-tg-btn:     1px 1px 2.7px rgba(0, 0, 0, 0.18);
@@ -127,7 +127,7 @@
         background: var(--color-slate-100);
     }
 
-    /* docs/02.6 — focus-visible обводка только для клавиатуры */
+    /* focus-visible обводка только для клавиатуры */
     :focus { outline: none; }
     :focus-visible {
         outline: 2px solid var(--color-brand);

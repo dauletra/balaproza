@@ -2,7 +2,7 @@
     Конкурсная биография автора (FR-PROF-07). Внутри вкладки «Туралы»,
     общая для своего и чужого профиля.
 
-    Что видно постороннему, решает `stub_data.contest_history` (BR-74a), а
+    Что видно постороннему, решает `core.data.contest_history` (BR-74a), а
     не этот шаблон: наверх поднимаются только победа и принятие, «қаралуда»
     и «қабылданбады» публично неотличимы, комментарий жюри приходит пустым.
     Прятать что-то ещё здесь — значит завести второе место, где живёт
@@ -12,7 +12,7 @@
     сходится со списком, и отказ нельзя вычислить вычитанием.
 
     Контекст:
-      contest_history — stub_data.contest_history(username, is_self=...)
+      contest_history — core.data.contest_history(user, is_self=...)
 {% endcomment %}
 {% if contest_history %}
     <div class="mt-6 border-t border-slate-100 pt-5">

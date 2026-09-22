@@ -397,7 +397,7 @@ class QualityIsAnAxisOfItsOwn(TestCase):
 
 class PresetsAreOneTapCombinations(TestCase):
     """«Не оқимын?» — комбинация осей одним тапом (docs/ui.md).
-    `single + short` §13.11 называет быстрым чтением дословно, но собрать
+    `single + short` docs/ui.md называет быстрым чтением дословно, но собрать
     её в панели значило два тапа в двух разных группах."""
 
     def test_a_preset_expands_into_its_axes(self):
