@@ -12,7 +12,6 @@
 весь список: «20» над первой страницей из трёх было бы неправдой.
 """
 
-from django.test import Client
 from django.urls import reverse
 
 from core import data
@@ -22,7 +21,6 @@ from core.models import (
     Follow,
     LibraryEntry,
     Report,
-    StoryComment,
 )
 from core.tests import factories as make
 from core.tests.base import TestCase, login_as_newcomer

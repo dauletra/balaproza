@@ -11,11 +11,24 @@
 а классов двести.
 """
 
+from pathlib import Path
+
 from django.core.cache import cache
 from django.test import TestCase as DjangoTestCase
 from django.utils import timezone
 
 from core.models import User
+
+# Корень шаблонов: файлы читают те тесты, которым нужна сама разметка, а
+# не отрендеренная страница, — «оба профиля включают один партиал», «у
+# метрики один глиф». Здесь, а не в каждом из них: одна и та же строка
+# лежала в трёх файлах и в четвёртом под другим именем.
+TEMPLATES = Path(__file__).resolve().parents[2] / 'templates'
+
+# Работа корпуса, у которой есть всё: двенадцать глав, комментарии,
+# реакции, опрос и читатели. Слагом, а не объектом: половина тестов
+# чтения ходит по адресу, а не по строке в базе.
+STORY_SLUG = 'dalney-berega'
 
 
 class TestCase(DjangoTestCase):
