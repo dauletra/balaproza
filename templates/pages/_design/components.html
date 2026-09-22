@@ -76,12 +76,6 @@
 
         <div class="mt-6 grid gap-4 sm:grid-cols-2">
             <div class="space-y-3">
-                <h3 class="font-display text-sm font-bold uppercase tracking-wide text-slate-600">Toggle</h3>
-                {% include "components/toggle.html" with name="notif" label="Хабарламаларды қосу" on=True %}
-                {% include "components/toggle.html" with name="email" label="Email-ге де жіберу" %}
-                {% include "components/toggle.html" with name="dark" label="Қараңғы тақырыпша" disabled=True %}
-            </div>
-            <div class="space-y-3">
                 <h3 class="font-display text-sm font-bold uppercase tracking-wide text-slate-600">Radio + Checkbox</h3>
                 {% include "components/radio_option.html" with name="gender" value="boy" label="Ұл" %}
                 {% include "components/radio_option.html" with name="gender" value="girl" label="Қыз" checked=True %}
@@ -269,10 +263,6 @@
 
         <h3 class="mt-6 mb-3 font-display text-sm font-bold uppercase tracking-wide text-slate-600">Modals</h3>
         <div class="flex flex-wrap gap-2">
-            <button type="button" x-data @click="$dispatch('open-login')"
-                    class="rounded-md border border-slate-300 bg-white px-4 py-2 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
-                Открыть LoginModal
-            </button>
             <button type="button" x-data @click="$dispatch('open-report', {})"
                     class="rounded-md border border-slate-300 bg-white px-4 py-2 font-sans text-sm font-semibold text-slate-700 hover:bg-slate-100">
                 Открыть ReportModal
@@ -324,7 +314,6 @@
     </section>
 
     {# ── Мaунтим модалки (они невидимы пока не открыли) ── #}
-    {% include "components/login_modal.html" %}
     {% include "components/report_modal.html" %}
     {% include "components/delete_confirm_modal.html" %}
 {% endblock %}

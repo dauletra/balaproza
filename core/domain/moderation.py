@@ -38,13 +38,6 @@ def overdue_label(hours: int = REVIEW_PROMISE_HOURS) -> str:
     return f'Мерзімнен асқан ({hours} сағат)'
 
 
-def review_is_overdue(submitted_at, now) -> bool:
-    """Просрочено ли обещание по этой заявке. Чистая функция от двух
-    моментов: то же правило нужно и очереди модератора, и сводке."""
-    if submitted_at is None:
-        return False
-    return (now - submitted_at).total_seconds() > REVIEW_PROMISE_HOURS * 3600
-
 # Оси очереди (FR-MOD-01). Отвечают на разные вопросы модератора: «с чего
 # начать сегодня» — это `waiting`, «кого мы держим дольше всех»; `repeat` —
 # работа, которую уже возвращали, и её читают, сверяя с замечанием.

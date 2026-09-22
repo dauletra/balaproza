@@ -1,7 +1,7 @@
 [project]
 name = "qazaqnovel"
 version = "0.1.0"
-description = "Add your description here"
+description = "Qazaqnovel — казахоязычный литературный портал для детей и подростков"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

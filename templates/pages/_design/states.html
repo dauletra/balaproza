@@ -22,7 +22,7 @@
     {# ── Skeleton primitives ── #}
     <section>
         <h2 class="mb-4 font-display text-lg font-bold text-slate-900">Skeleton primitives</h2>
-        <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div class="rounded-lg border border-slate-200 bg-white p-5">
                 <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">skeleton_box</p>
                 {% include "components/skeleton_box.html" with h="h-12" radius="lg" %}
@@ -30,14 +30,6 @@
             <div class="rounded-lg border border-slate-200 bg-white p-5">
                 <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">skeleton_text</p>
                 {% include "components/skeleton_text.html" with lines=3 %}
-            </div>
-            <div class="rounded-lg border border-slate-200 bg-white p-5">
-                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">skeleton_circle</p>
-                <div class="flex items-center gap-4">
-                    {% include "components/skeleton_circle.html" with size=32 %}
-                    {% include "components/skeleton_circle.html" with size=48 %}
-                    {% include "components/skeleton_circle.html" with size=72 %}
-                </div>
             </div>
         </div>
     </section>
@@ -72,20 +64,8 @@
     {# ── BookCardWide ── #}
     <section>
         <h2 class="mb-4 font-display text-lg font-bold text-slate-900">DeskBookCardWide</h2>
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div>
-                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Loading</p>
-                <div class="flex flex-col gap-3">
-                    {% include "components/skeleton_book_card_wide.html" %}
-                    {% include "components/skeleton_book_card_wide.html" %}
-                </div>
-            </div>
-            <div>
-                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Content</p>
-                <div class="flex flex-col gap-3">
-                    {% include "components/book_card_wide.html" with story=sample_story description="Қысқа аннотация үшін орын — әдетте 3-4 жол." status_key="Published" %}
-                </div>
-            </div>
+        <div class="flex flex-col gap-3">
+            {% include "components/book_card_wide.html" with story=sample_story description="Қысқа аннотация үшін орын — әдетте 3-4 жол." status_key="Published" %}
         </div>
     </section>
 
@@ -133,16 +113,8 @@
     {# ── Comment ── #}
     <section>
         <h2 class="mb-4 font-display text-lg font-bold text-slate-900">Comment</h2>
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div class="grid grid-cols-1 gap-6">
             <div>
-                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Loading</p>
-                <div class="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-5">
-                    {% include "components/skeleton_comment.html" %}
-                    {% include "components/skeleton_comment.html" %}
-                </div>
-            </div>
-            <div>
-                <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Content</p>
                 <div class="rounded-lg border border-slate-200 bg-white p-5">
                     {% comment %}
                         Раньше здесь стоял `with c=sample_comment` — параметра
@@ -153,15 +125,6 @@
                     {% include "components/comment.html" with comment_id=sample_comment.id author_name=sample_comment.author.public_name author_username=sample_comment.author.username date=sample_comment.created_at|ago text=sample_comment.text likes=sample_comment.likes liked=sample_comment.liked %}
                 </div>
             </div>
-        </div>
-    </section>
-
-    {# ── Chapter text (reading) ── #}
-    <section>
-        <h2 class="mb-4 font-display text-lg font-bold text-slate-900">Chapter body (reading mode)</h2>
-        <div class="rounded-lg border border-slate-200 bg-white p-6">
-            <p class="mb-3 font-sans text-xs font-bold uppercase tracking-wide text-slate-500">Loading</p>
-            {% include "components/skeleton_chapter_text.html" %}
         </div>
     </section>
 

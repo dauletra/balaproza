@@ -234,11 +234,6 @@ def release_story(story, moderator) -> int:
         story=story, moderator=moderator).delete()[0]
 
 
-def pending_revision_count(story) -> int:
-    return ChapterRevision.objects.filter(
-        chapter__story=story, state='pending').count()
-
-
 # ───────────────────── Жалобы (BR-33, FR-STORY-09) ─────────────────────────
 
 def create_report(reporter, *, story=None, comment=None, reason: str,

@@ -44,7 +44,6 @@ from .domain.contests import (
     SUBMISSION_STATUSES,
 )
 from .domain.formatting import (
-    KK_MONTHS_SHORT,
     kk_ago,
     kk_date,
     kk_period,
@@ -72,7 +71,6 @@ from .domain.moderation import (
     REVIEW_PROMISE_HOURS,
     diff_summary,
     paragraph_diff,
-    review_is_overdue,
 )
 from .domain.story import (
     COMMENTS_PAGE,
@@ -82,7 +80,6 @@ from .domain.story import (
     REVISION_STATES,
     STORY_FORMATS,
     STORY_STATUSES,
-    Reaction,
     story_status,
 )
 from .domain.slugs import slugify_kz
@@ -279,7 +276,6 @@ from .queries.moderation import (
     open_reports,
     open_reports_count,
     overdue_count,
-    pending_revision_count,
     portal_day_ago,
     portal_summary,
     publish_held_comment,
