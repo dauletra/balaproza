@@ -15,7 +15,7 @@ from core.tests.base import TestCase
 
 class AdminBulkDeleteKeepsTheCounterHonest(TestCase):
     """Модерация комментариев в MVP — штатное удаление списком в админке
-    (`core/admin.py`), не вызов `data.delete_comment`. `queryset.delete()`
+    (`core/admin/`), не вызов `data.delete_comment`. `queryset.delete()`
     раньше уходил в обход счётчика и оставлял `Story.comments` на старом
     значении."""
 

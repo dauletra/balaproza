@@ -34,12 +34,9 @@ from core.domain import notifications as notification_rules
 from core.domain import story as story_rules
 from core.domain import tags as tag_rules
 from core.domain.story import STORY_STATUS_LABELS
-from core.admin import (
-    BookOfWeekAdmin,
-    GenreAdmin,
-    NotificationAdmin,
-    StoryTagInline,
-)
+from core.admin.catalog import BookOfWeekAdmin, GenreAdmin
+from core.admin.social import NotificationAdmin
+from core.admin.story import StoryTagInline
 from core.models import (
     AwardGrant,
     BookOfWeek,
