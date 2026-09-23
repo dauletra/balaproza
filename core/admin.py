@@ -20,6 +20,7 @@ from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.admin.actions import delete_selected
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+from django.core.exceptions import PermissionDenied
 from django.db.models import Count, Exists, OuterRef
 from django.shortcuts import render
 
@@ -758,7 +759,16 @@ class SchoolLinkAdmin(admin.ModelAdmin):
 class ModerationDecisionAdmin(admin.ModelAdmin):
     """Журнал решений — только на чтение. Акт человека не правится
     задним числом: исправленный, он рассказывал бы о решении, которого
-    никто не принимал, — то же правило, что у `Notification`."""
+    никто не принимал, — то же правило, что у `Notification`.
+
+    И не удаляется: из последнего акта выводится статус работы
+    (`Story.refresh_status`) и замечание автору в рабочем месте. Удалённый
+    возврат молча делал бы возвращённую работу черновиком.
+
+    Запрет — на двери, а не в `has_delete_permission`: права на удаление
+    спрашивает и каскад. Отказ там остановил бы удаление работы или
+    человека целиком, а акт по несуществующей работе хранить незачем.
+    """
 
     list_display = ('story', 'outcome', 'moderator', 'chapters', 'decided_at')
     list_filter = ('outcome',)
@@ -771,6 +781,19 @@ class ModerationDecisionAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        actions.pop('delete_selected', None)
+        return actions
+
+    def delete_view(self, request, object_id, extra_context=None):
+        raise PermissionDenied
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        return super().change_view(request, object_id, form_url,
+                                   {**(extra_context or {}),
+                                    'show_delete': False})
 
 
 @admin.register(ModerationClaim)

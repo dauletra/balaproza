@@ -38,6 +38,7 @@ from core.models import (
     Genre,
     JuryMember,
     LibraryEntry,
+    ModerationDecision,
     Notification,
     PollOption,
     PollVote,
@@ -614,6 +615,8 @@ class Command(QuietCommand):
         for username, items in _corpus.NOTIFICATIONS_BY_USER.items():
             user = User.objects.get(username=username)
             for stub in items:
+                if stub.kind == 'moderation' and stub.outcome:
+                    self._seed_decision(stub)
                 _, is_new = Notification.objects.update_or_create(
                     user=user,
                     kind=stub.kind,
@@ -634,6 +637,21 @@ class Command(QuietCommand):
                 added += is_new
                 updated += not is_new
         return added, updated
+
+    def _seed_decision(self, stub):
+        """Акт в журнале за решением из ленты корпуса.
+
+        Уведомление — только весть автору; статус «на доработке» и
+        замечание в рабочем месте читаются из журнала
+        (`ModerationDecision`). Без акта демо-возврат выглядел бы в ленте,
+        а в рабочем месте его не было бы. Момент — тот же, что у вести:
+        `decided_at` ставится базой при создании, поэтому дописывается
+        отдельным `update`."""
+        story = Story.objects.get(slug=stub.story_slug)
+        decision, _ = ModerationDecision.objects.get_or_create(
+            story=story, outcome=stub.outcome, reason=stub.text)
+        ModerationDecision.objects.filter(pk=decision.pk).update(
+            decided_at=self._moment(stub.days_ago, stub.hours_ago or 0))
 
     def _seed_school_links(self):
         added = updated = 0

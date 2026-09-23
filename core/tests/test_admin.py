@@ -577,3 +577,35 @@ class TagDecisionsLeaveATrace(TestCase):
         self.assertEqual(trail[str(accepted.pk)], 'Қабылданды.')
         self.assertEqual(trail[str(rejected.pk)],
                          'Қабылданбады: Жанрды сипаттамайды.')
+
+
+class TheDecisionJournalIsNotDeletedByHand(TestCase):
+    """Из последнего акта выводится статус работы: удалённый возврат
+    молча делал бы её черновиком. Каскад от удаления самой работы при
+    этом проходит — акт по несуществующей работе хранить незачем."""
+
+    def setUp(self):
+        self.client.force_login(
+            User.objects.create_superuser('moderator', password='x'))
+        self.story = _story(User.objects.get(username='aidana'))
+        self.story.apply_moderation('needs_work', 'Себебі.')
+        self.decision = self.story.moderation_decisions.get()
+
+    def test_there_is_no_door_to_delete_a_decision(self):
+        self.assertEqual(self.client.get(reverse(
+            'admin:core_moderationdecision_delete',
+            args=[self.decision.pk])).status_code, 403)
+        page = self.client.get(reverse(
+            'admin:core_moderationdecision_changelist')).content.decode()
+        self.assertNotIn('value="delete_selected"', page)
+        card = self.client.get(reverse(
+            'admin:core_moderationdecision_change',
+            args=[self.decision.pk])).content.decode()
+        self.assertNotIn('deletelink', card)
+
+    def test_deleting_the_story_still_takes_its_decisions(self):
+        response = self.client.post(
+            reverse('admin:core_story_delete', args=[self.story.pk]),
+            {'post': 'yes'})
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Story.objects.filter(pk=self.story.pk).exists())

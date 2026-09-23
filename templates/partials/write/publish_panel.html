@@ -59,7 +59,9 @@
         Замечание модератора — первым, до всего остального: это
         единственное, ради чего автор сюда сейчас зашёл. Висит до повторной
         отправки; раньше следа не оставалось вовсе, и причина жила одним
-        экземпляром в ленте уведомлений.
+        экземпляром в ленте уведомлений. Теперь это акт из журнала
+        решений (`ModerationDecision`): лента чистится через месяц, журнал
+        — нет.
     {% endcomment %}
     {% if moderation_note %}
         <div class="mb-4 rounded-md border border-status-attention-fg/40 bg-status-attention-bg/50 p-4">
@@ -67,10 +69,10 @@
                 <span class="mt-0.5 shrink-0 text-status-attention-fg">{% include "components/icon.html" with name="adjustments" size=16 only %}</span>
                 <div class="min-w-0 flex-1">
                     <p class="font-sans text-sm font-bold text-slate-900">
-                        {{ moderation_note|outcome_label }} · {{ moderation_note.created_at|ago }}
+                        {{ moderation_note|outcome_label }} · {{ moderation_note.decided_at|ago }}
                     </p>
-                    {% if moderation_note.text %}
-                        <p class="mt-1 font-sans text-sm leading-relaxed text-slate-800">{{ moderation_note.text }}</p>
+                    {% if moderation_note.reason %}
+                        <p class="mt-1 font-sans text-sm leading-relaxed text-slate-800">{{ moderation_note.reason }}</p>
                     {% endif %}
                     <p class="mt-2 font-sans text-xs leading-relaxed text-slate-600">
                         Түзеткен соң қайта жібер — сол кезде бұл ескерту жоғалады.

@@ -302,7 +302,7 @@ def resolve_report(report, moderator, *, action: str, reason: str = '') -> None:
     with transaction.atomic():
         if action == 'uphold':
             if report.story_id:
-                report.story.take_down(reason)
+                report.story.take_down(reason, moderator=moderator)
             elif report.comment_id:
                 report.comment.delete()
                 # `.delete()` не обнуляет ссылку в уже загруженном `report` —

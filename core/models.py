@@ -582,11 +582,16 @@ class Story(models.Model):
         chapters = list(self.chapter_set.all())
         # Возвращённое отличается от нетронутого черновика, и
         # отличие это — последнее решение модератора, а не отдельная
-        # колонка: колонка разошлась бы с лентой уведомлений, где то же
-        # решение уже записано.
-        last_outcome = (Notification.objects
-                        .filter(story=self, kind='moderation')
-                        .order_by('-created_at', '-pk')
+        # колонка: колонка разошлась бы с журналом, где то же решение уже
+        # записано.
+        #
+        # Из журнала решений, а не из ленты уведомлений. Лента чистится
+        # (`prune_notifications`, 30 дней), и возвращённая работа, которую
+        # автор открыл через месяц, при первом же пересчёте молча
+        # становилась черновиком — без следа того, что её возвращали.
+        last_outcome = (ModerationDecision.objects
+                        .filter(story=self)
+                        .order_by('-decided_at', '-pk')
                         .values_list('outcome', flat=True).first())
         fresh = story_status(
             has_published=any(c.published_revision_id for c in chapters),
@@ -657,10 +662,10 @@ class Story(models.Model):
             # Метка «взял в работу» снимается решением: она про намерение
             # прочесть, а прочтение состоялось.
             ModerationClaim.objects.filter(story=self).delete()
-            # Уведомление пишется **до** пересчёта: статус `NeedsWork`
-            # выводится из последнего решения, а решение и есть эта
-            # запись. Обратный порядок оставлял бы возвращённую работу
-            # неотличимой от нетронутого черновика до следующей правки.
+            # Акт выше пишется **до** пересчёта: статус `NeedsWork`
+            # выводится из последнего решения в журнале. Обратный порядок
+            # оставлял бы возвращённую работу неотличимой от нетронутого
+            # черновика до следующей правки.
             note = Notification.objects.create(
                 user=self.author, kind='moderation', story=self,
                 outcome=outcome, text=reason,
@@ -674,27 +679,34 @@ class Story(models.Model):
                 notify_new_chapter(self, opened)
             return note
 
-    def take_down(self, reason: str) -> 'Notification':
+    def take_down(self, reason: str, moderator=None) -> 'Notification':
         """Снять уже опубликованное с публикации по жалобе.
 
         Не `apply_moderation`: та решает поданную ревизию и без
         `pending` падает — здесь наоборот, ревизии может не быть вовсе,
-        решается то, что уже стоит у читателя. Общее с ней — форма: акт,
-        уведомление и пересчёт статуса одной транзакцией. Текст остаётся
-        у автора, снимается только видимость (`published_revision`), тем
-        же способом, каким её даёт публикация ревизии, — поэтому `refresh_status()`
-        сам приводит работу в `NeedsWork`, ничего изобретать не пришлось.
+        решается то, что уже стоит у читателя. Общее с ней — форма: акт в
+        журнале, уведомление и пересчёт статуса одной транзакцией. Текст
+        остаётся у автора, снимается только видимость (`published_revision`),
+        тем же способом, каким её даёт публикация ревизии, — поэтому
+        `refresh_status()` по акту `rejected` сам приводит работу в
+        `NeedsWork`, ничего изобретать не пришлось.
 
-        Кто снял — хранит сам `Report` (`resolved_by`/`resolved_at`), не
-        это уведомление: у `apply_moderation` тоже нет `actor` в акте
-        читателю, решение платформы не подписывается именем модератора.
+        Акт в журнале обязателен, и не ради истории: без него статус
+        держался на одном уведомлении, и через месяц, когда ленту чистят,
+        снятая работа становилась черновиком, а причина снятия пропадала с
+        экрана автора. Имя модератора пишется в акт, а не в уведомление:
+        решение платформы автору не подписывается, как и у
+        `apply_moderation`.
         """
         reason = reason.strip()
         if not reason:
             raise ValueError('Себепсіз алып тастауға болмайды.')
         with transaction.atomic():
-            self.chapter_set.filter(published_revision__isnull=False) \
+            taken = self.chapter_set.filter(published_revision__isnull=False) \
                 .update(published_revision=None)
+            ModerationDecision.objects.create(
+                story=self, moderator=moderator, outcome='rejected',
+                reason=reason, chapters=taken)
             note = Notification.objects.create(
                 user=self.author, kind='moderation', story=self,
                 outcome='rejected', text=reason,

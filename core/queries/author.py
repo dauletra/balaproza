@@ -16,7 +16,13 @@ from django.db.models import Count, Prefetch
 from ..domain.library import LIBRARY_KINDS
 from ..domain.story import PUBLISH_CHECKLIST, checklist_label
 from ..managers import chapter_count_subquery
-from ..models import Chapter, LibraryEntry, Notification, Story
+from ..models import (
+    Chapter,
+    LibraryEntry,
+    ModerationDecision,
+    Notification,
+    Story,
+)
 from .catalog import all_stories
 
 
@@ -164,13 +170,21 @@ def moderation_note(story):
     чек-лист снова горел зелёным, кнопка отправки была активна, а
     единственный экземпляр причины лежал в ленте уведомлений — автор
     должен был помнить её наизусть, пока правит.
+
+    Берётся из журнала решений (`ModerationDecision`), а не из ленты:
+    лента чистится через месяц, и замечание к работе, которую автор
+    отложил, исчезало раньше, чем он к ней возвращался.
+
+    Замечание — **последнее** решение, если оно возврат, а не последний
+    возврат вообще: иначе одобренная после исправления работа носила бы
+    старое «Толықтыру қажет» до следующей подачи. Правило то же, что у
+    статуса (`Story.refresh_status`).
     """
     if story is None:
         return None
-    note = (Notification.objects.filter(story=story, kind='moderation')
-            .exclude(outcome='approved')
-            .select_related('story').order_by('-created_at', '-pk').first())
-    if note is None or pending_review_since(story):
+    note = (ModerationDecision.objects.filter(story=story)
+            .order_by('-decided_at', '-pk').first())
+    if note is None or note.outcome == 'approved' or pending_review_since(story):
         return None
     return note
 

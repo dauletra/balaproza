@@ -150,6 +150,12 @@ class ResolvingAStoryReport(TestCase):
             user=self.author, kind='moderation', story=self.story).latest('pk')
         self.assertEqual(note.outcome, 'rejected')
         self.assertEqual(note.text, 'Ережені бұзады.')
+        # Акт в журнале — с тем, кто снял: из него, а не из ленты, статус
+        # и замечание автору читаются и через месяц.
+        decision = self.story.moderation_decisions.get()
+        self.assertEqual((decision.outcome, decision.reason, decision.moderator),
+                         ('rejected', 'Ережені бұзады.', self.mod))
+        self.assertGreater(decision.chapters, 0)
 
     def test_uphold_without_a_reason_leaves_the_report_open(self):
         before = list(Chapter.objects.filter(story=self.story)

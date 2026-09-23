@@ -217,3 +217,58 @@ class OrphanFilesGoAwayButNotTheOnesInUse(TestCase):
         self._orphan()
         call_command('prune_media', '--apply', '--quiet')
         call_command('prune_media', '--apply', '--quiet')
+
+
+class AReturnOutlivesTheFeed(TestCase):
+    """Лента уведомлений чистится через `KEEP_DAYS`, журнал решений — нет.
+
+    Статус «Толықтыру қажет» и замечание в рабочем месте читались из
+    ленты, и работа, которую автор отложил на месяц, после чистки при
+    первом же пересчёте становилась черновиком без следа возврата.
+    Проверяется оба пути возврата: решение по поданному и снятие по
+    жалобе."""
+
+    REASON = 'Диалогтар үзіліп қалған.'
+
+    def setUp(self):
+        super().setUp()
+        self.author = make.user()
+
+    def _outlive_the_feed(self, story):
+        _age(Notification.objects.filter(story=story), KEEP_DAYS + 1)
+        data.prune_notifications()
+        self.assertFalse(Notification.objects.filter(story=story).exists())
+        story.refresh_status()
+        story.refresh_from_db()
+
+    def _assert_still_returned(self, story):
+        self.assertEqual(story.status, 'NeedsWork')
+        note = data.moderation_note(story)
+        self.assertIsNotNone(note)
+        self.assertEqual(note.reason, self.REASON)
+
+    def test_a_work_sent_back_stays_sent_back(self):
+        story = make.story(author=self.author, chapters=1, published=False,
+                           status='NotPublished')
+        make.submit(story)
+        story.apply_moderation('needs_work', self.REASON)
+        self._outlive_the_feed(story)
+        self._assert_still_returned(story)
+
+    def test_a_work_taken_down_stays_taken_down(self):
+        story = make.story(author=self.author, chapters=1)
+        story.take_down(self.REASON)
+        self._outlive_the_feed(story)
+        self._assert_still_returned(story)
+
+    def test_an_approval_after_a_return_still_clears_it(self):
+        """Журнал — не «был ли возврат когда-нибудь», а последнее решение."""
+        story = make.story(author=self.author, chapters=1, published=False,
+                           status='NotPublished')
+        make.submit(story)
+        story.apply_moderation('needs_work', self.REASON)
+        make.submit(story)
+        story.apply_moderation('approved')
+        self._outlive_the_feed(story)
+        self.assertEqual(story.status, 'Published')
+        self.assertIsNone(data.moderation_note(story))

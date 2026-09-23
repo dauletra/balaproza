@@ -212,10 +212,11 @@ def eligibility_line(contest):
 
 
 @register.filter(name="outcome_label")
-def outcome_label(notification):
-    """Подпись исхода модерации — из реестра, а не из шаблона.
+def outcome_label(event):
+    """Подпись исхода модерации — из реестра, а не из шаблона. Годится и
+    уведомлению, и акту журнала: у обоих `outcome` одного словаря.
     Незнакомый исход не называется никак: лучше пусто, чем чужая подпись."""
-    return MODERATION_OUTCOME_LABELS.get(notification.outcome, "")
+    return MODERATION_OUTCOME_LABELS.get(event.outcome, "")
 
 
 @register.simple_tag(name="review_promise")
