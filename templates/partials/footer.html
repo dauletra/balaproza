@@ -47,28 +47,14 @@
                     </button>
                 </h3>
                 <div class="flex flex-col gap-3 pb-3 sm:!block sm:pb-0" :class="{ 'hidden': !open }">
-                    <a href="mailto:daulet.rakhmankul@gmail.com"
+                    {# Адреса — `core/domain/contacts.py`: одно место на подвал и правовые тексты. #}
+                    <a href="mailto:{{ contact_email }}"
                        class="font-sans text-[14px] text-slate-600 hover:text-brand sm:mt-3 sm:block">
-                        daulet.rakhmankul@gmail.com
+                        {{ contact_email }}
                     </a>
-                    <ul class="mt-1 flex items-center gap-3.5 sm:mt-4" aria-label="Әлеуметтік желілер">
-                        <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="YouTube"
-                               class="grid h-11 w-11 place-items-center sm:h-auto sm:w-auto">
-                            {% include "components/icon.html" with name="youtube" size=18 only %}
-                        </a></li>
-                        <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="Instagram"
-                               class="grid h-11 w-11 place-items-center sm:h-auto sm:w-auto">
-                            {% include "components/icon.html" with name="instagram" size=18 cls="text-slate-900" only %}
-                        </a></li>
-                        <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="TikTok"
-                               class="grid h-11 w-11 place-items-center sm:h-auto sm:w-auto">
-                            {% include "components/icon.html" with name="tiktok" size=18 cls="text-slate-900" only %}
-                        </a></li>
-                        <li><a href="#" target="_blank" rel="noopener noreferrer" aria-label="Telegram"
-                               class="grid h-11 w-11 place-items-center sm:h-auto sm:w-auto">
-                            {% include "components/icon.html" with name="telegram" size=18 only %}
-                        </a></li>
-                    </ul>
+                    <div class="mt-1 sm:mt-4">
+                        {% include "components/social_links.html" with links=social_links hover="sm:h-auto sm:w-auto" %}
+                    </div>
                 </div>
             </section>
 

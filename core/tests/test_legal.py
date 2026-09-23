@@ -126,3 +126,26 @@ class PrivacyPolicyMatchesTheModel(TestCase):
     # недосмотр (домена ещё нет). Тест, написанный вперёд решения, был бы
     # красным по плану, а красный по плану тест перестают читать.
     # Пункт живёт открытым в LAUNCH.md (домен и ролевая почта).
+
+
+class ContactsLiveInOnePlace(TestCase):
+    """Почта и каналы платформы — `core/domain/contacts.py`, и оттуда их
+    берут правовые тексты, подвал и страница после регистрации. Литерал
+    почты в подвале пережил бы замену личного адреса ролевым."""
+
+    def test_the_footer_carries_the_same_address_as_the_policy(self):
+        from core.domain.contacts import CONTACT_EMAIL, social_links
+        page = self.client.get(reverse('core:home')).content.decode()
+        self.assertIn(f'mailto:{CONTACT_EMAIL}', page)
+        for link in social_links():
+            with self.subTest(channel=link['label']):
+                self.assertIn(f'href="{link["url"]}"', page)
+        policy = self.client.get(reverse('core:legal_privacy')).content.decode()
+        self.assertIn(CONTACT_EMAIL, policy)
+
+    def test_a_channel_without_an_address_is_not_drawn(self):
+        from core.domain.contacts import SOCIAL_CHANNELS, social_links
+        shown = {link['label'] for link in social_links()}
+        for _, label, url in SOCIAL_CHANNELS:
+            with self.subTest(channel=label):
+                self.assertEqual(label in shown, bool(url))

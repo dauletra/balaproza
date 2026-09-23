@@ -17,6 +17,7 @@ from datetime import timedelta
 from random import Random
 
 from django.conf import settings
+from django.core.files.storage import default_storage
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils import timezone
@@ -61,6 +62,18 @@ from core.queries.story import recount_recent_views
 
 from . import _corpus
 from ._base import QuietCommand
+
+
+def _existing_cover(name: str) -> str:
+    """Имя файла обложки корпуса — если файл лежит в `media/`, иначе пусто.
+
+    Файлы корпуса в репозитории не живут (`media/` в `.gitignore`), и на
+    машине, где их нет, — после уборки `media/`, на свежей копии — сид
+    записывал путь в никуда: вместо заглушки с буквами каталог рисовал
+    битые картинки, и по такому экрану нельзя было проверить ничего.
+    Пустое поле — законное состояние: работа без обложки, и её рисует
+    `cover_placeholder.html`."""
+    return name if name and default_storage.exists(name) else ''
 
 
 def _publish_demo_chapter(chapter, story) -> None:
@@ -204,7 +217,7 @@ class Command(QuietCommand):
                 defaults={
                     'title':           stub.title,
                     'author':          users[stub.author_username],
-                    'cover':           stub.cover,
+                    'cover':           _existing_cover(stub.cover),
                     'annotation':      stub.annotation,
                     'primary_genre':   genres[primary],
                     'secondary_genre': genres.get(secondary) if secondary else None,

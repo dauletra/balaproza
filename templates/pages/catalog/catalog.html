@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load qazaqnovel %}
 
 {% comment %}
     Унифицированный каталог. Один шаблон для genre/tag/all —
@@ -74,7 +75,8 @@
         top-16 — высота липкой шапки, z ниже её z-30.
     {% endcomment %}
     <div class="sticky top-16 z-20 -mx-4 mb-4 flex items-center gap-2 border-b border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 xl:hidden">
-        <span class="shrink-0 font-sans text-xs text-slate-500">{{ total_results }} шығарма</span>
+        {# Ноль не называется: пустая выдача говорит «Ештеңе табылмады» сама. #}
+        {% if total_results %}<span class="shrink-0 font-sans text-xs text-slate-500">{{ total_results|spaced }} шығарма</span>{% endif %}
 
         <form method="get" x-data class="ml-auto flex min-w-0 items-center">
             {% if mode != 'genre' and current_genre_slug %}<input type="hidden" name="genre" value="{{ current_genre_slug }}">{% endif %}
@@ -106,7 +108,7 @@
 
     {# ── Desktop: счётчик результатов + сортировка над списком ── #}
     <div class="mb-4 hidden items-baseline justify-between border-b border-slate-200 pb-3 xl:flex">
-        <span class="font-sans text-sm text-slate-600">{{ total_results }} шығарма</span>
+        <span class="font-sans text-sm text-slate-600">{% if total_results %}{{ total_results|spaced }} шығарма{% endif %}</span>
         {% comment %}
             Сортировка не входит в filter_groups (links.FILTER_GROUPS) ни в
             одном режиме — она не сужает выдачу, а меняет порядок, и раньше

@@ -104,7 +104,8 @@ uv run python manage.py seed_demo          # демо-корпус, идемпо
 ```
 core/
 ├── domain/        правила: константы и чистые функции (каталог, story, contests,
-│                  awards, notifications, moderation, formatting). Хранилища
+│                  awards, notifications, moderation, formatting, contacts —
+│                  почта и каналы платформы, одно место на проект). Хранилища
 │                  не знает
 ├── managers.py    выдача: StoryQuerySet и ContestQuerySet — публичность, состав
 │                  карточки, объём чтения, оси каталога, фазы конкурса

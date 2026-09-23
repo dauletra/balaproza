@@ -523,3 +523,20 @@ class RequirementCodesDoNotComeBack(unittest.TestCase):
         self.assertEqual(offenders, [],
                          'ссылка на документ, которого нет:\n'
                          + '\n'.join(offenders[:20]))
+
+
+class NoLinkLeadsNowhere(unittest.TestCase):
+    """Ссылка `href="#"` — обещание, за которым ничего нет.
+
+    Такими были четыре иконки соцсетей в подвале каждой страницы и те же
+    четыре на странице после регистрации под словами «Сұрағың бар ма?
+    Жаз:» — с `target="_blank"` они открывали новую вкладку с той же
+    страницей. Адреса каналов живут в `core/domain/contacts.py`, и канал
+    без адреса не рисуется."""
+
+    LINK = re.compile(r'<a\b[^>]*\bhref="#"', re.S)
+
+    def test_no_anchor_points_at_an_empty_fragment(self):
+        for path in _templates():
+            with self.subTest(template=path.name):
+                self.assertIsNone(self.LINK.search(path.read_text(encoding='utf-8')))

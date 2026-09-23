@@ -163,7 +163,10 @@ def genre_index(request):
     genres = data.all_genres()
     return render(request, 'pages/catalog/genre_index.html', {
         'genres':        genres,
-        'total_stories': sum(g.count for g in genres),
+        # Число работ — то же, что в хиро главной, а не сумма по жанрам:
+        # работа с основным и дополнительным жанром стоит в двух карточках,
+        # и сумма считала её дважды — «32 шығарма» при 21 в каталоге.
+        'total_stories': data.portal_stats()['stories'],
     })
 
 

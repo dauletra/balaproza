@@ -98,11 +98,18 @@
 
             <div class="mt-1 flex items-center gap-3">
                 {% include "components/button.html" with kind="primary" label=story|start_label icon="book" href=read_href %}
-                <span class="font-sans text-xs text-slate-600">
-                    {{ story.views|compact_count }} оқыды
-                    <span aria-hidden="true" class="text-slate-400">·</span>
-                    {{ story.likes|compact_count }} реакция
-                </span>
+                {% comment %}
+                    Ноль не показывается: у выбора редакции «0 реакция» читается
+                    как «никому не понравилось» — ровно против того, ради чего
+                    карточка стоит на главной.
+                {% endcomment %}
+                {% if story.views or story.likes %}
+                    <span class="font-sans text-xs text-slate-600">
+                        {% if story.views %}{{ story.views|compact_count }} оқыды{% endif %}
+                        {% if story.views and story.likes %}<span aria-hidden="true" class="text-slate-400">·</span>{% endif %}
+                        {% if story.likes %}{{ story.likes|compact_count }} реакция{% endif %}
+                    </span>
+                {% endif %}
             </div>
         </div>
     </article>

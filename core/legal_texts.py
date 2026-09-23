@@ -35,13 +35,14 @@ Telegram, — ничего из этого в базе нет, `get_or_create_te
 удаление поля роняет прогон, пока о нём не убрали фразу отсюда.
 """
 
+from .domain.contacts import CONTACT_EMAIL, CONTACT_TELEGRAM
+
 _LAST_UPDATED = '2026 жылғы 22 қыркүйек'
 
-# Куда писать. Один канал для обычных вопросов и один для формальных
-# обращений — по персональным данным пишут туда, где адрес можно
-# приложить к заявлению.
-_CONTACT_TELEGRAM = '@qazaqnovel'
-_CONTACT_EMAIL = 'daulet.rakhmankul@gmail.com'
+# Куда писать — из одного места на весь проект (`domain/contacts`): тот же
+# адрес стоит в подвале, и замена почты не должна обходить ни одно из мест.
+_CONTACT_TELEGRAM = CONTACT_TELEGRAM
+_CONTACT_EMAIL = CONTACT_EMAIL
 
 # Имя без подчёркивания — единственное, что этот модуль отдаёт наружу.
 LEGAL_PAGES = {

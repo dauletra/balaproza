@@ -1,4 +1,5 @@
 from . import data
+from .domain.contacts import CONTACT_EMAIL, social_links
 
 
 def auth_state(request):
@@ -24,10 +25,14 @@ def auth_state(request):
 
 
 def site_links(request):
-    """Глобально доступные внешние ссылки: «Авторлар мектебі».
-    Используется в footer и любых страницах без явного контекста.
-    """
-    return {'school_links_global': data.school_links()}
+    """Глобально доступные внешние ссылки: «Авторлар мектебі» и куда писать
+    платформе. Используется в footer и любых страницах без явного
+    контекста. Адреса — из `domain/contacts`, одного места на проект."""
+    return {
+        'school_links_global': data.school_links(),
+        'contact_email': CONTACT_EMAIL,
+        'social_links': social_links(),
+    }
 
 
 def nav_state(request):

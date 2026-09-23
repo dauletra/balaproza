@@ -1,8 +1,10 @@
+{% load qazaqnovel %}
 {% comment %}
     Tag hero — нейтральный slate-блок с `#`-префиксом и счётчиком стори.
     Отличается от цветного genre-hero: теги визуально вторичны.
 
-    Контекст: current_tag (Tag), results (для счётчика)
+    Контекст: current_tag (Tag), total_results (число — про всю выдачу,
+    а не про страницу: `results` это окно в 20)
 {% endcomment %}
 <header class="mb-5 rounded-lg border border-slate-200 bg-white p-5 sm:mb-6 sm:p-7">
     <p class="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -12,7 +14,7 @@
         <span class="text-slate-500">#</span>{{ current_tag.name }}
     </h1>
     <p class="mt-2 font-sans text-sm text-slate-600">
-        {{ results|length }} шығарма · {{ current_tag.usage_count }} рет қолданылған
+        {{ total_results|spaced }} шығарма · {{ current_tag.usage_count }} рет қолданылған
     </p>
     <p class="mt-1 font-sans text-xs text-slate-500">
         <a href="{% url 'core:catalog' %}" class="hover:text-brand">← Толық каталогқа</a>
