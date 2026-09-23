@@ -74,14 +74,13 @@ def moderation_queue(request):
     })
 
 
-@moderator_only
-def moderation_detail(request, slug):
-    """Карточка решения: текст, сравнение с опубликованным, история и три
-    исхода."""
-    story = data.story_for_moderation(slug)
-    if story is None:
-        raise Http404(f'Шығарма «{slug}» табылмады')
+def _render_detail(request, story, *, reason='', error='', status=200):
+    """Карточка решения — и при первом показе, и при отказе проверки.
 
+    Отказ рисует ту же карточку, а не редирект с тостом: ошибка встаёт у
+    поля «Себебі», набранное остаётся на месте. Тост после редиректа
+    всплывал в углу страницы, у которой форма решения — в самом низу под
+    текстом главы, и гас, пока модератор к ней листал."""
     submitted = data.submitted_chapters(story)
     # Сводка различий живёт на самом пункте: параллельный список пришлось
     # бы индексировать из шаблона, а такого фильтра в проекте нет и заводить
@@ -99,7 +98,19 @@ def moderation_detail(request, slug):
         # Работа могла быть отозвана автором, пока модератор читал: решать
         # нечего, и три кнопки об этом молчали бы.
         'has_pending': bool(submitted),
-    })
+        'reason':     reason,
+        'decision_error': error,
+    }, status=status)
+
+
+@moderator_only
+def moderation_detail(request, slug):
+    """Карточка решения: текст, сравнение с опубликованным, история и три
+    исхода."""
+    story = data.story_for_moderation(slug)
+    if story is None:
+        raise Http404(f'Шығарма «{slug}» табылмады')
+    return _render_detail(request, story)
 
 
 @moderator_only
@@ -128,8 +139,9 @@ def moderation_decide(request, slug):
     """Решение по поданному тексту.
 
     Причина отрицательного исхода обязательна — её проверяет и
-    `apply_moderation`, но сообщение отсюда адресно и возвращает на ту же
-    карточку, где набран текст.
+    `apply_moderation`. Отказ проверки рисует ту же карточку с ошибкой у
+    поля и набранным текстом (400), а не редирект с тостом: правило
+    портала для любой формы, отвергнутой проверкой.
     """
     story = data.story_for_moderation(slug)
     if story is None:
@@ -140,8 +152,8 @@ def moderation_decide(request, slug):
     try:
         story.apply_moderation(outcome, reason, moderator=_current_user(request))
     except ValueError as error:
-        messages.error(request, str(error))
-        return redirect('core:moderation_detail', slug=slug)
+        return _render_detail(request, story, reason=reason,
+                              error=str(error), status=400)
 
     messages.success(
         request,
@@ -207,12 +219,22 @@ def held_comment_decide(request, pk):
     if comment is None:
         raise Http404('Пікір табылмады')
 
-    if request.POST.get('action') == 'publish':
+    # Удаление — только по явному слову. Раньше им была любая ветка, кроме
+    # «publish»: пустой или искажённый запрос безвозвратно стирал реплику,
+    # хотя человек ничего не решал.
+    #
+    # Слово приходит телом формы («Жариялау») или адресом: удаление идёт
+    # через общее окно подтверждения, а оно шлёт POST на `confirm_url` без
+    # полей — своё действие несёт сам адрес.
+    action = request.POST.get('action') or request.GET.get('action')
+    if action == 'publish':
         data.publish_held_comment(comment)
         messages.success(request, 'Пікір жарияланды.')
-    else:
+    elif action == 'delete':
         data.delete_comment(comment)
         messages.success(request, 'Пікір өшірілді.')
+    else:
+        messages.error(request, 'Шешім таңдалмады — пікір орнында қалды.')
     return redirect('core:moderation_comments')
 
 

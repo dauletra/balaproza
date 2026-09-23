@@ -180,6 +180,34 @@ class TheModeratorDecidesInTwoWays(TestCase):
         self.assertFalse(
             self.author.notifications.filter(kind='comment').exists())
 
+    def test_an_empty_or_unknown_action_deletes_nothing(self):
+        """Удаление — только по явному слову. Раньше им была любая ветка,
+        кроме «publish»: пустой запрос безвозвратно стирал реплику."""
+        for action in ('', 'whatever'):
+            with self.subTest(action=action):
+                self._decide(action)
+                self.comment.refresh_from_db()
+                self.assertTrue(self.comment.held)
+
+    def test_the_confirmation_window_deletes_by_address(self):
+        """Окно подтверждения шлёт POST без полей — действие несёт адрес."""
+        url = reverse('core:moderation_comment_decide',
+                      kwargs={'pk': self.comment.pk})
+        page = self.client.get(reverse('core:moderation_comments')).content.decode()
+        self.assertIn(f'{url}?action=delete', page)
+        self.assertIn("open-delete-confirm", page)
+        self.client.post(f'{url}?action=delete')
+        self.assertFalse(
+            StoryComment.objects.filter(pk=self.comment.pk).exists())
+
+    def test_the_number_is_about_the_whole_queue(self):
+        """Число над списком — про всю очередь, а не про страницу в 20."""
+        for i in range(21):
+            StoryComment.objects.create(story=self.story, author=self.reader,
+                                        text=f'Жарнама {i}', held=True)
+        page = self.client.get(reverse('core:moderation_comments'))
+        self.assertContains(page, '22 пікір шешім күтеді')
+
     def test_the_section_is_closed_to_everyone_else(self):
         """404, а не 403 — как и весь раздел модерации."""
         reader = Client()

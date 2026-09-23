@@ -195,3 +195,74 @@ class ResolvingACommentReport(TestCase):
                    kwargs={'pk': self.report.pk}),
             {'action': 'dismiss'})
         self.assertTrue(StoryComment.objects.filter(pk=self.comment.pk).exists())
+
+
+class TheReportQueueHoldsWhatIsLeftToDecide(TestCase):
+    """Жалоба может потерять цель раньше решения — и одно решение может
+    закрыть сразу несколько жалоб."""
+
+    def setUp(self):
+        super().setUp()
+        self.author = make.user(username='rq_author')
+        self.story = make.story(author=self.author, chapters=1)
+        self.reporters = [make.user(username=f'rq_reader{i}') for i in range(3)]
+        self.mod = _moderator(self.client, 'rq_mod')
+
+    def test_a_report_whose_comment_is_gone_does_not_break_the_page(self):
+        """Автор сам удалил пікір до решения — связь `SET_NULL`, цели нет.
+        Ссылка на неё собиралась из пустого слага, и страница жалоб
+        отвечала 500: модератор не видел ни одной жалобы."""
+        comment = make.comment(self.story, author=self.author)
+        data.create_report(self.reporters[0], comment=comment, reason='spam')
+        live = data.create_report(self.reporters[1], story=self.story,
+                                  reason='spam')
+        comment.delete()
+
+        page = self.client.get(reverse('core:moderation_reports'))
+
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, '1 шағым шешім күтеді')
+        self.assertEqual(data.open_reports_count(), 1)
+        self.assertEqual(list(data.open_reports()), [live])
+
+    def test_upholding_one_closes_every_report_on_the_same_story(self):
+        first, second = (data.create_report(r, story=self.story, reason='spam')
+                         for r in self.reporters[:2])
+        data.resolve_report(first, self.mod, action='uphold',
+                            reason='Ережені бұзады.')
+        second.refresh_from_db()
+        self.assertEqual((second.outcome, second.resolved_by, second.resolution),
+                         ('upheld', self.mod, 'Ережені бұзады.'))
+        self.assertEqual(data.open_reports_count(), 0)
+
+    def test_upholding_one_closes_every_report_on_the_same_comment(self):
+        comment = make.comment(self.story, author=self.author)
+        first, second = (data.create_report(r, comment=comment, reason='spam')
+                         for r in self.reporters[:2])
+        data.resolve_report(first, self.mod, action='uphold', reason='Жарнама.')
+        second.refresh_from_db()
+        self.assertEqual(second.outcome, 'upheld')
+        self.assertFalse(StoryComment.objects.filter(pk=comment.pk).exists())
+
+    def test_dismissing_one_leaves_the_others(self):
+        """«Нарушения нет» — ответ на эту жалобу: у соседней может быть
+        другая причина."""
+        first, second = (data.create_report(r, story=self.story, reason=reason)
+                         for r, reason in zip(self.reporters, ('spam', 'copy')))
+        data.resolve_report(first, self.mod, action='dismiss')
+        second.refresh_from_db()
+        self.assertTrue(second.is_open)
+
+    def test_a_comment_is_not_removed_without_a_reason(self):
+        """У пікір причину проверял только `required` в браузере; теперь
+        сервер, и причина хранится в жалобе."""
+        comment = make.comment(self.story, author=self.author)
+        report = data.create_report(self.reporters[0], comment=comment,
+                                    reason='spam')
+        with self.assertRaises(ValueError):
+            data.resolve_report(report, self.mod, action='uphold', reason='  ')
+        self.assertTrue(StoryComment.objects.filter(pk=comment.pk).exists())
+
+        data.resolve_report(report, self.mod, action='uphold', reason='Жарнама.')
+        report.refresh_from_db()
+        self.assertEqual(report.resolution, 'Жарнама.')

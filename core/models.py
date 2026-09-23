@@ -1815,6 +1815,11 @@ class Report(models.Model):
     outcome = models.CharField('нәтижесі', max_length=16, blank=True,
                                choices=OUTCOME_CHOICES)
     resolved_at = models.DateTimeField('қаралған', null=True, blank=True)
+    # Почему снято — слова модератора. У работы они уходят и автору
+    # (`take_down`), у пікір — никуда больше: без этой колонки причину,
+    # которую форма требовала, стирал первый же редирект, и на «за что
+    # удалили» ответа не было нигде.
+    resolution = models.CharField('шешім себебі', max_length=300, blank=True)
     # Модератор мог уйти с портала; шешім қалады — ол болып қойды.
     resolved_by = models.ForeignKey('core.User', verbose_name='қараған',
                                     null=True, blank=True,

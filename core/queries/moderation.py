@@ -52,9 +52,11 @@ def _queue_base():
     return (Story.objects
             .filter(chapter__revisions__state='pending')
             .select_related('author', 'primary_genre', 'claim__moderator')
+            # «N бөлім» — главы, а не ревизии: подпись читается как число
+            # частей, и лишняя поданная ревизия одной главы не должна
+            # выглядеть второй главой.
             .annotate(waiting_since=Min('chapter__revisions__submitted_at'),
-                      pending_chapters=Count('chapter__revisions',
-                                             distinct=True))
+                      pending_chapters=Count('chapter', distinct=True))
             .order_by('waiting_since', 'pk'))
 
 
@@ -267,6 +269,20 @@ def create_report(reporter, *, story=None, comment=None, reason: str,
         reason=reason, note=note.strip()[:500])
 
 
+def _open_reports():
+    """Открытые жалобы, у которых ещё есть цель.
+
+    Цель может исчезнуть раньше решения: автор сам удалил пікір (связь
+    `SET_NULL` — акт жалобы при этом не стирается), или пікір ушёл
+    каскадом вместе с веткой. Такая жалоба решать уже нечего, и в очереди
+    она была хуже, чем бесполезной: ссылка на цель собиралась из пустого
+    слага, и страница жалоб отвечала 500 — модератор не видел ни одной.
+    Строка остаётся в базе как есть; из очереди и из счётчика её убирает
+    это правило, одно на оба места."""
+    return (Report.objects.filter(resolved_at__isnull=True)
+            .filter(Q(story__isnull=False) | Q(comment__isnull=False)))
+
+
 def open_reports():
     """Открытые жалобы, дольше висящая первой — тот же принцип очереди,
     что у ревизий: обещание, что до неё дойдут.
@@ -274,15 +290,14 @@ def open_reports():
     Выдачей, а не списком: страницу нарезает пагинатор, и до базы
     доезжает ровно она.
     """
-    return (Report.objects
-            .filter(resolved_at__isnull=True)
+    return (_open_reports()
             .select_related('reporter', 'story__author',
                             'comment__story', 'comment__author')
             .order_by('created_at'))
 
 
 def open_reports_count() -> int:
-    return Report.objects.filter(resolved_at__isnull=True).count()
+    return _open_reports().count()
 
 
 def report_by_id(pk):
@@ -302,8 +317,27 @@ def resolve_report(report, moderator, *, action: str, reason: str = '') -> None:
     """
     if action not in ('dismiss', 'uphold'):
         raise ValueError(f'Белгісіз әрекет: {action!r}')
+    reason = (reason or '').strip()
+    # Снятие без причины — ни у работы, ни у пікір. У работы это проверял
+    # и `take_down`, у пікір не проверяло ничего, кроме `required` в
+    # браузере.
+    if action == 'uphold' and not reason:
+        raise ValueError('Себепсіз алып тастауға болмайды.')
+    now = timezone.now()
     with transaction.atomic():
         if action == 'uphold':
+            # Остальные открытые жалобы на ту же цель закрываются этим же
+            # решением: снятое рассматривать второй раз нечего, а висящие в
+            # очереди, они звали бы модератора к работе, которой уже нет у
+            # читателя (или к пікір, которого нет вовсе). Ключи берутся
+            # **до** снятия: удаление пікір обнулит связь (`SET_NULL`), и
+            # искать соседей потом было бы не по чему.
+            same_target = (Report.objects.filter(story_id=report.story_id)
+                           if report.story_id else
+                           Report.objects.filter(comment_id=report.comment_id))
+            siblings = list(same_target.filter(resolved_at__isnull=True)
+                            .exclude(pk=report.pk)
+                            .values_list('pk', flat=True))
             if report.story_id:
                 report.story.take_down(reason, moderator=moderator)
             elif report.comment_id:
@@ -312,10 +346,15 @@ def resolve_report(report, moderator, *, action: str, reason: str = '') -> None:
                 # Django 6 отказывается сохранять запись с «неживым» связанным
                 # объектом в кэше, даже если поле не в `update_fields`.
                 report.comment = None
+            Report.objects.filter(pk__in=siblings).update(
+                outcome='upheld', resolved_at=now, resolved_by=moderator,
+                resolution=reason)
+            report.resolution = reason
         report.outcome = 'upheld' if action == 'uphold' else 'dismissed'
-        report.resolved_at = timezone.now()
+        report.resolved_at = now
         report.resolved_by = moderator
-        report.save(update_fields=['outcome', 'resolved_at', 'resolved_by'])
+        report.save(update_fields=['outcome', 'resolved_at', 'resolved_by',
+                                   'resolution'])
 
 
 # ── Сводка портала (D6) ──────────────────────────────────────────────────

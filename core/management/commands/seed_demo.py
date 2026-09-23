@@ -86,6 +86,16 @@ def _publish_demo_chapter(chapter, story) -> None:
             and (published.title, published.body) == (chapter.title, chapter.body)):
         return
 
+    # Поданная — по тому же правилу, что у автора (`submit_for_review`):
+    # одна на главу. Проверки не было, и каждый прогон сида ставил в
+    # очередь ещё одну копию той же главы — очередь говорила «3 бөлім» у
+    # работы из одной главы, а решение одобряло три ревизии разом.
+    if state == 'pending':
+        waiting = chapter.revisions.filter(state='pending')
+        if waiting.filter(title=chapter.title, body=chapter.body).exists():
+            return
+        waiting.update(state='draft')
+
     now = timezone.now()
     revision = ChapterRevision.objects.create(
         chapter=chapter, title=chapter.title, body=chapter.body, state=state,

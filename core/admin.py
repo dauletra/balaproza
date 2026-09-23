@@ -831,7 +831,8 @@ class ReportAdmin(admin.ModelAdmin):
                     'created_at')
     list_filter = ('reason', 'outcome')
     list_select_related = ('reporter', 'story', 'comment__author')
-    search_fields = ('reporter__username', 'story__title', 'note')
+    search_fields = ('reporter__username', 'story__title', 'note',
+                     'resolution')
     date_hierarchy = 'created_at'
 
     def has_add_permission(self, request):

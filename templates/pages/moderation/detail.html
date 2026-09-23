@@ -144,7 +144,12 @@
     {% endfor %}
 
     {# ── Решение ── #}
-    <section class="rounded-lg border border-slate-200 bg-white p-5" x-data="{ reason: '' }">
+    {% comment %}
+        Отказ проверки рисует эту же карточку: ошибка — у поля, набранное —
+        на месте (`reason`), фокус — в поле, и страница сама прокручивается
+        к форме, которая стоит под всем текстом главы.
+    {% endcomment %}
+    <section id="decision" class="rounded-lg border border-slate-200 bg-white p-5" x-data="{ reason: '{{ reason|escapejs }}' }">
         <h2 class="font-display text-lg font-bold text-slate-900">Шешім</h2>
         <p class="mt-1 font-sans text-xs leading-relaxed text-slate-500">
             Шешім бірден барлық жіберілген бөлімге қатысты. Қайтару мен қабылдамауда себеп міндетті — онсыз автор нені түзетерін білмейді.
@@ -157,7 +162,11 @@
                 <span class="font-sans text-sm font-semibold text-slate-800">Себебі</span>
                 <textarea name="reason" rows="4" x-model="reason"
                           placeholder="Автор нені түзетуі керек екенін нақты жаз."
-                          class="w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-2.5 font-sans text-sm text-slate-900 placeholder:text-slate-500 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30"></textarea>
+                          {% if decision_error %}autofocus aria-invalid="true" aria-describedby="decision-error"{% endif %}
+                          class="w-full resize-y rounded-md border {% if decision_error %}border-status-error-fg{% else %}border-slate-300{% endif %} bg-slate-50 px-3 py-2.5 font-sans text-sm text-slate-900 placeholder:text-slate-500 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30">{{ reason }}</textarea>
+                {% if decision_error %}
+                    <span id="decision-error" class="font-sans text-sm font-semibold text-status-error-fg">{{ decision_error }}</span>
+                {% endif %}
             </label>
 
             {% comment %}
@@ -181,13 +190,20 @@
                     {% include "components/icon.html" with name="check" size=16 only %}
                     Жариялау
                 </button>
+                {% comment %}
+                    Возврат и отказ без причины недоступны уже здесь: сервер
+                    отказал бы всё равно, а круг до него — перезагрузка
+                    страницы под длинным текстом главы.
+                {% endcomment %}
                 <button type="submit" name="outcome" value="needs_work"
-                        class="inline-flex h-10 items-center gap-2 rounded-md border border-status-attention-fg bg-white px-5 font-sans text-sm font-bold text-status-attention-fg hover:bg-status-attention-bg">
+                        :disabled="!reason.trim()"
+                        class="inline-flex h-10 items-center gap-2 rounded-md border border-status-attention-fg bg-white px-5 font-sans text-sm font-bold text-status-attention-fg hover:bg-status-attention-bg disabled:cursor-not-allowed disabled:opacity-50">
                     {% include "components/icon.html" with name="arrow-left" size=16 only %}
                     Толықтыруға қайтару
                 </button>
                 <button type="submit" name="outcome" value="rejected"
-                        class="inline-flex h-10 items-center gap-2 rounded-md border border-status-error-fg bg-white px-5 font-sans text-sm font-bold text-status-error-fg hover:bg-status-error-bg">
+                        :disabled="!reason.trim()"
+                        class="inline-flex h-10 items-center gap-2 rounded-md border border-status-error-fg bg-white px-5 font-sans text-sm font-bold text-status-error-fg hover:bg-status-error-bg disabled:cursor-not-allowed disabled:opacity-50">
                     {% include "components/icon.html" with name="x" size=16 only %}
                     Қабылдамау
                 </button>

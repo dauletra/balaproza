@@ -14,7 +14,7 @@
     <div>
         <h1 class="font-display text-3xl font-bold text-slate-900">Шағымдар</h1>
         <p class="mt-2 font-sans text-sm text-slate-600">
-            {% if reports %}{{ reports|length|spaced }} шағым шешім күтеді{% else %}Ашық шағым жоқ{% endif %}
+            {% if reports %}{{ page.paginator.count|spaced }} шағым шешім күтеді{% else %}Ашық шағым жоқ{% endif %}
         </p>
     </div>
     <a href="{% url 'core:moderation_queue' %}"
@@ -80,7 +80,7 @@
                         {% csrf_token %}
                         <input type="hidden" name="action" value="uphold">
                         <input type="text" name="reason" required maxlength="300"
-                               placeholder="{% if report.story_id %}Алып тастау себебі — авторға жетеді{% else %}Жою себебі{% endif %}"
+                               placeholder="{% if report.story_id %}Алып тастау себебі — авторға жетеді{% else %}Жою себебі — шағымда сақталады{% endif %}"
                                class="h-9 w-full min-w-0 flex-1 rounded-md border border-slate-300 bg-slate-50 px-3 font-sans text-sm text-slate-900 placeholder:text-slate-500 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/30">
                         <button type="submit"
                                 class="inline-flex h-9 shrink-0 items-center gap-2 rounded-md bg-status-error-fg px-4 font-sans text-sm font-bold text-white hover:opacity-90">

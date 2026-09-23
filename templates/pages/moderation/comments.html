@@ -23,7 +23,7 @@
     <div>
         <h1 class="font-display text-3xl font-bold text-slate-900">Тексерудегі пікірлер</h1>
         <p class="mt-2 font-sans text-sm text-slate-600">
-            {% if comments %}{{ comments|length|spaced }} пікір шешім күтеді{% else %}Бос — барлығы қаралған{% endif %}
+            {% if comments %}{{ page.paginator.count|spaced }} пікір шешім күтеді{% else %}Бос — барлығы қаралған{% endif %}
         </p>
     </div>
     <a href="{% url 'core:moderation_queue' %}"
@@ -40,7 +40,8 @@
                 <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                     <span class="font-sans text-sm font-bold text-slate-900">{{ comment.author.public_name }}</span>
                     <span class="font-sans text-xs text-slate-500">
-                        «{{ comment.story.title }}» · {{ comment.created_at|ago }}
+                        {# Работа — ссылкой: реплику решают в разговоре, к которому она написана. #}
+                        <a href="{% url 'core:story_detail' slug=comment.story.slug %}{% if comment.chapter_number %}?chapter={{ comment.chapter_number }}{% endif %}#pikirler" target="_blank" class="hover:text-brand">«{{ comment.story.title }}»{% if comment.chapter_number %}, {{ comment.chapter_number }}-бөлім{% endif %}</a> · {{ comment.created_at|ago }}
                     </span>
                 </div>
 
@@ -55,7 +56,14 @@
                         {% include "components/icon.html" with name="check" size=14 only %}
                         Жариялау
                     </button>
-                    <button type="submit" name="action" value="delete"
+                    {% comment %}
+                        Удаление безвозвратно — через общее окно подтверждения,
+                        как у «Жою» под самим пікір. Действие несёт адрес: окно
+                        шлёт POST без полей.
+                    {% endcomment %}
+                    {% url 'core:moderation_comment_decide' pk=comment.pk as decide_url %}
+                    <button type="button" x-data
+                            @click="$dispatch('open-delete-confirm', { name: 'Пікір', confirm_url: '{{ decide_url }}?action=delete', title: 'Пікірді өшіру керек пе?', body: 'Пікір оқырманға көрінбей жатып қайтарылмастай өшіріледі.' })"
                             class="inline-flex h-9 items-center gap-2 rounded-md border border-status-error-fg/40 bg-white px-4 font-sans text-sm font-bold text-status-error-fg hover:bg-status-error-bg">
                         {% include "components/icon.html" with name="trash" size=14 only %}
                         Өшіру

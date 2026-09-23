@@ -31,6 +31,26 @@ _EXEMPT_URL_NAMES = frozenset({
     'sitemap',
 })
 
+# Раздел модерации — по той же причине, что и админка ниже: это
+# инструмент сотрудника, а не участие в портале, и у заведённого
+# `createsuperuser` согласия нет по построению. Без исключения ссылка
+# «Модерация» из шапки админки уводила его на анкету, где рядом стоит
+# «Тіркеуден бас тарту» — удаление вошедшего каскадом. Постороннему
+# раздел всё равно отвечает 404 (`moderator_only`), так что исключение
+# ничего не открывает. Полноту списка против `core/urls.py` держит
+# `test_auth.TheModerationSectionIsNotGated`.
+_MODERATION_URL_NAMES = frozenset({
+    'moderation_queue',
+    'moderation_detail',
+    'moderation_claim',
+    'moderation_decide',
+    'moderation_comments',
+    'moderation_comment_decide',
+    'moderation_reports',
+    'moderation_report_resolve',
+    'moderation_summary',
+})
+
 _EXEMPT_PATH_PREFIXES = ('/static/', '/media/', '/__debug__/')
 
 
@@ -70,4 +90,5 @@ class OnboardingGuardMiddleware:
             match = resolve(request.path)
         except Resolver404:
             return False
-        return match.url_name not in _EXEMPT_URL_NAMES
+        return (match.url_name not in _EXEMPT_URL_NAMES
+                and match.url_name not in _MODERATION_URL_NAMES)

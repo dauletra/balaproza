@@ -23,6 +23,7 @@ from django.utils import timezone
 
 from core import data
 from core.domain.telegram import MAX_AUTH_AGE, verify_telegram_auth
+from core.middleware import _MODERATION_URL_NAMES
 from core.models import (
     ChapterReactionVote,
     LibraryEntry,
@@ -31,6 +32,7 @@ from core.models import (
     User,
 )
 from core.tests import factories
+from core.urls import urlpatterns as core_urlpatterns
 from core.tests.base import TestCase, login_as, login_as_newcomer, user
 
 
@@ -547,3 +549,25 @@ class DeletingYourAccount(TestCase):
         self.assertEqual(story.likes, 0)
         self.assertEqual(other_author.followers, 0)
         self.assertTrue(Story.objects.filter(pk=story.pk).exists())
+
+
+class TheModerationSectionIsNotGated(TestCase):
+    """Раздел модерации — инструмент сотрудника, как и админка, и анкета
+    портала его не гейтит. У заведённого `createsuperuser` согласия нет по
+    построению, и ссылка «Модерация» из шапки админки уводила его на
+    анкету — где рядом стоит «Тіркеуден бас тарту», удаление вошедшего."""
+
+    def test_a_staff_member_without_consent_reaches_the_section(self):
+        staff = login_as_newcomer(self.client, 'staff_no_consent',
+                                  onboarded=False)
+        staff.is_staff = True
+        staff.save(update_fields=['is_staff'])
+        self.assertEqual(
+            self.client.get(reverse('core:moderation_queue')).status_code, 200)
+
+    def test_every_moderation_route_is_exempt(self):
+        """Список имён живёт в middleware; новый маршрут раздела,
+        забытый в нём, снова уводил бы сотрудника на анкету."""
+        routes = {p.name for p in core_urlpatterns
+                  if str(p.pattern).startswith('moderation/')}
+        self.assertEqual(routes, set(_MODERATION_URL_NAMES))

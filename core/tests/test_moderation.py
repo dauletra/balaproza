@@ -17,6 +17,7 @@ from django.utils import timezone
 from core import data
 from core.domain.moderation import diff_summary, overdue_label, paragraph_diff
 from core.models import (
+    ChapterRevision,
     ModerationClaim,
     ModerationDecision,
     PortalDay,
@@ -262,13 +263,25 @@ class ADecisionLeavesAnActWithItsAuthor(TestCase):
         self.assertEqual(decision.chapters, 2)
 
     def test_a_negative_outcome_without_a_reason_changes_nothing(self):
+        """Ошибка — у поля на той же карточке, а не тостом после
+        редиректа: форма решения стоит под всем текстом главы, и тост
+        гас, пока модератор к ней листал."""
         response = self.client.post(
-            self.url, {'outcome': 'needs_work', 'reason': '   '}, follow=True)
-        self.assertContains(response, 'Себепсіз')
+            self.url, {'outcome': 'needs_work', 'reason': '   '})
+        self.assertContains(response, 'Себепсіз', status_code=400)
+        self.assertContains(response, 'id="decision-error"', status_code=400)
         self.assertFalse(ModerationDecision.objects.filter(
             story=self.story).exists())
         self.story.refresh_from_db()
         self.assertEqual(self.story.status, 'OnModeration')
+
+    def test_a_refused_form_keeps_what_was_typed(self):
+        """Отказ проверки возвращает набранное. Сюда попадает, например,
+        неизвестный исход — причина при этом написана и не должна
+        пропасть."""
+        response = self.client.post(
+            self.url, {'outcome': 'maybe', 'reason': 'Диалогтар үзіліп қалған.'})
+        self.assertContains(response, 'Диалогтар үзіліп қалған.', status_code=400)
 
     def test_approval_reaches_the_reader(self):
         self.client.post(self.url, {'outcome': 'approved', 'reason': ''})
@@ -508,3 +521,18 @@ class TheSummaryShowsWhereItIsGoing(TestCase):
         data.record_portal_day(timezone.localdate() - timedelta(days=7))
         with self.assertNumQueries(16):
             self.client.get(self.url)
+
+
+class TheQueueCountsChaptersNotRevisions(TestCase):
+    """«N бөлім» в очереди — главы. Лишняя поданная ревизия одной главы
+    (так делал неидемпотентный сид) выглядела второй главой."""
+
+    def test_two_pending_revisions_of_one_chapter_are_one_chapter(self):
+        story = make.story(chapters=1, published=False, status='NotPublished')
+        make.submit(story)
+        chapter = story.chapter_set.get()
+        ChapterRevision.objects.create(chapter=chapter, title='x', body='y',
+                                       state='pending',
+                                       submitted_at=timezone.now())
+        row = next(s for s in data.moderation_queue() if s.pk == story.pk)
+        self.assertEqual(row.pending_chapters, 1)
