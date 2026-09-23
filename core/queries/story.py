@@ -418,8 +418,15 @@ def collections_of(story):
 
 def sitemap_collections():
     """Жинақтар для карты сайта — без состава: краулеру нужен адрес, а
-    `all_collections()` тянет обложки трёх работ на каждую подборку."""
-    return Collection.objects.only('slug').order_by('position', 'pk')
+    `all_collections()` тянет обложки трёх работ на каждую подборку.
+
+    Правило то же, что у витрины: подборка, в которой нет ни одной
+    публичной работы, не зовётся. Прямая ссылка на неё работает — редакция
+    собирает её постепенно, — но поисковику это страница без единой
+    работы, и позвать его туда значит проиндексировать пустоту."""
+    return (Collection.objects
+            .filter(Exists(_public_items().filter(collection=OuterRef('pk'))))
+            .only('slug').order_by('position', 'pk'))
 
 
 def all_collections():

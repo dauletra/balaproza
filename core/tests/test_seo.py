@@ -2,6 +2,7 @@
 
 from django.urls import reverse
 
+from core.models import Collection
 from core.tests import factories
 from core.tests.base import TestCase
 
@@ -66,6 +67,34 @@ class SitemapCarriesTheLongTail(TestCase):
 
         self.assertNotContains(response, reverse(
             'core:profile_other', kwargs={'username': lonely.username}))
+
+    def test_a_collection_without_a_public_work_is_not(self):
+        """То же правило, что у витрины: пустая подборка и подборка, где
+        публичного не осталось, поисковику не зовутся — это страницы без
+        единой работы."""
+        empty = Collection.objects.create(slug='bos-zhinaq', name='Бос',
+                                          tint_hue=10, icon='book')
+        hidden = Collection.objects.create(slug='zhasyryn-zhinaq',
+                                           name='Жасырын', tint_hue=20,
+                                           icon='book')
+        hidden.item_set.create(story=factories.story(
+            status='NotPublished', published=False))
+        shown = Collection.objects.create(slug='korinetin-zhinaq',
+                                          name='Көрінетін', tint_hue=30,
+                                          icon='book')
+        shown.item_set.create(story=factories.story())
+
+        response = self.client.get('/sitemap.xml')
+
+        for collection, listed in ((empty, False), (hidden, False),
+                                   (shown, True)):
+            url = reverse('core:collection_detail',
+                          kwargs={'slug': collection.slug})
+            with self.subTest(collection=collection.slug):
+                if listed:
+                    self.assertContains(response, url)
+                else:
+                    self.assertNotContains(response, url)
 
     def test_a_pending_tag_is_not(self):
         pending = factories.tag(status='pending')
