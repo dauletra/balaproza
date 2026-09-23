@@ -9,3 +9,10 @@ Pending виден автору работы и скрыт от публики �
 """
 
 TAG_STATUSES = ("pending", "accepted", "rejected")
+
+# «Тексеруде» — та же пометка, что автор видит на своём чипе.
+TAG_STATUS_LABELS = {
+    "pending":  "Тексеруде",
+    "accepted": "Қабылданды",
+    "rejected": "Қабылданбады",
+}

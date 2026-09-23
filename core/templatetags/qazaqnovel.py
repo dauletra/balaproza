@@ -24,6 +24,7 @@ from core.domain.formatting import (
 )
 from core.domain.moderation import REVIEW_PROMISE_HOURS
 from core.domain.notifications import MODERATION_OUTCOME_LABELS
+from core.domain.story import STORY_FORMAT_LABELS, STORY_STATUS_LABELS
 
 register = template.Library()
 
@@ -217,6 +218,19 @@ def outcome_label(event):
     уведомлению, и акту журнала: у обоих `outcome` одного словаря.
     Незнакомый исход не называется никак: лучше пусто, чем чужая подпись."""
     return MODERATION_OUTCOME_LABELS.get(event.outcome, "")
+
+
+@register.filter(name="story_status_label")
+def story_status_label(key):
+    """Имя статуса работы — из домена, тем же словом, что в админке.
+    Незнакомый ключ не называется никак, как и у исхода модерации."""
+    return STORY_STATUS_LABELS.get(key, "")
+
+
+@register.filter(name="format_label")
+def format_label(key):
+    """Имя формата работы: «Бір бөлімді» / «Көп бөлімді»."""
+    return STORY_FORMAT_LABELS.get(key, "")
 
 
 @register.simple_tag(name="review_promise")

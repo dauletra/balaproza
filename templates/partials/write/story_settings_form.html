@@ -1,3 +1,4 @@
+{% load qazaqnovel %}
 {% comment %}
     StorySettingsForm — форма баптаулар, вынесена из `story_settings.html`
     : тот же приём, что у `chapter_editor_pane.html`
@@ -40,11 +41,11 @@
         </legend>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {% if form.format.value == "single" %}
-                {% include "components/format_card.html" with value="single" icon="book" label="Бір бөлімді" hint="Оқырман цельный мәтін көреді: әңгіме, ертегі, эссе, новелла." checked=True %}
-                {% include "components/format_card.html" with value="serial" icon="list" label="Көп бөлімді" hint="Оқырман бөлімдер тізімін және бөлімнен бөлімге өтуді көреді." %}
+                {% include "components/format_card.html" with value="single" icon="book" label="single"|format_label hint="Оқырман цельный мәтін көреді: әңгіме, ертегі, эссе, новелла." checked=True %}
+                {% include "components/format_card.html" with value="serial" icon="list" label="serial"|format_label hint="Оқырман бөлімдер тізімін және бөлімнен бөлімге өтуді көреді." %}
             {% else %}
-                {% include "components/format_card.html" with value="single" icon="book" label="Бір бөлімді" hint="Оқырман цельный мәтін көреді: әңгіме, ертегі, эссе, новелла." %}
-                {% include "components/format_card.html" with value="serial" icon="list" label="Көп бөлімді" hint="Оқырман бөлімдер тізімін және бөлімнен бөлімге өтуді көреді." checked=True %}
+                {% include "components/format_card.html" with value="single" icon="book" label="single"|format_label hint="Оқырман цельный мәтін көреді: әңгіме, ертегі, эссе, новелла." %}
+                {% include "components/format_card.html" with value="serial" icon="list" label="serial"|format_label hint="Оқырман бөлімдер тізімін және бөлімнен бөлімге өтуді көреді." checked=True %}
             {% endif %}
         </div>
         {% if form.format.errors.0 %}

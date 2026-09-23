@@ -18,24 +18,33 @@ from django.db import models, transaction
 from django.utils import timezone
 
 from .domain.catalog import BADGE_LABELS, PUBLIC_STATUSES
-from .domain.contests import AI_DECLARATIONS, SUBMISSION_STATUSES
+from .domain.contests import (
+    AI_DECLARATION_LABELS,
+    AI_DECLARATIONS,
+    SUBMISSION_STATUS_LABELS,
+    SUBMISSION_STATUSES,
+)
 from .domain.formatting import kk_joined, kk_period
 from .domain.library import LIBRARY_KINDS
 from .domain.notifications import (
     MODERATION_OUTCOME_LABELS,
     MODERATION_OUTCOMES,
+    NOTIF_KIND_LABELS,
     NOTIF_KINDS,
 )
 from .domain.reports import REPORT_REASON_LABELS, REPORT_REASONS
 from .domain.story import (
     REACTIONS,
     REACTIONS_BY_SLUG,
+    REVISION_STATE_LABELS,
     REVISION_STATES,
+    STORY_FORMAT_LABELS,
     STORY_FORMATS,
+    STORY_STATUS_LABELS,
     STORY_STATUSES,
     story_status,
 )
-from .domain.tags import TAG_STATUSES
+from .domain.tags import TAG_STATUS_LABELS, TAG_STATUSES
 from .managers import (
     ContestQuerySet,
     StoryQuerySet,
@@ -247,7 +256,7 @@ class Tag(models.Model):
     Оба счётчика — производные, и только по публичным работам.
     """
 
-    STATUS_CHOICES = [(s, s) for s in TAG_STATUSES]
+    STATUS_CHOICES = [(s, TAG_STATUS_LABELS[s]) for s in TAG_STATUSES]
 
     slug = models.SlugField('slug', max_length=48, unique=True,
                             allow_unicode=True)
@@ -364,8 +373,8 @@ class Story(models.Model):
     вопреки правилу «производное не хранится» — отмечено на месте.
     """
 
-    STATUS_CHOICES = [(s, s) for s in STORY_STATUSES]
-    FORMAT_CHOICES = [(f, f) for f in STORY_FORMATS]
+    STATUS_CHOICES = [(s, STORY_STATUS_LABELS[s]) for s in STORY_STATUSES]
+    FORMAT_CHOICES = [(f, STORY_FORMAT_LABELS[f]) for f in STORY_FORMATS]
 
     objects = StoryQuerySet.as_manager()
 
@@ -962,7 +971,7 @@ class ChapterRevision(models.Model):
  у события есть автор и адресат, у снимка текста их нет.
     """
 
-    STATE_CHOICES = [(s, s) for s in REVISION_STATES]
+    STATE_CHOICES = [(s, REVISION_STATE_LABELS[s]) for s in REVISION_STATES]
 
     chapter = models.ForeignKey(Chapter, verbose_name='бөлім',
                                 on_delete=models.CASCADE,
@@ -1463,8 +1472,10 @@ class Submission(models.Model):
     ограничение базы, а не только формы: вторая заявка ломает счёт
     участников и конкурсную биографию."""
 
-    STATUS_CHOICES = [(s, s) for s in SUBMISSION_STATUSES]
-    AI_DECLARATION_CHOICES = [(v, v) for v in AI_DECLARATIONS]
+    STATUS_CHOICES = [(s, SUBMISSION_STATUS_LABELS[s])
+                      for s in SUBMISSION_STATUSES]
+    AI_DECLARATION_CHOICES = [(v, AI_DECLARATION_LABELS[v])
+                              for v in AI_DECLARATIONS]
 
     contest = models.ForeignKey(Contest, verbose_name='байқау',
                                 on_delete=models.CASCADE,
@@ -1972,7 +1983,7 @@ class Notification(models.Model):
     только событие. Исключения — чужие слова: цитата читателя у
     комментария и причина модератора у отказа."""
 
-    KIND_CHOICES = [(k, k) for k in NOTIF_KINDS]
+    KIND_CHOICES = [(k, NOTIF_KIND_LABELS[k]) for k in NOTIF_KINDS]
     OUTCOME_CHOICES = [(o, MODERATION_OUTCOME_LABELS[o])
                        for o in MODERATION_OUTCOMES]
 

@@ -22,7 +22,7 @@
 <p>Мына тегтер қабылданбайды:</p>
 <ul>
     {% for tag in tags %}
-        <li><strong>#{{ tag.name }}</strong> — {{ tag.status }}</li>
+        <li><strong>#{{ tag.name }}</strong> — {{ tag.get_status_display }}</li>
     {% endfor %}
 </ul>
 

@@ -179,9 +179,17 @@ URL.
 
 ### Словари
 
-Статус (канон `status_badge.html`): `NotPublished` Жоба (neutral) ·
+Статус (слово — `domain/story.STORY_STATUS_LABELS`, цвет — `status_badge.html`):
+`NotPublished` Жоба (neutral) · `NeedsWork` Толықтыру қажет (attention) ·
 `OnModeration` Модерацияда (attention) · `Published` Жарияланды (published) ·
 `Completed` Аяқталды (info) · `OnProcess` Жазылып жатыр (warning).
+
+Слова кодов — формата, ревизии, тега, заявки, AI-декларации, вида
+уведомления — живут словарями в `core/domain` рядом со своими кодами.
+Модель строит из них `choices`, поэтому админка говорит теми же словами,
+что сайт; шаблон берёт слово фильтром (`story_status_label`,
+`format_label`), литерал подписи статуса или формата в шаблоне — второй
+словарь, который разойдётся с первым.
 
 Фаза конкурса: `upcoming` Жақында · `accepting` Өтінім қабылдау · `judging`
 Қазылар қарауда · `finished` Аяқталды.

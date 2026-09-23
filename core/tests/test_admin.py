@@ -22,12 +22,18 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.forms.models import modelform_factory
+from django.template.loader import render_to_string
 from django.test import RequestFactory, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from django.urls import reverse
 
 from core import data
+from core.domain import contests as contest_rules
+from core.domain import notifications as notification_rules
+from core.domain import story as story_rules
+from core.domain import tags as tag_rules
+from core.domain.story import STORY_STATUS_LABELS
 from core.admin import (
     BookOfWeekAdmin,
     GenreAdmin,
@@ -50,7 +56,7 @@ from core.models import (
 )
 from core.templatetags.qazaqnovel import outcome_label
 from core.tests import factories
-from core.tests.base import TestCase
+from core.tests.base import TestCase, login_as
 
 
 def _story(author, submitted=True, **kwargs):
@@ -609,3 +615,60 @@ class TheDecisionJournalIsNotDeletedByHand(TestCase):
             {'post': 'yes'})
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Story.objects.filter(pk=self.story.pk).exists())
+
+
+class StatusesAreWordsNotCodes(TestCase):
+    """Редактор видит те же слова, что автор: `Жазылып жатыр`, а не
+    `OnProcess`. Словарь один — в домене; модель строит из него `choices`,
+    бейдж на сайте читает его фильтром."""
+
+    def test_every_code_has_a_word(self):
+        """Новый статус без подписи уронил бы `choices` модели при импорте
+        — но только если его забыли в словаре; проверка — сама полнота."""
+        for codes, labels in (
+                (story_rules.STORY_STATUSES, story_rules.STORY_STATUS_LABELS),
+                (story_rules.STORY_FORMATS, story_rules.STORY_FORMAT_LABELS),
+                (story_rules.REVISION_STATES,
+                 story_rules.REVISION_STATE_LABELS),
+                (tag_rules.TAG_STATUSES, tag_rules.TAG_STATUS_LABELS),
+                (contest_rules.SUBMISSION_STATUSES,
+                 contest_rules.SUBMISSION_STATUS_LABELS),
+                (contest_rules.AI_DECLARATIONS,
+                 contest_rules.AI_DECLARATION_LABELS),
+                (notification_rules.NOTIF_KINDS,
+                 notification_rules.NOTIF_KIND_LABELS)):
+            with self.subTest(codes=codes):
+                self.assertEqual(set(codes), set(labels))
+                self.assertTrue(all(labels.values()))
+
+    def test_the_admin_lists_speak_kazakh(self):
+        self.client.force_login(
+            User.objects.create_superuser('moderator', password='x'))
+        for url, word, code in (
+                ('admin:core_story_changelist', 'Жазылып жатыр', 'OnProcess'),
+                ('admin:core_story_changelist', 'Көп бөлімді', 'serial'),
+                ('admin:core_submission_changelist', 'Қаралуда', 'reviewing'),
+                ('admin:core_tag_changelist', 'Тексеруде', 'pending'),
+                ('admin:core_notification_changelist', 'Реакция', 'like')):
+            with self.subTest(url=url, code=code):
+                page = self.client.get(reverse(url)).content.decode()
+                self.assertIn(word, page)
+                # Код остаётся значением фильтра в адресе — но не текстом.
+                self.assertNotIn(f'>{code}<', page)
+
+    def test_the_site_badge_reads_the_same_word(self):
+        for key, word in STORY_STATUS_LABELS.items():
+            with self.subTest(key=key):
+                self.assertIn(word, render_to_string(
+                    'components/status_badge.html', {'key': key}))
+
+    def test_the_author_chooses_a_format_by_the_same_words(self):
+        """Карточки выбора формата у автора берут слово из того же
+        словаря, что и админка."""
+        login_as(self.client)
+        for url in (reverse('core:new_story'),
+                    reverse('core:story_settings', kwargs={'slug': 'aidana-kus'})):
+            with self.subTest(url=url):
+                page = self.client.get(url).content.decode()
+                self.assertIn('Бір бөлімді', page)
+                self.assertIn('Көп бөлімді', page)

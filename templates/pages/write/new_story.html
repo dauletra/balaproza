@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load qazaqnovel %}
 
 {% block title %}Жаңа шығарма — Qazaqnovel{% endblock %}
 
@@ -61,11 +62,11 @@
             {% with picked=form.format.value|default:"single" %}
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {% if picked == "serial" %}
-                    {% include "components/format_card.html" with value="single" icon="book" label="Бір бөлімді" hint="Оқырман цельный мәтін көреді: әңгіме, ертегі, эссе, новелла." %}
-                    {% include "components/format_card.html" with value="serial" icon="list" label="Көп бөлімді" hint="Оқырман бөлімдер тізімін және бөлімнен бөлімге өтуді көреді." checked=True %}
+                    {% include "components/format_card.html" with value="single" icon="book" label="single"|format_label hint="Оқырман цельный мәтін көреді: әңгіме, ертегі, эссе, новелла." %}
+                    {% include "components/format_card.html" with value="serial" icon="list" label="serial"|format_label hint="Оқырман бөлімдер тізімін және бөлімнен бөлімге өтуді көреді." checked=True %}
                 {% else %}
-                    {% include "components/format_card.html" with value="single" icon="book" label="Бір бөлімді" hint="Оқырман цельный мәтін көреді: әңгіме, ертегі, эссе, новелла." checked=True %}
-                    {% include "components/format_card.html" with value="serial" icon="list" label="Көп бөлімді" hint="Оқырман бөлімдер тізімін және бөлімнен бөлімге өтуді көреді." %}
+                    {% include "components/format_card.html" with value="single" icon="book" label="single"|format_label hint="Оқырман цельный мәтін көреді: әңгіме, ертегі, эссе, новелла." checked=True %}
+                    {% include "components/format_card.html" with value="serial" icon="list" label="serial"|format_label hint="Оқырман бөлімдер тізімін және бөлімнен бөлімге өтуді көреді." %}
                 {% endif %}
             </div>
             {% endwith %}
