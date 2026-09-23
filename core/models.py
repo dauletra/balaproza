@@ -12,6 +12,7 @@ from functools import cached_property
 
 from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.indexes import GinIndex
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator
 from django.db import models, transaction
 from django.utils import timezone
@@ -1155,12 +1156,18 @@ class Contest(models.Model):
         constraints = [
             # Инвариант дат: приём открывается не позже дедлайна, итоги —
             # строго после него. Нарушение делает фазу невыводимой.
+            # Сообщения — редактору в форме админки: без них он читал бы
+            # имя ограничения по-английски.
             models.CheckConstraint(
                 condition=models.Q(opens_on__lte=models.F('closes_on')),
-                name='contest_opens_before_it_closes'),
+                name='contest_opens_before_it_closes',
+                violation_error_message='Қабылдау басталмай тұрып жабыла '
+                                        'алмайды.'),
             models.CheckConstraint(
                 condition=models.Q(closes_on__lt=models.F('results_on')),
-                name='contest_results_after_it_closes'),
+                name='contest_results_after_it_closes',
+                violation_error_message='Қорытынды қабылдау жабылғаннан '
+                                        'кейін ғана жарияланады.'),
         ]
 
     def __str__(self):
@@ -1321,6 +1328,13 @@ class TimelineStage(models.Model):
     def __str__(self):
         return f'{self.label} ({kk_period(self.starts, self.ends)})'
 
+    def clean(self):
+        """Этап, кончившийся раньше начала, рисуется на таймлайне конкурса
+        перевёрнутым отрезком, а `state` у него сразу «прошёл»."""
+        if self.starts and self.ends and self.ends < self.starts:
+            raise ValidationError(
+                {'ends': 'Кезең басталмай тұрып аяқтала алмайды.'})
+
     @property
     def state(self) -> str:
         today = timezone.localdate()
@@ -1408,6 +1422,24 @@ class AwardGrant(models.Model):
 
     def __str__(self):
         return f'{self.award.title} — {self.story.title}'
+
+    def clean(self):
+        """Награда вручается внутри одного конкурса и только допущенной
+        работе. База этого не держит — связи три независимых внешних
+        ключа, и выпадающие списки формы предлагают номинации всех
+        конкурсов и все работы портала: опечатка в выборе дала бы победу в
+        чужом конкурсе или работе, которая в нём не участвовала."""
+        if not (self.contest_id and self.award_id and self.story_id):
+            return
+        if self.award.contest_id != self.contest_id:
+            raise ValidationError(
+                {'award': 'Бұл номинация басқа байқаудікі.'})
+        if not Submission.objects.filter(
+                contest_id=self.contest_id, story_id=self.story_id,
+                status='accepted').exists():
+            raise ValidationError(
+                {'story': 'Бұл шығарма осы байқауға қабылданған өтінімдер '
+                          'арасында жоқ.'})
 
     @property
     def author(self):

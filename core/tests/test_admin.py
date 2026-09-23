@@ -17,13 +17,26 @@ import shutil
 import tempfile
 
 from django.contrib import admin as django_admin
+from django.contrib.admin.models import LogEntry
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.forms.models import modelform_factory
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from django.urls import reverse
 
+from core import data
+from core.admin import (
+    BookOfWeekAdmin,
+    GenreAdmin,
+    NotificationAdmin,
+    StoryTagInline,
+)
 from core.models import (
+    AwardGrant,
+    BookOfWeek,
     Chapter,
     ChapterRevision,
     Contest,
@@ -31,6 +44,8 @@ from core.models import (
     Genre,
     Notification,
     Story,
+    StoryTag,
+    TimelineStage,
     User,
 )
 from core.templatetags.qazaqnovel import outcome_label
@@ -250,3 +265,315 @@ class TheWholeToolOpens(TestCase):
         self.assertContains(self.client.get(
             reverse('admin:core_chapter_change', args=[chapter.pk])),
             'name="body"')
+
+    def test_no_list_pays_a_query_per_row(self):
+        """Список не делает запрос на строку. Сравнение не с абсолютным
+        числом, а с самим собой: страница на одну строку и на все строки
+        должны стоить одинаково, иначе колонка тянет связь поштучно."""
+        def cost(url):
+            with CaptureQueriesContext(connection) as ctx:
+                self.assertEqual(self.client.get(url).status_code, 200)
+            return len(ctx)
+
+        for model in django_admin.site._registry:
+            opts = model._meta
+            if model._default_manager.count() < 2:
+                continue
+            url = reverse(f'admin:{opts.app_label}_{opts.model_name}_changelist')
+            first = model._default_manager.order_by('pk').first()
+            with self.subTest(model=opts.model_name):
+                # Та же страница, урезанная фильтром до одной строки.
+                one = cost(f'{url}?pk__exact={first.pk}')
+                many = cost(url)
+                self.assertLessEqual(many, one + 1, 'N+1 в колонке списка')
+
+
+class TheHeaderLeadsToModeration(TestCase):
+    """Решения — в `/moderation/`, и дверь туда на каждой странице."""
+
+    def test_every_page_links_to_the_moderation_section(self):
+        self.client.force_login(
+            User.objects.create_superuser('moderator', password='x'))
+        page = self.client.get(reverse('admin:index'))
+        self.assertContains(page, reverse('core:moderation_queue'))
+        self.assertContains(page, 'Qazaqnovel')
+        self.assertNotContains(page, 'Django administration')
+
+
+class ActsAndCountersStayReadOnly(TestCase):
+    """Что пересчитывается по строкам или объявляет чужое решение, руками
+    не правится: ревизия главы, статус тега, счётчики."""
+
+    def setUp(self):
+        self.client.force_login(
+            User.objects.create_superuser('moderator', password='x'))
+
+    def test_a_revision_cannot_be_edited_added_or_deleted(self):
+        chapter = Chapter.objects.exclude(published_revision=None).first()
+        page = self.client.get(
+            reverse('admin:core_chapter_change', args=[chapter.pk])
+        ).content.decode()
+        for name in ('chapterrevision_set-0-body', 'chapterrevision_set-0-state',
+                     'chapterrevision_set-0-DELETE',
+                     'chapterreaction_set-0-count'):
+            with self.subTest(field=name):
+                self.assertNotIn(f'name="{name}"', page)
+        self.assertIn(chapter.published_revision.body[:20], page)
+
+    def test_a_tag_status_is_not_a_form_field(self):
+        """Отказ — только действием с причиной: оно снимает тег с работ и
+        пишет авторам."""
+        tag = factories.tag(status='pending')
+        page = self.client.get(
+            reverse('admin:core_tag_change', args=[tag.pk])).content.decode()
+        self.assertNotIn('name="status"', page)
+
+    def test_story_counters_are_not_form_fields(self):
+        story = Story.objects.first()
+        page = self.client.get(
+            reverse('admin:core_story_change', args=[story.pk])).content.decode()
+        for name in ('views', 'recent_views', 'likes', 'comments'):
+            with self.subTest(field=name):
+                self.assertNotIn(f'name="{name}"', page)
+
+
+class AccountRecoveryRebindsTelegram(TestCase):
+    """Процедура возврата аккаунта из правил — привязать к нему новый
+    Telegram. Кода у неё нет, кроме этого поля."""
+
+    def setUp(self):
+        self.client.force_login(
+            User.objects.create_superuser('moderator', password='x'))
+
+    def _post(self, user, telegram_id):
+        return self.client.post(
+            reverse('admin:core_user_change', args=[user.pk]), {
+                'username': user.username, 'pen_name': user.pen_name,
+                'bio': user.bio, 'email': user.email,
+                'telegram_id': telegram_id,
+                'telegram_push': 'on', 'push_moderation': 'on',
+                'push_response': 'on', 'push_new_chapter': 'on',
+                'is_active': 'on',
+                'last_login_0': '', 'last_login_1': '',
+                'date_joined_0': '2026-01-01', 'date_joined_1': '00:00:00',
+            })
+
+    def test_a_new_telegram_is_bound_and_a_taken_one_is_refused(self):
+        user = factories.user(telegram_id=factories.next_telegram_id())
+        other = factories.user(telegram_id=factories.next_telegram_id())
+
+        response = self._post(user, 424242424)
+        self.assertEqual(response.status_code, 302, response.content[:2000])
+        user.refresh_from_db()
+        self.assertEqual(user.telegram_id, 424242424)
+
+        response = self._post(user, other.telegram_id)
+        self.assertEqual(response.status_code, 200)
+        user.refresh_from_db()
+        self.assertEqual(user.telegram_id, 424242424)
+
+
+class AGrantStaysInsideItsContest(TestCase):
+    """Номинация — того же конкурса, работа — из принятых заявок."""
+
+    def setUp(self):
+        self.grant = AwardGrant.objects.select_related(
+            'contest', 'award', 'story').first()
+
+    def _copy(self, **changes):
+        fields = {'contest': self.grant.contest, 'award': self.grant.award,
+                  'story': self.grant.story}
+        fields.update(changes)
+        return AwardGrant(**fields)
+
+    def test_the_existing_grant_is_valid(self):
+        self.grant.full_clean()
+
+    def test_an_award_of_another_contest_is_refused(self):
+        foreign = ContestAward.objects.exclude(
+            contest=self.grant.contest).first()
+        with self.assertRaises(ValidationError) as caught:
+            self._copy(award=foreign).clean()
+        self.assertIn('award', caught.exception.message_dict)
+
+    def test_a_story_without_an_accepted_submission_is_refused(self):
+        outsider = Story.objects.exclude(
+            submissions__contest=self.grant.contest,
+            submissions__status='accepted').first()
+        with self.assertRaises(ValidationError) as caught:
+            self._copy(story=outsider).clean()
+        self.assertIn('story', caught.exception.message_dict)
+
+
+class IconsComeFromTheSprite(TestCase):
+    """Опечатка в иконке рисует пустой квадрат — поле выбирает из спрайта."""
+
+    def test_an_unknown_icon_is_refused_and_a_known_one_accepted(self):
+        Form = GenreAdmin(Genre, django_admin.site).get_form(None)
+        base = {'slug': 'test-genre', 'name': 'Сынақ', 'hue': 120,
+                'position': 99}
+        self.assertFalse(Form({**base, 'icon': 'no-such-icon'}).is_valid())
+        self.assertTrue(Form({**base, 'icon': 'feather'}).is_valid())
+        # У жанра иконка необязательна — пустой выбор остаётся.
+        self.assertTrue(Form({**base, 'icon': ''}).is_valid())
+
+
+def _staff_request():
+    """Запрос сотрудника для форм с автокомплитом: виджет спрашивает права."""
+    request = RequestFactory().get('/')
+    request.user = User.objects.create_superuser(
+        factories._uniq('staff'), password='x')
+    return request
+
+
+class TheAuthorsPathIsNotRepeatedHere(TestCase):
+    """Что делается в рабочем месте автора, в админке не повторяется
+    второй дверью, делающей половину."""
+
+    def setUp(self):
+        self.client.force_login(
+            User.objects.create_superuser('moderator', password='x'))
+
+    def test_deleting_a_chapter_here_does_what_the_author_would(self):
+        """Оставшиеся смыкаются, пікірлер главы становятся общими, статус
+        работы пересчитывается — как у `data.delete_chapter`."""
+        story = factories.story(chapters=2, status='OnProcess')
+        first = story.chapter_set.get(number=1)
+        note = factories.comment(story, chapter_number=1)
+        response = self.client.post(
+            reverse('admin:core_chapter_delete', args=[first.pk]),
+            {'post': 'yes'})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(list(story.chapter_set.values_list('number', flat=True)),
+                         [1])
+        note.refresh_from_db()
+        self.assertIsNone(note.chapter_number)
+
+    def test_a_chapter_is_not_added_or_moved_here(self):
+        chapter = Chapter.objects.first()
+        self.assertEqual(self.client.get(
+            reverse('admin:core_chapter_add')).status_code, 403)
+        page = self.client.get(
+            reverse('admin:core_chapter_change', args=[chapter.pk])
+        ).content.decode()
+        for name in ('story', 'number', 'position'):
+            with self.subTest(field=name):
+                self.assertNotIn(f'name="{name}"', page)
+
+    def test_a_submission_is_filed_by_its_author(self):
+        self.assertEqual(self.client.get(
+            reverse('admin:core_submission_add')).status_code, 403)
+        submission = factories.contest().submission_set.create(
+            author=(story := factories.story()).author, story=story,
+            submitted_on=timezone.localdate())
+        page = self.client.get(reverse(
+            'admin:core_submission_change', args=[submission.pk])).content.decode()
+        for name in ('contest', 'author', 'story', 'submitted_on'):
+            with self.subTest(field=name):
+                self.assertNotIn(f'name="{name}"', page)
+        self.assertIn('name="status"', page)
+
+    def test_the_audience_mark_is_the_authors(self):
+        story = Story.objects.first()
+        page = self.client.get(
+            reverse('admin:core_story_change', args=[story.pk])).content.decode()
+        self.assertNotIn('name="audience"', page)
+
+    def test_a_tag_is_rejected_not_deleted(self):
+        tag = factories.tag(status='pending')
+        self.assertEqual(self.client.get(
+            reverse('admin:core_tag_delete', args=[tag.pk])).status_code, 403)
+        page = self.client.get(
+            reverse('admin:core_tag_changelist')).content.decode()
+        self.assertNotIn('value="delete_selected"', page)
+
+    def test_a_rejected_tag_is_not_attached_to_a_story(self):
+        inline = StoryTagInline(Story, django_admin.site)
+        field = inline.formfield_for_foreignkey(
+            StoryTag._meta.get_field('tag'), _staff_request())
+        rejected = factories.tag(status='rejected')
+        self.assertFalse(field.queryset.filter(pk=rejected.pk).exists())
+
+
+class TheShowcaseShowsOnlyWhatOpens(TestCase):
+    """Подборка и книга недели ведут только к тому, что читатель откроет:
+    работа, ушедшая из публичного после того, как её поставили, с
+    витрины пропадает."""
+
+    def test_a_collection_drops_a_story_that_left_the_public(self):
+        collection = data.all_collections().first()
+        story = collection.stories[0]
+        Story.objects.filter(pk=story.pk).update(status='NeedsWork')
+        fresh = data.all_collections().get(pk=collection.pk)
+        self.assertNotIn(story.pk, [s.pk for s in fresh.stories])
+        self.assertNotIn(story.pk, [
+            s.pk for s in data.collection_by_slug(collection.slug).stories])
+
+    def test_a_collection_of_hidden_stories_is_empty(self):
+        collection = data.all_collections().first()
+        Story.objects.filter(collection_items__collection=collection).update(
+            status='NotPublished')
+        self.assertFalse(data.all_collections().filter(pk=collection.pk).exists())
+
+    def test_the_book_of_the_week_falls_back_to_a_public_pick(self):
+        draft = factories.story(status='NotPublished', published=False)
+        BookOfWeek.objects.create(story=draft, editorial_note='—', quote='—',
+                                  published_on=timezone.localdate()
+                                  + timezone.timedelta(days=1))
+        self.assertNotEqual(data.book_of_week().story, draft)
+
+    def test_the_admin_form_refuses_a_draft(self):
+        Form = BookOfWeekAdmin(BookOfWeek, django_admin.site).get_form(
+            _staff_request())
+        base = {'editorial_note': '—', 'quote': '—',
+                'published_on': timezone.localdate()}
+        draft = factories.story(status='NotPublished', published=False)
+        public = factories.story()
+        form = Form({**base, 'story': draft.pk})
+        self.assertFalse(form.is_valid())
+        self.assertIn('story', form.errors)
+        self.assertTrue(Form({**base, 'story': public.pk}).is_valid())
+
+
+class JournalsTellTheTruth(TestCase):
+
+    def test_an_outcome_is_shown_only_for_a_moderation_event(self):
+        column = NotificationAdmin(Notification, django_admin.site).outcome_label
+        self.assertEqual(column(Notification(kind='like', outcome='')), '')
+        self.assertEqual(column(Notification(kind='moderation', outcome='')),
+                         'Модерацияда')
+
+    def test_a_stage_cannot_end_before_it_starts(self):
+        stage = TimelineStage.objects.first()
+        stage.ends = stage.starts - timezone.timedelta(days=1)
+        with self.assertRaises(ValidationError) as caught:
+            stage.full_clean()
+        self.assertIn('ends', caught.exception.message_dict)
+
+    def test_contest_dates_are_refused_in_words(self):
+        contest = Contest.objects.first()
+        contest.closes_on = contest.opens_on - timezone.timedelta(days=1)
+        with self.assertRaises(ValidationError) as caught:
+            contest.full_clean()
+        self.assertIn('Қабылдау басталмай', str(caught.exception))
+
+
+class TagDecisionsLeaveATrace(TestCase):
+    """Действие списка Django не журналирует; решение по тегу — пишется."""
+
+    def test_accepting_and_rejecting_are_in_the_history(self):
+        moderator = User.objects.create_superuser('moderator', password='x')
+        self.client.force_login(moderator)
+        accepted = factories.tag(status='pending')
+        rejected = factories.tag(status='pending')
+        url = reverse('admin:core_tag_changelist')
+        self.client.post(url, {'action': 'accept',
+                               '_selected_action': [accepted.pk]})
+        self.client.post(url, {'action': 'reject', 'apply': '1',
+                               'reason': 'Жанрды сипаттамайды.',
+                               '_selected_action': [rejected.pk]})
+        trail = dict(LogEntry.objects.filter(user=moderator).values_list(
+            'object_id', 'change_message'))
+        self.assertEqual(trail[str(accepted.pk)], 'Қабылданды.')
+        self.assertEqual(trail[str(rejected.pk)],
+                         'Қабылданбады: Жанрды сипаттамайды.')

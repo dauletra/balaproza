@@ -1,0 +1,24 @@
+{% extends "admin/base.html" %}
+{% comment %}
+Шапка админки. Решение по работе, жалобе и задержанному пікір живёт в
+/moderation/, а не здесь, — поэтому дверь туда стоит на каждой странице
+инструмента, первой в ряду ссылок пользователя.
+{% endcomment %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title }}{% endblock %}
+
+{% block branding %}
+<div id="site-name"><a href="{% url 'admin:index' %}">{{ site_header }}</a></div>
+{% if user.is_anonymous %}
+  {% include "admin/color_theme_toggle.html" %}
+{% endif %}
+{% endblock %}
+
+{% block userlinks %}
+    {% if user.is_active and user.is_staff %}
+        <a href="{% url 'core:moderation_queue' %}">Модерация</a> /
+    {% endif %}
+    {{ block.super }}
+{% endblock %}
+
+{% block nav-global %}{% endblock %}

@@ -15,6 +15,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from ..counters import bump_reaction_count
+from ..domain.catalog import PUBLIC_STATUSES
 from ..domain.story import COMMENTS_PAGE, REACTIONS, RECENT_VIEWS_DAYS
 from ..managers import chapter_count_subquery
 from ..models import (
@@ -440,20 +441,33 @@ def all_collections():
     Прямая ссылка на пустую подборку при этом работает
     (`collection_by_slug`): редакция собирает её постепенно и смотрит на
     то, что уже набрала.
+
+    **Состав — только публичное**, и пустота считается по нему же.
+    Работа уходит из публичного и после того, как её поставили в
+    подборку, — снятием по жалобе, возвратом на доработку, — а карточка
+    с её обложкой вела бы на 404.
     """
     return Collection.objects.filter(
-        Exists(CollectionItem.objects.filter(collection=OuterRef('pk')))
+        Exists(_public_items().filter(collection=OuterRef('pk')))
     ).prefetch_related(
+        Prefetch('item_set', queryset=_public_items()),
         Prefetch('item_set__story',
                  queryset=Story.objects.select_related('primary_genre')))
+
+
+def _public_items():
+    """Строки подборок, чья работа видна читателю."""
+    return CollectionItem.objects.filter(story__status__in=PUBLIC_STATUSES)
 
 
 def collection_by_slug(slug: str):
     """Одна подборка — со всем, что рисует карточка работы. Без prefetch
     страница спрашивает автора, жанр, теги и объём на каждую работу
-    состава: семьдесят шесть запросов на десять карточек."""
+    состава: семьдесят шесть запросов на десять карточек. Состав — только
+    публичное, как и на витрине."""
     return (Collection.objects
-            .prefetch_related(Prefetch('item_set__story',
+            .prefetch_related(Prefetch('item_set', queryset=_public_items()),
+                              Prefetch('item_set__story',
                                        queryset=all_stories()))
             .filter(slug=slug).first())
 
@@ -464,9 +478,13 @@ def book_of_week():
     Последняя запись, а не флаг у произведения: неделя проходит, и выбор
     становится историей, а флаг пришлось бы снимать руками. Число частей
     едет той же строкой — блок главной рисуется дважды.
+
+    Последняя из **публичных**: выбор, чья работа с тех пор ушла из
+    публичного, главная не показывает — крупная карточка вела бы на 404, —
+    и блок держит предыдущий выбор.
     """
-    pick = (BookOfWeek.objects.select_related('story', 'story__author',
-                                              'story__primary_genre')
+    pick = (BookOfWeek.objects.filter(story__status__in=PUBLIC_STATUSES)
+            .select_related('story', 'story__author', 'story__primary_genre')
             .annotate(story_chapters=chapter_count_subquery('story', published_only=True))
             .order_by('-published_on').first())
     if pick is not None:
