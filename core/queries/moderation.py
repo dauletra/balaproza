@@ -16,13 +16,16 @@
 
 from datetime import datetime, time, timedelta
 
+from django.contrib.auth.models import Group, Permission
 from django.db import transaction
 from django.db.models import BooleanField, Count, ExpressionWrapper, Min, Q
 from django.utils import timezone
 
 from ..domain.moderation import (
+    MODERATOR_GROUP,
     QUEUE_SLOW_DAYS,
     REVIEW_PROMISE_HOURS,
+    moderator_codenames,
     paragraph_diff,
 )
 from ..domain.reports import REPORT_REASONS
@@ -472,3 +475,70 @@ def portal_day_ago(days: int = 7):
     """
     return PortalDay.objects.filter(
         day=timezone.localdate() - timedelta(days=days)).first()
+
+
+# ── Кто модерирует ───────────────────────────────────────────────────────
+
+def moderator_group():
+    """Группа «Модератор», приведённая к списку домена.
+
+    Приводится при каждом вызове, а не только при создании: список в коде
+    меняется, и группа, собранная прошлой версией, иначе держала бы права,
+    которых модератору больше не дают. Лишнее снимается, недостающее
+    добавляется — `set`, а не `add`.
+
+    Права берутся только у приложения портала: кодовое имя `view_user`
+    есть и у `auth`, если модель пользователя когда-нибудь окажется там.
+    """
+    codenames = moderator_codenames()
+    perms = list(Permission.objects.filter(
+        content_type__app_label='core', codename__in=codenames))
+    missing = codenames - {p.codename for p in perms}
+    if missing:
+        # Право, которого нет в базе, — опечатка в списке или модель,
+        # ушедшая из кода. Молча выдать группу без него значило бы
+        # объявить модератора, который не может того, что обещано.
+        raise LookupError(f'Нет таких прав: {sorted(missing)}')
+    group, _ = Group.objects.get_or_create(name=MODERATOR_GROUP)
+    group.permissions.set(perms)
+    return group
+
+
+def grant_moderator(user):
+    """Сделать человека модератором: сотрудник и участник группы.
+
+    Суперправ не даёт и пароля не заводит: модератор входит тем же
+    Telegram, что и все, — сессия одна на сайт и админку, и админка
+    пускает сотрудника по ней."""
+    with transaction.atomic():
+        group = moderator_group()
+        if not user.is_staff:
+            user.is_staff = True
+            user.save(update_fields=['is_staff'])
+        user.groups.add(group)
+    return user
+
+
+def revoke_moderator(user):
+    """Снять роль: из группы и из сотрудников.
+
+    Суперпользователя из сотрудников не выводит — у него права не от
+    группы, и снятие модерации не должно лишать админку того, кто ею
+    управляет. Метки «взял в работу» снимаются: бывший модератор держал
+    бы работу за собой, не имея доступа её решить."""
+    with transaction.atomic():
+        group = Group.objects.filter(name=MODERATOR_GROUP).first()
+        if group is not None:
+            user.groups.remove(group)
+        if user.is_staff and not user.is_superuser:
+            user.is_staff = False
+            user.save(update_fields=['is_staff'])
+        ModerationClaim.objects.filter(moderator=user).delete()
+    return user
+
+
+def moderators():
+    """Кто сейчас модерирует — сотрудники группы, по нику."""
+    return (User.objects.filter(is_staff=True,
+                                groups__name=MODERATOR_GROUP)
+            .order_by('username'))

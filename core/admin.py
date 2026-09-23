@@ -89,11 +89,16 @@ def _sprite_icons() -> tuple[str, ...]:
 
 class _IconChoiceForm(forms.ModelForm):
     """Поле `icon` — выбор из спрайта. `required` берётся у модели: у жанра
-    иконка необязательна, у подборки — обязательна."""
+    иконка необязательна, у подборки — обязательна.
+
+    У того, кто только смотрит, полей в форме нет вовсе — все они только
+    на чтение, — и подменять нечего."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        field = self.fields['icon']
+        field = self.fields.get('icon')
+        if field is None:
+            return
         choices = [(name, name) for name in _sprite_icons()]
         if not field.required:
             choices.insert(0, ('', '—'))
@@ -182,14 +187,14 @@ class TagAdmin(admin.ModelAdmin):
     свободно: автор введёт его ещё раз, и оно придёт на проверку заново.
     """
 
-    def has_delete_permission(self, request, obj=None):
-        return False
-
     list_display = ('name', 'slug', 'status', 'usage', 'created_at')
     list_filter = ('status',)
     search_fields = ('name', 'slug')
     readonly_fields = ('status',)
     actions = ('accept', 'reject')
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
     def get_queryset(self, request):
         # Число работ — аннотацией, а не `COUNT` на каждую строку списка.
@@ -212,14 +217,17 @@ class TagAdmin(admin.ModelAdmin):
         for tag in tags:
             self.log_change(request, tag, message)
 
-    @admin.action(description='Қабылдау (accepted)')
+    # Решение по тегу — правка: у того, кто только смотрит, действий нет.
+    @admin.action(description='Қабылдау (accepted)',
+                  permissions=('change',))
     def accept(self, request, queryset):
         tags = list(queryset)
         updated = data.accept_tags(tags)
         self._log(request, tags, 'Қабылданды.')
         self.message_user(request, f'{updated} тег қабылданды.')
 
-    @admin.action(description='Қабылдамау (rejected)')
+    @admin.action(description='Қабылдамау (rejected)',
+                  permissions=('change',))
     def reject(self, request, queryset):
         """Причина обязательна: «нельзя» без «почему»
         автор исправить не может."""

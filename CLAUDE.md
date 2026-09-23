@@ -7,8 +7,9 @@
 ## Текущий фокус
 
 **Код до запуска — [`PLAN-NEXT.md`](PLAN-NEXT.md)**, найденное обходом
-админки: пункт 1 (возврат на доработку, забывавшийся вместе с
-уведомлением) закрыт, пункт 2 ждёт решения о правах модератора. Остальное открытое делает человек и
+админки: пункты 1 (возврат на доработку, забывавшийся вместе с
+уведомлением) и 2 (роль модератора, `make_moderator`) закрыты, остались
+подписи статусов и карта сайта. Остальное открытое делает человек и
 делает один раз — список в [`LAUNCH.md`](LAUNCH.md): содержимое каталога, люди
 на модерации, домен с ролевой почтой, юрист, проверка восстановления,
 прод-бот, cron и потолок на прокси, плюс два решения о продукте
@@ -132,8 +133,9 @@ core/
 │                  Там же сверка папки со строками для prune_media
 ├── management/commands/  seed_demo + _corpus.py (демо-содержимое литералами),
 │                  пять суточных (snapshot_portal, recount_views,
-│                  recount_engagement, prune_old_rows, prune_media) и
-│                  push_notifications
+│                  recount_engagement, prune_old_rows, prune_media),
+│                  push_notifications и make_moderator (роль и группа
+│                  модератора по списку прав из domain/moderation)
 │                  (общее у команд — _base.QuietCommand)
 └── tests/         base.py (login_as), factories.py, runner.py
 templates/         base.html, components/, partials/, pages/ — всё в корневой

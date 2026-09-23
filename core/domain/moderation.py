@@ -104,3 +104,74 @@ REASON_TEMPLATES = (
     'Аннотация мәтінді сипаттамайды.',
     'Бөтен мәтін немесе дереккөзі көрсетілмеген үзінді бар.',
 )
+
+
+# ── Кто такой модератор ──────────────────────────────────────────────────
+#
+# Модератор — сотрудник (`is_staff`) в группе с этим именем. Раздел
+# `/moderation/` открыт любому сотруднику; группа отвечает за вторую
+# половину инструмента — админку, где без прав сотрудник видит пустую
+# страницу.
+#
+# Набор прав — здесь, списком, а не кликами в админке: собранный руками,
+# он был бы разным на каждой машине, и ответить на «что может модератор»
+# можно было бы только открыв группу. Команда `make_moderator` приводит
+# группу к этому списку при каждом вызове — лишнее снимается, недостающее
+# добавляется.
+#
+# Три яруса, по решению 2026-09-23:
+#
+# - **ведёт** — теги и блок-лист, пікірлер (прочитать и удалить), заявки и
+#   присуждения, подборки и книга недели, карточки работ;
+# - **смотрит** — люди, журналы, конкурсы, опросы, справочники: заявку и
+#   присуждение без конкурса не прочитать, но собирает конкурс редакция;
+# - **не может** — удалять людей и работы, раздавать права, править
+#   справочник жанров.
+#
+# Права инлайнов считаются отдельно: состав подборки, теги работы и главы
+# в её карточке — свои модели, и без их прав инлайн молча пропадает.
+MODERATOR_GROUP = "Модератор"
+
+_VIEW = ("view",)
+_EDIT = ("view", "change")
+_FULL = ("view", "add", "change", "delete")
+
+MODERATOR_PERMISSIONS = {
+    # Ведёт.
+    "tag":               _EDIT,          # принять и отклонить — действием
+    "storytag":          _FULL,          # теги в карточке работы
+    "blockedtagpattern": _FULL,
+    "storycomment":      ("view", "delete"),
+    "submission":        _EDIT,          # решение по заявке
+    "awardgrant":        _FULL,
+    "collection":        _FULL,
+    "collectionitem":    _FULL,
+    "bookofweek":        _FULL,
+    "story":             _EDIT,
+    "chapter":           _EDIT,          # рабочая копия, без удаления
+    "moderationclaim":   ("view", "delete"),   # снять забытую метку
+    # Смотрит.
+    "user":               _VIEW,
+    "moderationdecision": _VIEW,
+    "notification":       _VIEW,
+    "report":             _VIEW,
+    "portalday":          _VIEW,
+    "chapterrevision":    _VIEW,
+    "chapterreaction":    _VIEW,
+    "contest":            _VIEW,
+    "contestcondition":   _VIEW,
+    "timelinestage":      _VIEW,
+    "jurymember":         _VIEW,
+    "contestaward":       _VIEW,
+    "chapterpoll":        _VIEW,
+    "polloption":         _VIEW,
+    "genre":              _VIEW,
+    "schoollink":         _VIEW,
+}
+
+
+def moderator_codenames() -> set[str]:
+    """Кодовые имена прав группы: `change_tag`, `view_story` и так далее."""
+    return {f"{action}_{model}"
+            for model, actions in MODERATOR_PERMISSIONS.items()
+            for action in actions}
