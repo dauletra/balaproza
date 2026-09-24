@@ -4,7 +4,10 @@
 
 Установка на своей машине и ежедневная работа — в
 [`../README.md`](../README.md). Что осталось сделать человеком до
-открытия адреса — в [`../LAUNCH.md`](../LAUNCH.md).
+открытия адреса — в [`../LAUNCH.md`](../LAUNCH.md). Готовые скрипты и
+конфиги под то, что описано ниже (systemd, nginx, cron, первичная
+настройка Ubuntu-сервера) — в [`vps-setup.md`](vps-setup.md) и
+[`../ops/`](../ops/).
 
 ## Окружение
 
@@ -135,6 +138,9 @@ location /     { limit_req zone=qn_all burst=60 nodelay; }
 
 ## Процедура
 
+Одной командой — `ops/deploy.sh` (разбор шагов и что делать при сбое —
+`vps-setup.md`, «Деплой обновлений»). Руками — то же самое по шагам:
+
 ```bash
 git pull && uv sync --no-dev --group prod && npm ci && npm run build
 ```
@@ -153,7 +159,8 @@ uv run python manage.py check --deploy
 
 ## По расписанию
 
-Раз в минуту:
+Готовый crontab для всего, что ниже, — [`../ops/crontab`](../ops/crontab);
+устанавливает его `ops/provision.sh`. Раз в минуту:
 
 ```bash
 uv run python manage.py push_notifications

@@ -1,0 +1,19 @@
+# Ставится ops/provision.sh: `crontab -u qazaqnovel` (__APP_DIR__
+# подставляется скриптом). Команды и объяснение, зачем каждая, —
+# docs/deploy.md, раздел «По расписанию».
+#
+# `.env` читает сам Django (python-dotenv в config/settings.py) — эти
+# строки просто запускают manage.py, переменные подставлять не нужно.
+# Исключение — последняя строка: backup.sh не Django, и DATABASE_URL с
+# TELEGRAM_BOT_TOKEN ему нужно передать явно.
+
+* * * * * cd __APP_DIR__ && .venv/bin/python manage.py push_notifications >> /var/log/qazaqnovel/push_notifications.log 2>&1
+
+15 3 * * * cd __APP_DIR__ && .venv/bin/python manage.py snapshot_portal >> /var/log/qazaqnovel/daily.log 2>&1
+20 3 * * * cd __APP_DIR__ && .venv/bin/python manage.py recount_views >> /var/log/qazaqnovel/daily.log 2>&1
+25 3 * * * cd __APP_DIR__ && .venv/bin/python manage.py recount_engagement >> /var/log/qazaqnovel/daily.log 2>&1
+30 3 * * * cd __APP_DIR__ && .venv/bin/python manage.py prune_old_rows >> /var/log/qazaqnovel/daily.log 2>&1
+35 3 * * * cd __APP_DIR__ && .venv/bin/python manage.py prune_media --apply >> /var/log/qazaqnovel/daily.log 2>&1
+40 3 * * * cd __APP_DIR__ && .venv/bin/python manage.py clearsessions >> /var/log/qazaqnovel/daily.log 2>&1
+
+10 4 * * * bash -lc 'set -a; source __APP_DIR__/.env; set +a; BACKUP_DIR=/backups __APP_DIR__/ops/backup.sh' >> /var/log/qazaqnovel/backup.log 2>&1

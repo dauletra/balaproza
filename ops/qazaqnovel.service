@@ -1,0 +1,25 @@
+[Unit]
+Description=Qazaqnovel — Django/gunicorn
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=qazaqnovel
+Group=qazaqnovel
+WorkingDirectory=/srv/qazaqnovel
+
+# EnvironmentFile здесь нет намеренно: `.env` читает сам Django через
+# python-dotenv (config/settings.py) при импорте настроек, до systemd дело
+# не доходит вовсе.
+RuntimeDirectory=qazaqnovel
+RuntimeDirectoryMode=0750
+ExecStart=/srv/qazaqnovel/.venv/bin/gunicorn config.wsgi:application \
+    --workers 3 \
+    --bind unix:/run/qazaqnovel/gunicorn.sock \
+    --access-logfile - --error-logfile -
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
